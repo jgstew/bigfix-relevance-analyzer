@@ -261,7 +261,14 @@ EXPECTED: dict[str, Expected] = {
 
 def corpus_files() -> list[Path]:
     return sorted(
-        path for path in EXAMPLES.rglob("*") if path.is_file() and path.name != "README.md"
+        path
+        for path in EXAMPLES.rglob("*")
+        if path.is_file()
+        and path.name != "README.md"
+        # Raw inspector-name dumps for the analyzer's property tables, not
+        # documents with embedded relevance to extract - see
+        # relevance_properties/README.md.
+        and "relevance_properties" not in path.relative_to(EXAMPLES).parts
     )
 
 
