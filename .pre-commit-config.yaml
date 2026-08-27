@@ -66,17 +66,6 @@ repos:
         files: ^src/
         additional_dependencies: []
 
-  # A second, differently-implemented type checker (same config the editor
-  # uses via pyrightconfig.json) as a cross-check on mypy - not a
-  # replacement. Deferred to pre-push/CI rather than every commit: it's
-  # mostly confirmatory of what mypy --strict already caught, and not worth
-  # slowing down every commit for.
-  - repo: https://github.com/RobertCraigie/pyright-python
-    rev: 392b6ba8e54be6d603e02e9f8d601d27b7a48d12 # v1.1.411
-    hooks:
-      - id: pyright
-        stages: [pre-push, manual]
-
   # Security-focused AST linter for common Python mistakes (hardcoded
   # passwords, shell=True, insecure deserialization, etc.). -lll restricts
   # output to high-severity findings only, so it stays quiet on the low/medium
@@ -239,6 +228,22 @@ repos:
         always_run: true
         stages: [pre-push, manual]
         entry: uv run --frozen pytest
+      # A second, differently-implemented type checker (same config the editor
+      # uses via pyrightconfig.json) as a cross-check on mypy - not a
+      # replacement. Deferred to pre-push/CI rather than every commit: it's
+      # mostly confirmatory of what mypy --strict already caught, and not worth
+      # slowing down every commit for. Run via `uv run` (like the hooks above)
+      # rather than the RobertCraigie/pyright-python repo hook so it checks
+      # against the project's real, uv-managed .venv - which pyrightconfig.json
+      # points at - instead of a separately-managed, dependency-less
+      # pre-commit environment that can't resolve lxml/pytest.
+      - id: pyright
+        name: pyright (see config in pyrightconfig.json)
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push, manual]
+        entry: uv run --frozen pyright
 
   - repo: meta
     hooks:
