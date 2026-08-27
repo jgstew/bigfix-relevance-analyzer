@@ -36,6 +36,44 @@ Never write plain "relevance" in code, docs, or file/variable names when a
 specific one is meant - say **client relevance** or **session relevance**.
 "Relevance" alone is reserved for statements that are genuinely true of both.
 
+### ClientUI dashboards: the exception to "HTML means session relevance"
+
+Relevance embedded in HTML, or evaluated from JavaScript, is *almost* always
+session relevance - but **ClientUI dashboards are client relevance**. A
+ClientUI is an HTML file in the client's `__UISupport` folder (default
+`C:\Program Files (x86)\BigFix Enterprise\BES Client\__BESData\__UISupport`,
+or in relevance terms `(it & "\__UISupport") of pathnames of data folders of
+client`) that the BES Client renders **on the endpoint**. It uses the
+*identical* `<?Relevance ?>` substitution syntax as a console dashboard, so
+syntax alone cannot tell the two apart.
+
+What does tell them apart is the **mechanism**: a ClientUI cannot evaluate
+relevance from JavaScript at all - the only way to update its results is to
+reload the whole page. A console dashboard or web report can, via
+`Relevance(...)` / `EvaluateRelevance(...)`. So:
+
+| Signal | Dialect |
+| --- | --- |
+| static `<?Relevance ?>` in a `.html` file | **client** (ClientUI) |
+| static `<?Relevance ?>` in `.ojo` / `.besrpt` / `.beswrpt` / `.webreport` | session |
+| a JavaScript `Relevance(...)` / `EvaluateRelevance(...)` call, anywhere | session |
+
+Corroborating (but not required) ClientUI markers: a
+`<meta ... product="CustomDashboardClientUI"/>` tag, `cid:load?page=...`
+links, and `takeoffer:nnn` links. `clientui_dashboard_no_product_meta.html`
+deliberately has none of them.
+
+Note also that ClientUI client relevance freely uses `sites`,
+`relevant fixlets of sites`, and `relevant offer actions of sites` -
+inspectors that *look* session-only but are perfectly valid on a client. Any
+future attempt to type relevance from the inspectors it uses must not treat
+bare `sites` / `fixlets` / `offer actions` as session markers.
+
+The real deployed filenames are `_dashboard.html` (visible to the end user)
+and `_technician.html` (`CTRL-ALT-SHIFT-T` from the client UI); the copies
+here are renamed to match this folder's naming convention, which also proves
+that classification does not depend on the basename.
+
 This folder is organized by which dialect each example belongs to, plus a
 `mixed_context/` folder for the (real-world, common) case of a single BES
 file that uses both in different parts of itself.
@@ -50,6 +88,11 @@ client_relevance/
     baselines/           Baseline .bes files (top-level + per-component relevance)
     computer_groups/     Manual and automatic computer group .bes files
                           (SearchComponentRelevance)
+    clientui/            ClientUI dashboard .html files, rendered by the BES
+                          Client on the endpoint, with client relevance in
+                          <?Relevance ?> processing instructions - the one
+                          case where HTML relevance is *client* relevance
+                          (see the section above)
     plain_text/          Files whose entire contents is one client relevance
                           expression, no markup
     markdown_codeblocks/ Markdown files with client relevance in a fenced
@@ -111,6 +154,8 @@ and JS mechanism are otherwise untouched.
 | `client_relevance/baselines/baseline_relevance_with_components.bes` | `baselines/Docker - Stop & Delete all containers - Linux.bes` |
 | `client_relevance/computer_groups/computer_group_manual_relevance.bes` | `groups/Linux Docker Hosts.bes` |
 | `client_relevance/computer_groups/computer_group_automatic_relevance.bes` | `AutomaticComputerGroups/VM - AWS.bes` |
+| `client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html` | `clientui/information/_dashboard.html` |
+| `client_relevance/clientui/clientui_dashboard_no_product_meta.html` | `clientui/refresh/_dashboard.html` |
 | `session_relevance/dashboards/dashboard_session_relevance_html_table.ojo` | `dashboards/SessionRelevanceProperties.ojo` |
 | `session_relevance/dashboards/dashboard_session_relevance_chart.ojo` | `dashboards/ReportingPieCharts.ojo` |
 | `session_relevance/webreports/webreport_session_relevance_basic.besrpt` | `webreports/PC_Models_By_Domain.besrpt` |

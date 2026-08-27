@@ -1,10 +1,43 @@
 """bigfix-relevance-analyzer: work with BigFix Relevance generically (extract, analyze, etc.)."""
 
+import logging
 from importlib.metadata import PackageNotFoundError, version
+
+from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect
+from bigfix_relevance_analyzer.extract import (
+    HtmlContext,
+    RelevanceSite,
+    SiteKind,
+    extract_relevance_from_actionscript,
+    extract_relevance_from_bes_xml,
+    extract_relevance_from_file,
+    extract_relevance_from_html_text,
+    extract_relevance_from_markdown,
+    looks_like_clientui,
+)
 
 try:
     __version__ = version("bigfix-relevance-analyzer")
 except PackageNotFoundError:  # pragma: no cover - only hit for an uninstalled checkout
     __version__ = "0.0.0"
 
-__all__ = ["__version__"]
+# A library must not configure logging on its consumer's behalf. This handler
+# only keeps Python quiet when a consumer has configured nothing at all; what
+# gets emitted, and where, stays entirely theirs to decide. Nothing in this
+# package writes to stdout, so it is safe to import inside a stdio MCP server.
+logging.getLogger(__name__).addHandler(logging.NullHandler())
+
+__all__ = [
+    "Dialect",
+    "HtmlContext",
+    "RelevanceSite",
+    "SiteKind",
+    "__version__",
+    "classify_relevance_dialect",
+    "extract_relevance_from_actionscript",
+    "extract_relevance_from_bes_xml",
+    "extract_relevance_from_file",
+    "extract_relevance_from_html_text",
+    "extract_relevance_from_markdown",
+    "looks_like_clientui",
+]

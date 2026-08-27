@@ -23,6 +23,12 @@ classifiers = [
 keywords = ["bigfix", "relevance", "extract", "analyze"]
 dependencies = []
 
+[project.optional-dependencies]
+# Only for consumers that already parse BES XML with lxml and would rather hand
+# over their existing tree than have it parsed a second time. Extraction itself
+# uses the standard library, so the package never needs this.
+lxml = ["lxml"]
+
 [project.urls]
 Homepage = "https://github.com/JGStew/bigfix-relevance-analyzer"
 Repository = "https://github.com/JGStew/bigfix-relevance-analyzer"
@@ -31,9 +37,12 @@ Repository = "https://github.com/JGStew/bigfix-relevance-analyzer"
 dev = [
     "pytest>=8",
     "pytest-cov>=5",
+    # So the expat/lxml line-number parity test actually runs instead of skipping.
+    "lxml>=5",
     "ruff>=0.6",
     "mypy>=1.11",
     "pre-commit>=3.8",
+    "lxml-stubs>=0.5.1",
 ]
 
 [tool.hatch.build.targets.wheel]
