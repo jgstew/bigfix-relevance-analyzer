@@ -150,6 +150,46 @@ result = analyze_relevance_complexity(
 print(result.score, result.whose_clauses, result.max_of_chain)
 ```
 
+The score covers two different axes. **Readability** is the token-shaped part:
+length, nesting, `of` chains, `whose` filters. **Evaluation cost** is what the
+statement does to the client's eval loop, which does not follow from size -
+`exists descendants of folder "C:\"` is eight tokens and walks an entire disk on
+every evaluation cycle. `costly_inspectors` names the heavy families that were
+charged for, so a warning can point at them:
+
+```python
+result = analyze_relevance_complexity('exists descendants of folder "C:\\"')
+print(result.evaluation_cost, result.costly_inspectors)
+# 12.0 ('folder recursion',)
+```
+
+Those families are deliberately **not** weighted equally - hashing a file is a
+different order of expense from reading a few lines out of one - and neither is
+the same family across dialects, when the underlying inspector isn't either.
+
+Cost is also dialect-scoped, per rule rather than per table, and applying to
+both dialects does not mean costing the same in both. Session relevance cannot
+read a file at all, so `sha1 of <string>` is real work but nowhere near `sha1
+of <file>` on a client - the `hashing` rule charges each accordingly. `wmi`
+exists only on a Windows client and `results of <bes fixlet>` only on the
+server, so neither is charged against the other dialect at all. Pass the
+dialect - the extractor already knows it for every site - to get this scoping:
+
+```python
+for site in extract_relevance_from_file("MyFixlet.bes"):
+    result = analyze_relevance_complexity(site.text, site.dialect)
+```
+
+Without a dialect, nothing is excluded. The client-side families come from the
+candidate list in `jgstew/besapi`'s `examples/fixlet_add_mime_field.py`; every
+inspector name a rule matches on is checked against the QnA dumps by a test, and
+so is each rule's declared dialect, so the table stays grounded in what BigFix
+actually defines. Two things are not grounded that way and say so: the tiers are
+a judgement call rather than a benchmark, and the session-only rules are a seed
+rather than a survey - there is no curated equivalent of the besapi list for the
+server side yet. `WEIGHT_EVALUATION_COST` turns the whole axis off if a consumer
+only cares about readability.
+
 Counting runs over the token stream, never over raw text, so a comment
 mentioning `whose` or the word `and` inside a string literal cannot inflate the
 score. The metrics are heuristics and the weights are deliberately module-level
