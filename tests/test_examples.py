@@ -154,14 +154,20 @@ EXPECTED: dict[str, Expected] = {
     ),
     # ---------------- client relevance: plain text / markdown ----------------
     "client_relevance/plain_text/client_relevance_plain_text.rel": Expected(
-        sites=((PLAIN, UNCERTAIN, 1),),
+        sites=((PLAIN, CLIENT, 1),),
         text_prefixes=("windows of operating system AND",),
-        note=".rel carries no context signal; the future content classifier resolves it.",
+        note=(
+            ".rel carries no context signal; the content classifier types it from "
+            "`windows of operating system`."
+        ),
     ),
     "client_relevance/markdown_codeblocks/client_relevance_markdown_codeblock.md": Expected(
-        sites=((MD, UNCERTAIN, 6),),
+        sites=((MD, CLIENT, 6),),
         text_prefixes=("unique values of strings",),
-        note="A markdown fence carries no context signal, so UNCERTAIN despite the folder.",
+        note=(
+            "A markdown fence carries no context signal; the content classifier types it "
+            "from `iokit registries`."
+        ),
     ),
     # ---------------- session relevance: dashboards ----------------
     "session_relevance/dashboards/dashboard_session_relevance_html_table.ojo": Expected(
@@ -247,8 +253,12 @@ EXPECTED: dict[str, Expected] = {
         text_prefixes=("(id of site of it",),
     ),
     "session_relevance/markdown_codeblocks/session_relevance_markdown_codeblock.md": Expected(
-        sites=((MD, UNCERTAIN, 8),),
-        note="A markdown fence carries no context signal, so UNCERTAIN despite the folder.",
+        sites=((MD, UNCERTAIN, 11),),
+        note=(
+            "A markdown fence carries no context signal, and content cannot help: the only "
+            "inspector here is `types`, which every client platform also has. Keeping this "
+            "UNCERTAIN is the regression test for that trap."
+        ),
     ),
     # ---------------- mixed context ----------------
     "mixed_context/task_with_client_and_session_relevance.bes": Expected(

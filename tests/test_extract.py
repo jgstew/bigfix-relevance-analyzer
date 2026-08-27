@@ -9,7 +9,7 @@ import sys
 
 import pytest
 
-from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect
+from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.extract import (
     HtmlContext,
     RelevanceSite,
@@ -468,7 +468,9 @@ def test_markdown_extracts_fenced_code_blocks() -> None:
     sites = extract_relevance_from_markdown(text)
     assert kinds_lines(sites) == [("markdown-codeblock", 6)]
     assert texts(sites) == ["windows of operating system"]
-    assert sites[0].dialect is Dialect.UNCERTAIN
+    # A fence carries no context signal, so the content classifier settles it.
+    assert sites[0].context_dialect is Dialect.UNCERTAIN
+    assert sites[0].dialect is Dialect.CLIENT
 
 
 def test_markdown_ignores_inline_code_spans() -> None:
@@ -501,13 +503,14 @@ def test_file_dispatch_bes_xml_suffix_chain(tmp_path: object) -> None:
 
 
 @pytest.mark.parametrize(
-    ("suffix", "expected"),
+    ("suffix", "context_dialect"),
     [
         (".bsr", Dialect.SESSION),
+        # `.rel` says nothing about dialect; here the content does.
         (".rel", Dialect.UNCERTAIN),
     ],
 )
-def test_file_dispatch_plain_text(tmp_path: object, suffix: str, expected: Dialect) -> None:
+def test_file_dispatch_plain_text(tmp_path: object, suffix: str, context_dialect: Dialect) -> None:
     from pathlib import Path
 
     assert isinstance(tmp_path, Path)
@@ -516,7 +519,9 @@ def test_file_dispatch_plain_text(tmp_path: object, suffix: str, expected: Diale
     sites = extract_relevance_from_file(path)
     assert kinds_lines(sites) == [("plain-text", 1)]
     assert texts(sites) == ["number of bes computers"]
-    assert sites[0].dialect is expected
+    assert sites[0].context_dialect is context_dialect
+    assert sites[0].dialect is Dialect.SESSION
+    assert not sites[0].dialect_conflict
 
 
 def test_file_dispatch_plain_text_blank_file_yields_nothing(tmp_path: object) -> None:
@@ -562,22 +567,79 @@ def test_file_dispatch_unknown_extension_yields_nothing(
 
 
 # --------------------------------------------------------------------------
-# The content-classifier seam (interface now, implementation later)
+# Dialect provenance: what context said, what content said, and disagreement
 # --------------------------------------------------------------------------
 
+# `tests/test_dialect.py` covers the classifier itself; these cover how the
+# extractor records and reconciles its two sources of evidence.
 
-@pytest.mark.parametrize(
-    "text",
-    [
-        "number of bes computers",
-        "windows of operating system",
-        "number of relevant fixlets of sites",
-        "",
-    ],
-)
-def test_classify_relevance_dialect_is_unknown_for_now(text: str) -> None:
-    """Inspector/grammar-based typing is future work; today it has no opinion."""
-    assert classify_relevance_dialect(text) is None
+CONFLICTING_FIXLET_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<BES><Fixlet><Title>Wrong dialect</Title>
+<Relevance>number of bes computers &gt; 0</Relevance>
+</Fixlet></BES>
+"""
+
+
+def test_definite_context_records_a_matching_content_opinion() -> None:
+    sites = extract_relevance_from_bes_xml(FIXLET_XML)
+    relevance = next(site for site in sites if site.kind == "relevance")
+    assert relevance.context_dialect is Dialect.CLIENT
+    assert relevance.content_dialect is Dialect.CLIENT
+    assert relevance.dialect is Dialect.CLIENT
+    assert not relevance.dialect_conflict
+
+
+def test_content_with_no_opinion_leaves_definite_context_alone() -> None:
+    sites = extract_relevance_from_actionscript("appendfile {name of it}")
+    assert sites[0].context_dialect is Dialect.CLIENT
+    assert sites[0].content_dialect is None
+    assert sites[0].dialect is Dialect.CLIENT
+    assert not sites[0].dialect_conflict
+
+
+def test_session_relevance_in_a_fixlet_is_reported_as_a_conflict() -> None:
+    """Context still wins the verdict, but the disagreement is on the record."""
+    sites = extract_relevance_from_bes_xml(CONFLICTING_FIXLET_XML)
+    relevance = next(site for site in sites if site.kind == "relevance")
+    assert relevance.context_dialect is Dialect.CLIENT
+    assert relevance.content_dialect is Dialect.SESSION
+    assert relevance.dialect is Dialect.CLIENT
+    assert relevance.dialect_conflict
+
+
+def test_a_conflict_is_logged_as_a_warning(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING, logger="bigfix_relevance_analyzer"):
+        extract_relevance_from_bes_xml(CONFLICTING_FIXLET_XML)
+    assert "dialect conflict" in caplog.text
+    assert "BES/Fixlet/Relevance" in caplog.text
+
+
+def test_a_conflict_warning_reports_the_files_own_line_numbers() -> None:
+    """ActionScript sites are offset into the file before anything is reported."""
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n<BES><Task>\n<ActionScript '
+        'MIMEType="application/x-fixlet-windows-shell">\nwaithidden cmd /c echo '
+        "{number of bes computers}\n</ActionScript>\n</Task></BES>\n"
+    )
+    sites = extract_relevance_from_bes_xml(xml)
+    assert kinds_lines(sites) == [("actionscript-substitution", 4)]
+    assert sites[0].dialect_conflict
+
+
+def test_uncertain_context_filled_in_by_content_is_not_a_conflict() -> None:
+    sites = extract_relevance_from_markdown("```\nnumber of bes computers\n```\n")
+    assert sites[0].context_dialect is Dialect.UNCERTAIN
+    assert sites[0].content_dialect is Dialect.SESSION
+    assert sites[0].dialect is Dialect.SESSION
+    assert not sites[0].dialect_conflict
+
+
+def test_uncertain_context_and_no_content_opinion_stays_uncertain() -> None:
+    sites = extract_relevance_from_markdown("```\nnames of types\n```\n")
+    assert sites[0].context_dialect is Dialect.UNCERTAIN
+    assert sites[0].content_dialect is None
+    assert sites[0].dialect is Dialect.UNCERTAIN
+    assert not sites[0].dialect_conflict
 
 
 def test_classifier_opinion_fills_in_an_uncertain_site(monkeypatch: pytest.MonkeyPatch) -> None:

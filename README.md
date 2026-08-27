@@ -62,7 +62,8 @@ for site in extract_relevance_from_file("MyFixlet.bes"):
 ```
 
 Each result is a frozen `RelevanceSite` with `kind`, `text`, `line` (1-based,
-in the file), `context` (a short label for messages) and `dialect`.
+in the file), `context` (a short label for messages), and the dialect fields
+described under [Which dialect a statement is in](#which-dialect-a-statement-is-in).
 
 | File type | What is extracted |
 | --- | --- |
@@ -79,20 +80,37 @@ already have it in hand.
 
 ### Which dialect a statement is in
 
-`Dialect` is `CLIENT`, `SESSION`, `UNCERTAIN` or `BOTH`. It is currently decided
-entirely by **context** - which element, of which kind of file, a statement was
-found in. Typing relevance from the inspectors it uses is future work behind
-`classify_relevance_dialect`, which has no opinion yet (it returns `None`); when
-it grows one, it will only fill in sites that context left `UNCERTAIN`.
+`Dialect` is `CLIENT`, `SESSION`, `UNCERTAIN` or `BOTH`. Two independent
+opinions decide it, and every `RelevanceSite` keeps both rather than collapsing
+them:
 
-One case is worth knowing about: relevance in HTML or JavaScript is almost
-always session relevance, but **ClientUI dashboards** are HTML rendered by the
-BES Client on the endpoint and hold *client* relevance, using the identical
-`<?Relevance ?>` syntax. What separates them is the mechanism - a ClientUI
-cannot evaluate relevance from JavaScript at all. So a static substitution in a
-`.html` file is read as client relevance, a JavaScript relevance call is always
-session relevance, and a file doing both is reported as `UNCERTAIN` rather than
-guessed at.
+| Field | Meaning |
+| --- | --- |
+| `context_dialect` | What the mechanism said: which element, of which kind of file. `UNCERTAIN` when the mechanism settles nothing. |
+| `content_dialect` | What `classify_relevance_dialect` made of the inspectors used in the statement. `None` means it had no opinion. |
+| `dialect` | The resolved verdict: definite context wins, otherwise content, otherwise `UNCERTAIN`. |
+| `dialect_conflict` | True when context and content each reached a definite, *different* dialect. |
+
+Definite context wins because it is a fact about which engine will evaluate the
+statement, not an inference. Content fills in the gaps, and a conflict between
+the two is surfaced rather than resolved away - session inspectors in a fixlet's
+`<Relevance>` is relevance in the wrong place, and it fails on every endpoint
+that evaluates it. Conflicts are logged at `WARNING`.
+
+The classifier only ever uses *positive* evidence: an inspector it does not
+recognize contributes nothing. New BigFix versions add inspectors to both
+dialects, so an unfamiliar name is never grounds for typing a statement by
+elimination or for calling it invalid.
+
+One context case is worth knowing about: relevance in HTML or JavaScript is
+almost always session relevance, but **ClientUI dashboards** are HTML rendered
+by the BES Client on the endpoint and hold *client* relevance, using the
+identical `<?Relevance ?>` syntax. What separates them is the mechanism - a
+ClientUI cannot evaluate relevance from JavaScript at all. So a static
+substitution in a `.html` file is read as client relevance, a JavaScript
+relevance call is always session relevance, and in a file doing both the
+mechanism settles nothing for its substitutions, leaving their dialect to the
+content classifier.
 
 ### Optional lxml adapter
 

@@ -4,12 +4,21 @@ Extracts every relevance statement from BES XML documents, console dashboards
 and web reports, ClientUI dashboards, plain-relevance files, and markdown code
 blocks, recording where each one came from and which dialect it is written in.
 
-Dialect comes from **context** -- which element, of which kind of file, a
-statement was found in -- not from the relevance itself. Guessing a dialect
-from the inspectors a statement uses is a separate seam,
-:func:`~bigfix_relevance_analyzer.dialect.classify_relevance_dialect`, which
-has no opinion yet; when it grows one it fills in only sites that context left
-:attr:`~bigfix_relevance_analyzer.dialect.Dialect.UNCERTAIN`.
+Two independent opinions decide a statement's dialect, and every
+:class:`RelevanceSite` keeps both:
+
+* **Context** -- which element, of which kind of file, a statement was found
+  in. Definite context wins, because it says which engine will actually
+  evaluate the statement.
+* **Content** --
+  :func:`~bigfix_relevance_analyzer.dialect.classify_relevance_dialect` reading
+  the inspectors the statement uses. It fills in the dialect wherever context
+  was :attr:`~bigfix_relevance_analyzer.dialect.Dialect.UNCERTAIN` (a plain
+  ``.rel`` file, a markdown code block, a ClientUI document that also evaluates
+  relevance from JavaScript), and it may itself have no opinion.
+
+Where the two disagree, :attr:`RelevanceSite.dialect_conflict` is true and a
+warning is logged: relevance in the wrong place fails at evaluation time.
 
 XML is parsed with the standard library's expat by default, so the package has
 no dependencies outside the standard library. Projects that already parse BES
@@ -29,7 +38,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect
+from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect, is_definite
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from lxml import etree
@@ -78,7 +87,45 @@ class RelevanceSite:
     """Short label naming where this came from, for use in messages."""
 
     dialect: Dialect
-    """Which relevance dialect the statement is written in."""
+    """Which relevance dialect the statement is written in.
+
+    The resolved verdict: :attr:`context_dialect` when context was definite,
+    otherwise :attr:`content_dialect`, otherwise
+    :attr:`~bigfix_relevance_analyzer.dialect.Dialect.UNCERTAIN`.
+    """
+
+    context_dialect: Dialect = Dialect.UNCERTAIN
+    """What the extraction context alone said, before content was consulted.
+
+    :attr:`~bigfix_relevance_analyzer.dialect.Dialect.UNCERTAIN` means the
+    mechanism this was found in does not settle the dialect -- a plain
+    ``.rel`` file, a markdown code block, or a ClientUI document that also
+    evaluates relevance from JavaScript.
+    """
+
+    content_dialect: Dialect | None = None
+    """What the content classifier made of the statement itself.
+
+    ``None`` means it had no opinion: nothing in the statement is specific to
+    either dialect. See
+    :func:`~bigfix_relevance_analyzer.dialect.classify_relevance_dialect`.
+    """
+
+    @property
+    def dialect_conflict(self) -> bool:
+        """Whether context and content each reached a definite, *different* dialect.
+
+        Worth surfacing: it usually means the statement is in the wrong place --
+        session inspectors in a fixlet's ``<Relevance>``, say, which every
+        endpoint will fail to evaluate. :attr:`dialect` still reports what
+        context said, since which engine evaluates the statement is a fact about
+        where it was found, not about what it says.
+        """
+        return (
+            is_definite(self.context_dialect)
+            and is_definite(self.content_dialect)
+            and self.context_dialect is not self.content_dialect
+        )
 
 
 class HtmlContext(enum.Enum):
@@ -93,6 +140,51 @@ class HtmlContext(enum.Enum):
 
     CLIENTUI = "clientui"
     """ClientUI dashboard, rendered by the BES Client: substitutions are client relevance."""
+
+
+def _make_site(
+    *,
+    kind: SiteKind,
+    text: str,
+    line: int,
+    context: str,
+    context_dialect: Dialect,
+) -> RelevanceSite:
+    """Build a site, settling its dialect and keeping both opinions on record.
+
+    Every site is built here, so the classifier is consulted even when context
+    already settled the dialect. That costs two regex scans per site and buys
+    conflict detection: a statement whose content reads as the *other* dialect
+    than its surroundings imply is usually in the wrong place, and gets a
+    warning. Context still wins the resolved :attr:`RelevanceSite.dialect` --
+    which engine will evaluate a statement is a fact about where it was found.
+    """
+    content_dialect = classify_relevance_dialect(text)
+    if is_definite(context_dialect):
+        dialect = context_dialect
+        if is_definite(content_dialect) and content_dialect is not context_dialect:
+            logger.warning(
+                "dialect conflict in %s at line %d: found in %s relevance but reads as %s "
+                "relevance: %s",
+                context,
+                line,
+                context_dialect.value,
+                content_dialect.value,
+                text,
+            )
+    elif content_dialect is not None:
+        dialect = content_dialect
+    else:
+        dialect = Dialect.UNCERTAIN
+    return RelevanceSite(
+        kind=kind,
+        text=text,
+        line=line,
+        context=context,
+        dialect=dialect,
+        context_dialect=context_dialect,
+        content_dialect=content_dialect,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -188,20 +280,21 @@ def extract_relevance_from_actionscript(
     *,
     context: str = "ActionScript",
     dialect: Dialect = Dialect.CLIENT,
+    line_offset: int = 0,
 ) -> list[RelevanceSite]:
     """Extract the `{...}` relevance substitutions from an ActionScript body.
 
-    Lines are 1-based within ``body``; a caller that knows where the body sits
-    in a file adds its own offset. ActionScript runs on the endpoint, so
-    substitutions in it are client relevance.
+    Lines are 1-based within ``body`` plus ``line_offset``, for a body embedded
+    in a larger file. ActionScript runs on the endpoint, so substitutions in it
+    are client relevance, which is what ``dialect`` says by default.
     """
     return [
-        RelevanceSite(
+        _make_site(
             kind="actionscript-substitution",
             text=text,
-            line=line,
+            line=line + line_offset,
             context=context,
-            dialect=dialect,
+            context_dialect=dialect,
         )
         for line, text in _iter_substitution_spans(body)
     ]
@@ -327,9 +420,9 @@ def extract_relevance_from_html_text(
     a ClientUI dashboard. JavaScript relevance calls are always session
     relevance -- a ClientUI cannot evaluate relevance from JavaScript, so such
     a call is itself proof the document is not one. When a document contains
-    both mechanisms the signals contradict each other, and substitutions are
-    reported as :attr:`Dialect.UNCERTAIN` rather than assumed to be client
-    relevance.
+    both mechanisms the signals contradict each other, so context settles
+    nothing for its substitutions and their dialect falls to the content
+    classifier, which may in turn have no opinion.
 
     ``line_offset`` is added to every line, for scanning a fragment embedded in
     a larger file.
@@ -356,22 +449,22 @@ def extract_relevance_from_html_text(
     js_label = label or "JavaScript relevance call"
 
     sites = [
-        RelevanceSite(
+        _make_site(
             kind="relevance-pi",
             text=body,
             line=line + line_offset,
             context=pi_label,
-            dialect=pi_dialect,
+            context_dialect=pi_dialect,
         )
         for line, body in pi_spans
     ]
     sites += [
-        RelevanceSite(
+        _make_site(
             kind="javascript-call",
             text=body,
             line=line + line_offset,
             context=js_label,
-            dialect=Dialect.SESSION,
+            context_dialect=Dialect.SESSION,
         )
         for line, body in js_spans
     ]
@@ -411,12 +504,12 @@ def extract_relevance_from_markdown(text: str) -> list[RelevanceSite]:
             body = "\n".join(block).strip()
             if body:
                 sites.append(
-                    RelevanceSite(
+                    _make_site(
                         kind="markdown-codeblock",
                         text=body,
                         line=block_start,
                         context="markdown code block",
-                        dialect=_resolve(Dialect.UNCERTAIN, body),
+                        context_dialect=Dialect.UNCERTAIN,
                     )
                 )
             fence = None
@@ -436,26 +529,14 @@ def _extract_plain_text(text: str, dialect: Dialect) -> list[RelevanceSite]:
     if not body:
         return []
     return [
-        RelevanceSite(
+        _make_site(
             kind="plain-text",
             text=body,
             line=_line_of(text, len(text) - len(text.lstrip())),
             context="whole file",
-            dialect=_resolve(dialect, body),
+            context_dialect=dialect,
         )
     ]
-
-
-def _resolve(from_context: Dialect, text: str) -> Dialect:
-    """Settle a site's dialect: definite context wins, else ask the classifier.
-
-    The classifier has no opinion today, so this currently always returns
-    ``from_context``. Wiring it here means implementing content-based typing
-    later needs no change to the extractors.
-    """
-    if from_context is not Dialect.UNCERTAIN:
-        return from_context
-    return classify_relevance_dialect(text) or Dialect.UNCERTAIN
 
 
 # ---------------------------------------------------------------------------
@@ -503,12 +584,12 @@ def _sites_for_element(element: _Element) -> list[RelevanceSite]:
         if not body:
             return []
         return [
-            RelevanceSite(
+            _make_site(
                 kind="relevance",
                 text=body,
                 line=element.line,
                 context=context,
-                dialect=Dialect.CLIENT,
+                context_dialect=Dialect.CLIENT,
             )
         ]
 
@@ -521,12 +602,12 @@ def _sites_for_element(element: _Element) -> list[RelevanceSite]:
         if not body:
             return []
         return [
-            RelevanceSite(
+            _make_site(
                 kind="success-criteria",
                 text=body,
                 line=element.line,
                 context=context,
-                dialect=Dialect.CLIENT,
+                context_dialect=Dialect.CLIENT,
             )
         ]
 
@@ -540,12 +621,12 @@ def _sites_for_element(element: _Element) -> list[RelevanceSite]:
             return []
         name = element.attrib.get("Name")
         return [
-            RelevanceSite(
+            _make_site(
                 kind="analysis-property",
                 text=body,
                 line=element.line,
                 context=f'{context}[Name="{name}"]' if name else context,
-                dialect=Dialect.CLIENT,
+                context_dialect=Dialect.CLIENT,
             )
         ]
 
@@ -556,10 +637,9 @@ def _sites_for_element(element: _Element) -> list[RelevanceSite]:
                 "skipping ActionScript with MIMEType %r at line %d", mimetype, element.line
             )
             return []
-        return [
-            replace(site, line=site.line + element.line - 1, context=context)
-            for site in extract_relevance_from_actionscript(text)
-        ]
+        return extract_relevance_from_actionscript(
+            text, context=context, line_offset=element.line - 1
+        )
 
     if tag == "Description":
         # A Description is HTML rendered by the console, so relevance in it --

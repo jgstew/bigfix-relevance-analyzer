@@ -3,7 +3,7 @@
 import logging
 from importlib.metadata import PackageNotFoundError, version
 
-from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect
+from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect, is_definite
 from bigfix_relevance_analyzer.extract import (
     HtmlContext,
     RelevanceSite,
@@ -39,5 +39,6 @@ __all__ = [
     "extract_relevance_from_file",
     "extract_relevance_from_html_text",
     "extract_relevance_from_markdown",
+    "is_definite",
     "looks_like_clientui",
 ]

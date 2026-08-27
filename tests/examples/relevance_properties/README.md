@@ -28,6 +28,10 @@ Session relevance:
 | File | Signatures | Context |
 | --- | --- | --- |
 | `session_relevance_web_reports.txt` | 1644 | A **Web Reports** session |
+| `session_relevance_console.txt` | 1644 | A **console** session |
+
+The two session dumps are byte-identical: the console and Web Reports expose the
+same inspector surface, so "session relevance" below means either.
 
 Counts are lines; the three Linux files each contain 3 duplicate lines
 (`device file <symlink>`, `fifo file <symlink>`, `socket file <symlink>`), kept
@@ -90,10 +94,11 @@ context probes (`in console context`, `in web reports context`,
 
 ## Still not exhaustive
 
-- **No session relevance from other contexts.** Only Web Reports is captured.
-  A console session, the Fixlet Debugger's QnA view, the WebUI, or the REST
-  API may each expose a different set. This is the largest remaining gap, and
-  it is on the side that dialect detection depends on.
+- **No session relevance from other contexts.** The console and Web Reports are
+  captured and agree exactly, but the Fixlet Debugger's QnA view, the WebUI, and
+  the REST API may each expose a different set. This is the largest remaining
+  gap, and it is on the side that dialect detection depends on: it is why the
+  classifier's client marker list is short and conservative.
 - **No AIX, Solaris, or HP-UX.** The Unix inspectors those add are unknown
   here, and by the macOS precedent above, an unsampled platform can move a
   signature out of the session-only set.
