@@ -1,0 +1,11 @@
+[codespell]
+# "thead"/"theads" are real BigFix session relevance inspectors (HTML table
+# head element / plural), not typos for "thread"/"threads". They show up in
+# tests/examples/session_relevance/**.
+ignore-words-list = thead,theads
+
+# tests/examples/ holds real-world BigFix content copied verbatim from
+# https://github.com/jgstew/bigfix-content for fidelity (see its README) -
+# including whatever typos already exist in that third-party content. Don't
+# flag those; fixing them here would misrepresent what was actually copied.
+skip = tests/examples

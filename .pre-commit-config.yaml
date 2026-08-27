@@ -32,6 +32,24 @@ repos:
     hooks:
       - id: fix-files-to-ascii
 
+  - repo: https://github.com/jgstew/pre-commit-bigfix
+    rev: v0.9.3
+    hooks:
+      - id: bes-schema-validate
+        stages: [pre-push]
+      - id: bes-actionscript-lint-schclass
+        stages: [pre-push]
+      - id: bes-actionscript-validate-script
+        stages: [pre-push]
+      - id: bes-actionscript-validate-prefetch
+        stages: [pre-push]
+        # args: [--auto-fix-network, "yes"]
+        args: [--disable, "E401"]
+      - id: bes-conventions-check
+        stages: [pre-push]
+        args: [--strict]
+        exclude: ^tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript\.bes$
+
   # ruff replaces black + flake8 + isort: `ruff-check` lints (and fixes),
   # `ruff-format` is the formatter. Config lives in pyproject.toml.
   - repo: https://github.com/astral-sh/ruff-pre-commit

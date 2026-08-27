@@ -1,0 +1,16 @@
+# Config for https://github.com/crate-ci/typos
+# Run locally: `uvx typos` (or `pre-commit run typos --all-files`)
+
+[default.extend-words]
+# "thead"/"theads" are real BigFix session relevance inspectors (HTML table
+# head element / plural), not typos for "thread"/"threads". They show up in
+# tests/examples/session_relevance/**.
+thead = "thead"
+theads = "theads"
+
+[files]
+# tests/examples/ holds real-world BigFix content copied verbatim from
+# https://github.com/jgstew/bigfix-content for fidelity (see its README) -
+# including whatever typos already exist in that third-party content. Don't
+# flag those; fixing them here would misrepresent what was actually copied.
+extend-exclude = ["tests/examples/**"]
