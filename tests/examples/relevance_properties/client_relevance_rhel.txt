@@ -1,0 +1,2088 @@
+restricted site: restricted site
+enabled of <restricted site>: boolean
+allowed sites of <restricted site>: site
+setting of <server based group>: setting
+member of <server based group>: boolean
+server based group <string> of <client>: server based group
+server based groups of <client>: server based group
+pem encoded certificate string of <string>: x509 certificate
+base64 der encoded certificate string of <string>: x509 certificate
+pem encoded certificate of <file>: x509 certificate
+plugin store <string>: plugin store
+key <string> of <plugin store>: plugin store key
+keys of <plugin store>: plugin store key
+name of <plugin store key>: string
+value of <plugin store key>: string
+encrypted of <plugin store key>: boolean
+effective date of <plugin store key>: time
+cloud provider: cloud provider
+name of <cloud provider>: string
+unique id of <cloud provider>: string
+version of <cloud provider>: string
+region of <cloud provider>: string
+private ip of <cloud provider>: string
+instance data of <cloud provider>: instance data
+json of <instance data>: json value
+path <string> of <instance data>: json value
+keys of <instance data>: json key
+hardware: hardware
+virtual of <hardware>: boolean
+serial of <hardware>: string
+proxied of <hardware>: boolean
+uuid of <hardware>: uuid
+virtual machine of <operating system>: boolean
+hypervisor of <operating system>: string
+uuid <string>: uuid
+uuid <binary_string>: uuid
+unique values of <uuid>: uuid with multiplicity
+multiplicity of <uuid with multiplicity>: integer
+minima of <uuid>: uuid
+maxima of <uuid>: uuid
+extremas of <uuid>: ( uuid, uuid )
+encoding <string>: encoding
+sockets of <network>: socket
+local address of <socket>: ipv4or6 address
+remote address of <socket>: ipv4or6 address
+process of <socket>: process
+local port of <socket>: integer
+remote port of <socket>: integer
+tcp of <socket>: boolean
+udp of <socket>: boolean
+tcp state of <socket>: tcp state
+closed of <tcp state>: boolean
+listening of <tcp state>: boolean
+syn sent of <tcp state>: boolean
+syn received of <tcp state>: boolean
+established of <tcp state>: boolean
+fin wait one of <tcp state>: boolean
+fin wait two of <tcp state>: boolean
+close wait of <tcp state>: boolean
+closing of <tcp state>: boolean
+last ack of <tcp state>: boolean
+time wait of <tcp state>: boolean
+delete tcb of <tcp state>: boolean
+xinetd services: Xinetd Service
+xinetd services <string>: Xinetd Service
+name of <Xinetd Service>: string
+id of <Xinetd Service>: string
+protocol of <Xinetd Service>: string
+flag of <Xinetd Service>: string
+no access of <Xinetd Service>: string
+only from of <Xinetd Service>: string
+port of <Xinetd Service>: integer
+server of <Xinetd Service>: string
+server arg of <Xinetd Service>: string
+socket type of <Xinetd Service>: string
+type of <Xinetd Service>: string
+user of <Xinetd Service>: string
+wait of <Xinetd Service>: boolean
+disabled of <Xinetd Service>: boolean
+selinux booleans: SELinux Boolean
+selinux booleans <string>: SELinux Boolean
+name of <SELinux Boolean>: string
+current status of <SELinux Boolean>: boolean
+pending status of <SELinux Boolean>: boolean
+xml document of <string>: xml dom document
+xml document of <file>: xml dom document
+node name of <xml dom node>: string
+node type of <xml dom node>: integer
+node value of <xml dom node>: string
+owner document of <xml dom node>: xml dom document
+parent node of <xml dom node>: xml dom node
+first child of <xml dom node>: xml dom node
+last child of <xml dom node>: xml dom node
+previous sibling of <xml dom node>: xml dom node
+next sibling of <xml dom node>: xml dom node
+child node <integer> of <xml dom node>: xml dom node
+child nodes of <xml dom node>: xml dom node
+attribute <integer> of <xml dom node>: xml dom node
+attribute <string> of <xml dom node>: xml dom node
+attributes of <xml dom node>: xml dom node
+xpaths <string> of <xml dom node>: xml dom node
+xpaths <( string, string )> of <xml dom node>: xml dom node
+main processor: processor
+processors: processor
+processor <integer>: processor
+index of <processor>: integer
+family of <processor>: integer
+model of <processor>: integer
+family name of <processor>: string
+stepping of <processor>: integer
+cpuid level of <processor>: integer
+fdiv bug of <processor>: boolean
+hlt bug of <processor>: boolean
+sep bug of <processor>: boolean
+f00f bug of <processor>: boolean
+coma bug of <processor>: boolean
+fpu of <processor>: boolean
+fpu exception of <processor>: boolean
+wp of <processor>: boolean
+speed of <processor>: hertz
+bogomips of <processor>: integer
+vendor name of <processor>: string
+model name of <processor>: string
+brand string of <processor>: string
+flag list of <processor>: string
+feature mask of <processor>: integer
+extended feature mask of <processor>: integer
+cpupackage: cpupackage
+count of <cpupackage>: integer
+core of <cpupackage>: integer
+thread of <cpupackage>: integer
+smt capable of <cpupackage>: boolean
+smt enabled of <cpupackage>: boolean
+unique values of <rpm package version record>: rpm package version record with multiplicity
+multiplicity of <rpm package version record with multiplicity>: integer
+minima of <rpm package version record>: rpm package version record
+maxima of <rpm package version record>: rpm package version record
+extremas of <rpm package version record>: ( rpm package version record, rpm package version record )
+rpm package version record <string>: rpm package version record
+rpm package version record <rpm package version record>: rpm package version record
+epoch of <rpm package version record>: integer
+version of <rpm package version record>: rpm package version
+release of <rpm package version record>: rpm package release
+no epoch of <rpm package version record>: rpm package version record
+short form of <rpm package version record>: short rpm package version record
+unique values of <short rpm package version record>: short rpm package version record with multiplicity
+multiplicity of <short rpm package version record with multiplicity>: integer
+minima of <short rpm package version record>: short rpm package version record
+maxima of <short rpm package version record>: short rpm package version record
+extremas of <short rpm package version record>: ( short rpm package version record, short rpm package version record )
+short rpm package version record <short rpm package version record>: short rpm package version record
+epoch of <short rpm package version record>: integer
+version of <short rpm package version record>: rpm package version
+release of <short rpm package version record>: rpm package release
+no epoch of <short rpm package version record>: short rpm package version record
+long form of <short rpm package version record>: rpm package version record
+short rpm package version record <rpm package version record>: short rpm package version record
+rpm package version record <short rpm package version record>: rpm package version record
+unique values of <rpm package release>: rpm package release with multiplicity
+multiplicity of <rpm package release with multiplicity>: integer
+minima of <rpm package release>: rpm package release
+maxima of <rpm package release>: rpm package release
+extremas of <rpm package release>: ( rpm package release, rpm package release )
+rpm package release <string>: rpm package release
+rpm package release <rpm package release>: rpm package release
+unique values of <rpm package version>: rpm package version with multiplicity
+multiplicity of <rpm package version with multiplicity>: integer
+minima of <rpm package version>: rpm package version
+maxima of <rpm package version>: rpm package version
+extremas of <rpm package version>: ( rpm package version, rpm package version )
+rpm package version <string>: rpm package version
+rpm package version <rpm package version>: rpm package version
+capability <string>: capability
+provides of <package>: capability
+requires of <package>: capability
+conflicts of <package>: capability
+obsoletes of <package>: capability
+installed files of <package>: capability
+packages providing <capability> of <rpmdatabase>: package
+packages requiring <capability> of <rpmdatabase>: package
+packages conflicting with <capability> of <rpmdatabase>: package
+packages installing <capability> of <rpmdatabase>: package
+version of <capability>: string
+name of <capability>: string
+relation of <capability>: string
+installed <string> of <rpmdatabase>: boolean
+capability <string> of <rpmdatabase>: capability
+rpm: rpmdatabase
+rpm <string>: rpmdatabase
+ram: ram
+random access memory: ram
+size of <ram>: integer
+total amount of <ram>: integer
+used amount of <ram>: integer
+free amount of <ram>: integer
+shared amount of <ram>: integer
+buffered amount of <ram>: integer
+cached amount of <ram>: integer
+available amount of <ram>: integer
+unavailable amount of <ram>: integer
+process <integer>: process
+processes: process
+processes <string>: process
+name of <process>: string
+pid of <process>: integer
+id of <process>: integer
+process id of <process>: integer
+ppid of <process>: integer
+user of <process>: user
+effective user of <process>: user
+image file of <process>: file
+selinux context of <process>: string
+selinux domain of <process>: string
+loginuid of <process>: integer
+priority of <process>: integer
+tty of <process>: string
+session of <process>: integer
+start time of <process>: time
+exec time of <process>: time interval
+elapsed time of <process>: time interval
+policy of <process>: string
+schedule class of <process>: string
+exec shield of <process>: boolean
+nx bit of <process>: boolean
+posix capability of <process>: integer
+command line arguments of <process>: string
+command line argument <integer> of <process>: string
+environment of <process>: environment
+packages <string> of <rpmdatabase>: package
+packages of <rpmdatabase>: package
+version of <package>: version
+rpm version record of <package>: rpm package version record
+name of <package>: string
+architecture of <package>: string
+signature keyid of <package>: string
+unique name of <package>: string
+smbios: smbios
+structures of <smbios>: smbios structure
+structures <string> of <smbios>: smbios structure
+name of <smbios structure>: string
+length of <smbios structure>: integer
+type of <smbios structure>: integer
+name of <smbios value>: string
+type of <smbios value>: string
+offset of <smbios value>: integer
+structure of <smbios value>: smbios structure
+hexadecimal of <smbios value>: string
+values of <smbios structure>: smbios value
+values <string> of <smbios structure>: smbios value
+integer values <string> of <smbios structure>: smbios value
+string values <string> of <smbios structure>: smbios value
+integers <string> of <smbios structure>: integer
+strings <string> of <smbios structure>: string
+hexadecimals <string> of <smbios structure>: string
+bios_informations of <dmi>: dmi bios_information
+bios_information <integer> of <dmi>: dmi bios_information
+length of <dmi bios_information>: integer
+vendor of <dmi bios_information>: string
+bios_version of <dmi bios_information>: string
+bios_starting_address_segment of <dmi bios_information>: integer
+bios_release_date of <dmi bios_information>: string
+bios_rom_size of <dmi bios_information>: integer
+bios_characteristics of <dmi bios_information>: integer
+system_bios_major_release of <dmi bios_information>: integer
+system_bios_minor_release of <dmi bios_information>: integer
+embedded_controller_firmware_major_release of <dmi bios_information>: integer
+embedded_controller_firmware_minor_release of <dmi bios_information>: integer
+system_informations of <dmi>: dmi system_information
+system_information <integer> of <dmi>: dmi system_information
+length of <dmi system_information>: integer
+manufacturer of <dmi system_information>: string
+product_name of <dmi system_information>: string
+version of <dmi system_information>: string
+serial_number of <dmi system_information>: string
+uuid of <dmi system_information>: uuid
+wake_up_type of <dmi system_information>: integer
+sku_number of <dmi system_information>: string
+family of <dmi system_information>: string
+base_board_informations of <dmi>: dmi base_board_information
+base_board_information <integer> of <dmi>: dmi base_board_information
+length of <dmi base_board_information>: integer
+manufacturer of <dmi base_board_information>: string
+product of <dmi base_board_information>: string
+version of <dmi base_board_information>: string
+serial_number of <dmi base_board_information>: string
+asset_tag of <dmi base_board_information>: string
+feature_flags of <dmi base_board_information>: integer
+location_in_chassis of <dmi base_board_information>: string
+chassis_handle of <dmi base_board_information>: integer
+board_type of <dmi base_board_information>: integer
+number_of_contained_object_handles of <dmi base_board_information>: integer
+system_enclosure_or_chassiss of <dmi>: dmi system_enclosure_or_chassis
+system_enclosure_or_chassis <integer> of <dmi>: dmi system_enclosure_or_chassis
+length of <dmi system_enclosure_or_chassis>: integer
+manufacturer of <dmi system_enclosure_or_chassis>: string
+type of <dmi system_enclosure_or_chassis>: integer
+version of <dmi system_enclosure_or_chassis>: string
+serial_number of <dmi system_enclosure_or_chassis>: string
+asset_tag_number of <dmi system_enclosure_or_chassis>: string
+bootup_state of <dmi system_enclosure_or_chassis>: integer
+power_supply_state of <dmi system_enclosure_or_chassis>: integer
+thermal_state of <dmi system_enclosure_or_chassis>: integer
+security_status of <dmi system_enclosure_or_chassis>: integer
+oem_defined of <dmi system_enclosure_or_chassis>: integer
+height of <dmi system_enclosure_or_chassis>: integer
+number_of_power_cords of <dmi system_enclosure_or_chassis>: integer
+contained_element_count of <dmi system_enclosure_or_chassis>: integer
+contained_element_record_length of <dmi system_enclosure_or_chassis>: integer
+processor_informations of <dmi>: dmi processor_information
+processor_information <integer> of <dmi>: dmi processor_information
+length of <dmi processor_information>: integer
+socket_designation of <dmi processor_information>: string
+processor_type of <dmi processor_information>: integer
+processor_family of <dmi processor_information>: integer
+processor_manufacturer of <dmi processor_information>: string
+processor_id of <dmi processor_information>: integer
+processor_version of <dmi processor_information>: string
+voltage of <dmi processor_information>: integer
+external_clock of <dmi processor_information>: integer
+max_speed of <dmi processor_information>: integer
+current_speed of <dmi processor_information>: integer
+status of <dmi processor_information>: integer
+processor_upgrade of <dmi processor_information>: integer
+l1_cache_handle of <dmi processor_information>: integer
+l2_cache_handle of <dmi processor_information>: integer
+l3_cache_handle of <dmi processor_information>: integer
+serial_number of <dmi processor_information>: string
+asset_tag of <dmi processor_information>: string
+part_number of <dmi processor_information>: string
+core_count of <dmi processor_information>: integer
+core_enabled of <dmi processor_information>: integer
+thread_count of <dmi processor_information>: integer
+processor_characteristics of <dmi processor_information>: integer
+processor_family_2 of <dmi processor_information>: integer
+memory_controller_informations of <dmi>: dmi memory_controller_information
+memory_controller_information <integer> of <dmi>: dmi memory_controller_information
+length of <dmi memory_controller_information>: integer
+error_detecting_method of <dmi memory_controller_information>: integer
+error_correcting_capability of <dmi memory_controller_information>: integer
+supported_interleave of <dmi memory_controller_information>: integer
+current_interleave of <dmi memory_controller_information>: integer
+maximum_memory_module_size of <dmi memory_controller_information>: integer
+supported_speeds of <dmi memory_controller_information>: integer
+supported_memory_types of <dmi memory_controller_information>: integer
+memory_module_voltage of <dmi memory_controller_information>: integer
+number_of_associated_memory_slots of <dmi memory_controller_information>: integer
+memory_module_informations of <dmi>: dmi memory_module_information
+memory_module_information <integer> of <dmi>: dmi memory_module_information
+length of <dmi memory_module_information>: integer
+socket_designation of <dmi memory_module_information>: string
+bank_connections of <dmi memory_module_information>: integer
+current_speed of <dmi memory_module_information>: integer
+current_memory_type of <dmi memory_module_information>: integer
+installed_size of <dmi memory_module_information>: integer
+enabled_size of <dmi memory_module_information>: integer
+error_status of <dmi memory_module_information>: integer
+cache_informations of <dmi>: dmi cache_information
+cache_information <integer> of <dmi>: dmi cache_information
+length of <dmi cache_information>: integer
+socket_designation of <dmi cache_information>: string
+cache_configuration of <dmi cache_information>: integer
+maximum_cache_size of <dmi cache_information>: integer
+installed_size of <dmi cache_information>: integer
+supported_sram_type of <dmi cache_information>: integer
+current_sram_type of <dmi cache_information>: integer
+cache_speed of <dmi cache_information>: integer
+error_correction_type of <dmi cache_information>: integer
+system_cache_type of <dmi cache_information>: integer
+associativity of <dmi cache_information>: integer
+port_connector_informations of <dmi>: dmi port_connector_information
+port_connector_information <integer> of <dmi>: dmi port_connector_information
+length of <dmi port_connector_information>: integer
+internal_reference_designator of <dmi port_connector_information>: string
+internal_connector_type of <dmi port_connector_information>: integer
+external_reference_designator of <dmi port_connector_information>: string
+external_connector_type of <dmi port_connector_information>: integer
+port_type of <dmi port_connector_information>: integer
+system_slotss of <dmi>: dmi system_slots
+system_slots <integer> of <dmi>: dmi system_slots
+length of <dmi system_slots>: integer
+slot_designation of <dmi system_slots>: string
+slot_type of <dmi system_slots>: integer
+slot_data_bus_width of <dmi system_slots>: integer
+current_usage of <dmi system_slots>: integer
+slot_length of <dmi system_slots>: integer
+slot_id of <dmi system_slots>: integer
+slot_characteristics_1 of <dmi system_slots>: integer
+slot_characteristics_2 of <dmi system_slots>: integer
+segment_group_number of <dmi system_slots>: integer
+bus_number of <dmi system_slots>: integer
+device_function_number of <dmi system_slots>: integer
+on_board_devices_informations of <dmi>: dmi on_board_devices_information
+on_board_devices_information <integer> of <dmi>: dmi on_board_devices_information
+length of <dmi on_board_devices_information>: integer
+description_string of <dmi on_board_devices_information>: string
+bios_language_informations of <dmi>: dmi bios_language_information
+bios_language_information <integer> of <dmi>: dmi bios_language_information
+length of <dmi bios_language_information>: integer
+installable_languages of <dmi bios_language_information>: integer
+flags of <dmi bios_language_information>: integer
+reserved of <dmi bios_language_information>: binary_string
+current_language of <dmi bios_language_information>: string
+group_associationss of <dmi>: dmi group_associations
+group_associations <integer> of <dmi>: dmi group_associations
+length of <dmi group_associations>: integer
+group_name of <dmi group_associations>: string
+item_type of <dmi group_associations>: integer
+item_handle of <dmi group_associations>: integer
+physical_memory_arrays of <dmi>: dmi physical_memory_array
+physical_memory_array <integer> of <dmi>: dmi physical_memory_array
+length of <dmi physical_memory_array>: integer
+location of <dmi physical_memory_array>: integer
+use of <dmi physical_memory_array>: integer
+memory_error_correction of <dmi physical_memory_array>: integer
+maximum_capacity of <dmi physical_memory_array>: integer
+memory_error_information_handle of <dmi physical_memory_array>: integer
+number_of_memory_devices of <dmi physical_memory_array>: integer
+memory_devices of <dmi>: dmi memory_device
+memory_device <integer> of <dmi>: dmi memory_device
+length of <dmi memory_device>: integer
+memory_array_handle of <dmi memory_device>: integer
+memory_error_information_handle of <dmi memory_device>: integer
+total_width of <dmi memory_device>: integer
+data_width of <dmi memory_device>: integer
+size of <dmi memory_device>: integer
+form_factor of <dmi memory_device>: integer
+device_set of <dmi memory_device>: integer
+device_locator of <dmi memory_device>: string
+bank_locator of <dmi memory_device>: string
+memory_type of <dmi memory_device>: integer
+type_detail of <dmi memory_device>: integer
+speed of <dmi memory_device>: integer
+manufacturer of <dmi memory_device>: string
+serial_number of <dmi memory_device>: string
+asset_tag of <dmi memory_device>: string
+part_number of <dmi memory_device>: string
+attributes of <dmi memory_device>: integer
+b32_bit_memory_error_informations of <dmi>: dmi b32_bit_memory_error_information
+b32_bit_memory_error_information <integer> of <dmi>: dmi b32_bit_memory_error_information
+length of <dmi b32_bit_memory_error_information>: integer
+error_type of <dmi b32_bit_memory_error_information>: integer
+error_granularity of <dmi b32_bit_memory_error_information>: integer
+error_operation of <dmi b32_bit_memory_error_information>: integer
+vendor_syndrome of <dmi b32_bit_memory_error_information>: integer
+memory_array_error_address of <dmi b32_bit_memory_error_information>: integer
+device_error_address of <dmi b32_bit_memory_error_information>: integer
+error_resolution of <dmi b32_bit_memory_error_information>: integer
+memory_array_mapped_addresss of <dmi>: dmi memory_array_mapped_address
+memory_array_mapped_address <integer> of <dmi>: dmi memory_array_mapped_address
+length of <dmi memory_array_mapped_address>: integer
+starting_address of <dmi memory_array_mapped_address>: integer
+ending_address of <dmi memory_array_mapped_address>: integer
+memory_array_handle of <dmi memory_array_mapped_address>: integer
+partition_width of <dmi memory_array_mapped_address>: integer
+memory_device_mapped_addresss of <dmi>: dmi memory_device_mapped_address
+memory_device_mapped_address <integer> of <dmi>: dmi memory_device_mapped_address
+length of <dmi memory_device_mapped_address>: integer
+starting_address of <dmi memory_device_mapped_address>: integer
+ending_address of <dmi memory_device_mapped_address>: integer
+memory_device_handle of <dmi memory_device_mapped_address>: integer
+memory_array_mapped_address_handle of <dmi memory_device_mapped_address>: integer
+partition_row_position of <dmi memory_device_mapped_address>: integer
+interleave_position of <dmi memory_device_mapped_address>: integer
+interleaved_data_depth of <dmi memory_device_mapped_address>: integer
+built_in_pointing_devices of <dmi>: dmi built_in_pointing_device
+built_in_pointing_device <integer> of <dmi>: dmi built_in_pointing_device
+length of <dmi built_in_pointing_device>: integer
+type of <dmi built_in_pointing_device>: integer
+interface of <dmi built_in_pointing_device>: integer
+number_of_buttons of <dmi built_in_pointing_device>: integer
+portable_batterys of <dmi>: dmi portable_battery
+portable_battery <integer> of <dmi>: dmi portable_battery
+length of <dmi portable_battery>: integer
+location of <dmi portable_battery>: string
+manufacturer of <dmi portable_battery>: string
+manufacture_date of <dmi portable_battery>: string
+serial_number of <dmi portable_battery>: string
+device_name of <dmi portable_battery>: string
+device_chemistry of <dmi portable_battery>: integer
+design_capacity of <dmi portable_battery>: integer
+design_voltage of <dmi portable_battery>: integer
+sbds_version_number of <dmi portable_battery>: string
+maximum_error_in_battery_data of <dmi portable_battery>: integer
+sbds_serial_number of <dmi portable_battery>: integer
+sbds_manufacture_date of <dmi portable_battery>: integer
+sbds_device_chemistry of <dmi portable_battery>: string
+design_capacity_multiplier of <dmi portable_battery>: integer
+oem_specific of <dmi portable_battery>: integer
+system_resets of <dmi>: dmi system_reset
+system_reset <integer> of <dmi>: dmi system_reset
+length of <dmi system_reset>: integer
+capabilities of <dmi system_reset>: integer
+reset_count of <dmi system_reset>: integer
+reset_limit of <dmi system_reset>: integer
+timer_interval of <dmi system_reset>: integer
+timeout of <dmi system_reset>: integer
+hardware_securitys of <dmi>: dmi hardware_security
+hardware_security <integer> of <dmi>: dmi hardware_security
+length of <dmi hardware_security>: integer
+hardware_security_settings of <dmi hardware_security>: integer
+system_power_controlss of <dmi>: dmi system_power_controls
+system_power_controls <integer> of <dmi>: dmi system_power_controls
+length of <dmi system_power_controls>: integer
+next_scheduled_power_on_month of <dmi system_power_controls>: integer
+next_scheduled_power_on_day_of_month of <dmi system_power_controls>: integer
+next_scheduled_power_on_hour of <dmi system_power_controls>: integer
+next_scheduled_power_on_minute of <dmi system_power_controls>: integer
+next_scheduled_power_on_second of <dmi system_power_controls>: integer
+voltage_probes of <dmi>: dmi voltage_probe
+voltage_probe <integer> of <dmi>: dmi voltage_probe
+length of <dmi voltage_probe>: integer
+description of <dmi voltage_probe>: string
+location_and_status of <dmi voltage_probe>: integer
+maximum_value of <dmi voltage_probe>: integer
+minimum_value of <dmi voltage_probe>: integer
+resolution of <dmi voltage_probe>: integer
+tolerance of <dmi voltage_probe>: integer
+accuracy of <dmi voltage_probe>: integer
+oem_defined of <dmi voltage_probe>: integer
+nominal_value of <dmi voltage_probe>: integer
+cooling_devices of <dmi>: dmi cooling_device
+cooling_device <integer> of <dmi>: dmi cooling_device
+length of <dmi cooling_device>: integer
+temperature_probe_handle of <dmi cooling_device>: integer
+device_type_and_status of <dmi cooling_device>: integer
+cooling_unit_group of <dmi cooling_device>: integer
+oem_defined of <dmi cooling_device>: integer
+nominal_speed of <dmi cooling_device>: integer
+temperature_probes of <dmi>: dmi temperature_probe
+temperature_probe <integer> of <dmi>: dmi temperature_probe
+length of <dmi temperature_probe>: integer
+description of <dmi temperature_probe>: string
+location_and_status of <dmi temperature_probe>: integer
+maximum_value of <dmi temperature_probe>: integer
+minimum_value of <dmi temperature_probe>: integer
+resolution of <dmi temperature_probe>: integer
+tolerance of <dmi temperature_probe>: integer
+accuracy of <dmi temperature_probe>: integer
+oem_defined of <dmi temperature_probe>: integer
+nominal_value of <dmi temperature_probe>: integer
+electrical_current_probes of <dmi>: dmi electrical_current_probe
+electrical_current_probe <integer> of <dmi>: dmi electrical_current_probe
+length of <dmi electrical_current_probe>: integer
+description of <dmi electrical_current_probe>: string
+location_and_status of <dmi electrical_current_probe>: integer
+maximum_value of <dmi electrical_current_probe>: integer
+minimum_value of <dmi electrical_current_probe>: integer
+resolution of <dmi electrical_current_probe>: integer
+tolerance of <dmi electrical_current_probe>: integer
+accuracy of <dmi electrical_current_probe>: integer
+oem_defined of <dmi electrical_current_probe>: integer
+nominal_value of <dmi electrical_current_probe>: integer
+out_of_band_remote_accesss of <dmi>: dmi out_of_band_remote_access
+out_of_band_remote_access <integer> of <dmi>: dmi out_of_band_remote_access
+length of <dmi out_of_band_remote_access>: integer
+manufacturer_name of <dmi out_of_band_remote_access>: string
+connections of <dmi out_of_band_remote_access>: integer
+system_boot_informations of <dmi>: dmi system_boot_information
+system_boot_information <integer> of <dmi>: dmi system_boot_information
+length of <dmi system_boot_information>: integer
+reserved of <dmi system_boot_information>: binary_string
+b64_bit_memory_error_informations of <dmi>: dmi b64_bit_memory_error_information
+b64_bit_memory_error_information <integer> of <dmi>: dmi b64_bit_memory_error_information
+length of <dmi b64_bit_memory_error_information>: integer
+error_type of <dmi b64_bit_memory_error_information>: integer
+error_granularity of <dmi b64_bit_memory_error_information>: integer
+error_operation of <dmi b64_bit_memory_error_information>: integer
+vendor_syndrome of <dmi b64_bit_memory_error_information>: integer
+memory_array_error_address of <dmi b64_bit_memory_error_information>: integer
+device_error_address of <dmi b64_bit_memory_error_information>: integer
+error_resolution of <dmi b64_bit_memory_error_information>: integer
+management_devices of <dmi>: dmi management_device
+management_device <integer> of <dmi>: dmi management_device
+length of <dmi management_device>: integer
+description of <dmi management_device>: string
+type of <dmi management_device>: integer
+address of <dmi management_device>: integer
+address_type of <dmi management_device>: integer
+management_device_components of <dmi>: dmi management_device_component
+management_device_component <integer> of <dmi>: dmi management_device_component
+length of <dmi management_device_component>: integer
+description of <dmi management_device_component>: string
+management_device_handle of <dmi management_device_component>: integer
+component_handle of <dmi management_device_component>: integer
+threshold_handle of <dmi management_device_component>: integer
+management_device_threshold_datas of <dmi>: dmi management_device_threshold_data
+management_device_threshold_data <integer> of <dmi>: dmi management_device_threshold_data
+length of <dmi management_device_threshold_data>: integer
+lower_threshold_non_critical of <dmi management_device_threshold_data>: integer
+upper_threshold_non_critical of <dmi management_device_threshold_data>: integer
+lower_threshold_critical of <dmi management_device_threshold_data>: integer
+upper_threshold_critical of <dmi management_device_threshold_data>: integer
+lower_threshold_non_recoverable of <dmi management_device_threshold_data>: integer
+upper_threshold_non_recoverable of <dmi management_device_threshold_data>: integer
+memory_channels of <dmi>: dmi memory_channel
+memory_channel <integer> of <dmi>: dmi memory_channel
+length of <dmi memory_channel>: integer
+channel_type of <dmi memory_channel>: integer
+maximum_channel_load of <dmi memory_channel>: integer
+memory_device_count of <dmi memory_channel>: integer
+memory_device_load of <dmi memory_channel>: integer
+memory_device_handle of <dmi memory_channel>: integer
+ipmi_device_informations of <dmi>: dmi ipmi_device_information
+ipmi_device_information <integer> of <dmi>: dmi ipmi_device_information
+length of <dmi ipmi_device_information>: integer
+interface_type of <dmi ipmi_device_information>: integer
+ipmi_specification_revision of <dmi ipmi_device_information>: integer
+i2c_slave_address of <dmi ipmi_device_information>: integer
+nv_storage_device_address of <dmi ipmi_device_information>: integer
+base_address of <dmi ipmi_device_information>: integer
+system_power_supplys of <dmi>: dmi system_power_supply
+system_power_supply <integer> of <dmi>: dmi system_power_supply
+length of <dmi system_power_supply>: integer
+power_unit_group of <dmi system_power_supply>: integer
+location of <dmi system_power_supply>: string
+device_name of <dmi system_power_supply>: string
+manufacturer of <dmi system_power_supply>: string
+serial_number of <dmi system_power_supply>: string
+asset_tag_number of <dmi system_power_supply>: string
+model_part_number of <dmi system_power_supply>: string
+revision_level of <dmi system_power_supply>: string
+max_power_capacity of <dmi system_power_supply>: integer
+power_supply_characteristics of <dmi system_power_supply>: integer
+input_voltage_probe_handle of <dmi system_power_supply>: integer
+cooling_device_handle of <dmi system_power_supply>: integer
+input_current_probe_handle of <dmi system_power_supply>: integer
+additional_informations of <dmi>: dmi additional_information
+additional_information <integer> of <dmi>: dmi additional_information
+length of <dmi additional_information>: integer
+number_of_additional_information_entries of <dmi additional_information>: integer
+onboard_devices_extended_informations of <dmi>: dmi onboard_devices_extended_information
+onboard_devices_extended_information <integer> of <dmi>: dmi onboard_devices_extended_information
+length of <dmi onboard_devices_extended_information>: integer
+reference_designation of <dmi onboard_devices_extended_information>: integer
+device_type_instance of <dmi onboard_devices_extended_information>: integer
+segment_group_number of <dmi onboard_devices_extended_information>: integer
+bus_number of <dmi onboard_devices_extended_information>: integer
+device_function_number of <dmi onboard_devices_extended_information>: integer
+inactives of <dmi>: dmi inactive
+inactive <integer> of <dmi>: dmi inactive
+length of <dmi inactive>: integer
+end_of_tables of <dmi>: dmi end_of_table
+end_of_table <integer> of <dmi>: dmi end_of_table
+length of <dmi end_of_table>: integer
+dmi: dmi
+oem_strings of <dmi>: string
+oem_string <integer> of <dmi>: string
+system_configuration_options of <dmi>: string
+system_configuration_option <integer> of <dmi>: string
+device_types of <dmi on_board_devices_information>: integer
+device_type <integer> of <dmi on_board_devices_information>: integer
+device_descriptions of <dmi on_board_devices_information>: string
+device_description <integer> of <dmi on_board_devices_information>: string
+routing table: routing table
+ipv4 routing table: routing table
+routes of <routing table>: route
+destination of <route>: ipv4or6 address
+gateway of <route>: ipv4or6 address
+mask of <route>: ipv4or6 address
+interface of <route>: string
+metric of <route>: integer
+mtu of <route>: integer
+window of <route>: integer
+irtt of <route>: integer
+up flag of <route>: boolean
+gateway flag of <route>: boolean
+host flag of <route>: boolean
+reject flag of <route>: boolean
+running application <string>: application
+recent application <string>: application
+running applications: application
+recent applications: application
+device of <grub file location>: grub device
+block list of <grub file location>: grub block list
+path of <grub file location>: string
+location of <grub kernel>: grub file location
+boot arguments of <grub kernel>: string
+boot argument <integer> of <grub kernel>: string
+nounzip of <grub module>: boolean
+title of <grub bootable image>: string
+kernel of <grub bootable image>: grub kernel
+chainloader of <grub bootable image>: grub file location
+initrd of <grub bootable image>: grub file location
+root of <grub bootable image>: grub device
+rootnoverify of <grub bootable image>: grub device
+savedefault of <grub bootable image>: boolean
+quiet of <grub bootable image>: boolean
+modules of <grub bootable image>: grub module
+module <integer> of <grub bootable image>: grub module
+index of <grub image choice>: integer
+foreground of <grub color pair>: grub color
+background of <grub color pair>: grub color
+normal of <grub color scheme>: grub color pair
+highlight of <grub color scheme>: grub color pair
+grub config file: grub config file
+grub config file <string>: grub config file
+path of <grub config file>: string
+default image of <grub config file>: grub image choice
+fallback images of <grub config file>: grub image choice
+fallback image <integer> of <grub config file>: grub image choice
+gfxmenu of <grub config file>: grub file location
+splashimage of <grub config file>: grub file location
+timeout of <grub config file>: integer
+hiddenmenu of <grub config file>: boolean
+bootable images of <grub config file>: grub bootable image
+bootable image <integer> of <grub config file>: grub bootable image
+bootable image <string> of <grub config file>: grub bootable image
+color scheme of <grub config file>: grub color scheme
+setting of <manual group>: setting
+member of <manual group>: boolean
+manual group <string> of <client>: manual group
+manual groups of <client>: manual group
+json of <file>: json value
+name of <sqlite table>: string
+schema of <sqlite table>: string
+table <string> of <sqlite database>: sqlite table
+tables of <sqlite database>: sqlite table
+indices of <sqlite table>: string
+statement <string> of <sqlite database>: sqlite statement
+rows of <sqlite statement>: sqlite row
+sqlite database of <file>: sqlite database
+encoding of <sqlite database>: string
+sqlite version: version
+name of <sqlite column type>: string
+type of <sqlite column type>: string
+integer of <sqlite column type>: boolean
+float of <sqlite column type>: boolean
+text of <sqlite column type>: boolean
+null of <sqlite column type>: boolean
+blob of <sqlite column type>: boolean
+column type <integer> of <sqlite table>: sqlite column type
+column type <string> of <sqlite table>: sqlite column type
+column types of <sqlite table>: sqlite column type
+name of <sqlite column>: string
+column <integer> of <sqlite row>: sqlite column
+column <string> of <sqlite row>: sqlite column
+type of <sqlite column>: sqlite column type
+logged on users: logged on user
+active of <logged on user>: boolean
+remote of <logged on user>: boolean
+user of <logged on user>: user
+process id of <logged on user>: integer
+name of <logged on user>: string
+tty of <logged on user>: string
+current user: logged on user
+in agent context: boolean
+in proxy agent context: boolean
+in plugin portal context: boolean
+evaluationcycle of <client>: evaluation cycle
+average of <evaluation cycle>: integer
+average duration of <evaluation cycle>: time interval
+maximum of <evaluation cycle>: integer
+maximum duration of <evaluation cycle>: time interval
+total duration of <evaluation cycle>: time interval
+sleep duration of <evaluation cycle>: time interval
+relay select duration of <evaluation cycle>: time interval
+gather duration of <evaluation cycle>: time interval
+quiet mode duration of <evaluation cycle>: time interval
+archive duration of <evaluation cycle>: time interval
+api duration of <evaluation cycle>: time interval
+client query duration of <evaluation cycle>: time interval
+action duration of <evaluation cycle>: time interval
+relevance duration of <evaluation cycle>: time interval
+property duration of <evaluation cycle>: time interval
+report duration of <evaluation cycle>: time interval
+other duration of <evaluation cycle>: time interval
+sleep percent of <evaluation cycle>: floating point
+relay select percent of <evaluation cycle>: floating point
+gather percent of <evaluation cycle>: floating point
+quiet mode percent of <evaluation cycle>: floating point
+archive percent of <evaluation cycle>: floating point
+api percent of <evaluation cycle>: floating point
+client query percent of <evaluation cycle>: floating point
+action percent of <evaluation cycle>: floating point
+relevance percent of <evaluation cycle>: floating point
+property percent of <evaluation cycle>: floating point
+report percent of <evaluation cycle>: floating point
+other percent of <evaluation cycle>: floating point
+track fixlets of <evaluation cycle>: string
+upload progress of <client>: string
+power level: power level
+full of <power level>: boolean
+normal of <power level>: boolean
+low of <power level>: boolean
+plugged of <power level>: boolean
+ups of <power level>: boolean
+instances of <application usage summary>: application usage summary instance
+name of <application usage summary instance>: string
+total run count of <application usage summary instance>: integer
+first start time of <application usage summary instance>: time
+last start time of <application usage summary instance>: time
+last time seen of <application usage summary instance>: time
+total duration of <application usage summary instance>: time interval
+size of <application usage summary instance>: integer
+string version of <application usage summary instance>: string
+version of <application usage summary instance>: version
+image path of <application usage summary instance>: string
+version of <client>: version
+download folder: folder
+download path <string>: string
+download file <string>: file
+download folder of <encoding>: folder
+download file <string> of <encoding>: file
+modification time of <filesystem object>: time
+accessed time of <filesystem object>: time
+change time of <filesystem object>: time
+user name of <filesystem object>: string
+group name of <filesystem object>: string
+uid of <filesystem object>: integer
+gid of <filesystem object>: integer
+mode of <filesystem object>: mode
+user read of <filesystem object>: boolean
+user write of <filesystem object>: boolean
+user execute of <filesystem object>: boolean
+group read of <filesystem object>: boolean
+group write of <filesystem object>: boolean
+group execute of <filesystem object>: boolean
+other read of <filesystem object>: boolean
+other write of <filesystem object>: boolean
+other execute of <filesystem object>: boolean
+setuid of <filesystem object>: boolean
+setgid of <filesystem object>: boolean
+user mask of <filesystem object>: integer
+group mask of <filesystem object>: integer
+other mask of <filesystem object>: integer
+link count of <filesystem object>: integer
+has extended acl of <filesystem object>: boolean
+socket file <filesystem object>: socket file
+socket file <string>: socket file
+socket file <string> of <folder>: socket file
+socket file <symlink>: socket file
+socket files of <folder>: socket file
+fifo file <filesystem object>: fifo file
+fifo file <string>: fifo file
+fifo file <string> of <folder>: fifo file
+fifo file <symlink>: fifo file
+fifo files of <folder>: fifo file
+device type of <device file>: string
+major of <device file>: integer
+minor of <device file>: integer
+device file <filesystem object>: device file
+device file <string>: device file
+device file <string> of <folder>: device file
+device file <symlink>: device file
+device files of <folder>: device file
+wake on lan subnet cidr string: string
+client cryptography: client_cryptography
+encrypt report of <client_cryptography>: boolean
+desired encrypt report of <client_cryptography>: boolean
+encrypt report failure message of <client_cryptography>: string
+runlevel: runlevel
+value of <runlevel>: string
+previous value of <runlevel>: string
+effective time of <runlevel>: time
+name of <symlink>: string
+pathname of <symlink>: string
+location of <symlink>: string
+value of <symlink>: string
+value accessible of <symlink>: boolean
+parent folder of <symlink>: folder
+symlink <string>: symlink
+symlink <binary_string>: symlink
+symlink <string> of <folder>: symlink
+symlink <binary_string> of <folder>: symlink
+symlink <string> of <encoding>: symlink
+symlink <binary_string> of <encoding>: symlink
+symlink <filesystem object>: symlink
+file <symlink>: file
+folder <symlink>: folder
+device file <symlink>: device file
+fifo file <symlink>: fifo file
+socket file <symlink>: socket file
+symlink <symlink>: symlink
+modification time of <symlink>: time
+accessed time of <symlink>: time
+change time of <symlink>: time
+user name of <symlink>: string
+group name of <symlink>: string
+uid of <symlink>: integer
+gid of <symlink>: integer
+link count of <symlink>: integer
+symlinks of <folder>: symlink
+ancestors of <symlink>: folder
+application usage summary <string>: application usage summary
+name of <application usage summary>: string
+total run count of <application usage summary>: integer
+first start time of <application usage summary>: time
+last start time of <application usage summary>: time
+last time seen of <application usage summary>: time
+total duration of <application usage summary>: time interval
+running of <application usage summary>: boolean
+application usage summaries: application usage summary
+application usages <string>: timed( time range, integer )
+executions <string>: execution
+identity of <execution>: string
+time of <execution>: time
+type of <execution>: string
+path of <execution>: string
+modification time of <execution>: time
+version info of <execution>: string
+root server: root server
+host name of <root server>: string
+id of <root server>: integer
+content of <file>: file content
+byte <integer> of <file>: integer
+locked content of <file>: file content
+pending restart: boolean
+pending restart <string>: boolean
+pending restart names: string
+group <integer> of <site>: site group
+member of <site group>: boolean
+id of <site group>: integer
+variables of <file>: string
+users: user
+users <string>: user
+local users: user
+local users <string>: user
+name of <user>: string
+tty of <user>: string
+id of <user>: integer
+user id of <user>: integer
+pending login: boolean
+swap: swap
+size of <swap>: integer
+total amount of <swap>: integer
+used amount of <swap>: integer
+free amount of <swap>: integer
+current site: site
+site <string>: site
+sites: site
+gather schedule authority of <site>: string
+name of <site>: string
+url of <site>: string
+site tag of <site>: string
+type of <site>: string
+folder of <site>: folder
+client folder of <site>: folder
+masthead of <site>: file
+last gather time of <site>: time
+subscribe time of <site>: time
+gather schedule time interval of <site>: time interval
+version of <site>: integer
+site version list of <site>: site version list
+evaluated of <site>: boolean
+allowed of <site>: boolean
+settings of <client>: setting
+setting <string> of <client>: setting
+settings of <site>: setting
+setting <string> of <site>: setting
+name of <setting>: string
+value of <setting>: string
+sha256 of <setting>: string
+effective date of <setting>: time
+enabled of <setting>: boolean
+custom site subscription effective date <string>: time
+services: service
+service <string>: service
+running service <string>: service
+relay service: service
+main gather service: service
+proxy agent service: service
+plugin portal service: service
+webui service: service
+web reports service: service
+state of <service>: string
+version of <service>: version
+running of <service>: boolean
+image path of <service>: string
+file of <service>: file
+folder of <service>: folder
+runlevels of <service>: string
+registration server: registration server
+apparent registration server time: time
+last relay select time: time
+now of <registration server>: time
+version of <registration server>: version
+name of <registration server>: string
+current relay: current relay
+version of <current relay>: version
+authenticating of <current relay>: boolean
+download server: download server
+name of <download server>: string
+matches <regular expression> of <string>: regular expression match
+first matches <regular expression> of <string>: regular expression match
+parenthesized parts of <regular expression match>: substring
+parenthesized part <integer> of <regular expression match>: substring
+regexes <string>: regular expression
+regular expressions <string>: regular expression
+case insensitive regexes <string>: regular expression
+case insensitive regular expressions <string>: regular expression
+regex escape of <string>: string
+operating system: operating system
+name of <operating system>: string
+release of <operating system>: string
+windows of <operating system>: boolean
+unix of <operating system>: boolean
+mac of <operating system>: boolean
+android of <operating system>: boolean
+embedded of <operating system>: boolean
+major version of <operating system>: integer
+update level of <operating system>: integer
+minor version of <operating system>: integer
+build number of <operating system>: integer
+build number high of <operating system>: integer
+build number low of <operating system>: integer
+build of <operating system>: string
+architecture of <operating system>: string
+machine of <operating system>: string
+codename of <operating system>: string
+product info string of <operating system>: string
+version of <operating system>: version
+boot time of <operating system>: time
+uptime of <operating system>: time interval
+hostname: string
+computer name: string
+domainname: string
+host name: string
+domain name: string
+dns name: string
+little endian of <operating system>: boolean
+big endian of <operating system>: boolean
+uuid of <operating system>: uuid
+network: network
+interfaces of <network>: network interface
+interface <integer> of <network>: network interface
+family of <network interface>: integer
+ip interfaces of <network>: network ip interface
+ip interface <integer> of <network>: network ip interface
+ipv4 interfaces of <network>: network adapter interface
+ipv6 interfaces of <network>: network adapter interface
+ipv4or6 interfaces of <network>: network adapter interface
+address of <network ip interface>: ipv4 address
+alias of <network ip interface>: boolean
+broadcast address of <network ip interface>: ipv4 address
+broadcast support of <network ip interface>: boolean
+cidr address of <network ip interface>: string
+cidr string of <network ip interface>: string
+loopback of <network ip interface>: boolean
+mac address of <network ip interface>: string
+multicast support of <network ip interface>: boolean
+name of <network ip interface>: string
+point to point of <network ip interface>: boolean
+subnet address of <network ip interface>: ipv4 address
+subnet mask of <network ip interface>: ipv4 address
+up of <network ip interface>: boolean
+address of <network adapter interface>: ipv4or6 address
+broadcast address of <network adapter interface>: ipv4or6 address
+broadcast support of <network adapter interface>: boolean
+cidr address of <network adapter interface>: string
+cidr string of <network adapter interface>: string
+loopback of <network adapter interface>: boolean
+mac address of <network adapter interface>: string
+multicast support of <network adapter interface>: boolean
+point to point of <network adapter interface>: boolean
+subnet address of <network adapter interface>: ipv4or6 address
+subnet mask of <network adapter interface>: ipv4or6 address
+up of <network adapter interface>: boolean
+adapter of <network adapter interface>: network adapter
+adapters of <network>: network adapter
+any adapters of <network>: network adapter
+find adapters <string> of <network>: network adapter
+address of <network adapter>: ipv4 address
+cidr address of <network adapter>: string
+cidr string of <network adapter>: string
+loopback of <network adapter>: boolean
+mac address of <network adapter>: string
+multicast support of <network adapter>: boolean
+name of <network adapter>: string
+friendly name of <network adapter>: string
+subnet address of <network adapter>: ipv4 address
+subnet mask of <network adapter>: ipv4 address
+up of <network adapter>: boolean
+ipv4 interfaces of <network adapter>: network adapter interface
+ipv6 interfaces of <network adapter>: network adapter interface
+ipv4or6 interfaces of <network adapter>: network adapter interface
+setuid of <mode>: boolean
+setgid of <mode>: boolean
+sticky of <mode>: boolean
+user mask of <mode>: mode_mask
+group mask of <mode>: mode_mask
+other mask of <mode>: mode_mask
+read of <mode_mask>: boolean
+write of <mode_mask>: boolean
+execute of <mode_mask>: boolean
+computer id: integer
+client license: license
+bes license: license
+site number of <license>: integer
+registrar number of <license>: integer
+start date of <license>: time
+expiration date of <license>: time
+expiration state of <license>: string
+organization of <license>: string
+email address of <license>: string
+common name of <license>: string
+gather url of <license>: string
+evaluation of <license>: boolean
+seat of <license>: integer
+maximum seat count of <license>: integer
+seat count state of <license>: string
+fips mode of <license>: boolean
+encryption certificate of <license>: x509 certificate
+allow unmentioned site of <license>: boolean
+products of <license>: bes product
+name of <bes product>: string
+expiration date of <bes product>: date
+perpetual of <bes product>: boolean
+perpetual maintenance of <bes product>: boolean
+term of <bes product>: boolean
+legacy of <bes product>: boolean
+state of <bes product>: string
+computer count of <bes product>: integer
+workstation count of <bes product>: integer
+windows server count of <bes product>: integer
+non windows server count of <bes product>: integer
+rvu count of <bes product>: integer
+client device count of <bes product>: integer
+mvs count of <bes product>: integer
+mobile count of <bes product>: integer
+cloud count of <bes product>: integer
+user count of <bes product>: integer
+device count of <bes product>: integer
+active container count of <bes product>: integer
+site urls of <bes product>: string
+type of <license>: string
+download hash algorithms of <license>: string
+signature hash algorithms of <license>: string
+effective download hash algorithm of <license>: string
+effective signature hash algorithm of <license>: string
+enhanced security of <license>: boolean
+sha256 download of <license>: boolean
+tls cipher list of <license>: string
+system locale: language
+system ui language: language
+system language: string
+primary language of <language>: primary language
+primary country of <language>: string
+primary codeset of <language>: string
+platform id of <language>: string
+root folder: folder
+system folder: folder
+filesystem <string>: filesystem
+drive <string>: filesystem
+filesystem of <file>: filesystem
+drive of <file>: filesystem
+filesystem of <folder>: filesystem
+drive of <folder>: filesystem
+filesystem of <device file>: filesystem
+drive of <device file>: filesystem
+filesystem of <fifo file>: filesystem
+drive of <fifo file>: filesystem
+filesystem of <socket file>: filesystem
+drive of <socket file>: filesystem
+filesystem of <symlink>: filesystem
+drive of <symlink>: filesystem
+name of <filesystem>: string
+volume of <filesystem>: string
+size of <filesystem>: integer
+total space of <filesystem>: integer
+free space of <filesystem>: integer
+used space of <filesystem>: integer
+free percent of <filesystem>: integer
+used percent of <filesystem>: integer
+file count of <filesystem>: integer
+free file count of <filesystem>: integer
+used file count of <filesystem>: integer
+type of <filesystem>: string
+filesystems: filesystem
+drives: filesystem
+mount point of <filesystem>: string
+device name of <filesystem>: string
+fstype of <filesystem>: string
+filesystem type of <filesystem>: string
+mount option of <filesystem>: string
+block size of <filesystem>: integer
+uuid of <filesystem>: string
+default web browser: file
+size of <file>: integer
+environment: environment
+variables of <environment>: environment variable
+variable <string> of <environment>: environment variable
+name of <environment variable>: string
+value of <environment variable>: string
+module <string>: module
+version string <string> of <module>: string
+name of <module>: string
+version of <module>: version
+modules: module
+info of <client>: string
+client: client
+registration address of <client>: ipv4or6 address
+registration subnet address of <client>: ipv4or6 address
+registration cidr address of <client>: string
+registration mac address of <client>: string
+brand of <client>: string
+build target of <client>: string
+last command time of <client>: time
+last report time of <client>: time
+data folder of <client>: folder
+storage folder of <client>: folder
+authenticating of <client>: boolean
+certificate of <client>: x509 certificate
+character sets of <client>: string
+deployment character set of <client>: string
+report character set of <client>: string
+fxf character set of <client>: string
+local character set of <client>: string
+banned prefetch plugins of <client>: string
+bios: bios
+date of <bios>: string
+version of <bios>: string
+analysis: analysis
+last time of <analysis>: time
+administrator <string> of <client>: setting
+administrators of <client>: setting
+administrative rights of <client>: administrative rights
+enabled of <administrative rights>: boolean
+action lock state: action lock state
+locked of <action lock state>: boolean
+expiration date of <action lock state>: time
+effective date of <action lock state>: time
+controller of <action lock state>: string
+lock string of <action lock state>: string
+parameter <string> of <action>: string
+parameter <string>: string
+relevant offer actions of <site>: action
+headers of <action>: fixlet_header
+headers <string> of <action>: fixlet_header
+action: action
+active action: action
+action <integer>: action
+id of <action>: integer
+constraint of <action>: integer
+system constraint of <action>: integer
+first active count of <action>: integer
+active count of <action>: integer
+active line number of <action>: integer
+last active line number of <action>: integer
+origin fixlet id of <action>: integer
+constrained of <action>: boolean
+pending of <action>: boolean
+waiting for download of <action>: boolean
+active of <action>: boolean
+pending restart of <action>: boolean
+pending login of <action>: boolean
+group leader of <action>: boolean
+offer of <action>: boolean
+offer accepted of <action>: boolean
+persistent constraint of <action>: integer
+pending time of <action>: time
+complete time of <action>: time
+active start time of <action>: time
+last active time of <action>: time
+last change time of <action>: time
+download failure of <action>: integer
+exit code of <action>: integer
+status of <action>: string
+key <string> of <file>: string
+locked key <string> of <file>: string
+section <string> of <file>: file section
+locked section <string> of <file>: file section
+key <string> of <file section>: string
+md5 of <file>: string
+sha1 of <file>: string
+sha2_224 of <file>: string
+sha2_256 of <file>: string
+sha2_384 of <file>: string
+sha2_512 of <file>: string
+sha224 of <file>: string
+sha256 of <file>: string
+sha384 of <file>: string
+sha512 of <file>: string
+line number of <file line>: integer
+rawline number of <file line>: integer
+previous line of <file line>: file line
+previous rawline of <file line>: file line
+next line of <file line>: file line
+next rawline of <file line>: file line
+line <integer> of <file>: file line
+rawline <integer> of <file>: file line
+lines of <file>: file line
+rawlines of <file>: file line
+lines starting with <string> of <file>: file line
+rawlines starting with <string> of <file>: file line
+lines containing <string> of <file>: file line
+rawlines containing <string> of <file>: file line
+locked line <integer> of <file>: file line
+locked rawline <integer> of <file>: file line
+locked lines of <file>: file line
+locked rawlines of <file>: file line
+locked lines starting with <string> of <file>: file line
+locked rawlines starting with <string> of <file>: file line
+locked lines containing <string> of <file>: file line
+locked rawlines containing <string> of <file>: file line
+descendants of <folder>: file
+descendant folders of <folder>: folder
+ancestors of <filesystem object>: folder
+ipv4: ip version
+ipv6: ip version
+any ip version: ip version
+ip version <integer>: ip version
+ipv4 address <string>: ipv4 address
+ipv6 address <string>: ipv6 address
+ipv4or6 address <string>: ipv4or6 address
+ipv4 part of <ipv6 address>: ipv4 address
+ipv4 part of <ipv4or6 address>: ipv4 address
+hexadecet <integer> of <ipv6 address>: integer
+hexadecet <integer> of <ipv4or6 address>: integer
+ip version of <ipv4or6 address>: ip version
+unique values of <ipv4 address>: ipv4 address with multiplicity
+multiplicity of <ipv4 address with multiplicity>: integer
+minima of <ipv4 address>: ipv4 address
+maxima of <ipv4 address>: ipv4 address
+extremas of <ipv4 address>: ( ipv4 address, ipv4 address )
+unique values of <ipv6 address>: ipv6 address with multiplicity
+multiplicity of <ipv6 address with multiplicity>: integer
+minima of <ipv6 address>: ipv6 address
+maxima of <ipv6 address>: ipv6 address
+extremas of <ipv6 address>: ( ipv6 address, ipv6 address )
+unique values of <ipv4or6 address>: ipv4or6 address with multiplicity
+multiplicity of <ipv4or6 address with multiplicity>: integer
+minima of <ipv4or6 address>: ipv4or6 address
+maxima of <ipv4or6 address>: ipv4or6 address
+extremas of <ipv4or6 address>: ( ipv4or6 address, ipv4or6 address )
+current analysis: fixlet
+fixlets of <site>: fixlet
+relevant fixlets of <site>: fixlet
+relevance of <fixlet>: boolean
+id of <fixlet>: integer
+site of <fixlet>: site
+headers of <fixlet>: fixlet_header
+headers <string> of <fixlet>: fixlet_header
+name of <fixlet_header>: string
+value of <fixlet_header>: string
+selected server: selected server
+name of <selected server>: string
+ip address of <selected server>: ipv4or6 address
+port number of <selected server>: integer
+priority of <selected server>: integer
+weight of <selected server>: integer
+distance of <selected server>: integer range
+competition size of <selected server>: integer
+competition weight of <selected server>: integer
+gateway address <integer> of <selected server>: ipv4or6 address
+gateway addresses of <selected server>: ipv4or6 address
+full gateway addresses of <selected server>: ipv4or6 address
+name of <filesystem object>: string
+pathname of <filesystem object>: string
+location of <filesystem object>: string
+binary name of <filesystem object>: binary_string
+parent folder of <filesystem object>: folder
+file <string>: file
+file <string> of <encoding>: file
+file <string> of <folder>: file
+file <binary_string> of <folder>: file
+folder <string>: folder
+folder <binary_string>: folder
+folder <string> of <encoding>: folder
+total size of <download storage folder>: integer
+folder <string> of <folder>: folder
+folder <binary_string> of <folder>: folder
+file <binary_string>: file
+binary pathname of <filesystem object>: binary_string
+binary location of <filesystem object>: binary_string
+folder <binary_string> of <encoding>: folder
+download storage folder: download storage folder
+file <binary_string> of <encoding>: file
+application <string> of <folder>: application
+application <binary_string> of <folder>: application
+files of <folder>: file
+string named files of <folder>: file
+binary named files of <folder>: file
+find files <string> of <folder>: file
+folders of <folder>: folder
+string named folders of <folder>: folder
+binary named folders of <folder>: folder
+find folders <string> of <folder>: folder
+application <string>: application
+application <binary_string>: application
+position <integer> of <binary_string>: binary position
+start of <binary_substring>: binary position
+end of <binary_substring>: binary position
+preceding binary_string of <binary position>: binary_substring
+following binary_string of <binary position>: binary_substring
+positions of <binary_string>: binary position
+first <integer> of <binary_string>: binary_substring
+last <integer> of <binary_string>: binary_substring
+binary_substring <( integer, integer )> of <binary_string>: binary_substring
+preceding binary_string of <binary_substring>: binary_substring
+following binary_string of <binary_substring>: binary_substring
+byte <integer> of <binary_string>: binary_substring
+bytes of <binary_string>: binary_substring
+binary_substrings <binary_string> of <binary_string>: binary_substring
+sha1 of <x509 certificate>: string
+invalid before of <x509 certificate>: time
+invalid after of <x509 certificate>: time
+serial number of <x509 certificate>: string
+version of <x509 certificate>: integer
+public key algorithm of <x509 certificate>: string
+signature algorithm of <x509 certificate>: string
+subject of <x509 certificate>: string
+issuer of <x509 certificate>: string
+subject common name of <x509 certificate>: string
+random floating point: floating point
+random integer: integer
+random integer of <integer>: integer
+unique values of <floating point>: floating point with multiplicity
+multiplicity of <floating point with multiplicity>: integer
+minima of <floating point>: floating point
+maxima of <floating point>: floating point
+extremas of <floating point>: ( floating point, floating point )
+sums of <floating point>: floating point
+products of <floating point>: floating point
+significance threshold of <floating point>: floating point
+significance place of <floating point>: floating point
+relative significance place of <floating point>: floating point
+more significance <integer> of <floating point>: floating point
+less significance <integer> of <floating point>: floating point
+significance place <integer> of <floating point>: floating point
+relative significance place <integer> of <floating point>: floating point
+divided by zero of <floating point>: boolean
+inexact of <floating point>: boolean
+invalid of <floating point>: boolean
+overflow of <floating point>: boolean
+underflow of <floating point>: boolean
+finite of <floating point>: boolean
+infinite of <floating point>: boolean
+nan of <floating point>: boolean
+normal of <floating point>: boolean
+integer floor of <floating point>: integer
+integer ceiling of <floating point>: integer
+sqrt of <floating point>: floating point
+sqrt of <integer>: floating point
+floating point <string>: floating point
+floating point <floating point>: floating point
+md5 of <string>: string
+sha1 of <string>: string
+sha2_224 of <string>: string
+sha2_256 of <string>: string
+sha2_384 of <string>: string
+sha2_512 of <string>: string
+sha224 of <string>: string
+sha256 of <string>: string
+sha384 of <string>: string
+sha512 of <string>: string
+sums of <time interval>: time interval
+strverscmp version <string>: strverscmp version
+pad of <version>: version
+major revision of <version>: integer
+minor revision of <version>: integer
+patch revision of <version>: integer
+build revision of <version>: integer
+version <string>: version
+unique values of <version>: version with multiplicity
+multiplicity of <version with multiplicity>: integer
+minima of <version>: version
+maxima of <version>: version
+extremas of <version>: ( version, version )
+size of <integer set>: integer
+elements of <integer set>: integer
+sets of <integer>: integer set
+unions of <integer set>: integer set
+intersections of <integer set>: integer set
+size of <string set>: integer
+elements of <string set>: string
+sets of <string>: string set
+unions of <string set>: string set
+intersections of <string set>: string set
+unique values of <site version list>: site version list with multiplicity
+multiplicity of <site version list with multiplicity>: integer
+minima of <site version list>: site version list
+maxima of <site version list>: site version list
+extremas of <site version list>: ( site version list, site version list )
+site version list <string>: site version list
+component <integer> of <site version list>: integer
+unique values of <time of day with time zone>: time of day with time zone with multiplicity
+multiplicity of <time of day with time zone with multiplicity>: integer
+time of <time of day with time zone>: time of day
+zone of <time of day with time zone>: time zone
+hour_of_day of <time of day with time zone>: integer
+minute_of_hour of <time of day with time zone>: integer
+second_of_minute of <time of day with time zone>: integer
+two digit hour of <time of day with time zone>: string
+two digit minute of <time of day with time zone>: string
+two digit second of <time of day with time zone>: string
+zoned time_of_day <string>: time of day with time zone
+time <time zone> of <time>: time of day with time zone
+current time_of_day <time zone>: time of day with time zone
+current time_of_day: time of day with time zone
+unique values of <year>: year with multiplicity
+multiplicity of <year with multiplicity>: integer
+minima of <year>: year
+maxima of <year>: year
+extremas of <year>: ( year, year )
+leap of <year>: boolean
+length of <year>: time interval
+year <integer>: year
+year <string>: year
+unique values of <time range>: time range with multiplicity
+multiplicity of <time range with multiplicity>: integer
+start of <time range>: time
+end of <time range>: time
+length of <time range>: time interval
+range before <time> of <time range>: time range
+range after <time> of <time range>: time range
+initial part <time interval> of <time range>: time range
+final part <time interval> of <time range>: time range
+unique values of <time of day>: time of day with multiplicity
+multiplicity of <time of day with multiplicity>: integer
+minima of <time of day>: time of day
+maxima of <time of day>: time of day
+extremas of <time of day>: ( time of day, time of day )
+midnight: time of day
+noon: time of day
+hour_of_day of <time of day>: integer
+minute_of_hour of <time of day>: integer
+second_of_minute of <time of day>: integer
+two digit hour of <time of day>: string
+two digit minute of <time of day>: string
+two digit second of <time of day>: string
+time_of_day <string>: time of day
+unique values of <month>: month with multiplicity
+multiplicity of <month with multiplicity>: integer
+minima of <month>: month
+maxima of <month>: month
+extremas of <month>: ( month, month )
+january: month
+february: month
+march: month
+april: month
+may: month
+june: month
+july: month
+august: month
+september: month
+october: month
+november: month
+december: month
+month <integer>: month
+month <string>: month
+unique values of <number of months>: number of months with multiplicity
+multiplicity of <number of months with multiplicity>: integer
+minima of <number of months>: number of months
+maxima of <number of months>: number of months
+extremas of <number of months>: ( number of months, number of months )
+month: number of months
+year: number of months
+unique values of <month and year>: month and year with multiplicity
+multiplicity of <month and year with multiplicity>: integer
+minima of <month and year>: month and year
+maxima of <month and year>: month and year
+extremas of <month and year>: ( month and year, month and year )
+month of <month and year>: month
+year of <month and year>: year
+length of <month and year>: time interval
+january of <integer>: month and year
+february of <integer>: month and year
+march of <integer>: month and year
+april of <integer>: month and year
+may of <integer>: month and year
+june of <integer>: month and year
+july of <integer>: month and year
+august of <integer>: month and year
+september of <integer>: month and year
+october of <integer>: month and year
+november of <integer>: month and year
+december of <integer>: month and year
+unique values of <date>: date with multiplicity
+multiplicity of <date with multiplicity>: integer
+minima of <date>: date
+maxima of <date>: date
+extremas of <date>: ( date, date )
+day_of_month of <date>: day of month
+month of <date>: month
+year of <date>: year
+day_of_week of <date>: day of week
+day_of_year of <date>: day of year
+month_and_year of <date>: month and year
+january <integer> of <integer>: date
+february <integer> of <integer>: date
+march <integer> of <integer>: date
+april <integer> of <integer>: date
+may <integer> of <integer>: date
+june <integer> of <integer>: date
+july <integer> of <integer>: date
+august <integer> of <integer>: date
+september <integer> of <integer>: date
+october <integer> of <integer>: date
+november <integer> of <integer>: date
+december <integer> of <integer>: date
+first <day of week> of <month and year>: date
+first sunday of <month and year>: date
+first monday of <month and year>: date
+first tuesday of <month and year>: date
+first wednesday of <month and year>: date
+first thursday of <month and year>: date
+first friday of <month and year>: date
+first saturday of <month and year>: date
+date <string>: date
+date <time zone> of <time>: date
+current date: date
+current day_of_week: day of week
+current day_of_month: day of month
+current month: month
+current year: year
+current day_of_year: day of year
+current month_and_year: month and year
+unique values of <day of year>: day of year with multiplicity
+multiplicity of <day of year with multiplicity>: integer
+minima of <day of year>: day of year
+maxima of <day of year>: day of year
+extremas of <day of year>: ( day of year, day of year )
+day of <day of year>: day of month
+month of <day of year>: month
+january <integer>: day of year
+february <integer>: day of year
+march <integer>: day of year
+april <integer>: day of year
+may <integer>: day of year
+june <integer>: day of year
+july <integer>: day of year
+august <integer>: day of year
+september <integer>: day of year
+october <integer>: day of year
+november <integer>: day of year
+december <integer>: day of year
+unique values of <day of week>: day of week with multiplicity
+multiplicity of <day of week with multiplicity>: integer
+sunday: day of week
+monday: day of week
+tuesday: day of week
+wednesday: day of week
+thursday: day of week
+friday: day of week
+saturday: day of week
+day_of_week <string>: day of week
+unique values of <day of month>: day of month with multiplicity
+multiplicity of <day of month with multiplicity>: integer
+minima of <day of month>: day of month
+maxima of <day of month>: day of month
+extremas of <day of month>: ( day of month, day of month )
+day_of_month <integer>: day of month
+day_of_month <string>: day of month
+null: undefined
+nil: undefined
+error <string>: undefined
+unary operators: unary operator
+unary operators <string>: unary operator
+unary operators returning <type>: unary operator
+name of <unary operator>: string
+symbol of <unary operator>: string
+result type of <unary operator>: type
+operand type of <unary operator>: type
+integer <integer>: integer
+unique values of <integer>: integer with multiplicity
+multiplicity of <integer with multiplicity>: integer
+minima of <integer>: integer
+maxima of <integer>: integer
+extremas of <integer>: ( integer, integer )
+bit <integer> of <integer>: boolean
+absolute value of <integer>: integer
+greatest integer: integer
+least integer: integer
+integer <string>: integer
+lower bound of <integer range>: integer
+upper bound of <integer range>: integer
+type <string>: type
+types: type
+name of <type>: string
+size of <type>: integer
+parent of <type>: type
+string <string>: string
+character <integer>: string
+length of <string>: integer
+properties: property
+properties <string>: property
+properties of <type>: property
+properties <string> of <type>: property
+properties returning <type>: property
+properties returning <type> of <type>: property
+singular name of <property>: string
+plural name of <property>: string
+usual name of <property>: string
+result type of <property>: type
+index type of <property>: type
+direct object type of <property>: type
+multivalued of <property>: boolean
+dependency known of <property>: boolean
+casts: cast
+casts <string>: cast
+casts from of <type>: cast
+casts returning <type>: cast
+name of <cast>: string
+operand type of <cast>: type
+result type of <cast>: type
+true: boolean
+false: boolean
+boolean <string>: boolean
+binary_string <string>: binary_string
+byte <integer>: binary_string
+length of <binary_string>: integer
+representable of <binary_string>: boolean
+representable in utf8 of <binary_string>: boolean
+representable in utf16 of <binary_string>: boolean
+representable in <string> of <binary_string>: boolean
+representation in <string> of <binary_string>: string
+binary operators: binary operator
+binary operators <string>: binary operator
+binary operators returning <type>: binary operator
+name of <binary operator>: string
+symbol of <binary operator>: string
+result type of <binary operator>: type
+left operand type of <binary operator>: type
+right operand type of <binary operator>: type
+substrings before <string> of <string>: substring
+substrings after <string> of <string>: substring
+substrings between <string> of <string>: substring
+substrings separated by <string> of <string>: substring
+multiplicity of <string with multiplicity>: integer
+unique values of <string>: string with multiplicity
+universal time zone: time zone
+local time zone: time zone
+time zone <string>: time zone
+unique values of <time zone>: time zone with multiplicity
+multiplicity of <time zone with multiplicity>: integer
+microsecond: time interval
+millisecond: time interval
+second: time interval
+minute: time interval
+hour: time interval
+day: time interval
+week: time interval
+unique values of <time interval>: time interval with multiplicity
+multiplicity of <time interval with multiplicity>: integer
+minima of <time interval>: time interval
+maxima of <time interval>: time interval
+extremas of <time interval>: ( time interval, time interval )
+absolute value of <time interval>: time interval
+greatest time interval: time interval
+least time interval: time interval
+time interval <string>: time interval
+first <integer> of <string>: substring
+last <integer> of <string>: substring
+substring <( integer, integer )> of <string>: substring
+first <string> of <string>: substring
+last <string> of <string>: substring
+preceding text of <substring>: substring
+following text of <substring>: substring
+character <integer> of <string>: substring
+characters of <string>: substring
+substrings <string> of <string>: substring
+position <integer> of <string>: string position
+start of <substring>: string position
+end of <substring>: string position
+preceding text of <string position>: substring
+following text of <string position>: substring
+positions of <string>: string position
+concatenations of <string>: string
+concatenations <string> of <string>: string
+local encoding concatenations of <string>: string
+local encoding concatenations <string> of <string>: string
+fxf encoding concatenations of <string>: string
+fxf encoding concatenations <string> of <string>: string
+significant digits <integer> of <integer>: integer
+significant digits <integer> of <hertz>: hertz
+time <string>: time
+local time <string>: time
+universal time <string>: time
+now: time
+unique values of <time>: time with multiplicity
+multiplicity of <time with multiplicity>: integer
+minima of <time>: time
+maxima of <time>: time
+extremas of <time>: ( time, time )
+hz: hertz
+khz: hertz
+mhz: hertz
+ghz: hertz
+unique values of <hertz>: hertz with multiplicity
+multiplicity of <hertz with multiplicity>: integer
+minima of <hertz>: hertz
+maxima of <hertz>: hertz
+extremas of <hertz>: ( hertz, hertz )
+absolute value of <hertz>: hertz
+greatest hz: hertz
+least hz: hertz
+sums of <integer>: integer
+hexadecimal integer <string>: integer
+hexadecimal string <string>: string
+padded string of <bit set>: string
+bit set <string>: bit set
+bit <integer>: bit set
+least significant one bit of <bit set>: integer
+most significant one bit of <bit set>: integer
+right shift <integer> of <bit set>: bit set
+left shift <integer> of <bit set>: bit set
+bit <integer> of <bit set>: boolean
+one bits of <bit set>: integer
+tuple items of <string>: tuple item
+string of <tuple item>: string
+index of <tuple item>: integer
+tuple string item <integer> of <string>: string
+tuple string items of <string>: string
+tuple strings of <string>: string
+standard deviations of <floating point>: floating point
+standard deviations of <integer>: floating point
+rope <string>: rope
+length of <rope>: integer
+percent encode <string>: string
+percent decode <string>: string
+percent encode <binary_string>: string
+numeric value of <string>: integer
+means of <floating point>: floating point
+means of <integer>: floating point
+products of <integer>: integer
+format <string>: format
+cryptography: cryptography
+fips mode of <cryptography>: boolean
+desired fips mode of <cryptography>: boolean
+fips mode failure message of <cryptography>: string
+version of <cryptography>: string
+conjunctions of <boolean>: boolean
+disjunctions of <boolean>: boolean
+base64 encode <string>: string
+base64 decode <string>: string
+integers to <integer>: integer
+integers in <( integer, integer )>: integer
+integers in <( integer, integer, integer )>: integer
+json of <string>: json value
+type of <json value>: string
+element <integer> of <json value>: json value
+key <string> of <json value>: json key
+path <string> of <json value>: json value
+keys of <json value>: json key
+elements of <json value>: json value
+name of <json key>: string
+value of <json key>: json value
+html tag <string> of <string>: html
+html tag <string> of <html>: html
+html tag <( string, string )>: html
+html tag <( string, html )>: html
+html tag <( string, html attribute list )>: html
+html tag <( string, html attribute list, string )>: html
+html tag <( string, html attribute list, html )>: html
+html of <string>: html
+html of <html>: html
+html <string> of <string>: html
+html <string> of <html>: html
+head of <string>: html
+head of <html>: html
+head <string> of <string>: html
+head <string> of <html>: html
+title of <string>: html
+title of <html>: html
+title <string> of <string>: html
+title <string> of <html>: html
+meta of <string>: html
+meta of <html>: html
+meta <string> of <string>: html
+meta <string> of <html>: html
+body of <string>: html
+body of <html>: html
+body <string> of <string>: html
+body <string> of <html>: html
+div of <string>: html
+div of <html>: html
+div <string> of <string>: html
+div <string> of <html>: html
+span of <string>: html
+span of <html>: html
+span <string> of <string>: html
+span <string> of <html>: html
+address of <string>: html
+address of <html>: html
+address <string> of <string>: html
+address <string> of <html>: html
+h1 of <string>: html
+h1 of <html>: html
+h1 <string> of <string>: html
+h1 <string> of <html>: html
+h2 of <string>: html
+h2 of <html>: html
+h2 <string> of <string>: html
+h2 <string> of <html>: html
+h3 of <string>: html
+h3 of <html>: html
+h3 <string> of <string>: html
+h3 <string> of <html>: html
+h4 of <string>: html
+h4 of <html>: html
+h4 <string> of <string>: html
+h4 <string> of <html>: html
+h5 of <string>: html
+h5 of <html>: html
+h5 <string> of <string>: html
+h5 <string> of <html>: html
+h6 of <string>: html
+h6 of <html>: html
+h6 <string> of <string>: html
+h6 <string> of <html>: html
+em of <string>: html
+em of <html>: html
+em <string> of <string>: html
+em <string> of <html>: html
+strong of <string>: html
+strong of <html>: html
+strong <string> of <string>: html
+strong <string> of <html>: html
+dfn of <string>: html
+dfn of <html>: html
+dfn <string> of <string>: html
+dfn <string> of <html>: html
+code of <string>: html
+code of <html>: html
+code <string> of <string>: html
+code <string> of <html>: html
+samp of <string>: html
+samp of <html>: html
+samp <string> of <string>: html
+samp <string> of <html>: html
+kbd of <string>: html
+kbd of <html>: html
+kbd <string> of <string>: html
+kbd <string> of <html>: html
+var of <string>: html
+var of <html>: html
+var <string> of <string>: html
+var <string> of <html>: html
+cite of <string>: html
+cite of <html>: html
+cite <string> of <string>: html
+cite <string> of <html>: html
+abbr of <string>: html
+abbr of <html>: html
+abbr <string> of <string>: html
+abbr <string> of <html>: html
+acronym of <string>: html
+acronym of <html>: html
+acronym <string> of <string>: html
+acronym <string> of <html>: html
+blockquote of <string>: html
+blockquote of <html>: html
+blockquote <string> of <string>: html
+blockquote <string> of <html>: html
+q of <string>: html
+q of <html>: html
+q <string> of <string>: html
+q <string> of <html>: html
+sub of <string>: html
+sub of <html>: html
+sub <string> of <string>: html
+sub <string> of <html>: html
+sup of <string>: html
+sup of <html>: html
+sup <string> of <string>: html
+sup <string> of <html>: html
+p of <string>: html
+p of <html>: html
+p <string> of <string>: html
+p <string> of <html>: html
+br: html
+br <string>: html
+pre of <string>: html
+pre of <html>: html
+pre <string> of <string>: html
+pre <string> of <html>: html
+ins of <string>: html
+ins of <html>: html
+ins <string> of <string>: html
+ins <string> of <html>: html
+del of <string>: html
+del of <html>: html
+del <string> of <string>: html
+del <string> of <html>: html
+unordered lists of <string>: html
+unordered lists <string> of <string>: html
+unordered lists of <html>: html
+unordered lists <string> of <html>: html
+ordered lists of <string>: html
+ordered lists <string> of <string>: html
+ordered lists of <html>: html
+ordered lists <string> of <html>: html
+definition lists of <string>: html
+definition lists <string> of <string>: html
+definition lists of <html>: html
+definition lists <string> of <html>: html
+ul of <string>: html
+ul of <html>: html
+ul <string> of <string>: html
+ul <string> of <html>: html
+ol of <string>: html
+ol of <html>: html
+ol <string> of <string>: html
+ol <string> of <html>: html
+li of <string>: html
+li of <html>: html
+li <string> of <string>: html
+li <string> of <html>: html
+dt of <string>: html
+dt of <html>: html
+dt <string> of <string>: html
+dt <string> of <html>: html
+dd of <string>: html
+dd of <html>: html
+dd <string> of <string>: html
+dd <string> of <html>: html
+table of <string>: html
+table of <html>: html
+table <string> of <string>: html
+table <string> of <html>: html
+caption of <string>: html
+caption of <html>: html
+caption <string> of <string>: html
+caption <string> of <html>: html
+thead of <string>: html
+thead of <html>: html
+thead <string> of <string>: html
+thead <string> of <html>: html
+tfoot of <string>: html
+tfoot of <html>: html
+tfoot <string> of <string>: html
+tfoot <string> of <html>: html
+tbody of <string>: html
+tbody of <html>: html
+tbody <string> of <string>: html
+tbody <string> of <html>: html
+colgroup of <string>: html
+colgroup of <html>: html
+colgroup <string> of <string>: html
+colgroup <string> of <html>: html
+col of <string>: html
+col of <html>: html
+col <string> of <string>: html
+col <string> of <html>: html
+tr of <string>: html
+tr of <html>: html
+tr <string> of <string>: html
+tr <string> of <html>: html
+th of <string>: html
+th of <html>: html
+th <string> of <string>: html
+th <string> of <html>: html
+td of <string>: html
+td of <html>: html
+td <string> of <string>: html
+td <string> of <html>: html
+anchor of <string>: html
+anchor of <html>: html
+anchor <string> of <string>: html
+anchor <string> of <html>: html
+link of <string>: html
+link of <html>: html
+link <string> of <string>: html
+link <string> of <html>: html
+base of <string>: html
+base of <html>: html
+base <string> of <string>: html
+base <string> of <html>: html
+tt of <string>: html
+tt of <html>: html
+tt <string> of <string>: html
+tt <string> of <html>: html
+italic of <string>: html
+italic of <html>: html
+italic <string> of <string>: html
+italic <string> of <html>: html
+b of <string>: html
+b of <html>: html
+b <string> of <string>: html
+b <string> of <html>: html
+big of <string>: html
+big of <html>: html
+big <string> of <string>: html
+big <string> of <html>: html
+small of <string>: html
+small of <html>: html
+small <string> of <string>: html
+small <string> of <html>: html
+hr: html
+hr <string>: html
+html <string>: html
+concatenations of <html>: html
+concatenations <string> of <html>: html
+concatenations <html> of <string>: html
+concatenations <html> of <html>: html
+html concatenations of <html>: html
+html concatenations <string> of <html>: html
+attr lists of <( string, string )>: html attribute list
