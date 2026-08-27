@@ -25,8 +25,17 @@ jobs:
     # pull_request event HEAD is detached at the merge ref, where it passes -
     # which is why this only shows up after the merge.) SKIP is read by
     # pre-commit itself, so it applies to both steps below.
+    #
+    # GH_TOKEN puts zizmor in online mode (offline is the default without it):
+    # it can then fetch the referenced actions themselves for the audits that
+    # need that - see the comment above the zizmor hook in
+    # .pre-commit-config.yaml. The runner's own GITHUB_TOKEN is enough for a
+    # public repo; this is read-only per the `permissions:` block above and
+    # never touches git credentials (actions/checkout above already sets
+    # persist-credentials: false).
     env:
       SKIP: no-commit-to-branch
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -41,15 +50,31 @@ jobs:
       # single source of truth for the uv version: the `rev` of the
       # astral-sh/uv-pre-commit repo in .pre-commit-config.yaml, which
       # `pre-commit autoupdate` already keeps current. Read with awk rather
-      # than a yaml parser so it needs nothing installed first.
+      # than a yaml parser so it needs nothing installed first. `rev` is
+      # SHA-pinned (Dependabot's pre-commit ecosystem keeps the trailing
+      # `# X.Y.Z` comment in sync when it bumps the SHA - same convention as
+      # the actions/* pins above), so the version comes from that comment;
+      # fall back to the bare `rev` value for a tag-pinned rev with no
+      # comment.
       - name: read uv version from .pre-commit-config.yaml
         run: |
           UV_VERSION="$(awk '
             /^[[:space:]]*-[[:space:]]*repo:.*astral-sh\/uv-pre-commit[[:space:]]*$/ { found = 1; next }
-            found && $1 == "rev:" { gsub(/["'\'']/, "", $2); print $2; exit }
+            found && $1 == "rev:" {
+              if (match($0, /#[ \t]*(frozen:[ \t]*)?[vV]?[0-9]+(\.[0-9]+)*/)) {
+                ver = substr($0, RSTART, RLENGTH)
+                sub(/^#[ \t]*(frozen:[ \t]*)?[vV]?/, "", ver)
+              } else {
+                ver = $2
+                gsub(/["'\'']/, "", ver)
+                sub(/^[vV]/, "", ver)
+              }
+              print ver
+              exit
+            }
           ' .pre-commit-config.yaml)"
           if [ -z "$UV_VERSION" ]; then
-            echo "::error::could not read the astral-sh/uv-pre-commit rev from .pre-commit-config.yaml"
+            echo "::error::could not read the astral-sh/uv-pre-commit version from .pre-commit-config.yaml"
             exit 1
           fi
           echo "UV_VERSION=$UV_VERSION" >> "$GITHUB_ENV"
