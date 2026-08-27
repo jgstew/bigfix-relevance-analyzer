@@ -3,6 +3,9 @@
 import logging
 from importlib.metadata import PackageNotFoundError, version
 
+from bigfix_relevance_analyzer.complexity import RelevanceComplexity
+from bigfix_relevance_analyzer.complexity import analyze as analyze_relevance_complexity
+from bigfix_relevance_analyzer.complexity import score as score_relevance_complexity
 from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect, is_definite
 from bigfix_relevance_analyzer.extract import (
     HtmlContext,
@@ -30,9 +33,11 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 __all__ = [
     "Dialect",
     "HtmlContext",
+    "RelevanceComplexity",
     "RelevanceSite",
     "SiteKind",
     "__version__",
+    "analyze_relevance_complexity",
     "classify_relevance_dialect",
     "extract_relevance_from_actionscript",
     "extract_relevance_from_bes_xml",
@@ -41,4 +46,5 @@ __all__ = [
     "extract_relevance_from_markdown",
     "is_definite",
     "looks_like_clientui",
+    "score_relevance_complexity",
 ]

@@ -34,6 +34,10 @@ plan of record is a hand-rolled Pratt parser with the operator, precedence, and
 keyword data kept in declarative tables, plus a shared corpus of input to
 expected parse trees as the primary asset.
 
+The tokenizer for that parser already exists and is in use by the complexity
+scorer, so the grammar research starts from a lexer that is exercised against
+the whole example corpus rather than from raw text.
+
 The long-term goal may be to **translate the core to Rust**, exposed as PyO3
 wheels for Python consumers and as WebAssembly for a VS Code extension. That is
 the honest end-state for "one implementation, every consumer": today a Python
@@ -130,6 +134,42 @@ sites = extract_relevance_from_lxml_tree(my_tree)
 Both paths report identical line numbers, including for a start tag whose
 attributes span several lines - a test pins this across the whole example
 corpus, since an off-by-one there would shift every reported line in a file.
+
+## Scoring complexity
+
+`analyze_relevance_complexity` gives a statement a heuristic score, along with
+the individual metrics that produced it, so a pre-commit hook can threshold on
+the number and still say *why* something was flagged:
+
+```python
+from bigfix_relevance_analyzer import analyze_relevance_complexity
+
+result = analyze_relevance_complexity(
+    'exists files whose (name of it starts with "bes") of folder "/tmp"'
+)
+print(result.score, result.whose_clauses, result.max_of_chain)
+```
+
+Counting runs over the token stream, never over raw text, so a comment
+mentioning `whose` or the word `and` inside a string literal cannot inflate the
+score. The metrics are heuristics and the weights are deliberately module-level
+constants (`WEIGHT_WHOSE_CLAUSE` and friends) so they can be tuned against
+real content without touching the counting.
+
+### The tokenizer
+
+`bigfix_relevance_analyzer.tokenizer` is the lexer the scorer counts against,
+and the front end the future parser will sit on. It turns text into a lossless
+stream of tokens: joining their texts reproduces the input exactly, whitespace
+and comments included, which is what a formatter or auto-fixer would need later.
+It never raises - malformed relevance yields error tokens, because content
+extracted from the wild is regularly truncated or broken and a scorer still has
+to produce a number for it.
+
+It deliberately does **not** bind multi-word inspector names; that needs the
+inspector table below and type-directed disambiguation, both of which are parser
+work. Keeping this layer table-free makes it total: any input lexes, and the
+same input always lexes the same way, regardless of which dumps happen to exist.
 
 ## The inspector table
 
