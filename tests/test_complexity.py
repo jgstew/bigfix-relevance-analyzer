@@ -30,6 +30,7 @@ from bigfix_relevance_analyzer.complexity import (
 )
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.extract import extract_relevance_from_file
+from bigfix_relevance_analyzer.tokenizer import code_tokens
 
 # ---------------------------------------------------------------------------
 # Metrics
@@ -604,3 +605,299 @@ def test_nine_nested_is_more_than_three_times_three_nested() -> None:
         return text
 
     assert score(nested(9)) > 3 * score(nested(3))
+
+
+# ---------------------------------------------------------------------------
+# Conditional nesting is read from keywords, not from parentheses
+# ---------------------------------------------------------------------------
+#
+# Relevance does not require parentheses around a conditional's branches, but
+# they make a deep one easier to follow -- so writing them must not cost
+# anything. Nesting is therefore detected from `then`/`else`, and a `(` that
+# exists only to wrap a nested `if` is scaffolding: it contributes neither
+# parenthesis depth nor tokens, because the nesting it marks is already charged
+# once as conditional depth.
+#
+# Residual, pinned below rather than fixed: parentheses around a *condition*
+# (`if (a and b) then ...`) are still charged. Whether they are redundant
+# depends on the token after the `)`, which a single pass cannot know when it
+# commits the depth at the `(`.
+
+
+def nested_conditional(n: int, *, parens: bool) -> str:
+    """`n` conditionals nested in each other's `then` branch, with or without parens.
+
+    Only a branch that is itself a conditional gets parenthesized -- wrapping the
+    innermost leaf too would compare against a paren that is plain grouping, not
+    conditional scaffolding, and is charged for on purpose.
+    """
+    text = '"leaf"'
+    for i in range(n):
+        branch = f"({text})" if parens and i else text
+        text = f'if c{i} then {branch} else "e{i}"'
+    return text
+
+
+def test_unparenthesized_nesting_is_seen() -> None:
+    """The bug: without parens to infer from, nesting used to report depth 1."""
+    assert analyze(nested_conditional(2, parens=False)).max_conditional_depth == 2
+
+
+def test_deep_unparenthesized_nesting_is_seen() -> None:
+    assert analyze(nested_conditional(3, parens=False)).max_conditional_depth == 3
+
+
+@pytest.mark.parametrize("depth", [2, 3])
+def test_parentheses_around_a_nested_conditional_do_not_change_the_score(depth: int) -> None:
+    """The regression test: the clearer form must not cost more than the terser one."""
+    assert score(nested_conditional(depth, parens=True)) == pytest.approx(
+        score(nested_conditional(depth, parens=False))
+    )
+
+
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 5])
+def test_parentheses_never_raise_the_score_of_a_nesting(n: int) -> None:
+    assert score(nested_conditional(n, parens=True)) <= score(nested_conditional(n, parens=False))
+
+
+def test_conditional_scaffolding_adds_no_parenthesis_depth() -> None:
+    result = analyze('if a then (if b then "p" else "q") else "r"')
+    assert result.max_conditional_depth == 2
+    assert result.max_paren_depth == 0
+    assert result.conditional_parens == 1
+
+
+def test_token_count_excludes_conditional_scaffolding() -> None:
+    """The exclusion stays auditable: the raw lexical count is recoverable."""
+    text = 'if a then (if b then "p" else "q") else "r"'
+    result = analyze(text)
+    assert result.conditional_parens == 1
+    assert result.token_count + 2 * result.conditional_parens == len(list(code_tokens(text)))
+
+
+# -- chains stay flat -------------------------------------------------------
+
+
+def test_a_parenthesized_else_if_chain_is_still_flat() -> None:
+    result = analyze('if a then "x" else (if b then "p" else "q")')
+    assert result.max_conditional_depth == 1
+
+
+@pytest.mark.parametrize(
+    "statement",
+    [
+        'if a then (if b then "p" else "q") else if c then "r" else "s"',
+        'if a then if b then "p" else "q" else if c then "r" else "s"',
+    ],
+)
+def test_a_chain_after_a_nesting_returns_to_sibling_depth(statement: str) -> None:
+    """Without a closing rule the chain link would report depth 3, not 2."""
+    result = analyze(statement)
+    assert result.conditional_branches == 3
+    assert result.max_conditional_depth == 2
+
+
+# -- parentheses that are not scaffolding still count -----------------------
+
+
+def test_parens_that_group_a_branch_expression_still_count() -> None:
+    """Real grouping is not scaffolding, even inside a branch."""
+    assert analyze("if a then (b and (c or d)) else e").max_paren_depth == 2
+
+
+def test_parens_around_a_condition_still_count() -> None:
+    """Pins the documented residual, so removing it later is a deliberate act."""
+    assert analyze('if (a and b) then "x" else "y"').max_paren_depth == 1
+
+
+def test_a_whose_paren_is_not_conditional_scaffolding() -> None:
+    assert analyze('exists files whose (if a then "x" else "y")').max_paren_depth == 1
+
+
+def test_a_conditional_buried_in_a_branch_still_nests() -> None:
+    result = analyze('if a then ("x" & (if b then "p" else "q")) else "z"')
+    assert result.max_conditional_depth == 2
+    assert result.max_paren_depth == 2
+
+
+def test_a_conditional_in_a_condition_nests() -> None:
+    result = analyze('if (if a then b else c) then "x" else "y"')
+    assert result.max_conditional_depth == 2
+
+
+def test_unbalanced_conditional_parens_are_scored_not_raised() -> None:
+    result = analyze('if a then (if b then "x"')
+    assert result.max_conditional_depth == 2
+    assert result.score > 0
+
+
+# -- pinned scores, so recalibration is always a deliberate act -------------
+
+
+@pytest.mark.parametrize(
+    ("statement", "expected"),
+    [
+        ("((a) and (b and (c)))", 35.5885),
+        # 27.5 before WEIGHT_WHOSE_CLAUSE dropped 5.0 -> 1.5, so that filtering
+        # a cross product stops costing more than leaving it unfiltered.
+        ('exists files whose (name of it starts with "bes")', 24.0),
+        ("(a and b) or (c and d)", 24.0),
+        ("a) b) c", 8.0),
+    ],
+)
+def test_pinned_scores(statement: str, expected: float) -> None:
+    assert score(statement) == pytest.approx(expected, abs=1e-3)
+
+
+# ---------------------------------------------------------------------------
+# Tuples: cross products are charged, filters are not punished
+# ---------------------------------------------------------------------------
+#
+# A relevance tuple expands to a cross product: (10 items, 10 items, 10 items)
+# is 1000 tuples. `whose` filters cut that down -- an outer whose tames the
+# whole product, a member-level whose tames one factor -- so the scorer must
+# never reward deleting them. Unfiltered tuple commas are charged (linearly in
+# total, superlinearly on the worst single tuple); a filtered, projected
+# (`(...) of x`), or all-literal tuple charges nothing.
+#
+# Accepted heuristic limits, pinned below rather than fixed: `whose (true)`
+# waives (junk filters are not detectable without a parser); a cast between
+# the tuple and its whose defeats the waiver (chasing casts needs unbounded
+# lookahead); a member-only filter with a large body can still cost slightly
+# more than deleting it, because it tames only one factor of the product.
+
+
+def test_an_unfiltered_tuple_is_charged() -> None:
+    result = analyze("(items a, items b, items c)")
+    assert result.tuple_commas == 2
+    assert result.unfiltered_tuple_commas == 2
+    assert result.max_unfiltered_tuple_commas == 2
+
+
+def test_an_outer_whose_waives_the_whole_tuple() -> None:
+    result = analyze('(items a, items b, items c) whose (item 0 of it = "x")')
+    assert result.tuple_commas == 2
+    assert result.unfiltered_tuple_commas == 0
+
+
+def test_a_member_filter_waives_one_comma() -> None:
+    result = analyze("((items a) whose (it > 1), items b, items c)")
+    assert result.tuple_commas == 2
+    assert result.unfiltered_tuple_commas == 1
+
+
+def test_member_and_outer_filters_together_waive_everything() -> None:
+    """The motivating example: filters in both places, nothing charged."""
+    statement = '((items a) whose (it > 1), items b, items c) whose (item 0 of it = "x")'
+    assert analyze(statement).unfiltered_tuple_commas == 0
+
+
+def test_a_projection_tuple_is_not_charged() -> None:
+    """`(a, b) of x` expands linearly with x, not multiplicatively."""
+    result = analyze("(id of it, name of it) of x")
+    assert result.tuple_commas == 1
+    assert result.unfiltered_tuple_commas == 0
+
+
+def test_all_literal_tuples_are_not_charged() -> None:
+    """Argument tuples of plain literals expand nothing."""
+    assert analyze('substrings separated by ("a", "b") of x').unfiltered_tuple_commas == 0
+    result = analyze("(1, 2, 3)")
+    assert result.tuple_commas == 2
+    assert result.unfiltered_tuple_commas == 0
+
+
+def test_a_mixed_literal_tuple_is_still_a_tuple() -> None:
+    assert analyze('("a", items b)').unfiltered_tuple_commas == 1
+
+
+def test_a_wrapped_tuple_is_still_waived_by_whose() -> None:
+    assert analyze("((items a, items b)) whose (it > 1)").unfiltered_tuple_commas == 0
+
+
+def test_a_bare_toplevel_tuple_is_charged() -> None:
+    """An outer whose is impossible without parens, so bare commas charge."""
+    result = analyze("items a, items b, items c")
+    assert result.tuple_commas == 2
+    assert result.unfiltered_tuple_commas == 2
+
+
+def test_an_unbalanced_tuple_charges_at_end_of_input() -> None:
+    assert analyze("(items a, items b").unfiltered_tuple_commas == 1
+
+
+def test_commas_in_strings_and_comments_are_not_tuples() -> None:
+    assert analyze('"a, b, c"').tuple_commas == 0
+    assert analyze("x /* a, b */").tuple_commas == 0
+
+
+def test_a_trivial_whose_still_waives() -> None:
+    """Accepted gaming: junk filters need a parser to detect."""
+    assert analyze("(items a, items b) whose (true)").unfiltered_tuple_commas == 0
+
+
+def test_a_cast_between_tuple_and_whose_defeats_the_waiver() -> None:
+    """Pinned limit: only an *immediate* whose or `of` waives."""
+    statement = '(items a, items b) as string whose (it = "x")'
+    assert analyze(statement).unfiltered_tuple_commas == 1
+
+
+# -- the incentive must point the right way ----------------------------------
+
+
+def filterable_tuple(members: int) -> str:
+    return "(" + ", ".join(f"items i{k}" for k in range(members)) + ")"
+
+
+@pytest.mark.parametrize("members", [2, 3, 4, 5])
+def test_filtering_a_tuple_never_raises_the_score(members: int) -> None:
+    """True at every width, narrowest included -- the whole point of the weight."""
+    unfiltered = filterable_tuple(members)
+    filtered = f'{unfiltered} whose (item 0 of it = "x")'
+    assert score(filtered) < score(unfiltered)
+
+
+def test_a_filter_body_can_still_outweigh_what_it_waives() -> None:
+    """The honest limit: the waiver is finite, so a sprawling filter body still
+    costs more than it saves. That is reading cost the score is meant to show,
+    not the perverse incentive the fan-out charge exists to prevent."""
+    unfiltered = filterable_tuple(2)
+    sprawling = " and ".join(f'name of item 0 of it != "v{k}"' for k in range(6))
+    assert score(f"{unfiltered} whose ({sprawling})") > score(unfiltered)
+
+
+def test_wider_unfiltered_tuples_cost_increasingly_more() -> None:
+    scores = [score(filterable_tuple(n)) for n in (2, 3, 4, 5)]
+    deltas = [b - a for a, b in pairwise(scores)]
+    assert deltas == sorted(deltas)
+    assert deltas[-1] > deltas[0]
+
+
+# -- member filters and an outer filter stack --------------------------------
+#
+# An outer `whose` runs *after* the cross product is built, so it bounds what
+# flows onward but not the expansion the engine paid for. A member `whose`
+# narrows a factor *before* the product, so it makes the expansion itself
+# smaller. They are therefore credited against different terms and stack:
+# together they beat either alone.
+
+
+def test_member_and_outer_filters_stack_on_fanout() -> None:
+    three = "(items a, items b, items c)"
+    member = "((items a) whose (it > 1), items b, items c)"
+    assert analyze(three).max_unfiltered_tuple_commas == 2
+    assert analyze(f'{three} whose (it = "x")').max_unfiltered_tuple_commas == 1
+    assert analyze(member).max_unfiltered_tuple_commas == 1
+    assert analyze(f'{member} whose (it = "x")').max_unfiltered_tuple_commas == 0
+
+
+def test_filtering_a_member_pays_off_even_under_an_outer_filter() -> None:
+    """The gap this closes: a member filter used to add cost and waive nothing."""
+    outer_only = '(items a, items b, items c) whose (item 0 of it = "x")'
+    both = '((items a) whose (it > 1), items b, items c) whose (item 0 of it = "x")'
+    assert score(both) < score(outer_only)
+
+
+def test_an_outer_filter_still_beats_no_filter() -> None:
+    three = "(items a, items b, items c)"
+    assert score(f'{three} whose (item 0 of it = "x")') < score(three)

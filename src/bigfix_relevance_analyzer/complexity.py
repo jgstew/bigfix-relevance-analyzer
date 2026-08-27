@@ -16,6 +16,37 @@ hold at once. Where a construct can both pile up and nest, it is counted twice
 ``if``\\ s in a row read linearly; three nested inside each other's branches do
 not, and only the depth metric can tell them apart.
 
+The same nesting is never charged twice over, though. Relevance does not
+require parentheses around a conditional's branches, but they make a deep one
+easier to follow, so writing them costs nothing: conditional nesting is read
+from the ``then`` and ``else`` keywords rather than from parentheses, and a
+``(`` whose only job is to wrap a nested ``if`` adds neither parenthesis depth
+nor tokens. ``if a then (if b then x else y) else z`` and the same statement
+without the parentheses score identically.
+
+The two axes pull against each other in one place, and the tie is broken in
+favour of the engine. A tuple is a cross product -- ``(10 items, 10 items,
+10 items)`` is a thousand tuples -- and a ``whose`` filter cuts that down.
+Filters do cost something to read, and their contents are charged like any
+other tokens, but a statement that narrows its cross product must never score
+worse than the same statement with the filter deleted. So an unnarrowed tuple
+is charged for its fan-out (see :data:`WEIGHT_TUPLE_FANOUT`) and the flat cost
+of a ``whose`` is deliberately small. The waiver is the only mechanism: there
+is no credit that could be farmed by adding filters that select nothing.
+
+Where the filter sits matters, and the two places stack. A ``whose`` on a
+member narrows a factor before the product is built, so it shrinks the
+expansion itself; an outer ``whose`` runs after, bounding what flows onward but
+not what the engine already expanded. Filtering in both places therefore beats
+filtering in either -- see :attr:`RelevanceComplexity.max_unfiltered_tuple_commas`.
+
+Two consequences worth stating plainly. A trivial ``whose (true)`` waives the
+charge, because telling it from a real filter needs a parser. And the waiver is
+finite, so a *sprawling* filter body still costs more than it saves -- that is
+reading cost the score is meant to surface, not the perverse incentive the
+fan-out charge exists to remove. The score is a blend of both axes, not a proxy
+for either alone.
+
 **Evaluation cost** is what the statement does to the engine evaluating it, and
 it does not follow from size. ``exists descendants of folder "C:\\"`` is eight
 tokens and walks an entire disk, on every evaluation cycle, on every endpoint.
@@ -143,8 +174,33 @@ not a smell -- so compounding it the way :data:`DEPTH_EXPONENT` compounds
 parentheses would flag ordinary code as complex.
 """
 
-WEIGHT_WHOSE_CLAUSE = 5.0
-"""A `whose` filter introduces a second scope with its own `it`."""
+WEIGHT_WHOSE_CLAUSE = 1.5
+"""A `whose` filter introduces a second scope with its own `it`.
+
+Deliberately small. A filter does add reading cost -- a pile of large `whose`
+bodies is genuinely harder to follow, and its contents are charged like any
+other tokens -- but a `whose` over a tuple *reduces* the cross product the
+engine evaluates. Charging it heavily made deleting the filter the cheaper
+statement, which is exactly backwards; see :data:`WEIGHT_TUPLE_FANOUT`.
+"""
+
+WEIGHT_UNFILTERED_TUPLE_COMMA = 2.0
+"""Each comma of a tuple nothing narrows, charged in total across the statement."""
+
+WEIGHT_TUPLE_FANOUT = 18.0
+"""The worst single unnarrowed tuple, charged by :func:`depth_cost`.
+
+A tuple is a cross product -- ``(10 items, 10 items, 10 items)`` is a thousand
+tuples -- so its cost is multiplicative in the number of members, not additive,
+and the superlinear curve is a better fit than a flat per-comma charge. Applied
+to the widest unfiltered tuple rather than the total, so three separate pairs
+are not mistaken for one triple.
+
+Calibrated with :data:`WEIGHT_WHOSE_CLAUSE` so that filtering never costs more
+than not filtering: for a filter body worth ``B`` and a flat whose weight ``w``,
+a tuple of ``n`` commas needs
+``WEIGHT_TUPLE_FANOUT >= (B + w - WEIGHT_UNFILTERED_TUPLE_COMMA * n) / n ** DEPTH_EXPONENT``.
+"""
 
 WEIGHT_CONDITIONAL = 1.0
 """Each `if`. Small: a run of unnested conditionals reads linearly."""
@@ -535,8 +591,77 @@ _CHAIN_BREAKERS = frozenset({"(", ")", ";", ","})
 
 # The word that opens a conditional. `then` and `else` are not counted: they
 # cannot appear without an `if`, so counting them would only multiply the same
-# signal.
+# signal. They do steer the nesting rules below.
 _CONDITIONAL_WORD = "if"
+_ELSE_WORD = "else"
+
+# An `if` following one of these is inside a conditional that is still open --
+# its condition or its `then` branch -- so it nests. Following `else` instead
+# is an `else if` chain, which reads linearly and stays flat.
+_NESTING_PREDECESSORS = frozenset({"if", "then"})
+
+# A `(` following one of these *may* be conditional scaffolding. It only is if
+# the very next token turns out to be `if`; see the retraction in `analyze`.
+_SCAFFOLD_PREDECESSORS = frozenset({"if", "then", "else"})
+
+
+@dataclass(slots=True)
+class _OpenConditional:
+    """One ``if`` whose branches are still being read."""
+
+    paren_depth: int
+    """Raw parenthesis depth at the ``if``, for the no-keyword fallback."""
+
+    seen_else: bool = False
+    """Whether this ``if``'s ``else`` has gone past.
+
+    A second ``else`` cannot belong to the same ``if``, so one that already has
+    its own is finished and must be closed before the new one is attributed.
+    """
+
+
+@dataclass(slots=True)
+class _OpenParen:
+    """One ``(`` still open, and what is known about why it is there."""
+
+    context: str
+    """The code token this ``(`` follows, seen through an enclosing ``(``.
+
+    So the inner paren of ``then ((`` reports ``then`` rather than ``(``, which
+    is what lets scaffolding be recognized however it is wrapped.
+    """
+
+    conditional_height: int
+    """``len(open_conditionals)`` when this ``(`` opened; the ``)`` truncates back."""
+
+    scaffolding: bool = False
+    """Whether the next token turned out to be ``if``.
+
+    Such a pair only wraps a conditional, whose nesting is charged once already
+    as conditional depth, so it contributes neither depth nor tokens.
+    """
+
+    commas: int = 0
+    """Top-level commas seen inside this frame: the tuple's cross-product width."""
+
+    member_filters: int = 0
+    """``whose`` clauses applied to this frame's members, each waiving one comma."""
+
+    member_tokens: int = 0
+    """Tokens in the member being read, to decide whether it is a bare literal."""
+
+    member_literal: bool = False
+    """Whether the member so far is a single ``STRING`` or ``NUMBER`` token."""
+
+    all_literal: bool = True
+    """Whether every member has been a bare literal. Such a tuple expands nothing."""
+
+
+def _context(prev: str, open_parens: list[_OpenParen]) -> str:
+    """The token an ``if`` or ``(`` really follows, seeing through an enclosing ``(``."""
+    if prev == "(" and open_parens:
+        return open_parens[-1].context
+    return prev
 
 
 @dataclass(frozen=True, slots=True)
@@ -544,9 +669,22 @@ class RelevanceComplexity:
     """Per-metric counts for one relevance statement, plus a weighted score."""
 
     token_count: int = 0
-    """Tokens that carry meaning: whitespace and comments excluded."""
+    """Tokens that carry meaning: whitespace and comments excluded.
+
+    Parentheses that only wrap a nested conditional are excluded too -- see
+    :attr:`conditional_parens`. The raw lexical count is recoverable as
+    ``token_count + 2 * conditional_parens``.
+    """
 
     max_paren_depth: int = 0
+    """Deepest parenthesis nesting, ignoring conditional scaffolding.
+
+    A ``(`` whose only job is to wrap a nested ``if`` is not counted here,
+    because that nesting is already charged as
+    :attr:`max_conditional_depth`; charging both would make the clearer,
+    parenthesized form of a deep conditional cost more than the terser one.
+    Parentheses around a *condition* are still counted -- see :func:`analyze`.
+    """
     boolean_operators: int = 0
     """Bare ``and`` / ``or`` / ``not`` words."""
 
@@ -568,8 +706,42 @@ class RelevanceComplexity:
 
     A run of unnested conditionals, and an ``else if`` chain, both report 1: they
     read linearly. Two means one conditional sits inside another's branch.
-    Inferred from parenthesis depth -- see :func:`analyze` -- because binding a
-    branch to its ``if`` needs the parser this module does not have.
+
+    Read from the ``then`` and ``else`` keywords, not from parentheses, so an
+    unparenthesized nesting counts the same as a parenthesized one. Flattening
+    an ``else if`` chain is a deliberate editorial choice about how it reads,
+    not an artefact of how it is detected.
+    """
+
+    conditional_parens: int = 0
+    """Parenthesis pairs that only wrap a nested conditional.
+
+    Excluded from both :attr:`token_count` and :attr:`max_paren_depth`, and
+    reported so that exclusion stays visible rather than silent.
+    """
+
+    tuple_commas: int = 0
+    """Every code ``,``, however the tuple is narrowed."""
+
+    unfiltered_tuple_commas: int = 0
+    """Commas of tuples whose *output* nothing narrows.
+
+    Waived when the tuple is followed by ``whose`` or by ``of`` (a projection),
+    by each ``whose`` inside the tuple that narrows one member, and entirely
+    when every member is a bare literal and so expands nothing.
+    """
+
+    max_unfiltered_tuple_commas: int = 0
+    """The widest single tuple whose *expansion* nothing narrows.
+
+    Separate from the total for the same reason :attr:`max_of_chain` is: one
+    wide cross product is worse than several narrow ones. It is also credited
+    differently from :attr:`unfiltered_tuple_commas`, because the two model
+    different things. A member ``whose`` narrows a factor before the product is
+    built, so it removes a factor here. An outer ``whose`` runs after the
+    product is built -- it bounds what flows onward but not what the engine
+    expanded -- so it returns only one factor. The two therefore stack: filters
+    in both places beat a filter in either.
     """
 
     semicolon_clauses: int = 0
@@ -610,6 +782,8 @@ class RelevanceComplexity:
             # Linear on purpose -- see WEIGHT_MAX_OF_CHAIN.
             + WEIGHT_MAX_OF_CHAIN * self.max_of_chain
             + WEIGHT_WHOSE_CLAUSE * self.whose_clauses
+            + WEIGHT_UNFILTERED_TUPLE_COMMA * self.unfiltered_tuple_commas
+            + depth_cost(self.max_unfiltered_tuple_commas, WEIGHT_TUPLE_FANOUT)
             + WEIGHT_CONDITIONAL * self.conditional_branches
             + depth_cost(self.max_conditional_depth, WEIGHT_CONDITIONAL_DEPTH)
             + WEIGHT_ITERATION_KEYWORD * self.iteration_keywords
@@ -630,6 +804,12 @@ def analyze(text: str, dialect: Dialect | None = None) -> RelevanceComplexity:
     relevance. Leaving it out excludes nothing -- see :func:`cost_rules_for`.
     Readability metrics do not depend on it.
 
+    One known imprecision: parentheses around a *condition*
+    (``if (a and b) then ...``) are counted as ordinary nesting, unlike the ones
+    wrapping a nested ``if``. They are only redundant when the ``)`` is followed
+    by ``then``, which is not knowable at the ``(`` where the depth is
+    committed, and a second pass to find out is not worth it for a scorer.
+
     Never raises. Malformed relevance is scored like anything else, with the
     unlexable part reported as :attr:`RelevanceComplexity.error_tokens`.
     """
@@ -643,10 +823,13 @@ def analyze(text: str, dialect: Dialect | None = None) -> RelevanceComplexity:
     whoses = 0
     conditionals = 0
     max_conditional_depth = 0
-    # Parenthesis depth of each `if` still considered open. An `if` at the same
-    # depth as the one before it is a sibling or an `else if` chain link, not a
-    # nesting, so the earlier one is popped first.
-    open_conditionals: list[int] = []
+    open_conditionals: list[_OpenConditional] = []
+    open_parens: list[_OpenParen] = []
+    scaffold_parens = 0
+    prev = ""
+    # Every `(`, scaffolding included. Only the no-keyword fallback reads this;
+    # `depth` is the scored one, which scaffolding does not raise.
+    raw_depth = 0
     iterations = 0
     semicolons = 0
     strings = 0
@@ -654,10 +837,74 @@ def analyze(text: str, dialect: Dialect | None = None) -> RelevanceComplexity:
     identifiers: set[str] = set()
     runs: list[str] = []
     run: list[str] = []
+    # Commas of a tuple whose `)` has just been seen, already net of that
+    # tuple's own member filters. Whether they are charged depends on the next
+    # token, so the decision waits one token.
+    pending_commas = 0
+    total_commas = 0
+    unfiltered_commas = 0
+    max_unfiltered = 0
+    # Stands in for the paren-less top level, so bare `a, b, c` is a tuple too.
+    # Never pushed onto `open_parens`; resolved after the loop.
+    top_frame = _OpenParen(context="", conditional_height=0)
+
+    def frame() -> _OpenParen:
+        """The tuple currently being read into."""
+        return open_parens[-1] if open_parens else top_frame
+
+    def charged_commas(closing: _OpenParen) -> int:
+        """How many of ``closing``'s commas survive its own waivers."""
+        if closing.all_literal:
+            return 0
+        return max(0, closing.commas - closing.member_filters)
 
     for token in code_tokens(text):
         token_count += 1
         word = token.normalized
+        opening = token.kind is TokenKind.PUNCT and word == "("
+
+        # Resolve the previous `)`'s commas now that the next token is known.
+        # Cannot collide with the scaffolding retraction below: that needs
+        # `prev == "("`, and commas only pend when `prev == ")"`.
+        if pending_commas:
+            if token.kind is TokenKind.WORD and (word in _WHOSE_WORDS or word == "of"):
+                # Nothing flows onward unfiltered, so the linear term is waived
+                # outright. The fan-out term only gets one factor back: an outer
+                # `whose` runs *after* the product is built, so unlike a member
+                # filter it does not shrink the expansion the engine paid for.
+                # `of` is a projection and expands linearly, so it waives both.
+                if word == "of":
+                    pending_commas = 0
+                else:
+                    fanout = max(0, pending_commas - 1)
+                    max_unfiltered = max(max_unfiltered, fanout)
+            elif token.kind is TokenKind.PUNCT and word == ")":
+                # A wrapper paren: hand the commas to the frame it closes, which
+                # will pend them again, so `((a, b)) whose (...)` still waives.
+                enclosing = frame()
+                enclosing.commas += pending_commas
+                enclosing.all_literal = False
+            else:
+                unfiltered_commas += pending_commas
+                max_unfiltered = max(max_unfiltered, pending_commas)
+            pending_commas = 0
+
+        # An `if` directly inside a `(` that follows `if`/`then`/`else` retracts
+        # that `(`: the pair is conditional scaffolding, and the nesting it
+        # marks is charged once already as conditional depth. This runs before
+        # the maximum is committed below -- which is why `(` never commits one.
+        if (
+            token.kind is TokenKind.WORD
+            and word == _CONDITIONAL_WORD
+            and prev == "("
+            and open_parens
+            and open_parens[-1].context in _SCAFFOLD_PREDECESSORS
+        ):
+            open_parens[-1].scaffolding = True
+            depth -= 1
+            scaffold_parens += 1
+        if not opening:
+            max_depth = max(max_depth, depth)
 
         # Word runs for the cost patterns, built in the same pass. A run ends at
         # the first token that is not a word.
@@ -667,25 +914,56 @@ def analyze(text: str, dialect: Dialect | None = None) -> RelevanceComplexity:
             runs.append(" ".join(run))
             run = []
 
+        # Track the member being read, so a tuple of bare literals -- an
+        # argument list like `("a", "b")` -- can be recognized as expanding
+        # nothing. Only a member that is exactly one literal token qualifies.
+        # Parentheses are not member tokens of any one frame: a member holding
+        # a sub-expression leaves its own frame's token count at zero, which is
+        # what makes it correctly non-literal. The separating comma is not one
+        # either -- counting it would clear the literal flag the comma branch
+        # below is about to read.
+        if not (token.kind is TokenKind.PUNCT and word in ("(", ")", ",")):
+            current = frame()
+            current.member_tokens += 1
+            current.member_literal = current.member_tokens == 1 and token.kind in (
+                TokenKind.STRING,
+                TokenKind.NUMBER,
+            )
+
         if token.kind is TokenKind.WORD:
             if word == "of":
                 ofs += 1
                 of_chain += 1
                 max_of_chain = max(max_of_chain, of_chain)
-                continue
-            if word in _BOOLEAN_WORDS:
+            elif word in _BOOLEAN_WORDS:
                 booleans += 1
             elif word in _WHOSE_WORDS:
                 whoses += 1
+                # A filter on one member narrows one factor of the product.
+                frame().member_filters += 1
             elif word == _CONDITIONAL_WORD:
                 conditionals += 1
-                # Anything opened at this depth or shallower has closed: a
-                # conditional only nests when it sits inside the parentheses of
-                # another one's branch.
-                while open_conditionals and open_conditionals[-1] >= depth:
-                    open_conditionals.pop()
-                open_conditionals.append(depth)
+                context = _context(prev, open_parens)
+                if context in _NESTING_PREDECESSORS:
+                    pass  # A condition or `then` branch of an open `if`: nest.
+                elif context == _ELSE_WORD:
+                    # `else if` reads linearly, so a chain link replaces the
+                    # conditional it continues instead of nesting inside it.
+                    if open_conditionals and open_conditionals[-1].seen_else:
+                        open_conditionals.pop()
+                else:
+                    # No keyword to go on -- fall back to parenthesis depth.
+                    while open_conditionals and open_conditionals[-1].paren_depth >= raw_depth:
+                        open_conditionals.pop()
+                open_conditionals.append(_OpenConditional(raw_depth))
                 max_conditional_depth = max(max_conditional_depth, len(open_conditionals))
+            elif word == _ELSE_WORD:
+                # A second `else` cannot belong to the same `if`, so whatever
+                # already has one has finished.
+                while open_conditionals and open_conditionals[-1].seen_else:
+                    open_conditionals.pop()
+                if open_conditionals:
+                    open_conditionals[-1].seen_else = True
             elif word in _ITERATION_WORDS:
                 iterations += 1
             if word not in GRAMMAR_WORDS:
@@ -696,28 +974,67 @@ def analyze(text: str, dialect: Dialect | None = None) -> RelevanceComplexity:
             errors += 1
         elif token.kind is TokenKind.PUNCT:
             if word == "(":
+                open_parens.append(_OpenParen(_context(prev, open_parens), len(open_conditionals)))
+                raw_depth += 1
                 depth += 1
-                max_depth = max(max_depth, depth)
             elif word == ")":
-                # Clamped: unbalanced relevance must not push depth negative and
-                # then hide real nesting that follows.
-                depth = max(0, depth - 1)
+                raw_depth = max(0, raw_depth - 1)
+                if open_parens:
+                    closing = open_parens.pop()
+                    # Nothing opened inside these parentheses is still open.
+                    del open_conditionals[closing.conditional_height :]
+                    if not closing.scaffolding:
+                        depth = max(0, depth - 1)
+                    if closing.member_tokens and not closing.member_literal:
+                        closing.all_literal = False
+                    # Charged or waived once the next token says which.
+                    pending_commas = charged_commas(closing)
+                else:
+                    # Clamped: unbalanced relevance must not push depth negative
+                    # and then hide real nesting that follows.
+                    depth = max(0, depth - 1)
+            elif word == ",":
+                current = frame()
+                current.commas += 1
+                total_commas += 1
+                if not current.member_literal:
+                    current.all_literal = False
+                current.member_tokens = 0
+                current.member_literal = False
             elif word == ";":
                 semicolons += 1
             if word in _CHAIN_BREAKERS:
                 of_chain = 0
 
+        prev = word
+
+    # Input ending in `(` never reached a commit above.
+    max_depth = max(max_depth, depth)
+    # A tuple still pending at the end was never narrowed by anything, and the
+    # top level cannot be: an outer `whose` needs parentheses to apply to. A
+    # frame left open by unbalanced input is in the same position.
+    if top_frame.member_tokens and not top_frame.member_literal:
+        top_frame.all_literal = False
+    leftovers = [pending_commas, charged_commas(top_frame)]
+    leftovers += [charged_commas(unclosed) for unclosed in open_parens]
+    for leftover in leftovers:
+        unfiltered_commas += leftover
+        max_unfiltered = max(max_unfiltered, leftover)
     if run:
         runs.append(" ".join(run))
     cost, costly = _evaluation_cost(runs, dialect)
 
     return RelevanceComplexity(
-        token_count=token_count,
+        token_count=token_count - 2 * scaffold_parens,
         max_paren_depth=max_depth,
+        conditional_parens=scaffold_parens,
         boolean_operators=booleans,
         of_count=ofs,
         max_of_chain=max_of_chain,
         whose_clauses=whoses,
+        tuple_commas=total_commas,
+        unfiltered_tuple_commas=unfiltered_commas,
+        max_unfiltered_tuple_commas=max_unfiltered,
         conditional_branches=conditionals,
         max_conditional_depth=max_conditional_depth,
         iteration_keywords=iterations,
