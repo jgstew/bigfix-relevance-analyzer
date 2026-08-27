@@ -1,0 +1,442 @@
+<html> & <string>: html
+<string> & <html>: html
+<html> & <html>: html
+<json key> = <json key>: boolean
+<json value> = <json value>: boolean
+<format> + <string>: format
+<format> + <integer>: format
+<format> + <time interval>: format
+<format> + <time>: format
+<format> + <time of day>: format
+<format> + <day of week>: format
+<format> + <date>: format
+<format> + <format>: format
+<rope> & <string>: rope
+<string> & <rope>: rope
+<rope> & <rope>: rope
+<rope> contains <string>: boolean
+<bit set> = <bit set>: boolean
+<bit set> contains <bit set>: boolean
+<bit set> + <bit set>: bit set
+<bit set> - <bit set>: bit set
+<bit set> * <bit set>: bit set
+<hertz> = <hertz>: boolean
+<hertz> < <hertz>: boolean
+<hertz> <= <hertz>: boolean
+<hertz> + <hertz>: hertz
+<hertz> - <hertz>: hertz
+<hertz> * <integer>: hertz
+<integer> * <hertz>: hertz
+<hertz> / <hertz>: integer
+<hertz> / <integer>: hertz
+<hertz> % <hertz>: hertz
+<time> = <time>: boolean
+<time> < <time>: boolean
+<time> <= <time>: boolean
+<time> + <time interval>: time
+<time interval> + <time>: time
+<time> - <time interval>: time
+<time> - <time>: time interval
+<time interval> = <time interval>: boolean
+<time interval> < <time interval>: boolean
+<time interval> <= <time interval>: boolean
+<time interval> + <time interval>: time interval
+<time interval> - <time interval>: time interval
+<time interval> * <integer>: time interval
+<integer> * <time interval>: time interval
+<time interval> / <time interval>: integer
+<time interval> / <integer>: time interval
+<time interval> % <time interval>: time interval
+<time zone> + <time interval>: time zone
+<time interval> + <time zone>: time zone
+<time zone> - <time interval>: time zone
+<time zone> - <time zone>: time interval
+<time zone> = <time zone>: boolean
+<binary_string> = <binary_string>: boolean
+<binary_string> < <binary_string>: boolean
+<binary_string> <= <binary_string>: boolean
+<binary_string> starts with <binary_string>: boolean
+<binary_string> ends with <binary_string>: boolean
+<binary_string> contains <binary_string>: boolean
+<binary_string> & <binary_string>: binary_string
+<boolean> = <boolean>: boolean
+<string> = <string>: boolean
+<string> < <string>: boolean
+<string> <= <string>: boolean
+<string> starts with <string>: boolean
+<string> ends with <string>: boolean
+<string> contains <string>: boolean
+<string> & <string>: string
+<type> = <type>: boolean
+<integer> = <integer>: boolean
+<integer> < <integer>: boolean
+<integer> <= <integer>: boolean
+<integer> + <integer>: integer
+<integer> - <integer>: integer
+<integer> * <integer>: integer
+<integer> / <integer>: integer
+<integer> % <integer>: integer
+<large integer> = <large integer>: boolean
+<large integer> < <large integer>: boolean
+<large integer> <= <large integer>: boolean
+<large integer> = <integer>: boolean
+<large integer> <= <integer>: boolean
+<large integer> < <integer>: boolean
+<integer> = <large integer>: boolean
+<integer> <= <large integer>: boolean
+<integer> < <large integer>: boolean
+<large integer> + <large integer>: large integer
+<large integer> - <large integer>: large integer
+<large integer> * <large integer>: large integer
+<large integer> / <large integer>: large integer
+<large integer> % <large integer>: large integer
+<large integer> + <integer>: large integer
+<large integer> - <integer>: large integer
+<large integer> * <integer>: large integer
+<large integer> / <integer>: large integer
+<large integer> % <integer>: large integer
+<integer> + <large integer>: large integer
+<integer> - <large integer>: large integer
+<integer> * <large integer>: large integer
+<integer> / <large integer>: large integer
+<integer> % <large integer>: large integer
+<uinteger> = <uinteger>: boolean
+<uinteger> < <uinteger>: boolean
+<uinteger> <= <uinteger>: boolean
+<uinteger> = <integer>: boolean
+<uinteger> <= <integer>: boolean
+<uinteger> < <integer>: boolean
+<integer> = <uinteger>: boolean
+<integer> <= <uinteger>: boolean
+<integer> < <uinteger>: boolean
+<uinteger> + <uinteger>: uinteger
+<uinteger> - <uinteger>: uinteger
+<uinteger> * <uinteger>: uinteger
+<uinteger> / <uinteger>: uinteger
+<uinteger> % <uinteger>: uinteger
+<uinteger> + <integer>: uinteger
+<uinteger> - <integer>: uinteger
+<uinteger> * <integer>: uinteger
+<uinteger> / <integer>: uinteger
+<uinteger> % <integer>: uinteger
+<integer> + <uinteger>: uinteger
+<integer> - <uinteger>: uinteger
+<integer> * <uinteger>: uinteger
+<integer> / <uinteger>: uinteger
+<integer> % <uinteger>: uinteger
+<day of month> = <day of month>: boolean
+<day of month> < <day of month>: boolean
+<day of month> <= <day of month>: boolean
+<day of month> + <time interval>: day of month
+<time interval> + <day of month>: day of month
+<day of month> - <time interval>: day of month
+<day of month> - <day of month>: time interval
+<day of week> = <day of week>: boolean
+<day of week> + <time interval>: day of week
+<time interval> + <day of week>: day of week
+<day of week> - <time interval>: day of week
+<day of week> - <day of week>: time interval
+<day of year> = <day of year>: boolean
+<day of year> < <day of year>: boolean
+<day of year> <= <day of year>: boolean
+<month> & <day of month>: day of year
+<day of month> & <month>: day of year
+<day of year> + <time interval>: day of year
+<time interval> + <day of year>: day of year
+<day of year> - <time interval>: day of year
+<day of year> - <day of year>: time interval
+<day of year> + <number of months>: day of year
+<number of months> + <day of year>: day of year
+<day of year> - <number of months>: day of year
+<date> = <date>: boolean
+<date> < <date>: boolean
+<date> <= <date>: boolean
+<day of month> & <month and year>: date
+<month and year> & <day of month>: date
+<day of year> & <year>: date
+<year> & <day of year>: date
+<day of year> & <month and year>: date
+<month and year> & <day of year>: date
+<date> + <number of months>: date
+<number of months> + <date>: date
+<date> - <number of months>: date
+<date> + <time interval>: date
+<time interval> + <date>: date
+<date> - <time interval>: date
+<date> - <date>: time interval
+<date> & <time of day with time zone>: time
+<time of day with time zone> & <date>: time
+<month and year> = <month and year>: boolean
+<month and year> < <month and year>: boolean
+<month and year> <= <month and year>: boolean
+<month> & <year>: month and year
+<year> & <month>: month and year
+<month and year> + <number of months>: month and year
+<number of months> + <month and year>: month and year
+<month and year> - <number of months>: month and year
+<month and year> - <month and year>: number of months
+<number of months> = <number of months>: boolean
+<number of months> < <number of months>: boolean
+<number of months> <= <number of months>: boolean
+<number of months> + <number of months>: number of months
+<number of months> - <number of months>: number of months
+<integer> * <number of months>: number of months
+<number of months> * <integer>: number of months
+<number of months> / <number of months>: integer
+<number of months> / <integer>: number of months
+<number of months> % <number of months>: number of months
+<month> = <month>: boolean
+<month> < <month>: boolean
+<month> <= <month>: boolean
+<month> + <number of months>: month
+<number of months> + <month>: month
+<month> - <number of months>: month
+<month> - <month>: number of months
+<time of day> = <time of day>: boolean
+<time of day> < <time of day>: boolean
+<time of day> <= <time of day>: boolean
+<time of day> + <time interval>: time of day
+<time interval> + <time of day>: time of day
+<time of day> - <time interval>: time of day
+<time of day> - <time of day>: time interval
+<time range> = <time range>: boolean
+<time> & <time>: time range
+<time> & <time interval>: time range
+<time interval> & <time>: time range
+<time range> & <time>: time range
+<time> & <time range>: time range
+<time range> & <time range>: time range
+<time range> + <time range>: time range
+<time range> * <time range>: time range
+<time range> contains <time>: boolean
+<time range> contains <time range>: boolean
+<year> = <year>: boolean
+<year> < <year>: boolean
+<year> <= <year>: boolean
+<year> + <number of months>: year
+<number of months> + <year>: year
+<year> - <number of months>: year
+<year> - <year>: number of months
+<time of day with time zone> < <time of day with time zone>: boolean
+<time of day with time zone> <= <time of day with time zone>: boolean
+<time of day with time zone> = <time of day with time zone>: boolean
+<time of day> & <time zone>: time of day with time zone
+<time zone> & <time of day>: time of day with time zone
+<time of day with time zone> & <time zone>: time of day with time zone
+<time zone> & <time of day with time zone>: time of day with time zone
+<time of day with time zone> + <time interval>: time of day with time zone
+<time interval> + <time of day with time zone>: time of day with time zone
+<time of day with time zone> - <time interval>: time of day with time zone
+<time of day with time zone> - <time of day with time zone>: time interval
+<time range> * <integer>: timed( time range, integer )
+<integer> * <time range>: timed( time range, integer )
+<time range> * <boolean>: timed( time range, boolean )
+<boolean> * <time range>: timed( time range, boolean )
+<site version list> = <site version list>: boolean
+<site version list> < <site version list>: boolean
+<site version list> <= <site version list>: boolean
+<site version list> contains <site version list>: boolean
+<integer set> + <integer set>: integer set
+<integer set> - <integer set>: integer set
+<integer set> * <integer set>: integer set
+<integer set> = <integer set>: boolean
+<integer set> contains <integer>: boolean
+<integer set> contains <integer set>: boolean
+<string set> + <string set>: string set
+<string set> - <string set>: string set
+<string set> * <string set>: string set
+<string set> = <string set>: boolean
+<string set> contains <string>: boolean
+<string set> contains <string set>: boolean
+<version> = <version>: boolean
+<version> < <version>: boolean
+<version> <= <version>: boolean
+<version> = <string>: boolean
+<version> < <string>: boolean
+<version> <= <string>: boolean
+<string> = <version>: boolean
+<string> < <version>: boolean
+<string> <= <version>: boolean
+<strverscmp version> = <strverscmp version>: boolean
+<strverscmp version> < <strverscmp version>: boolean
+<strverscmp version> <= <strverscmp version>: boolean
+<strverscmp version> = <string>: boolean
+<strverscmp version> < <string>: boolean
+<strverscmp version> <= <string>: boolean
+<string> = <strverscmp version>: boolean
+<string> < <strverscmp version>: boolean
+<string> <= <strverscmp version>: boolean
+<floating point> = <floating point>: boolean
+<floating point> < <floating point>: boolean
+<floating point> <= <floating point>: boolean
+<floating point> + <floating point>: floating point
+<floating point> - <floating point>: floating point
+<floating point> * <floating point>: floating point
+<floating point> / <floating point>: floating point
+<integer> + <floating point>: floating point
+<integer> - <floating point>: floating point
+<integer> * <floating point>: floating point
+<integer> / <floating point>: floating point
+<floating point> + <integer>: floating point
+<floating point> - <integer>: floating point
+<floating point> * <integer>: floating point
+<floating point> / <integer>: floating point
+<integer> = <floating point>: boolean
+<integer> <= <floating point>: boolean
+<integer> < <floating point>: boolean
+<floating point> = <integer>: boolean
+<floating point> <= <integer>: boolean
+<floating point> < <integer>: boolean
+<string> contains <regular expression>: boolean
+<string> = <regular expression>: boolean
+<regular expression> = <string>: boolean
+<string> starts with <regular expression>: boolean
+<string> ends with <regular expression>: boolean
+<rate> = <rate>: boolean
+<rate> < <rate>: boolean
+<rate> <= <rate>: boolean
+<rate> + <rate>: rate
+<rate> - <rate>: rate
+<rate> * <floating point>: rate
+<floating point> * <rate>: rate
+<rate> / <floating point>: rate
+<rate> * <time interval>: floating point
+<time interval> * <rate>: floating point
+<floating point> / <time interval>: rate
+<bes action set> + <bes action set>: bes action set
+<bes action set> - <bes action set>: bes action set
+<bes action set> * <bes action set>: bes action set
+<bes action set> = <bes action set>: boolean
+<bes action set> contains <bes action>: boolean
+<bes action set> contains <bes action set>: boolean
+<bes action> = <bes action>: boolean
+<bes action status> = <bes action status>: boolean
+<bes computer set> + <bes computer set>: bes computer set
+<bes computer set> - <bes computer set>: bes computer set
+<bes computer set> * <bes computer set>: bes computer set
+<bes computer set> = <bes computer set>: boolean
+<bes computer set> contains <bes computer>: boolean
+<bes computer set> contains <bes computer set>: boolean
+<bes computer> = <bes computer>: boolean
+<bes computer group set> + <bes computer group set>: bes computer group set
+<bes computer group set> - <bes computer group set>: bes computer group set
+<bes computer group set> * <bes computer group set>: bes computer group set
+<bes computer group set> = <bes computer group set>: boolean
+<bes computer group set> contains <bes computer group>: boolean
+<bes computer group set> contains <bes computer group set>: boolean
+<bes computer group> = <bes computer group>: boolean
+<bes domain set> + <bes domain set>: bes domain set
+<bes domain set> - <bes domain set>: bes domain set
+<bes domain set> * <bes domain set>: bes domain set
+<bes domain set> = <bes domain set>: boolean
+<bes domain set> contains <bes domain>: boolean
+<bes domain set> contains <bes domain set>: boolean
+<bes domain> = <bes domain>: boolean
+<bes filter set> + <bes filter set>: bes filter set
+<bes filter set> - <bes filter set>: bes filter set
+<bes filter set> * <bes filter set>: bes filter set
+<bes filter set> = <bes filter set>: boolean
+<bes filter set> contains <bes filter>: boolean
+<bes filter set> contains <bes filter set>: boolean
+<bes filter> = <bes filter>: boolean
+<bes fixlet set> + <bes fixlet set>: bes fixlet set
+<bes fixlet set> - <bes fixlet set>: bes fixlet set
+<bes fixlet set> * <bes fixlet set>: bes fixlet set
+<bes fixlet set> = <bes fixlet set>: boolean
+<bes fixlet set> contains <bes fixlet>: boolean
+<bes fixlet set> contains <bes fixlet set>: boolean
+<bes fixlet> = <bes fixlet>: boolean
+<bes ldap directory set> + <bes ldap directory set>: bes ldap directory set
+<bes ldap directory set> - <bes ldap directory set>: bes ldap directory set
+<bes ldap directory set> * <bes ldap directory set>: bes ldap directory set
+<bes ldap directory set> = <bes ldap directory set>: boolean
+<bes ldap directory set> contains <bes ldap directory>: boolean
+<bes ldap directory set> contains <bes ldap directory set>: boolean
+<bes ldap directory> = <bes ldap directory>: boolean
+<bes idp directory set> + <bes idp directory set>: bes idp directory set
+<bes idp directory set> - <bes idp directory set>: bes idp directory set
+<bes idp directory set> * <bes idp directory set>: bes idp directory set
+<bes idp directory set> = <bes idp directory set>: boolean
+<bes idp directory set> contains <bes idp directory>: boolean
+<bes idp directory set> contains <bes idp directory set>: boolean
+<bes idp directory> = <bes idp directory>: boolean
+<bes peer download> < <bes peer download>: boolean
+<bes peer download> = <bes peer download>: boolean
+<bes property set> + <bes property set>: bes property set
+<bes property set> - <bes property set>: bes property set
+<bes property set> * <bes property set>: bes property set
+<bes property set> = <bes property set>: boolean
+<bes property set> contains <bes property>: boolean
+<bes property set> contains <bes property set>: boolean
+<bes property> = <bes property>: boolean
+<bes role set> + <bes role set>: bes role set
+<bes role set> - <bes role set>: bes role set
+<bes role set> * <bes role set>: bes role set
+<bes role set> = <bes role set>: boolean
+<bes role set> contains <bes role>: boolean
+<bes role set> contains <bes role set>: boolean
+<bes role> = <bes role>: boolean
+<bes site set> + <bes site set>: bes site set
+<bes site set> - <bes site set>: bes site set
+<bes site set> * <bes site set>: bes site set
+<bes site set> = <bes site set>: boolean
+<bes site set> contains <bes site>: boolean
+<bes site set> contains <bes site set>: boolean
+<bes site> = <bes site>: boolean
+<bes site file set> + <bes site file set>: bes site file set
+<bes site file set> - <bes site file set>: bes site file set
+<bes site file set> * <bes site file set>: bes site file set
+<bes site file set> = <bes site file set>: boolean
+<bes site file set> contains <bes site file>: boolean
+<bes site file set> contains <bes site file set>: boolean
+<bes site file> = <bes site file>: boolean
+<bes unmanagedasset set> + <bes unmanagedasset set>: bes unmanagedasset set
+<bes unmanagedasset set> - <bes unmanagedasset set>: bes unmanagedasset set
+<bes unmanagedasset set> * <bes unmanagedasset set>: bes unmanagedasset set
+<bes unmanagedasset set> = <bes unmanagedasset set>: boolean
+<bes unmanagedasset set> contains <bes unmanagedasset>: boolean
+<bes unmanagedasset set> contains <bes unmanagedasset set>: boolean
+<bes unmanagedasset> = <bes unmanagedasset>: boolean
+<bes user set> + <bes user set>: bes user set
+<bes user set> - <bes user set>: bes user set
+<bes user set> * <bes user set>: bes user set
+<bes user set> = <bes user set>: boolean
+<bes user set> contains <bes user>: boolean
+<bes user set> contains <bes user set>: boolean
+<bes user> = <bes user>: boolean
+<bes wizard set> + <bes wizard set>: bes wizard set
+<bes wizard set> - <bes wizard set>: bes wizard set
+<bes wizard set> * <bes wizard set>: bes wizard set
+<bes wizard set> = <bes wizard set>: boolean
+<bes wizard set> contains <bes wizard>: boolean
+<bes wizard set> contains <bes wizard set>: boolean
+<bes wizard> = <bes wizard>: boolean
+<bes webui app set> + <bes webui app set>: bes webui app set
+<bes webui app set> - <bes webui app set>: bes webui app set
+<bes webui app set> * <bes webui app set>: bes webui app set
+<bes webui app set> = <bes webui app set>: boolean
+<bes webui app set> contains <bes webui app>: boolean
+<bes webui app set> contains <bes webui app set>: boolean
+<bes webui app> = <bes webui app>: boolean
+<ipv4 address> = <string>: boolean
+<string> = <ipv4 address>: boolean
+<ipv4or6 address> = <string>: boolean
+<string> = <ipv4or6 address>: boolean
+<ipv4 address> < <string>: boolean
+<string> < <ipv4 address>: boolean
+<ipv4or6 address> < <string>: boolean
+<string> < <ipv4or6 address>: boolean
+<ipv4 address> <= <string>: boolean
+<string> <= <ipv4 address>: boolean
+<ipv4or6 address> <= <string>: boolean
+<string> <= <ipv4or6 address>: boolean
+<ipv4 address> = <ipv4 address>: boolean
+<ipv4 address> < <ipv4 address>: boolean
+<ipv4 address> <= <ipv4 address>: boolean
+<ipv6 address> = <ipv6 address>: boolean
+<ipv6 address> < <ipv6 address>: boolean
+<ipv6 address> <= <ipv6 address>: boolean
+<ipv4or6 address> = <ipv4or6 address>: boolean
+<ipv4or6 address> < <ipv4or6 address>: boolean
+<ipv4or6 address> <= <ipv4or6 address>: boolean
+<ip version> = <ip version>: boolean

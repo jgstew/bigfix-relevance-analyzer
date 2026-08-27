@@ -268,6 +268,25 @@ def test_console_html_with_both_mechanisms_stays_session() -> None:
     assert [site.dialect for site in sites] == [Dialect.SESSION, Dialect.SESSION]
 
 
+def test_unknown_html_pi_alone_gets_no_context_dialect() -> None:
+    """Neither renderer is established, so a static substitution proves nothing."""
+    sites = extract_relevance_from_html_text("now", context=HtmlContext.UNKNOWN)
+    assert sites == []
+    sites = extract_relevance_from_html_text(CLIENTUI_PI, context=HtmlContext.UNKNOWN)
+    assert sites[0].context_dialect is Dialect.UNCERTAIN
+
+
+def test_unknown_html_with_a_js_call_is_session() -> None:
+    """A JS relevance call is proof the renderer is not a ClientUI, marker or not."""
+    sites = extract_relevance_from_html_text(
+        f"{CLIENTUI_PI}\n{CONSOLE_JS}", context=HtmlContext.UNKNOWN
+    )
+    assert [(site.kind, site.context_dialect) for site in sites] == [
+        ("relevance-pi", Dialect.SESSION),
+        ("javascript-call", Dialect.SESSION),
+    ]
+
+
 @pytest.mark.parametrize(
     "marker",
     [
@@ -540,11 +559,9 @@ def test_file_dispatch_plain_text_blank_file_yields_nothing(tmp_path: object) ->
         (".besrpt", Dialect.SESSION),
         (".beswrpt", Dialect.SESSION),
         (".webreport", Dialect.SESSION),
-        (".html", Dialect.CLIENT),
-        (".htm", Dialect.CLIENT),
     ],
 )
-def test_file_dispatch_html_like(tmp_path: object, suffix: str, expected: Dialect) -> None:
+def test_file_dispatch_console_like(tmp_path: object, suffix: str, expected: Dialect) -> None:
     from pathlib import Path
 
     assert isinstance(tmp_path, Path)
@@ -552,6 +569,55 @@ def test_file_dispatch_html_like(tmp_path: object, suffix: str, expected: Dialec
     path.write_text(CLIENTUI_PI, encoding="utf-8")
     sites = extract_relevance_from_file(path)
     assert [site.dialect for site in sites] == [expected]
+
+
+@pytest.mark.parametrize("suffix", [".html", ".htm"])
+def test_file_dispatch_html_with_clientui_marker_is_client(tmp_path: object, suffix: str) -> None:
+    from pathlib import Path
+
+    assert isinstance(tmp_path, Path)
+    path = tmp_path / f"example{suffix}"
+    path.write_text(f'<meta product="CustomDashboardClientUI"/>\n{CLIENTUI_PI}', encoding="utf-8")
+    sites = extract_relevance_from_file(path)
+    assert [site.dialect for site in sites] == [Dialect.CLIENT]
+
+
+def test_file_dispatch_html_without_marker_has_no_context_dialect(tmp_path: object) -> None:
+    """The extension alone does not say who renders a bare `.html` file."""
+    from pathlib import Path
+
+    assert isinstance(tmp_path, Path)
+    path = tmp_path / "example.html"
+    path.write_text(CLIENTUI_PI, encoding="utf-8")
+    sites = extract_relevance_from_file(path)
+    assert sites[0].context_dialect is Dialect.UNCERTAIN
+    # `CLIENTUI_PI`'s text is the ClientUI trap (`relevant fixlets of sites`),
+    # so content has no opinion either and this stays unresolved.
+    assert sites[0].dialect is Dialect.UNCERTAIN
+
+
+def test_file_dispatch_html_without_marker_falls_to_content(tmp_path: object) -> None:
+    """Without a marker, a static substitution's dialect is the content's to type."""
+    from pathlib import Path
+
+    assert isinstance(tmp_path, Path)
+    path = tmp_path / "example.html"
+    path.write_text("<?Relevance windows of operating system ?>", encoding="utf-8")
+    sites = extract_relevance_from_file(path)
+    assert [site.dialect for site in sites] == [Dialect.CLIENT]
+
+
+def test_file_dispatch_html_without_marker_but_with_js_call_is_session(
+    tmp_path: object,
+) -> None:
+    """A JS relevance call proves the document is not a ClientUI, marker or not."""
+    from pathlib import Path
+
+    assert isinstance(tmp_path, Path)
+    path = tmp_path / "example.html"
+    path.write_text(CONSOLE_JS, encoding="utf-8")
+    sites = extract_relevance_from_file(path)
+    assert [site.dialect for site in sites] == [Dialect.SESSION]
 
 
 def test_file_dispatch_unknown_extension_yields_nothing(

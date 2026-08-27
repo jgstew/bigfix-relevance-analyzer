@@ -2,7 +2,7 @@
 
 Session relevance run in the BigFix console/WebUI against the `types`
 inspector. Note that `types` is *not* a session-only inspector, despite reading
-like one: every client platform sampled in `../../relevance_properties/` ships
+like one: every client platform sampled in `../../relevance_inspectors/` ships
 the same introspection meta-layer. So nothing in this statement identifies its
 dialect, and the content classifier is right to have no opinion on it -- this
 example is the regression test for that trap.

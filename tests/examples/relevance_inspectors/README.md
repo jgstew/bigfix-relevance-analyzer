@@ -1,4 +1,4 @@
-# Relevance properties / inspectors
+# Relevance inspectors
 
 Raw dumps of the inspectors (built-in properties/operators) that BigFix
 relevance exposes, one per line, in several evaluation contexts. This is
@@ -9,7 +9,11 @@ embedded relevance to extract. See the parent
 [`tests/examples/README.md`](../README.md) for the client relevance vs. session
 relevance distinction these files are organized around.
 
-## Files
+## Files: properties
+
+The `properties` inspector category, captured per platform/context (see
+"Introspection meta-layer" below for the other categories - casts, operators,
+types).
 
 Client relevance, one file per *distinct* dump. Every platform in a "covers"
 row produced byte-identical output, same order, so they are not stored
@@ -17,18 +21,18 @@ separately:
 
 | File | Signatures | Covers |
 | --- | --- | --- |
-| `client_relevance_windows.txt` | 2883 | `windows-latest`, `windows-2025` |
-| `client_relevance_macos.txt` | 2345 | `macos-latest` (macOS 26, arm64) |
-| `client_relevance_ubuntu.txt` | 2124 | Ubuntu latest, 24.04, 22.04, 20.04 |
-| `client_relevance_rhel.txt` | 2088 | AlmaLinux, Amazon Linux 2023, Oracle Linux 9, Rocky Linux 9 |
-| `client_relevance_debian.txt` | 2073 | Debian latest, Debian 11 |
+| `client_relevance_properties_windows.txt` | 2883 | `windows-latest`, `windows-2025` |
+| `client_relevance_properties_macos.txt` | 2345 | `macos-latest` (macOS 26, arm64) |
+| `client_relevance_properties_ubuntu.txt` | 2124 | Ubuntu latest, 24.04, 22.04, 20.04 |
+| `client_relevance_properties_rhel.txt` | 2088 | AlmaLinux, Amazon Linux 2023, Oracle Linux 9, Rocky Linux 9 |
+| `client_relevance_properties_debian.txt` | 2073 | Debian latest, Debian 11 |
 
 Session relevance:
 
 | File | Signatures | Context |
 | --- | --- | --- |
-| `session_relevance_web_reports.txt` | 1644 | A **Web Reports** session |
-| `session_relevance_console.txt` | 1644 | A **console** session |
+| `session_relevance_properties_web_reports.txt` | 1644 | A **Web Reports** session |
+| `session_relevance_properties_console.txt` | 1644 | A **console** session |
 
 The two session dumps are byte-identical: the console and Web Reports expose the
 same inspector surface, so "session relevance" below means either.
@@ -36,6 +40,47 @@ same inspector surface, so "session relevance" below means either.
 Counts are lines; the three Linux files each contain 3 duplicate lines
 (`device file <symlink>`, `fifo file <symlink>`, `socket file <symlink>`), kept
 because these are verbatim captures. Deduplicated they are 2121 / 2085 / 2070.
+
+## Introspection meta-layer: casts, operators, types
+
+`properties` is one of several introspection categories BigFix exposes over
+itself; `casts`, `binary operators`, `unary operators` and `types` are the
+others, and none of the files above capture them. That is why things like
+`as trimmed string`, `as lowercase`, `contains`, `starts with` and `-` (unary
+minus) read as unrecognized words against the `properties`-only vocabulary --
+they are casts and operators, not properties, and were never in scope for
+those dumps.
+
+Session-side only, so far:
+
+| File | Signatures | Query |
+| --- | --- | --- |
+| `session_relevance_casts.txt` | 171 | `(it as string) of casts` |
+| `session_relevance_binary_operators.txt` | 442 | `(it as string) of binary operators` |
+| `session_relevance_unary_operators.txt` | 7 | `(it as string) of unary operators` |
+| `session_relevance_types.txt` | 166 | `(it as string) of types` |
+
+Casts and operators are in the same `signature: type` format as the property
+dumps. `types` is not: a type's `as string` form is just its own name, so that
+file is a flat list of type names, one per line, no `: type` suffix -- and its
+first line is a genuine empty string, part of the capture rather than a
+formatting accident (this project has no theory for which type that is; see it
+as unresolved rather than guess).
+
+**Client-side casts, operators and types are not captured yet.** Unlike the
+`properties` dumps, these came from a single live session via
+`bigfix_query_session_relevance` (see Provenance below), and there is no
+equivalent client-relevance query tool available to this project to run the
+same four queries against each of the five client platforms. Someone with
+Fixlet Debugger or console client-relevance access to each platform can
+capture them the same way the original `client_relevance_*.txt` files were
+made -- run each of the four queries above per platform and diff against the
+others, the same way the platform files above turned out byte-identical.
+Until then, anything built on these four files should treat the client side of
+`casts`, `binary operators`, `unary operators` and `types` as **shared
+vocabulary by assumption**, not by evidence -- the dialect classifier's traps
+document (in `dialect.py`) already treats the whole meta-layer this way for
+exactly this reason.
 
 ## What the two dialects share
 
@@ -147,14 +192,25 @@ container jobs prefix them `Q: A: `):
 gh run view --repo jgstew/tools --job <JOB_ID> --log | sed -E 's/^[^\t]*\t[^\t]*\t//' | sed -E 's/^[0-9-]{10}T[0-9:.]+Z //; s/^Q: //' | grep '^A: ' | sed 's/^A: //'
 ```
 
-`client_relevance_windows.txt` predates this and was captured by hand; the
+`client_relevance_properties_windows.txt` predates this and was captured by hand; the
 extraction above reproduces it byte-for-byte from the `windows-latest` job,
 which is how the pipeline was validated.
+
+The four meta-layer files (`session_relevance_casts.txt`,
+`session_relevance_binary_operators.txt`,
+`session_relevance_unary_operators.txt`, `session_relevance_types.txt`) were
+captured directly through the BigFix SaaS MCP server's
+`bigfix_query_session_relevance` tool against a live session, one query per
+file: `(it as string) of casts`, and the same shape for `binary operators`,
+`unary operators` and `types`. The query is identical across all four; only
+`types`' result differs in shape, since a type's `as string` form is its own
+name rather than a `signature: return-type` pair. No client-side equivalents
+exist yet -- see "Introspection meta-layer" above.
 
 ## Regenerating
 
 From a BES Client (per platform, for the `client_relevance_*.txt` files) or a
-Web Reports/console session (for `session_relevance_web_reports.txt`),
+Web Reports/console session (for `session_relevance_properties_web_reports.txt`),
 evaluate `properties` - e.g. via the Fixlet Debugger's QnA view, a REST API
 session relevance query, or the BigFix SaaS MCP server's
 `bigfix_query_session_relevance` tool:

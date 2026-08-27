@@ -22,7 +22,7 @@ statement is in, so an inspector name merely mentioned in a quoted string or a
 comment must not type it. A marker only ever appears in one of two curated
 sets, and the sets are
 validated against the inspector dumps in
-``tests/examples/relevance_properties/`` by ``tests/test_dialect_markers.py``.
+``tests/examples/relevance_inspectors/`` by ``tests/test_dialect_markers.py``.
 
 The two directions are not equally strong evidence:
 
@@ -47,7 +47,7 @@ from typing a dialect and does not belong in this module.
 
 Three traps, all names that *read* as server-side but are valid on a client
 ------------------------------------------------------------------------------
-See ``tests/examples/relevance_properties/README.md`` for the per-platform data.
+See ``tests/examples/relevance_inspectors/README.md`` for the per-platform data.
 
 **ClientUI dashboards.** HTML rendered by the BES Client on the endpoint
 contains *client* relevance that freely uses ``sites``, ``relevant fixlets of

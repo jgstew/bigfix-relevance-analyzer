@@ -5,7 +5,7 @@ the traps documented there mean the dumps cannot simply be diffed into a word
 list. These tests hold the curation to the data: a marker claimed to be
 session-only must be absent from all five client platform dumps, and vice versa.
 
-The dumps in ``tests/examples/relevance_properties/`` are the evidence base and
+The dumps in ``tests/examples/relevance_inspectors/`` are the evidence base and
 are deliberately test-only reference data, not something the package ships.
 """
 
@@ -23,7 +23,7 @@ from bigfix_relevance_analyzer.dialect import (
     _SESSION_MARKERS,
 )
 
-PROPERTIES = Path(__file__).parent / "examples" / "relevance_properties"
+INSPECTORS = Path(__file__).parent / "examples" / "relevance_inspectors"
 
 
 def _signatures(path: Path) -> set[str]:
@@ -45,14 +45,65 @@ def _union(paths: list[Path]) -> set[str]:
     return set().union(*(_signatures(path) for path in paths))
 
 
-CLIENT_DUMPS = sorted(PROPERTIES.glob("client_relevance_*.txt"))
-SESSION_DUMPS = sorted(PROPERTIES.glob("session_relevance_*.txt"))
+# The `properties` dumps only. `session_relevance_casts.txt`,
+# `_binary_operators.txt`, `_unary_operators.txt` and `_types.txt` document a
+# different introspection category -- the meta-layer that dialect.py's trap 2
+# already treats as shared vocabulary rather than a dialect marker -- and
+# `_types.txt` is not even in `signature: type` form, so it does not belong in
+# a glob this parser reads.
+_META_LAYER_FILENAMES = frozenset(
+    {
+        "session_relevance_casts.txt",
+        "session_relevance_binary_operators.txt",
+        "session_relevance_unary_operators.txt",
+        "session_relevance_types.txt",
+    }
+)
+
+CLIENT_DUMPS = sorted(INSPECTORS.glob("client_relevance_*.txt"))
+SESSION_DUMPS = sorted(
+    p for p in INSPECTORS.glob("session_relevance_*.txt") if p.name not in _META_LAYER_FILENAMES
+)
 
 
 def test_the_dumps_are_where_the_tests_expect() -> None:
     """Guard against a silent rename turning every check below into a no-op."""
     assert len(CLIENT_DUMPS) == 5
     assert len(SESSION_DUMPS) == 2
+
+
+@pytest.mark.parametrize(
+    ("filename", "expected_lines"),
+    [
+        ("session_relevance_casts.txt", 171),
+        ("session_relevance_binary_operators.txt", 442),
+        ("session_relevance_unary_operators.txt", 7),
+        ("session_relevance_types.txt", 166),
+    ],
+)
+def test_meta_layer_dumps_have_the_captured_line_count(filename: str, expected_lines: int) -> None:
+    """Pins each file to the count `bigfix_query_session_relevance` reported.
+
+    These are session-side only (see the dump README): no client-relevance
+    query tool was available to capture the platform equivalents.
+    """
+    lines = (INSPECTORS / filename).read_text(encoding="utf-8").splitlines()
+    assert len(lines) == expected_lines
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "session_relevance_casts.txt",
+        "session_relevance_binary_operators.txt",
+        "session_relevance_unary_operators.txt",
+    ],
+)
+def test_cast_and_operator_dumps_are_signature_colon_type(filename: str) -> None:
+    """Unlike `_types.txt`, these are in the same `signature: type` shape as
+    the property dumps."""
+    for line in (INSPECTORS / filename).read_text(encoding="utf-8").splitlines():
+        assert ": " in line, f"{filename} line {line!r} is not `signature: type`"
 
 
 def _variants(marker: str) -> set[str]:

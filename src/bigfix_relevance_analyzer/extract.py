@@ -141,6 +141,14 @@ class HtmlContext(enum.Enum):
     CLIENTUI = "clientui"
     """ClientUI dashboard, rendered by the BES Client: substitutions are client relevance."""
 
+    UNKNOWN = "unknown"
+    """Renderer not established, so substitutions get no dialect from context.
+
+    A bare `.html` file is this: unlike `.ojo` or `.besrpt`, the extension says
+    nothing about which side renders it. A JavaScript relevance call in the
+    document still settles it, since only the console side can make one.
+    """
+
 
 def _make_site(
     *,
@@ -417,12 +425,13 @@ def extract_relevance_from_html_text(
 
     ``context`` decides the dialect of static `<?Relevance ?>` substitutions:
     session relevance in a console dashboard or web report, client relevance in
-    a ClientUI dashboard. JavaScript relevance calls are always session
-    relevance -- a ClientUI cannot evaluate relevance from JavaScript, so such
-    a call is itself proof the document is not one. When a document contains
-    both mechanisms the signals contradict each other, so context settles
-    nothing for its substitutions and their dialect falls to the content
-    classifier, which may in turn have no opinion.
+    a ClientUI dashboard, and no opinion at all when the renderer is
+    :attr:`HtmlContext.UNKNOWN`. JavaScript relevance calls are always session
+    relevance -- a ClientUI cannot evaluate relevance from JavaScript, so such a
+    call is itself proof the document is not one, wherever it is found. A
+    ClientUI document that also has a JS call contradicts itself, so context
+    settles nothing for its substitutions either; both cases fall to the
+    content classifier, which may in turn have no opinion.
 
     ``line_offset`` is added to every line, for scanning a fragment embedded in
     a larger file.
@@ -438,8 +447,14 @@ def extract_relevance_from_html_text(
         )
     elif context is HtmlContext.CLIENTUI:
         pi_dialect = Dialect.CLIENT
-    else:
+    elif context is HtmlContext.CONSOLE:
         pi_dialect = Dialect.SESSION
+    elif js_spans:
+        # A JS relevance call proves this is not a ClientUI, even though
+        # nothing told us which renderer it is otherwise.
+        pi_dialect = Dialect.SESSION
+    else:
+        pi_dialect = Dialect.UNCERTAIN
 
     pi_label = label or (
         "ClientUI HTML relevance substitution"
@@ -850,9 +865,15 @@ def extract_relevance_from_file(path: str | bytes | os.PathLike[str]) -> list[Re
     """Extract every relevance statement from a file, keyed off its type.
 
     Recognizes BES XML (`.bes`, `.bes.xml`), console dashboards and web reports
-    (`.ojo`, `.besrpt`, `.beswrpt`, `.webreport`), ClientUI dashboards
-    (`.html`, `.htm`), whole-file relevance (`.bsr`, `.rel`) and markdown
-    (`.md`). Returns an empty list for a file type it does not recognize.
+    (`.ojo`, `.besrpt`, `.beswrpt`, `.webreport`), HTML (`.html`, `.htm`),
+    whole-file relevance (`.bsr`, `.rel`) and markdown (`.md`). Returns an
+    empty list for a file type it does not recognize.
+
+    `.html`/`.htm` gets no context dialect from the extension alone -- unlike
+    `.ojo` or `.besrpt`, it does not say which side renders the document.
+    :func:`looks_like_clientui` is checked first; a corroborating marker gets
+    the ClientUI treatment, and otherwise the document's own mechanism (a
+    JavaScript relevance call, if any) or the content classifier decides.
     """
     file_path = Path(os.fsdecode(path))
     suffixes = _significant_suffixes(file_path)
@@ -865,7 +886,15 @@ def extract_relevance_from_file(path: str | bytes | os.PathLike[str]) -> list[Re
         return extract_relevance_from_html_text(_read_text(file_path), context=HtmlContext.CONSOLE)
 
     if last in _CLIENTUI_HTML_SUFFIXES:
-        return extract_relevance_from_html_text(_read_text(file_path), context=HtmlContext.CLIENTUI)
+        html_text = _read_text(file_path)
+        # The extension alone does not say who renders this -- unlike `.ojo` or
+        # `.besrpt`, a bare `.html` is also how a WebUI fragment, an exported
+        # dashboard, or plain documentation would be named. A ClientUI marker
+        # in the document is corroborating evidence worth trusting; without
+        # one, only the content mechanism (a JS call, or the classifier on
+        # what a static substitution says) gets to decide.
+        context = HtmlContext.CLIENTUI if looks_like_clientui(html_text) else HtmlContext.UNKNOWN
+        return extract_relevance_from_html_text(html_text, context=context)
 
     if last in _SESSION_TEXT_SUFFIXES:
         return _extract_plain_text(_read_text(file_path), Dialect.SESSION)

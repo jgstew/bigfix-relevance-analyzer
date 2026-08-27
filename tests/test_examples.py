@@ -118,8 +118,9 @@ EXPECTED: dict[str, Expected] = {
     # ClientUI dashboards are HTML rendered by the BES Client on the endpoint.
     # They use the same <?Relevance ?> syntax as console dashboards but hold
     # CLIENT relevance -- the one case where HTML relevance is not session
-    # relevance. A ClientUI cannot evaluate relevance from JavaScript, so the
-    # presence of a static PI (and absence of any JS call) is the signal.
+    # relevance. A `.html` file gets no context dialect from its extension
+    # alone; the dispatcher looks for a corroborating ClientUI marker
+    # (`looks_like_clientui`) and both examples below carry one.
     "client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html": Expected(
         sites=(
             (PI, CLIENT, 27),
@@ -147,9 +148,10 @@ EXPECTED: dict[str, Expected] = {
         sites=((PI, CLIENT, 11),),
         text_prefixes=("ps of bs of (it as string) of now",),
         note=(
-            "Has none of the corroborating ClientUI markers (no "
-            'product="CustomDashboardClientUI" meta, no cid:load link), so it pins '
-            "that classification rests on the mechanism, not on those markers."
+            'Has no product="CustomDashboardClientUI" meta, but does have a '
+            "`cid:load` refresh link (line 29) -- the dispatcher's own corroborating "
+            "marker for a bare `.html` file with no other renderer signal. Without "
+            "that marker this would dispatch as HtmlContext.UNKNOWN instead."
         ),
     ),
     # ---------------- client relevance: plain text / markdown ----------------
@@ -275,10 +277,10 @@ def corpus_files() -> list[Path]:
         for path in EXAMPLES.rglob("*")
         if path.is_file()
         and path.name != "README.md"
-        # Raw inspector-name dumps for the analyzer's property tables, not
+        # Raw inspector-name dumps for the analyzer's inspector tables, not
         # documents with embedded relevance to extract - see
-        # relevance_properties/README.md.
-        and "relevance_properties" not in path.relative_to(EXAMPLES).parts
+        # relevance_inspectors/README.md.
+        and "relevance_inspectors" not in path.relative_to(EXAMPLES).parts
     )
 
 
