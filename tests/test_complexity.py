@@ -8,6 +8,8 @@ a test-breaking change.
 
 from __future__ import annotations
 
+from itertools import pairwise
+
 import pytest
 from test_examples import corpus_files
 
@@ -18,9 +20,11 @@ from bigfix_relevance_analyzer.complexity import (
     COST_LOW,
     COST_MODERATE,
     COST_RULES,
+    DEPTH_EXPONENT,
     RelevanceComplexity,
     analyze,
     cost_rules_for,
+    depth_cost,
     evaluation_cost_rules,
     score,
 )
@@ -458,3 +462,145 @@ def test_declared_dialects_match_the_inspector_dumps() -> None:
                 sorted(d.value for d in from_dumps),
             )
     assert mismatched == {}
+
+
+# ---------------------------------------------------------------------------
+# Conditionals: depth matters more than count
+# ---------------------------------------------------------------------------
+#
+# A run of unnested `if`s reads linearly and costs a reader little; one `if`
+# inside another's branch makes them hold both conditions at once. So there are
+# two metrics, the same way `of` has both a count and a longest chain: the flat
+# count carries a small weight, the nesting depth a larger one.
+#
+# Depth is inferred from parenthesis depth at each `if`, because the tokenizer
+# does not parse and so cannot see where a branch ends. That makes an `else if`
+# chain -- which stays at one depth -- flat, which is the right answer for
+# readability even though a parser would nest it.
+
+
+def test_a_single_conditional_is_counted() -> None:
+    result = analyze('if windows of operating system then "a" else "b"')
+    assert result.conditional_branches == 1
+    assert result.max_conditional_depth == 1
+
+
+def test_no_conditional_counts_zero() -> None:
+    result = analyze("windows of operating system")
+    assert result.conditional_branches == 0
+    assert result.max_conditional_depth == 0
+
+
+def test_sequential_conditionals_stay_shallow() -> None:
+    result = analyze('(if a then "x" else "y"); (if b then "p" else "q")')
+    assert result.conditional_branches == 2
+    assert result.max_conditional_depth == 1
+
+
+def test_an_else_if_chain_is_flat() -> None:
+    """A chain reads linearly, so it is not nesting even though it is `if`s."""
+    result = analyze('if a then "x" else if b then "p" else "q"')
+    assert result.conditional_branches == 2
+    assert result.max_conditional_depth == 1
+
+
+def test_a_nested_conditional_reports_depth_two() -> None:
+    result = analyze('if a then (if b then "p" else "q") else "r"')
+    assert result.conditional_branches == 2
+    assert result.max_conditional_depth == 2
+
+
+def test_deeper_nesting_reports_deeper_depth() -> None:
+    statement = 'if a then (if b then (if c then "x" else "y") else "z") else "w"'
+    assert analyze(statement).max_conditional_depth == 3
+
+
+def test_nested_conditionals_outscore_the_same_number_sequentially() -> None:
+    """The point: depth is what costs, not the raw number of branches."""
+    sequential = '(if a then "x" else "y"); (if b then "p" else "q")'
+    nested = 'if a then (if b then "p" else "q") else "r"'
+    flat = analyze(sequential)
+    deep = analyze(nested)
+    assert flat.conditional_branches == deep.conditional_branches
+    assert deep.max_conditional_depth > flat.max_conditional_depth
+
+
+def test_conditionals_in_string_literals_do_not_count() -> None:
+    result = analyze('name of it = "if a then b else c"')
+    assert result.conditional_branches == 0
+    assert result.max_conditional_depth == 0
+
+
+def test_conditionals_in_comments_do_not_count() -> None:
+    result = analyze("name /* if a then b else c */ of it")
+    assert result.conditional_branches == 0
+
+
+def test_adding_a_conditional_raises_the_score() -> None:
+    """Same operands, with and without the branching around them."""
+    assert score('if a then "x" else "y"') > score('a "x" "y"')
+
+
+# ---------------------------------------------------------------------------
+# Depth is charged slightly above linearly -- but not for `of`
+# ---------------------------------------------------------------------------
+#
+# Holding nine enclosing conditions in mind is worse than three times holding
+# three, so paren and conditional depth are raised to DEPTH_EXPONENT rather
+# than multiplied. `of` chains are deliberately left linear: chaining
+# properties is how relevance is ordinarily written -- `names of processes of
+# it` is idiomatic, not a smell -- so charging depth there would flag routine
+# code. The exponent leaves depth 1 untouched (1 ** n == 1) and only diverges
+# as nesting grows.
+
+
+def test_depth_exponent_is_slightly_above_linear() -> None:
+    assert 1.0 < DEPTH_EXPONENT < 2.0
+
+
+def test_depth_cost_at_one_is_just_the_weight() -> None:
+    """Nothing changes for unnested code."""
+    assert depth_cost(1, 4.0) == 4.0
+    assert depth_cost(0, 4.0) == 0.0
+
+
+def test_depth_cost_grows_faster_than_linearly() -> None:
+    single = depth_cost(1, 1.0)
+    assert depth_cost(2, 1.0) > 2 * single
+    assert depth_cost(9, 1.0) > 3 * depth_cost(3, 1.0)
+
+
+def test_parenthesis_depth_is_charged_superlinearly() -> None:
+    scores = [score("(" * n + "a" + ")" * n) for n in (1, 2, 3, 4)]
+    deltas = [b - a for a, b in pairwise(scores)]
+    assert deltas == sorted(deltas)
+    assert deltas[-1] > deltas[0]
+
+
+def test_conditional_depth_is_charged_superlinearly() -> None:
+    def nested(n: int) -> str:
+        text = '"leaf"'
+        for i in range(n):
+            text = f'if c{i} then ({text}) else "e{i}"'
+        return text
+
+    scores = [score(nested(n)) for n in (1, 2, 3, 4)]
+    deltas = [b - a for a, b in pairwise(scores)]
+    assert deltas == sorted(deltas)
+
+
+def test_of_chains_stay_linear() -> None:
+    """Chaining properties is ordinary relevance, not a complexity smell."""
+    scores = [score(" of ".join(f"p{i}" for i in range(n))) for n in (2, 3, 4, 5)]
+    deltas = [b - a for a, b in pairwise(scores)]
+    assert deltas[0] == pytest.approx(deltas[-1])
+
+
+def test_nine_nested_is_more_than_three_times_three_nested() -> None:
+    def nested(n: int) -> str:
+        text = '"leaf"'
+        for i in range(n):
+            text = f'if c{i} then ({text}) else "e{i}"'
+        return text
+
+    assert score(nested(9)) > 3 * score(nested(3))

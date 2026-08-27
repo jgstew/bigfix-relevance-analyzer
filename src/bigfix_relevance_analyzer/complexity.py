@@ -10,7 +10,11 @@ scored high, not just that it did.
 Two axes, one score
 -------------------
 **Readability** is the token-shaped part: length, nesting depth, ``of`` chains,
-``whose`` filters, how many distinct names a reader has to hold at once.
+``whose`` filters, conditional nesting, how many distinct names a reader has to
+hold at once. Where a construct can both pile up and nest, it is counted twice
+-- once flat, once by depth -- because those are not the same cost. Three
+``if``\\ s in a row read linearly; three nested inside each other's branches do
+not, and only the depth metric can tell them apart.
 
 **Evaluation cost** is what the statement does to the engine evaluating it, and
 it does not follow from size. ``exists descendants of folder "C:\\"`` is eight
@@ -72,6 +76,7 @@ server side, so they cover the constructs whose expansion the dumps make plain
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 
@@ -85,10 +90,12 @@ __all__ = [
     "COST_LOW",
     "COST_MODERATE",
     "COST_RULES",
+    "DEPTH_EXPONENT",
     "CostRule",
     "RelevanceComplexity",
     "analyze",
     "cost_rules_for",
+    "depth_cost",
     "evaluation_cost_rules",
     "score",
 ]
@@ -97,19 +104,58 @@ __all__ = [
 # Weights. Provisional -- see the module docstring.
 # ---------------------------------------------------------------------------
 
+DEPTH_EXPONENT = 1.5
+"""How sharply nesting is charged, above linear.
+
+Nine levels of nesting is worse than three times three levels: every enclosing
+condition is one more thing a reader holds at once, so the cost compounds. This
+raises depth to a power rather than multiplying it. Kept mild -- ``1 ** n == 1``
+means unnested code is unaffected, and shallow nesting barely moves -- so it
+only bites where nesting is genuinely deep.
+
+Applied to parenthesis and conditional depth, but deliberately **not** to
+``of`` chains: see :data:`WEIGHT_MAX_OF_CHAIN`.
+"""
+
+
+def depth_cost(depth: int, weight: float) -> float:
+    """Charge ``depth`` levels of nesting at ``weight``, slightly above linearly."""
+    # math.pow rather than `**`: the builtin is typed as returning Any, since a
+    # negative base with a fractional exponent yields a complex number.
+    return weight * math.pow(depth, DEPTH_EXPONENT)
+
+
 WEIGHT_TOKEN = 1.0
 """Baseline: longer statements are harder, all else equal."""
 
 WEIGHT_PAREN_DEPTH = 3.0
-"""Nesting depth, the single strongest readability signal."""
+"""Nesting depth, the single strongest readability signal. Charged by
+:func:`depth_cost`, so it compounds rather than scaling linearly."""
 
 WEIGHT_BOOLEAN_OPERATOR = 2.0
 WEIGHT_OF = 1.0
 WEIGHT_MAX_OF_CHAIN = 2.0
-"""A long unbroken `of` chain costs more than the same `of`s spread out."""
+"""A long unbroken `of` chain costs more than the same `of`s spread out.
+
+Charged **linearly**, unlike the other depth metrics. Chaining properties is
+simply how relevance is written -- ``names of processes of it`` is idiomatic,
+not a smell -- so compounding it the way :data:`DEPTH_EXPONENT` compounds
+parentheses would flag ordinary code as complex.
+"""
 
 WEIGHT_WHOSE_CLAUSE = 5.0
 """A `whose` filter introduces a second scope with its own `it`."""
+
+WEIGHT_CONDITIONAL = 1.0
+"""Each `if`. Small: a run of unnested conditionals reads linearly."""
+
+WEIGHT_CONDITIONAL_DEPTH = 3.0
+"""Nesting of conditionals, which is what actually costs a reader.
+
+Deliberately several times :data:`WEIGHT_CONDITIONAL`: holding one branch in
+mind is cheap, holding a branch inside another branch is not. Charged by
+:func:`depth_cost`, so deep nesting compounds.
+"""
 
 WEIGHT_ITERATION_KEYWORD = 1.0
 WEIGHT_SEMICOLON_CLAUSE = 2.0
@@ -487,6 +533,11 @@ _WHOSE_WORDS = frozenset({"whose", "whoses"})
 # Punctuation that ends an `of` chain: a chain cannot cross a clause boundary.
 _CHAIN_BREAKERS = frozenset({"(", ")", ";", ","})
 
+# The word that opens a conditional. `then` and `else` are not counted: they
+# cannot appear without an `if`, so counting them would only multiply the same
+# signal.
+_CONDITIONAL_WORD = "if"
+
 
 @dataclass(frozen=True, slots=True)
 class RelevanceComplexity:
@@ -508,6 +559,18 @@ class RelevanceComplexity:
     whose_clauses: int = 0
     iteration_keywords: int = 0
     """References to the implicit subject: ``it``, ``item``, ``items``."""
+
+    conditional_branches: int = 0
+    """Every ``if``, however it nests."""
+
+    max_conditional_depth: int = 0
+    """The deepest nesting of ``if`` inside another ``if``'s branch.
+
+    A run of unnested conditionals, and an ``else if`` chain, both report 1: they
+    read linearly. Two means one conditional sits inside another's branch.
+    Inferred from parenthesis depth -- see :func:`analyze` -- because binding a
+    branch to its ``if`` needs the parser this module does not have.
+    """
 
     semicolon_clauses: int = 0
     """Number of ``;``-separated clauses, or 0 when there is no ``;`` at all."""
@@ -541,11 +604,14 @@ class RelevanceComplexity:
         """
         return (
             WEIGHT_TOKEN * self.token_count
-            + WEIGHT_PAREN_DEPTH * self.max_paren_depth
+            + depth_cost(self.max_paren_depth, WEIGHT_PAREN_DEPTH)
             + WEIGHT_BOOLEAN_OPERATOR * self.boolean_operators
             + WEIGHT_OF * self.of_count
+            # Linear on purpose -- see WEIGHT_MAX_OF_CHAIN.
             + WEIGHT_MAX_OF_CHAIN * self.max_of_chain
             + WEIGHT_WHOSE_CLAUSE * self.whose_clauses
+            + WEIGHT_CONDITIONAL * self.conditional_branches
+            + depth_cost(self.max_conditional_depth, WEIGHT_CONDITIONAL_DEPTH)
             + WEIGHT_ITERATION_KEYWORD * self.iteration_keywords
             + WEIGHT_SEMICOLON_CLAUSE * self.semicolon_clauses
             + WEIGHT_STRING_LITERAL * self.string_literals
@@ -575,6 +641,12 @@ def analyze(text: str, dialect: Dialect | None = None) -> RelevanceComplexity:
     of_chain = 0
     max_of_chain = 0
     whoses = 0
+    conditionals = 0
+    max_conditional_depth = 0
+    # Parenthesis depth of each `if` still considered open. An `if` at the same
+    # depth as the one before it is a sibling or an `else if` chain link, not a
+    # nesting, so the earlier one is popped first.
+    open_conditionals: list[int] = []
     iterations = 0
     semicolons = 0
     strings = 0
@@ -605,6 +677,15 @@ def analyze(text: str, dialect: Dialect | None = None) -> RelevanceComplexity:
                 booleans += 1
             elif word in _WHOSE_WORDS:
                 whoses += 1
+            elif word == _CONDITIONAL_WORD:
+                conditionals += 1
+                # Anything opened at this depth or shallower has closed: a
+                # conditional only nests when it sits inside the parentheses of
+                # another one's branch.
+                while open_conditionals and open_conditionals[-1] >= depth:
+                    open_conditionals.pop()
+                open_conditionals.append(depth)
+                max_conditional_depth = max(max_conditional_depth, len(open_conditionals))
             elif word in _ITERATION_WORDS:
                 iterations += 1
             if word not in GRAMMAR_WORDS:
@@ -637,6 +718,8 @@ def analyze(text: str, dialect: Dialect | None = None) -> RelevanceComplexity:
         of_count=ofs,
         max_of_chain=max_of_chain,
         whose_clauses=whoses,
+        conditional_branches=conditionals,
+        max_conditional_depth=max_conditional_depth,
         iteration_keywords=iterations,
         semicolon_clauses=semicolons + 1 if semicolons else 0,
         string_literals=strings,
