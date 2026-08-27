@@ -13,6 +13,7 @@ reference data rather than fixtures.
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -24,6 +25,9 @@ from bigfix_relevance_analyzer import _inspector_data
 REPO_ROOT = Path(__file__).resolve().parent.parent
 GENERATOR = REPO_ROOT / "tools" / "generate_inspector_data.py"
 DUMPS = REPO_ROOT / "tests" / "examples" / "relevance_inspectors"
+DUMPS_README = DUMPS / "README.md"
+
+_DUMP_FILENAME_RE = re.compile(r"`((?:client|session)_relevance_[a-z_]+\.txt)`")
 
 
 def _load_generator() -> ModuleType:
@@ -84,6 +88,25 @@ def test_unparsable_dump_filenames_are_rejected(filename: str) -> None:
     """A typo'd filename must fail loudly, not be silently skipped."""
     with pytest.raises(ValueError):
         _load_generator().parse_dump_filename(filename)
+
+
+def test_the_dump_readme_matches_the_actual_files() -> None:
+    """Every dump the README names must exist, and every dump must be named.
+
+    A rename that forgets to update the README (this happened once already,
+    with the session meta-layer dumps moving to `*_rest_api.txt`) is otherwise
+    invisible: nothing else reads the README's prose.
+    """
+    mentioned = set(_DUMP_FILENAME_RE.findall(DUMPS_README.read_text(encoding="utf-8")))
+    actual = {path.name for path in DUMPS.glob("*.txt")}
+
+    stale = mentioned - actual
+    assert not stale, f"README mentions dumps that do not exist: {sorted(stale)}"
+
+    undocumented = actual - mentioned
+    assert not undocumented, (
+        f"dumps exist but the README never mentions them: {sorted(undocumented)}"
+    )
 
 
 def test_every_dump_is_accounted_for_by_the_generator() -> None:

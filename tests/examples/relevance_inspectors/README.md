@@ -51,40 +51,70 @@ minus) read as unrecognized words against the `properties`-only vocabulary --
 they are casts and operators, not properties, and were never in scope for
 those dumps.
 
-Session-side only, so far:
+Session-side, all from the REST API via `bigfix_query_session_relevance` (see
+Provenance below):
 
 | File | Signatures | Query |
 | --- | --- | --- |
-| `session_relevance_casts.txt` | 171 | `(it as string) of casts` |
-| `session_relevance_binary_operators.txt` | 442 | `(it as string) of binary operators` |
-| `session_relevance_unary_operators.txt` | 7 | `(it as string) of unary operators` |
-| `session_relevance_types.txt` | 166 | `(it as string) of types` |
+| `session_relevance_casts_rest_api.txt` | 171 | `(it as string) of casts` |
+| `session_relevance_binary_operators_rest_api.txt` | 442 | `(it as string) of binary operators` |
+| `session_relevance_unary_operators_rest_api.txt` | 7 | `(it as string) of unary operators` |
+| `session_relevance_types_rest_api.txt` | 166 | `(it as string) of types` |
+
+Client-side, captured on Windows only so far:
+
+| File | Signatures | Query |
+| --- | --- | --- |
+| `client_relevance_casts_windows.txt` | 230 | `(it as string) of casts` |
+| `client_relevance_binary_operators_windows.txt` | 374 | `(it as string) of binary operators` |
+| `client_relevance_unary_operators_windows.txt` | 6 | `(it as string) of unary operators` |
+| `client_relevance_types_windows.txt` | 309 | `(it as string) of types` |
 
 Casts and operators are in the same `signature: type` format as the property
 dumps. `types` is not: a type's `as string` form is just its own name, so that
-file is a flat list of type names, one per line, no `: type` suffix -- and its
-first line is a genuine empty string, part of the capture rather than a
-formatting accident (this project has no theory for which type that is; see it
-as unresolved rather than guess).
+file is a flat list of type names, one per line, no `: type` suffix -- and the
+REST API capture's first line is a genuine empty string, part of the capture
+rather than a formatting accident (this project has no theory for which type
+that is; see it as unresolved rather than guess).
 
-**Client-side casts, operators and types are not captured yet.** Unlike the
-`properties` dumps, these came from a single live session via
-`bigfix_query_session_relevance` (see Provenance below), and there is no
-equivalent client-relevance query tool available to this project to run the
-same four queries against each of the five client platforms. Someone with
-Fixlet Debugger or console client-relevance access to each platform can
-capture them the same way the original `client_relevance_*.txt` files were
-made -- run each of the four queries above per platform and diff against the
-others, the same way the platform files above turned out byte-identical.
-Until then, anything built on these four files should treat the client side of
-`casts`, `binary operators`, `unary operators` and `types` as **shared
-vocabulary by assumption**, not by evidence -- the dialect classifier's traps
-document (in `dialect.py`) already treats the whole meta-layer this way for
-exactly this reason.
+**Trap 2 is now an evidence-backed finding, not an assumption.** Every one of
+these five categories -- `properties`, `casts`, `binary operators`, `unary
+operators`, `types` -- has at least one client dump and one session dump, and
+`bigfix_relevance_analyzer.inspectors` resolves every one of them to
+`dialects={client, session}`: the Windows client genuinely defines the same
+introspection meta-layer the session engine does. The remaining gap is
+platform breadth, not dialect: **macOS, Ubuntu, Debian and RHEL have no
+casts/operators/types dumps yet** -- only `properties` was captured on all
+five platforms. Someone with Fixlet Debugger or console client-relevance access
+to those platforms can capture them the same way the original
+`client_relevance_properties_*.txt` files were made -- run the four queries
+above per platform. `tools/generate_inspector_data.py` (see "Filenames are the
+provenance" below) picks up a new dump with no code change.
 
-## What the two dialects share
+## Filenames are the provenance
 
-Computed from the files in this folder:
+Every dump's name is `{dialect}_relevance_{category}[_{context}].txt`:
+
+- `dialect` is `client` or `session`.
+- `category` is one of the five introspection categories above --
+  `properties`, `casts`, `binary_operators`, `unary_operators`, `types`.
+- `context` names the platform or session surface (`windows`, `console`,
+  `rest_api`, ...). Omit it when only one capture exists for that dialect and
+  category -- that is why the four REST API files above carry a context
+  segment but nothing forces every file to.
+
+`tools/generate_inspector_data.py` parses this to build
+`bigfix_relevance_analyzer._inspector_data`, and its tests
+(`tests/test_inspector_data.py`) fail on a filename that does not parse. Adding
+a dump is exactly: name it correctly, drop it in this folder, run
+`python tools/generate_inspector_data.py`, commit both.
+
+## What `properties` shares between the two dialects
+
+Computed from the `properties` files in this folder -- the only category
+captured across all five client platforms, so it is the one with cross-platform
+counts worth stating. See "Trap 2" above for what the other four categories
+show instead (both dialects, Windows-only breadth so far).
 
 | Set | Count |
 | --- | --- |
@@ -197,16 +227,23 @@ gh run view --repo jgstew/tools --job <JOB_ID> --log | sed -E 's/^[^\t]*\t[^\t]*
 extraction above reproduces it byte-for-byte from the `windows-latest` job,
 which is how the pipeline was validated.
 
-The four meta-layer files (`session_relevance_casts.txt`,
-`session_relevance_binary_operators.txt`,
-`session_relevance_unary_operators.txt`, `session_relevance_types.txt`) were
-captured directly through the BigFix SaaS MCP server's
-`bigfix_query_session_relevance` tool against a live session, one query per
-file: `(it as string) of casts`, and the same shape for `binary operators`,
-`unary operators` and `types`. The query is identical across all four; only
-`types`' result differs in shape, since a type's `as string` form is its own
-name rather than a `signature: return-type` pair. No client-side equivalents
-exist yet -- see "Introspection meta-layer" above.
+The four `*_rest_api.txt` session meta-layer files (`session_relevance_casts_rest_api.txt`,
+`session_relevance_binary_operators_rest_api.txt`,
+`session_relevance_unary_operators_rest_api.txt`,
+`session_relevance_types_rest_api.txt`) were captured directly through the
+BigFix SaaS MCP server's `bigfix_query_session_relevance` tool against a live
+session, one query per file: `(it as string) of casts`, and the same shape for
+`binary operators`, `unary operators` and `types`. The query is identical
+across all four; only `types`' result differs in shape, since a type's
+`as string` form is its own name rather than a `signature: return-type` pair.
+
+The four `*_windows.txt` client meta-layer files
+(`client_relevance_casts_windows.txt`,
+`client_relevance_binary_operators_windows.txt`,
+`client_relevance_unary_operators_windows.txt`,
+`client_relevance_types_windows.txt`) were captured the same way as
+`client_relevance_properties_windows.txt` above, on Windows only so far -- see
+"Introspection meta-layer" above for the remaining platform gap.
 
 ## Regenerating
 

@@ -30,12 +30,17 @@ The two directions are not equally strong evidence:
   namespace for server-side inspectors and covers ~92% of session-only
   signatures. It needs an exception set, though: ``bes license`` and
   ``bes product`` are defined on clients too.
-* **Client markers are weaker.** Session relevance has been sampled from the
-  console and Web Reports, which turn out to have an identical inspector
-  surface, but not from the WebUI, the Fixlet Debugger or the REST API -- so an
-  inspector that looks client-only against the data we have might turn out to
-  exist in an unsampled session context. The client list is therefore short and
-  made of distinctive multi-word phrases rather than everything client-only.
+* **Client markers are weaker.** These markers are drawn from session
+  **properties**, which has been sampled from the console and Web Reports --
+  identical inspector surfaces -- but not from the WebUI, the Fixlet Debugger or
+  the REST API, so an inspector that looks client-only against the data we have
+  might turn out to exist in an unsampled session context. (The REST API has
+  been sampled for the *other* introspection categories -- casts, operators,
+  types -- which is separate evidence with its own dumps; see
+  ``tests/examples/relevance_inspectors/README.md``. It does not narrow this
+  gap, since none of those categories contribute markers here.) The client
+  list is therefore short and made of distinctive multi-word phrases rather
+  than everything client-only.
 
 Only *positive* evidence is ever used: an inspector nobody recognizes
 contributes nothing, and the answer for a statement made entirely of unknown
