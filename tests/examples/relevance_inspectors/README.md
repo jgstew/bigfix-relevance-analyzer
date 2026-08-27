@@ -61,7 +61,7 @@ Provenance below):
 | `session_relevance_unary_operators_rest_api.txt` | 7 | `(it as string) of unary operators` |
 | `session_relevance_types_rest_api.txt` | 166 | `(it as string) of types` |
 
-Client-side, captured on Windows only so far:
+Client-side, captured on Windows and now macOS:
 
 | File | Signatures | Query |
 | --- | --- | --- |
@@ -69,27 +69,34 @@ Client-side, captured on Windows only so far:
 | `client_relevance_binary_operators_windows.txt` | 374 | `(it as string) of binary operators` |
 | `client_relevance_unary_operators_windows.txt` | 6 | `(it as string) of unary operators` |
 | `client_relevance_types_windows.txt` | 309 | `(it as string) of types` |
+| `client_relevance_casts_macos.txt` | 188 | `(it as string) of casts` |
+| `client_relevance_binary_operators_macos.txt` | 345 | `(it as string) of binary operators` |
+| `client_relevance_unary_operators_macos.txt` | 7 | `(it as string) of unary operators` |
+| `client_relevance_types_macos.txt` | 244 | `(it as string) of types` |
 
 Casts and operators are in the same `signature: type` format as the property
 dumps. `types` is not: a type's `as string` form is just its own name, so that
 file is a flat list of type names, one per line, no `: type` suffix -- and the
 REST API capture's first line is a genuine empty string, part of the capture
 rather than a formatting accident (this project has no theory for which type
-that is; see it as unresolved rather than guess).
+that is; see it as unresolved rather than guess). The macOS `types` dump has
+the same leading empty line, captured directly via `sudo QnA` on the BES
+Agent -- not just a REST API/Windows quirk.
 
 **Trap 2 is now an evidence-backed finding, not an assumption.** Every one of
 these five categories -- `properties`, `casts`, `binary operators`, `unary
 operators`, `types` -- has at least one client dump and one session dump, and
 `bigfix_relevance_analyzer.inspectors` resolves every one of them to
-`dialects={client, session}`: the Windows client genuinely defines the same
-introspection meta-layer the session engine does. The remaining gap is
-platform breadth, not dialect: **macOS, Ubuntu, Debian and RHEL have no
+`dialects={client, session}`: the Windows and macOS clients genuinely define
+the same introspection meta-layer the session engine does. The remaining gap
+is platform breadth, not dialect: **Ubuntu, Debian and RHEL have no
 casts/operators/types dumps yet** -- only `properties` was captured on all
-five platforms. Someone with Fixlet Debugger or console client-relevance access
-to those platforms can capture them the same way the original
-`client_relevance_properties_*.txt` files were made -- run the four queries
-above per platform. `tools/generate_inspector_data.py` (see "Filenames are the
-provenance" below) picks up a new dump with no code change.
+five platforms. Someone with Fixlet Debugger, `sudo QnA` (macOS/Linux), or
+console client-relevance access to those platforms can capture them the same
+way the original `client_relevance_properties_*.txt` files were made -- run
+the four queries above per platform. `tools/generate_inspector_data.py` (see
+"Filenames are the provenance" below) picks up a new dump with no code
+change.
 
 ## Filenames are the provenance
 
@@ -242,8 +249,23 @@ The four `*_windows.txt` client meta-layer files
 `client_relevance_binary_operators_windows.txt`,
 `client_relevance_unary_operators_windows.txt`,
 `client_relevance_types_windows.txt`) were captured the same way as
-`client_relevance_properties_windows.txt` above, on Windows only so far -- see
-"Introspection meta-layer" above for the remaining platform gap.
+`client_relevance_properties_windows.txt` above.
+
+The four `*_macos.txt` client meta-layer files
+(`client_relevance_casts_macos.txt`,
+`client_relevance_binary_operators_macos.txt`,
+`client_relevance_unary_operators_macos.txt`,
+`client_relevance_types_macos.txt`) were captured directly on a macOS BES
+Agent via the `QnA` binary, one query per file, e.g.:
+
+```bash
+echo '(it as string) of casts' | sudo /Library/BESAgent/BESAgent.app/Contents/MacOS/QnA | grep '^A: ' | sed 's/^A: //' > client_relevance_casts_macos.txt
+```
+
+with the same substitution as the REST API queries above for `binary
+operators`, `unary operators` and `types`. `sudo` is required because `QnA`
+needs root to read the client's local action site. See "Introspection
+meta-layer" above for the remaining platform gap (Ubuntu, Debian, RHEL).
 
 ## Regenerating
 

@@ -1,0 +1,188 @@
+<yaml value> as string: string
+<yaml value> as integer: integer
+<yaml value> as float: floating point
+<yaml value> as boolean: boolean
+<yaml key> as string: string
+<tcp state> as string: string
+<environment variable> as string: string
+<cidr subnet> as string: string
+<action lock state> as string: string
+<power state> as string: string
+<html> as string: string
+<html> as decoded string: string
+<string> as html: html
+<html> as html: html
+<rate> as string: string
+<stage> as string: string
+<version> as string: string
+<string> as version: version
+<version> as version: version
+<bit set> as integer: integer
+<integer> as bit set: bit set
+<integer> as bits: bit set
+<bit set> as string: string
+<integer> as day_of_month: day of month
+<day of month> as integer: integer
+<string> as day_of_month: day of month
+<day of month> as string: string
+<day of month> as two digits: string
+<string> as day_of_week: day of week
+<day of week> as string: string
+<day of week> as three letters: string
+<day of year> as string: string
+<hertz> as string: string
+<string> as date: date
+<date> as string: string
+<ip version> as string: string
+<ipv4 address> as string: string
+<ipv6 address> as string: string
+<ipv4or6 address> as string: string
+<ipv6 address> as string with leading zeros: string
+<ipv4or6 address> as string with leading zeros: string
+<ipv6 address> as string with ipv4: string
+<ipv4or6 address> as string with ipv4: string
+<ipv6 address> as compressed string: string
+<ipv4or6 address> as compressed string: string
+<ipv6 address> as compressed string with ipv4: string
+<ipv4or6 address> as compressed string with ipv4: string
+<ipv6 address> as string with zone index: string
+<ipv4or6 address> as string with zone index: string
+<ipv6 address> as string with leading zeros with zone index: string
+<ipv4or6 address> as string with leading zeros with zone index: string
+<ipv6 address> as string with ipv4 with zone index: string
+<ipv4or6 address> as string with ipv4 with zone index: string
+<ipv6 address> as compressed string with zone index: string
+<ipv4or6 address> as compressed string with zone index: string
+<ipv6 address> as compressed string with ipv4 with zone index: string
+<ipv4or6 address> as compressed string with ipv4 with zone index: string
+<string> as ipv6 address: ipv6 address
+<string> as ipv4or6 address: ipv4or6 address
+<ipv4 address> as ipv6 address: ipv6 address
+<ipv4 address> as ipv4or6 address: ipv4or6 address
+<ipv6 address> as ipv4or6 address: ipv4or6 address
+<month and year> as string: string
+<number of months> as string: string
+<integer> as month: month
+<month> as integer: integer
+<string> as month: month
+<month> as string: string
+<month> as three letters: string
+<month> as two digits: string
+<power level> as string: string
+<rope> as string: string
+<substring> as string: string
+<substring> as substring: substring
+<string> as time_of_day: time of day
+<time of day> as string: string
+<time range> as string: string
+<string> as time zone: time zone
+<time zone> as string: string
+<string> as left trimmed string: string
+<string> as right trimmed string: string
+<string> as trimmed string: string
+<tuple item> as string: string
+<integer> as year: year
+<year> as integer: integer
+<string> as year: year
+<year> as string: string
+<string> as zoned time_of_day: time of day with time zone
+<string> as universal zoned time_of_day: time of day with time zone
+<string> as local zoned time_of_day: time of day with time zone
+<time of day with time zone> as string: string
+<bios> as string: string
+<dummy type> as string: string
+<server based group> as string: string
+<operating system> as string: string
+<user attribute> as string: string
+<security identifier> as string: string
+<client process owner> as string: string
+<filesystem object> as file: file
+<file> as string: string
+<filesystem object> as folder: folder
+<integer> as floating point: floating point
+<floating point> as integer: integer
+<floating point> as string: string
+<floating point> as scientific notation: string
+<floating point> as standard notation: string
+<string> as floating point: floating point
+<floating point> as floating point: floating point
+<time> as local date: date
+<time> as universal date: date
+<string> as time: time
+<string> as local time: time
+<string> as universal time: time
+<time> as string: string
+<time> as local string: string
+<time> as universal string: string
+<string> as time interval: time interval
+<time interval> as string: string
+<action> as string: string
+<setting> as string: string
+<site version list> as string: string
+<string> as site version list: site version list
+<json key> as string: string
+<json value> as string: string
+<json value> as integer: integer
+<json value> as float: floating point
+<json value> as boolean: boolean
+<sqlite column type> as string: string
+<sqlite column> as string: string
+<sqlite database> as string: string
+<sqlite row> as string: string
+<sqlite table> as string: string
+<manual group> as string: string
+<format> as string: string
+<application> as string: string
+<binary_substring> as string: string
+<binary_substring> as binary_substring: binary_substring
+<agent interface capability> as string: string
+<filesystem object> as string: string
+<file content> as uppercase: file content
+<file content> as lowercase: file content
+<smbios value> as string: string
+<smbios value> as hexadecimal: string
+<uuid> as string: string
+<uuid> as hexadecimal: string
+<uuid> as binary_string: binary_string
+<string> as uinteger: uinteger
+<integer> as uinteger: uinteger
+<large integer> as uinteger: uinteger
+<uinteger> as string: string
+<uinteger> as uinteger: uinteger
+<binary operator> as string: string
+<string> as boolean: boolean
+<boolean> as string: string
+<boolean> as boolean: boolean
+<cast> as string: string
+<property> as string: string
+<string> as uppercase: string
+<string> as lowercase: string
+<string> as string: string
+<string> as binary_string: binary_string
+<string> as utf8 binary_string: binary_string
+<string> as utf16 binary_string: binary_string
+<string> as local binary_string: binary_string
+<string> as fxf binary_string: binary_string
+<type> as string: string
+<string> as integer: integer
+<uinteger> as integer: integer
+<large integer> as integer: integer
+<integer> as string: string
+<integer> as integer: integer
+<unary operator> as string: string
+<undefined> as string: string
+<string> as large integer: large integer
+<integer> as large integer: large integer
+<uinteger> as large integer: large integer
+<large integer> as string: string
+<large integer> as large integer: large integer
+<binary_string> as string: string
+<binary_string> as utf8 string: string
+<binary_string> as utf16 string: string
+<binary_string> as local string: string
+<binary_string> as fxf string: string
+<integer> as hexadecimal: string
+<uinteger> as hexadecimal: string
+<large integer> as hexadecimal: string
+<string> as hexadecimal: string
+<binary_string> as hexadecimal: string

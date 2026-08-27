@@ -23,7 +23,7 @@ SOURCES: tuple[str, ...] = (
     "session:web_reports",
 )
 
-# 509 rows
+# 526 rows
 BINARY_OPERATORS: str = """\
 40	<bes action set> * <bes action set>: bes action set
 40	<bes action set> + <bes action set>: bes action set
@@ -140,229 +140,239 @@ BINARY_OPERATORS: str = """\
 40	<bes wizard set> contains <bes wizard set>: boolean
 40	<bes wizard set> contains <bes wizard>: boolean
 40	<bes wizard> = <bes wizard>: boolean
-50	<binary_string> & <binary_string>: binary_string
-50	<binary_string> < <binary_string>: boolean
-50	<binary_string> <= <binary_string>: boolean
-50	<binary_string> = <binary_string>: boolean
-50	<binary_string> contains <binary_string>: boolean
-50	<binary_string> ends with <binary_string>: boolean
-50	<binary_string> starts with <binary_string>: boolean
-50	<bit set> * <bit set>: bit set
-50	<bit set> + <bit set>: bit set
-50	<bit set> - <bit set>: bit set
-50	<bit set> = <bit set>: boolean
-50	<bit set> contains <bit set>: boolean
-50	<boolean> * <time range>: timed( time range, boolean )
-50	<boolean> = <boolean>: boolean
-10	<cidr subnet> = <cidr subnet>: boolean
-10	<cidr subnet> = <string>: boolean
-10	<cidr subnet> contains <cidr subnet>: boolean
-10	<cidr subnet> contains <ipv4 address>: boolean
-10	<cidr subnet> contains <ipv4or6 address>: boolean
-10	<cidr subnet> contains <ipv6 address>: boolean
+52	<binary_string> & <binary_string>: binary_string
+52	<binary_string> < <binary_string>: boolean
+52	<binary_string> <= <binary_string>: boolean
+52	<binary_string> = <binary_string>: boolean
+52	<binary_string> contains <binary_string>: boolean
+52	<binary_string> ends with <binary_string>: boolean
+52	<binary_string> starts with <binary_string>: boolean
+52	<bit set> * <bit set>: bit set
+52	<bit set> + <bit set>: bit set
+52	<bit set> - <bit set>: bit set
+52	<bit set> = <bit set>: boolean
+52	<bit set> contains <bit set>: boolean
+52	<boolean> * <time range>: timed( time range, boolean )
+52	<boolean> = <boolean>: boolean
+12	<cidr subnet> = <cidr subnet>: boolean
+12	<cidr subnet> = <string>: boolean
+12	<cidr subnet> contains <cidr subnet>: boolean
+12	<cidr subnet> contains <ipv4 address>: boolean
+12	<cidr subnet> contains <ipv4or6 address>: boolean
+12	<cidr subnet> contains <ipv6 address>: boolean
 10	<connection status> = <connection status>: boolean
-50	<date> & <time of day with time zone>: time
-50	<date> + <number of months>: date
-50	<date> + <time interval>: date
-50	<date> - <date>: time interval
-50	<date> - <number of months>: date
-50	<date> - <time interval>: date
-50	<date> < <date>: boolean
-50	<date> <= <date>: boolean
-50	<date> = <date>: boolean
-50	<day of month> & <month and year>: date
-50	<day of month> & <month>: day of year
-50	<day of month> + <time interval>: day of month
-50	<day of month> - <day of month>: time interval
-50	<day of month> - <time interval>: day of month
-50	<day of month> < <day of month>: boolean
-50	<day of month> <= <day of month>: boolean
-50	<day of month> = <day of month>: boolean
-50	<day of week> + <time interval>: day of week
-50	<day of week> - <day of week>: time interval
-50	<day of week> - <time interval>: day of week
-50	<day of week> = <day of week>: boolean
-50	<day of year> & <month and year>: date
-50	<day of year> & <year>: date
-50	<day of year> + <number of months>: day of year
-50	<day of year> + <time interval>: day of year
-50	<day of year> - <day of year>: time interval
-50	<day of year> - <number of months>: day of year
-50	<day of year> - <time interval>: day of year
-50	<day of year> < <day of year>: boolean
-50	<day of year> <= <day of year>: boolean
-50	<day of year> = <day of year>: boolean
+2	<country> = <country>: boolean
+52	<date> & <time of day with time zone>: time
+52	<date> + <number of months>: date
+52	<date> + <time interval>: date
+52	<date> - <date>: time interval
+52	<date> - <number of months>: date
+52	<date> - <time interval>: date
+52	<date> < <date>: boolean
+52	<date> <= <date>: boolean
+52	<date> = <date>: boolean
+52	<day of month> & <month and year>: date
+52	<day of month> & <month>: day of year
+52	<day of month> + <time interval>: day of month
+52	<day of month> - <day of month>: time interval
+52	<day of month> - <time interval>: day of month
+52	<day of month> < <day of month>: boolean
+52	<day of month> <= <day of month>: boolean
+52	<day of month> = <day of month>: boolean
+52	<day of week> + <time interval>: day of week
+52	<day of week> - <day of week>: time interval
+52	<day of week> - <time interval>: day of week
+52	<day of week> = <day of week>: boolean
+52	<day of year> & <month and year>: date
+52	<day of year> & <year>: date
+52	<day of year> + <number of months>: day of year
+52	<day of year> + <time interval>: day of year
+52	<day of year> - <day of year>: time interval
+52	<day of year> - <number of months>: day of year
+52	<day of year> - <time interval>: day of year
+52	<day of year> < <day of year>: boolean
+52	<day of year> <= <day of year>: boolean
+52	<day of year> = <day of year>: boolean
 10	<event log event type> = <event log event type>: boolean
-10	<file content> contains <string>: boolean
-10	<firewall action> = <firewall action>: boolean
+12	<file content> contains <string>: boolean
+2	<file signature> = <file signature>: boolean
+2	<file type> = <file type>: boolean
+12	<firewall action> = <firewall action>: boolean
 10	<firewall local policy modify state> = <firewall local policy modify state>: boolean
 10	<firewall profile type> = <firewall profile type>: boolean
 10	<firewall scope> = <firewall scope>: boolean
 10	<firewall service type> = <firewall service type>: boolean
-50	<floating point> * <floating point>: floating point
-50	<floating point> * <integer>: floating point
-40	<floating point> * <rate>: rate
-50	<floating point> + <floating point>: floating point
-50	<floating point> + <integer>: floating point
-50	<floating point> - <floating point>: floating point
-50	<floating point> - <integer>: floating point
-50	<floating point> / <floating point>: floating point
-50	<floating point> / <integer>: floating point
-40	<floating point> / <time interval>: rate
-50	<floating point> < <floating point>: boolean
-50	<floating point> < <integer>: boolean
-50	<floating point> <= <floating point>: boolean
-50	<floating point> <= <integer>: boolean
-50	<floating point> = <floating point>: boolean
-50	<floating point> = <integer>: boolean
-50	<format> + <date>: format
-50	<format> + <day of week>: format
-50	<format> + <format>: format
-50	<format> + <integer>: format
-50	<format> + <string>: format
-50	<format> + <time interval>: format
-50	<format> + <time of day>: format
-50	<format> + <time>: format
+52	<floating point> * <floating point>: floating point
+52	<floating point> * <integer>: floating point
+42	<floating point> * <rate>: rate
+52	<floating point> + <floating point>: floating point
+52	<floating point> + <integer>: floating point
+52	<floating point> - <floating point>: floating point
+52	<floating point> - <integer>: floating point
+52	<floating point> / <floating point>: floating point
+52	<floating point> / <integer>: floating point
+42	<floating point> / <time interval>: rate
+52	<floating point> < <floating point>: boolean
+52	<floating point> < <integer>: boolean
+52	<floating point> <= <floating point>: boolean
+52	<floating point> <= <integer>: boolean
+52	<floating point> = <floating point>: boolean
+52	<floating point> = <integer>: boolean
+52	<format> + <date>: format
+52	<format> + <day of week>: format
+52	<format> + <format>: format
+52	<format> + <integer>: format
+52	<format> + <string>: format
+52	<format> + <time interval>: format
+52	<format> + <time of day>: format
+52	<format> + <time>: format
 50	<hertz> % <hertz>: hertz
-50	<hertz> * <integer>: hertz
-50	<hertz> + <hertz>: hertz
-50	<hertz> - <hertz>: hertz
-50	<hertz> / <hertz>: integer
-50	<hertz> / <integer>: hertz
-50	<hertz> < <hertz>: boolean
-50	<hertz> <= <hertz>: boolean
-50	<hertz> = <hertz>: boolean
-50	<html> & <html>: html
-50	<html> & <string>: html
-50	<integer set> * <integer set>: integer set
-50	<integer set> + <integer set>: integer set
-50	<integer set> - <integer set>: integer set
-50	<integer set> = <integer set>: boolean
-50	<integer set> contains <integer set>: boolean
-50	<integer set> contains <integer>: boolean
+2	<hertz> %25 <hertz>: hertz
+52	<hertz> * <integer>: hertz
+52	<hertz> + <hertz>: hertz
+52	<hertz> - <hertz>: hertz
+52	<hertz> / <hertz>: integer
+52	<hertz> / <integer>: hertz
+52	<hertz> < <hertz>: boolean
+52	<hertz> <= <hertz>: boolean
+52	<hertz> = <hertz>: boolean
+52	<html> & <html>: html
+52	<html> & <string>: html
+52	<integer set> * <integer set>: integer set
+52	<integer set> + <integer set>: integer set
+52	<integer set> - <integer set>: integer set
+52	<integer set> = <integer set>: boolean
+52	<integer set> contains <integer set>: boolean
+52	<integer set> contains <integer>: boolean
 50	<integer> % <integer>: integer
 50	<integer> % <large integer>: large integer
 50	<integer> % <uinteger>: uinteger
-50	<integer> * <floating point>: floating point
-50	<integer> * <hertz>: hertz
-50	<integer> * <integer>: integer
-50	<integer> * <large integer>: large integer
-50	<integer> * <number of months>: number of months
-50	<integer> * <time interval>: time interval
-50	<integer> * <time range>: timed( time range, integer )
-50	<integer> * <uinteger>: uinteger
-50	<integer> + <floating point>: floating point
-50	<integer> + <integer>: integer
-50	<integer> + <large integer>: large integer
-50	<integer> + <uinteger>: uinteger
-50	<integer> - <floating point>: floating point
-50	<integer> - <integer>: integer
-50	<integer> - <large integer>: large integer
-50	<integer> - <uinteger>: uinteger
-50	<integer> / <floating point>: floating point
-50	<integer> / <integer>: integer
-50	<integer> / <large integer>: large integer
-50	<integer> / <uinteger>: uinteger
-50	<integer> < <floating point>: boolean
-50	<integer> < <integer>: boolean
-50	<integer> < <large integer>: boolean
+2	<integer> %25 <integer>: integer
+2	<integer> %25 <large integer>: large integer
+2	<integer> %25 <uinteger>: uinteger
+52	<integer> * <floating point>: floating point
+52	<integer> * <hertz>: hertz
+52	<integer> * <integer>: integer
+52	<integer> * <large integer>: large integer
+52	<integer> * <number of months>: number of months
+52	<integer> * <time interval>: time interval
+52	<integer> * <time range>: timed( time range, integer )
+52	<integer> * <uinteger>: uinteger
+52	<integer> + <floating point>: floating point
+52	<integer> + <integer>: integer
+52	<integer> + <large integer>: large integer
+52	<integer> + <uinteger>: uinteger
+52	<integer> - <floating point>: floating point
+52	<integer> - <integer>: integer
+52	<integer> - <large integer>: large integer
+52	<integer> - <uinteger>: uinteger
+52	<integer> / <floating point>: floating point
+52	<integer> / <integer>: integer
+52	<integer> / <large integer>: large integer
+52	<integer> / <uinteger>: uinteger
+52	<integer> < <floating point>: boolean
+52	<integer> < <integer>: boolean
+52	<integer> < <large integer>: boolean
 10	<integer> < <registry key value type>: boolean
 10	<integer> < <registry key value>: boolean
-50	<integer> < <uinteger>: boolean
-50	<integer> <= <floating point>: boolean
-50	<integer> <= <integer>: boolean
-50	<integer> <= <large integer>: boolean
+52	<integer> < <uinteger>: boolean
+52	<integer> <= <floating point>: boolean
+52	<integer> <= <integer>: boolean
+52	<integer> <= <large integer>: boolean
 10	<integer> <= <registry key value type>: boolean
 10	<integer> <= <registry key value>: boolean
-50	<integer> <= <uinteger>: boolean
-50	<integer> = <floating point>: boolean
-50	<integer> = <integer>: boolean
-50	<integer> = <large integer>: boolean
+52	<integer> <= <uinteger>: boolean
+52	<integer> = <floating point>: boolean
+52	<integer> = <integer>: boolean
+52	<integer> = <large integer>: boolean
 10	<integer> = <registry key value type>: boolean
 10	<integer> = <registry key value>: boolean
-50	<integer> = <uinteger>: boolean
+52	<integer> = <uinteger>: boolean
 10	<internet protocol> = <internet protocol>: boolean
-50	<ip version> = <ip version>: boolean
-50	<ipv4 address> < <ipv4 address>: boolean
-50	<ipv4 address> < <string>: boolean
-50	<ipv4 address> <= <ipv4 address>: boolean
-50	<ipv4 address> <= <string>: boolean
-50	<ipv4 address> = <ipv4 address>: boolean
-50	<ipv4 address> = <string>: boolean
-50	<ipv4or6 address> < <ipv4or6 address>: boolean
-50	<ipv4or6 address> < <string>: boolean
-50	<ipv4or6 address> <= <ipv4or6 address>: boolean
-50	<ipv4or6 address> <= <string>: boolean
-50	<ipv4or6 address> = <ipv4or6 address>: boolean
-50	<ipv4or6 address> = <string>: boolean
-50	<ipv6 address> < <ipv6 address>: boolean
-50	<ipv6 address> <= <ipv6 address>: boolean
-50	<ipv6 address> = <ipv6 address>: boolean
-50	<json key> = <json key>: boolean
-50	<json value> = <json value>: boolean
+52	<ip version> = <ip version>: boolean
+52	<ipv4 address> < <ipv4 address>: boolean
+52	<ipv4 address> < <string>: boolean
+52	<ipv4 address> <= <ipv4 address>: boolean
+52	<ipv4 address> <= <string>: boolean
+52	<ipv4 address> = <ipv4 address>: boolean
+52	<ipv4 address> = <string>: boolean
+52	<ipv4or6 address> < <ipv4or6 address>: boolean
+52	<ipv4or6 address> < <string>: boolean
+52	<ipv4or6 address> <= <ipv4or6 address>: boolean
+52	<ipv4or6 address> <= <string>: boolean
+52	<ipv4or6 address> = <ipv4or6 address>: boolean
+52	<ipv4or6 address> = <string>: boolean
+52	<ipv6 address> < <ipv6 address>: boolean
+52	<ipv6 address> <= <ipv6 address>: boolean
+52	<ipv6 address> = <ipv6 address>: boolean
+52	<json key> = <json key>: boolean
+52	<json value> = <json value>: boolean
 50	<large integer> % <integer>: large integer
 50	<large integer> % <large integer>: large integer
-50	<large integer> * <integer>: large integer
-50	<large integer> * <large integer>: large integer
-50	<large integer> + <integer>: large integer
-50	<large integer> + <large integer>: large integer
-50	<large integer> - <integer>: large integer
-50	<large integer> - <large integer>: large integer
-50	<large integer> / <integer>: large integer
-50	<large integer> / <large integer>: large integer
-50	<large integer> < <integer>: boolean
-50	<large integer> < <large integer>: boolean
-50	<large integer> <= <integer>: boolean
-50	<large integer> <= <large integer>: boolean
-50	<large integer> = <integer>: boolean
-50	<large integer> = <large integer>: boolean
+2	<large integer> %25 <integer>: large integer
+2	<large integer> %25 <large integer>: large integer
+52	<large integer> * <integer>: large integer
+52	<large integer> * <large integer>: large integer
+52	<large integer> + <integer>: large integer
+52	<large integer> + <large integer>: large integer
+52	<large integer> - <integer>: large integer
+52	<large integer> - <large integer>: large integer
+52	<large integer> / <integer>: large integer
+52	<large integer> / <large integer>: large integer
+52	<large integer> < <integer>: boolean
+52	<large integer> < <large integer>: boolean
+52	<large integer> <= <integer>: boolean
+52	<large integer> <= <large integer>: boolean
+52	<large integer> = <integer>: boolean
+52	<large integer> = <large integer>: boolean
 10	<media type> = <media type>: boolean
 10	<metabase identifier> = <metabase identifier>: boolean
 10	<metabase type> = <metabase type>: boolean
 10	<metabase user type> = <metabase user type>: boolean
-50	<month and year> & <day of month>: date
-50	<month and year> & <day of year>: date
-50	<month and year> + <number of months>: month and year
-50	<month and year> - <month and year>: number of months
-50	<month and year> - <number of months>: month and year
-50	<month and year> < <month and year>: boolean
-50	<month and year> <= <month and year>: boolean
-50	<month and year> = <month and year>: boolean
-50	<month> & <day of month>: day of year
-50	<month> & <year>: month and year
-50	<month> + <number of months>: month
-50	<month> - <month>: number of months
-50	<month> - <number of months>: month
-50	<month> < <month>: boolean
-50	<month> <= <month>: boolean
-50	<month> = <month>: boolean
+52	<month and year> & <day of month>: date
+52	<month and year> & <day of year>: date
+52	<month and year> + <number of months>: month and year
+52	<month and year> - <month and year>: number of months
+52	<month and year> - <number of months>: month and year
+52	<month and year> < <month and year>: boolean
+52	<month and year> <= <month and year>: boolean
+52	<month and year> = <month and year>: boolean
+52	<month> & <day of month>: day of year
+52	<month> & <year>: month and year
+52	<month> + <number of months>: month
+52	<month> - <month>: number of months
+52	<month> - <number of months>: month
+52	<month> < <month>: boolean
+52	<month> <= <month>: boolean
+52	<month> = <month>: boolean
 50	<number of months> % <number of months>: number of months
-50	<number of months> * <integer>: number of months
-50	<number of months> + <date>: date
-50	<number of months> + <day of year>: day of year
-50	<number of months> + <month and year>: month and year
-50	<number of months> + <month>: month
-50	<number of months> + <number of months>: number of months
-50	<number of months> + <year>: year
-50	<number of months> - <number of months>: number of months
-50	<number of months> / <integer>: number of months
-50	<number of months> / <number of months>: integer
-50	<number of months> < <number of months>: boolean
-50	<number of months> <= <number of months>: boolean
-50	<number of months> = <number of months>: boolean
+2	<number of months> %25 <number of months>: number of months
+52	<number of months> * <integer>: number of months
+52	<number of months> + <date>: date
+52	<number of months> + <day of year>: day of year
+52	<number of months> + <month and year>: month and year
+52	<number of months> + <month>: month
+52	<number of months> + <number of months>: number of months
+52	<number of months> + <year>: year
+52	<number of months> - <number of months>: number of months
+52	<number of months> / <integer>: number of months
+52	<number of months> / <number of months>: integer
+52	<number of months> < <number of months>: boolean
+52	<number of months> <= <number of months>: boolean
+52	<number of months> = <number of months>: boolean
 10	<operating system product type> = <operating system product type>: boolean
 10	<plugin store key> = <plugin store key>: boolean
 10	<plugin store> = <plugin store>: boolean
-10	<power state> = <power state>: boolean
+12	<power state> = <power state>: boolean
 10	<priority class> = <priority class>: boolean
-40	<rate> * <floating point>: rate
-40	<rate> * <time interval>: floating point
-40	<rate> + <rate>: rate
-40	<rate> - <rate>: rate
-40	<rate> / <floating point>: rate
-40	<rate> < <rate>: boolean
-40	<rate> <= <rate>: boolean
-40	<rate> = <rate>: boolean
+42	<rate> * <floating point>: rate
+42	<rate> * <time interval>: floating point
+42	<rate> + <rate>: rate
+42	<rate> - <rate>: rate
+42	<rate> / <floating point>: rate
+42	<rate> < <rate>: boolean
+42	<rate> <= <rate>: boolean
+42	<rate> = <rate>: boolean
 10	<registry key value type> < <integer>: boolean
 10	<registry key value type> < <registry key value type>: boolean
 10	<registry key value type> < <string>: boolean
@@ -381,56 +391,57 @@ BINARY_OPERATORS: str = """\
 10	<registry key value> = <integer>: boolean
 10	<registry key value> = <registry key value>: boolean
 10	<registry key value> = <string>: boolean
-50	<regular expression> = <string>: boolean
-50	<rope> & <rope>: rope
-50	<rope> & <string>: rope
-50	<rope> contains <string>: boolean
-10	<security identifier> = <security identifier>: boolean
-50	<site version list> < <site version list>: boolean
-50	<site version list> <= <site version list>: boolean
-50	<site version list> = <site version list>: boolean
-50	<site version list> contains <site version list>: boolean
-50	<string set> * <string set>: string set
-50	<string set> + <string set>: string set
-50	<string set> - <string set>: string set
-50	<string set> = <string set>: boolean
-50	<string set> contains <string set>: boolean
-50	<string set> contains <string>: boolean
-50	<string> & <html>: html
-50	<string> & <rope>: rope
-50	<string> & <string>: string
-50	<string> < <ipv4 address>: boolean
-50	<string> < <ipv4or6 address>: boolean
+52	<regular expression> = <string>: boolean
+52	<rope> & <rope>: rope
+52	<rope> & <string>: rope
+52	<rope> contains <string>: boolean
+12	<security identifier> = <security identifier>: boolean
+52	<site version list> < <site version list>: boolean
+52	<site version list> <= <site version list>: boolean
+52	<site version list> = <site version list>: boolean
+52	<site version list> contains <site version list>: boolean
+2	<stage> = <stage>: boolean
+52	<string set> * <string set>: string set
+52	<string set> + <string set>: string set
+52	<string set> - <string set>: string set
+52	<string set> = <string set>: boolean
+52	<string set> contains <string set>: boolean
+52	<string set> contains <string>: boolean
+52	<string> & <html>: html
+52	<string> & <rope>: rope
+52	<string> & <string>: string
+52	<string> < <ipv4 address>: boolean
+52	<string> < <ipv4or6 address>: boolean
 10	<string> < <registry key value type>: boolean
 10	<string> < <registry key value>: boolean
-50	<string> < <string>: boolean
+52	<string> < <string>: boolean
 40	<string> < <strverscmp version>: boolean
-10	<string> < <uuid>: boolean
-50	<string> < <version>: boolean
-50	<string> <= <ipv4 address>: boolean
-50	<string> <= <ipv4or6 address>: boolean
+12	<string> < <uuid>: boolean
+52	<string> < <version>: boolean
+52	<string> <= <ipv4 address>: boolean
+52	<string> <= <ipv4or6 address>: boolean
 10	<string> <= <registry key value type>: boolean
 10	<string> <= <registry key value>: boolean
-50	<string> <= <string>: boolean
+52	<string> <= <string>: boolean
 40	<string> <= <strverscmp version>: boolean
-10	<string> <= <uuid>: boolean
-50	<string> <= <version>: boolean
-10	<string> = <cidr subnet>: boolean
-50	<string> = <ipv4 address>: boolean
-50	<string> = <ipv4or6 address>: boolean
+12	<string> <= <uuid>: boolean
+52	<string> <= <version>: boolean
+12	<string> = <cidr subnet>: boolean
+52	<string> = <ipv4 address>: boolean
+52	<string> = <ipv4or6 address>: boolean
 10	<string> = <registry key value type>: boolean
 10	<string> = <registry key value>: boolean
-50	<string> = <regular expression>: boolean
-50	<string> = <string>: boolean
+52	<string> = <regular expression>: boolean
+52	<string> = <string>: boolean
 40	<string> = <strverscmp version>: boolean
-10	<string> = <uuid>: boolean
-50	<string> = <version>: boolean
-50	<string> contains <regular expression>: boolean
-50	<string> contains <string>: boolean
-50	<string> ends with <regular expression>: boolean
-50	<string> ends with <string>: boolean
-50	<string> starts with <regular expression>: boolean
-50	<string> starts with <string>: boolean
+12	<string> = <uuid>: boolean
+52	<string> = <version>: boolean
+52	<string> contains <regular expression>: boolean
+52	<string> contains <string>: boolean
+52	<string> ends with <regular expression>: boolean
+52	<string> ends with <string>: boolean
+52	<string> starts with <regular expression>: boolean
+52	<string> starts with <string>: boolean
 40	<strverscmp version> < <string>: boolean
 40	<strverscmp version> < <strverscmp version>: boolean
 40	<strverscmp version> <= <string>: boolean
@@ -440,107 +451,114 @@ BINARY_OPERATORS: str = """\
 10	<task action type> = <task action type>: boolean
 10	<task trigger type> = <task trigger type>: boolean
 50	<time interval> % <time interval>: time interval
-50	<time interval> & <time>: time range
-50	<time interval> * <integer>: time interval
-40	<time interval> * <rate>: floating point
-50	<time interval> + <date>: date
-50	<time interval> + <day of month>: day of month
-50	<time interval> + <day of week>: day of week
-50	<time interval> + <day of year>: day of year
-50	<time interval> + <time interval>: time interval
-50	<time interval> + <time of day with time zone>: time of day with time zone
-50	<time interval> + <time of day>: time of day
-50	<time interval> + <time zone>: time zone
-50	<time interval> + <time>: time
-50	<time interval> - <time interval>: time interval
-50	<time interval> / <integer>: time interval
-50	<time interval> / <time interval>: integer
-50	<time interval> < <time interval>: boolean
-50	<time interval> <= <time interval>: boolean
-50	<time interval> = <time interval>: boolean
-50	<time of day with time zone> & <date>: time
-50	<time of day with time zone> & <time zone>: time of day with time zone
-50	<time of day with time zone> + <time interval>: time of day with time zone
-50	<time of day with time zone> - <time interval>: time of day with time zone
-50	<time of day with time zone> - <time of day with time zone>: time interval
-50	<time of day with time zone> < <time of day with time zone>: boolean
-50	<time of day with time zone> <= <time of day with time zone>: boolean
-50	<time of day with time zone> = <time of day with time zone>: boolean
-50	<time of day> & <time zone>: time of day with time zone
-50	<time of day> + <time interval>: time of day
-50	<time of day> - <time interval>: time of day
-50	<time of day> - <time of day>: time interval
-50	<time of day> < <time of day>: boolean
-50	<time of day> <= <time of day>: boolean
-50	<time of day> = <time of day>: boolean
-50	<time range> & <time range>: time range
-50	<time range> & <time>: time range
-50	<time range> * <boolean>: timed( time range, boolean )
-50	<time range> * <integer>: timed( time range, integer )
-50	<time range> * <time range>: time range
-50	<time range> + <time range>: time range
-50	<time range> = <time range>: boolean
-50	<time range> contains <time range>: boolean
-50	<time range> contains <time>: boolean
-50	<time zone> & <time of day with time zone>: time of day with time zone
-50	<time zone> & <time of day>: time of day with time zone
-50	<time zone> + <time interval>: time zone
-50	<time zone> - <time interval>: time zone
-50	<time zone> - <time zone>: time interval
-50	<time zone> = <time zone>: boolean
-50	<time> & <time interval>: time range
-50	<time> & <time range>: time range
-50	<time> & <time>: time range
-50	<time> + <time interval>: time
-50	<time> - <time interval>: time
-50	<time> - <time>: time interval
-50	<time> < <time>: boolean
-50	<time> <= <time>: boolean
-50	<time> = <time>: boolean
-50	<type> = <type>: boolean
+2	<time interval> %25 <time interval>: time interval
+52	<time interval> & <time>: time range
+52	<time interval> * <integer>: time interval
+42	<time interval> * <rate>: floating point
+52	<time interval> + <date>: date
+52	<time interval> + <day of month>: day of month
+52	<time interval> + <day of week>: day of week
+52	<time interval> + <day of year>: day of year
+52	<time interval> + <time interval>: time interval
+52	<time interval> + <time of day with time zone>: time of day with time zone
+52	<time interval> + <time of day>: time of day
+52	<time interval> + <time zone>: time zone
+52	<time interval> + <time>: time
+52	<time interval> - <time interval>: time interval
+52	<time interval> / <integer>: time interval
+52	<time interval> / <time interval>: integer
+52	<time interval> < <time interval>: boolean
+52	<time interval> <= <time interval>: boolean
+52	<time interval> = <time interval>: boolean
+52	<time of day with time zone> & <date>: time
+52	<time of day with time zone> & <time zone>: time of day with time zone
+52	<time of day with time zone> + <time interval>: time of day with time zone
+52	<time of day with time zone> - <time interval>: time of day with time zone
+52	<time of day with time zone> - <time of day with time zone>: time interval
+52	<time of day with time zone> < <time of day with time zone>: boolean
+52	<time of day with time zone> <= <time of day with time zone>: boolean
+52	<time of day with time zone> = <time of day with time zone>: boolean
+52	<time of day> & <time zone>: time of day with time zone
+52	<time of day> + <time interval>: time of day
+52	<time of day> - <time interval>: time of day
+52	<time of day> - <time of day>: time interval
+52	<time of day> < <time of day>: boolean
+52	<time of day> <= <time of day>: boolean
+52	<time of day> = <time of day>: boolean
+52	<time range> & <time range>: time range
+52	<time range> & <time>: time range
+52	<time range> * <boolean>: timed( time range, boolean )
+52	<time range> * <integer>: timed( time range, integer )
+52	<time range> * <time range>: time range
+52	<time range> + <time range>: time range
+52	<time range> = <time range>: boolean
+52	<time range> contains <time range>: boolean
+52	<time range> contains <time>: boolean
+52	<time zone> & <time of day with time zone>: time of day with time zone
+52	<time zone> & <time of day>: time of day with time zone
+52	<time zone> + <time interval>: time zone
+52	<time zone> - <time interval>: time zone
+52	<time zone> - <time zone>: time interval
+52	<time zone> = <time zone>: boolean
+52	<time> & <time interval>: time range
+52	<time> & <time range>: time range
+52	<time> & <time>: time range
+52	<time> + <time interval>: time
+52	<time> - <time interval>: time
+52	<time> - <time>: time interval
+52	<time> < <time>: boolean
+52	<time> <= <time>: boolean
+52	<time> = <time>: boolean
+52	<type> = <type>: boolean
 50	<uinteger> % <integer>: uinteger
 50	<uinteger> % <uinteger>: uinteger
-50	<uinteger> * <integer>: uinteger
-50	<uinteger> * <uinteger>: uinteger
-50	<uinteger> + <integer>: uinteger
-50	<uinteger> + <uinteger>: uinteger
-50	<uinteger> - <integer>: uinteger
-50	<uinteger> - <uinteger>: uinteger
-50	<uinteger> / <integer>: uinteger
-50	<uinteger> / <uinteger>: uinteger
-50	<uinteger> < <integer>: boolean
-50	<uinteger> < <uinteger>: boolean
-50	<uinteger> <= <integer>: boolean
-50	<uinteger> <= <uinteger>: boolean
-50	<uinteger> = <integer>: boolean
-50	<uinteger> = <uinteger>: boolean
-10	<uuid> < <string>: boolean
-10	<uuid> < <uuid>: boolean
-10	<uuid> <= <string>: boolean
-10	<uuid> <= <uuid>: boolean
-10	<uuid> = <string>: boolean
-10	<uuid> = <uuid>: boolean
-50	<version> < <string>: boolean
-50	<version> < <version>: boolean
-50	<version> <= <string>: boolean
-50	<version> <= <version>: boolean
-50	<version> = <string>: boolean
-50	<version> = <version>: boolean
-50	<year> & <day of year>: date
-50	<year> & <month>: month and year
-50	<year> + <number of months>: year
-50	<year> - <number of months>: year
-50	<year> - <year>: number of months
-50	<year> < <year>: boolean
-50	<year> <= <year>: boolean
-50	<year> = <year>: boolean
+2	<uinteger> %25 <integer>: uinteger
+2	<uinteger> %25 <uinteger>: uinteger
+52	<uinteger> * <integer>: uinteger
+52	<uinteger> * <uinteger>: uinteger
+52	<uinteger> + <integer>: uinteger
+52	<uinteger> + <uinteger>: uinteger
+52	<uinteger> - <integer>: uinteger
+52	<uinteger> - <uinteger>: uinteger
+52	<uinteger> / <integer>: uinteger
+52	<uinteger> / <uinteger>: uinteger
+52	<uinteger> < <integer>: boolean
+52	<uinteger> < <uinteger>: boolean
+52	<uinteger> <= <integer>: boolean
+52	<uinteger> <= <uinteger>: boolean
+52	<uinteger> = <integer>: boolean
+52	<uinteger> = <uinteger>: boolean
+12	<uuid> < <string>: boolean
+12	<uuid> < <uuid>: boolean
+12	<uuid> <= <string>: boolean
+12	<uuid> <= <uuid>: boolean
+12	<uuid> = <string>: boolean
+12	<uuid> = <uuid>: boolean
+52	<version> < <string>: boolean
+52	<version> < <version>: boolean
+52	<version> <= <string>: boolean
+52	<version> <= <version>: boolean
+52	<version> = <string>: boolean
+52	<version> = <version>: boolean
+2	<volume> = <volume>: boolean
+2	<yaml key> = <yaml key>: boolean
+2	<yaml value> = <yaml value>: boolean
+52	<year> & <day of year>: date
+52	<year> & <month>: month and year
+52	<year> + <number of months>: year
+52	<year> - <number of months>: year
+52	<year> - <year>: number of months
+52	<year> < <year>: boolean
+52	<year> <= <year>: boolean
+52	<year> = <year>: boolean
 """
 
-# 253 rows
+# 265 rows
 CASTS: str = """\
-10	<action lock state> as string: string
-10	<action> as string: string
-10	<agent interface capability> as string: string
+12	<action lock state> as string: string
+12	<action> as string: string
+12	<agent interface capability> as string: string
+2	<application> as string: string
 40	<bes action set> as xml string: string
 40	<bes action set> as xml: utf8 string
 40	<bes action status> as string: string
@@ -562,95 +580,99 @@ CASTS: str = """\
 40	<bes property set> as xml: utf8 string
 40	<bes property> as xml string: string
 40	<bes property> as xml: utf8 string
-50	<binary operator> as string: string
-50	<binary_string> as fxf string: string
-50	<binary_string> as hexadecimal: string
-50	<binary_string> as local string: string
-50	<binary_string> as string: string
-50	<binary_string> as utf16 string: string
-50	<binary_string> as utf8 string: string
-50	<binary_substring> as binary_substring: binary_substring
-50	<binary_substring> as string: string
-10	<bios> as string: string
-50	<bit set> as integer: integer
-50	<bit set> as string: string
-50	<boolean> as boolean: boolean
-50	<boolean> as string: string
-50	<cast> as string: string
-10	<cidr subnet> as string: string
-50	<date> as string: string
-50	<day of month> as integer: integer
-50	<day of month> as string: string
-50	<day of month> as two digits: string
-50	<day of week> as string: string
-50	<day of week> as three letters: string
-50	<day of year> as string: string
+52	<binary operator> as string: string
+52	<binary_string> as fxf string: string
+52	<binary_string> as hexadecimal: string
+52	<binary_string> as local string: string
+52	<binary_string> as string: string
+52	<binary_string> as utf16 string: string
+52	<binary_string> as utf8 string: string
+52	<binary_substring> as binary_substring: binary_substring
+52	<binary_substring> as string: string
+12	<bios> as string: string
+52	<bit set> as integer: integer
+52	<bit set> as string: string
+52	<boolean> as boolean: boolean
+52	<boolean> as string: string
+52	<cast> as string: string
+12	<cidr subnet> as string: string
+2	<client process owner> as string: string
+52	<date> as string: string
+52	<day of month> as integer: integer
+52	<day of month> as string: string
+52	<day of month> as two digits: string
+52	<day of week> as string: string
+52	<day of week> as three letters: string
+52	<day of year> as string: string
 10	<discretionary access control list> as string: string
-10	<environment variable> as string: string
-10	<file content> as lowercase: file content
-10	<file content> as uppercase: file content
-10	<file> as string: string
-10	<filesystem object> as string: string
+2	<dummy type> as string: string
+12	<environment variable> as string: string
+12	<file content> as lowercase: file content
+12	<file content> as uppercase: file content
+12	<file> as string: string
+2	<filesystem object> as file: file
+2	<filesystem object> as folder: folder
+12	<filesystem object> as string: string
 10	<firewall profile type> as string: string
-50	<floating point> as floating point: floating point
-50	<floating point> as integer: integer
-50	<floating point> as scientific notation: string
-50	<floating point> as standard notation: string
-50	<floating point> as string: string
-50	<format> as string: string
-50	<hertz> as string: string
-50	<html> as decoded string: string
-50	<html> as html: html
-50	<html> as string: string
-50	<integer> as bit set: bit set
-50	<integer> as bits: bit set
-50	<integer> as day_of_month: day of month
-50	<integer> as floating point: floating point
-50	<integer> as hexadecimal: string
-50	<integer> as integer: integer
-50	<integer> as large integer: large integer
-50	<integer> as month: month
-50	<integer> as string: string
-50	<integer> as uinteger: uinteger
-50	<integer> as year: year
-50	<ip version> as string: string
-50	<ipv4 address> as ipv4or6 address: ipv4or6 address
-50	<ipv4 address> as ipv6 address: ipv6 address
-50	<ipv4 address> as string: string
-50	<ipv4or6 address> as compressed string with ipv4 with zone index: string
-50	<ipv4or6 address> as compressed string with ipv4: string
-50	<ipv4or6 address> as compressed string with zone index: string
-50	<ipv4or6 address> as compressed string: string
-50	<ipv4or6 address> as string with ipv4 with zone index: string
-50	<ipv4or6 address> as string with ipv4: string
-50	<ipv4or6 address> as string with leading zeros with zone index: string
-50	<ipv4or6 address> as string with leading zeros: string
-50	<ipv4or6 address> as string with zone index: string
-50	<ipv4or6 address> as string: string
-50	<ipv6 address> as compressed string with ipv4 with zone index: string
-50	<ipv6 address> as compressed string with ipv4: string
-50	<ipv6 address> as compressed string with zone index: string
-50	<ipv6 address> as compressed string: string
-50	<ipv6 address> as ipv4or6 address: ipv4or6 address
-50	<ipv6 address> as string with ipv4 with zone index: string
-50	<ipv6 address> as string with ipv4: string
-50	<ipv6 address> as string with leading zeros with zone index: string
-50	<ipv6 address> as string with leading zeros: string
-50	<ipv6 address> as string with zone index: string
-50	<ipv6 address> as string: string
-50	<json key> as string: string
-50	<json value> as boolean: boolean
-50	<json value> as float: floating point
-50	<json value> as integer: integer
-50	<json value> as string: string
+52	<floating point> as floating point: floating point
+52	<floating point> as integer: integer
+52	<floating point> as scientific notation: string
+52	<floating point> as standard notation: string
+52	<floating point> as string: string
+52	<format> as string: string
+52	<hertz> as string: string
+52	<html> as decoded string: string
+52	<html> as html: html
+52	<html> as string: string
+52	<integer> as bit set: bit set
+52	<integer> as bits: bit set
+52	<integer> as day_of_month: day of month
+52	<integer> as floating point: floating point
+52	<integer> as hexadecimal: string
+52	<integer> as integer: integer
+52	<integer> as large integer: large integer
+52	<integer> as month: month
+52	<integer> as string: string
+52	<integer> as uinteger: uinteger
+52	<integer> as year: year
+52	<ip version> as string: string
+52	<ipv4 address> as ipv4or6 address: ipv4or6 address
+52	<ipv4 address> as ipv6 address: ipv6 address
+52	<ipv4 address> as string: string
+52	<ipv4or6 address> as compressed string with ipv4 with zone index: string
+52	<ipv4or6 address> as compressed string with ipv4: string
+52	<ipv4or6 address> as compressed string with zone index: string
+52	<ipv4or6 address> as compressed string: string
+52	<ipv4or6 address> as string with ipv4 with zone index: string
+52	<ipv4or6 address> as string with ipv4: string
+52	<ipv4or6 address> as string with leading zeros with zone index: string
+52	<ipv4or6 address> as string with leading zeros: string
+52	<ipv4or6 address> as string with zone index: string
+52	<ipv4or6 address> as string: string
+52	<ipv6 address> as compressed string with ipv4 with zone index: string
+52	<ipv6 address> as compressed string with ipv4: string
+52	<ipv6 address> as compressed string with zone index: string
+52	<ipv6 address> as compressed string: string
+52	<ipv6 address> as ipv4or6 address: ipv4or6 address
+52	<ipv6 address> as string with ipv4 with zone index: string
+52	<ipv6 address> as string with ipv4: string
+52	<ipv6 address> as string with leading zeros with zone index: string
+52	<ipv6 address> as string with leading zeros: string
+52	<ipv6 address> as string with zone index: string
+52	<ipv6 address> as string: string
+52	<json key> as string: string
+52	<json value> as boolean: boolean
+52	<json value> as float: floating point
+52	<json value> as integer: integer
+52	<json value> as string: string
 10	<language> as string: string
-50	<large integer> as hexadecimal: string
-50	<large integer> as integer: integer
-50	<large integer> as large integer: large integer
-50	<large integer> as string: string
-50	<large integer> as uinteger: uinteger
+52	<large integer> as hexadecimal: string
+52	<large integer> as integer: integer
+52	<large integer> as large integer: large integer
+52	<large integer> as string: string
+52	<large integer> as uinteger: uinteger
 10	<local group member> as string: string
-10	<manual group> as string: string
+12	<manual group> as string: string
 10	<metabase identifier> as integer: integer
 10	<metabase identifier> as string: string
 10	<metabase type> as integer: integer
@@ -659,20 +681,20 @@ CASTS: str = """\
 10	<metabase user type> as string: string
 10	<metabase value> as integer: integer
 10	<metabase value> as string: string
-50	<month and year> as string: string
-50	<month> as integer: integer
-50	<month> as string: string
-50	<month> as three letters: string
-50	<month> as two digits: string
-50	<number of months> as string: string
-10	<operating system> as string: string
+52	<month and year> as string: string
+52	<month> as integer: integer
+52	<month> as string: string
+52	<month> as three letters: string
+52	<month> as two digits: string
+52	<number of months> as string: string
+12	<operating system> as string: string
 10	<plugin store key> as string: string
 10	<plugin store> as string: string
-10	<power level> as string: string
-10	<power state> as string: string
+12	<power level> as string: string
+12	<power state> as string: string
 10	<primary language> as string: string
-50	<property> as string: string
-40	<rate> as string: string
+52	<property> as string: string
+42	<rate> as string: string
 10	<registry key value type> as string: string
 10	<registry key value> as application: application
 10	<registry key value> as file: file
@@ -686,61 +708,62 @@ CASTS: str = """\
 10	<registry key value> as time: time
 10	<registry key value> as uinteger: uinteger
 10	<registry key> as string: string
-50	<rope> as string: string
+52	<rope> as string: string
 10	<security descriptor> as string: string
-10	<security identifier> as string: string
-10	<server based group> as string: string
+12	<security identifier> as string: string
+12	<server based group> as string: string
 10	<service> as string: string
-10	<setting> as string: string
+12	<setting> as string: string
 10	<site profile variable> as string: string
-50	<site version list> as string: string
-10	<smbios value> as hexadecimal: string
-10	<smbios value> as string: string
-10	<sqlite column type> as string: string
-10	<sqlite column> as string: string
-10	<sqlite database> as string: string
-10	<sqlite row> as string: string
-10	<sqlite table> as string: string
-50	<string> as binary_string: binary_string
-50	<string> as boolean: boolean
-50	<string> as date: date
-50	<string> as day_of_month: day of month
-50	<string> as day_of_week: day of week
-50	<string> as floating point: floating point
-50	<string> as fxf binary_string: binary_string
-50	<string> as hexadecimal: string
-50	<string> as html: html
-50	<string> as integer: integer
-50	<string> as ipv4or6 address: ipv4or6 address
-50	<string> as ipv6 address: ipv6 address
-50	<string> as large integer: large integer
-50	<string> as left trimmed string: string
-50	<string> as local binary_string: binary_string
-50	<string> as local time: time
-50	<string> as local zoned time_of_day: time of day with time zone
-50	<string> as lowercase: string
-50	<string> as month: month
-50	<string> as right trimmed string: string
-50	<string> as site version list: site version list
-50	<string> as string: string
+52	<site version list> as string: string
+12	<smbios value> as hexadecimal: string
+12	<smbios value> as string: string
+12	<sqlite column type> as string: string
+12	<sqlite column> as string: string
+12	<sqlite database> as string: string
+12	<sqlite row> as string: string
+12	<sqlite table> as string: string
+2	<stage> as string: string
+52	<string> as binary_string: binary_string
+52	<string> as boolean: boolean
+52	<string> as date: date
+52	<string> as day_of_month: day of month
+52	<string> as day_of_week: day of week
+52	<string> as floating point: floating point
+52	<string> as fxf binary_string: binary_string
+52	<string> as hexadecimal: string
+52	<string> as html: html
+52	<string> as integer: integer
+52	<string> as ipv4or6 address: ipv4or6 address
+52	<string> as ipv6 address: ipv6 address
+52	<string> as large integer: large integer
+52	<string> as left trimmed string: string
+52	<string> as local binary_string: binary_string
+52	<string> as local time: time
+52	<string> as local zoned time_of_day: time of day with time zone
+52	<string> as lowercase: string
+52	<string> as month: month
+52	<string> as right trimmed string: string
+52	<string> as site version list: site version list
+52	<string> as string: string
 40	<string> as strverscmp version: strverscmp version
-50	<string> as time interval: time interval
-50	<string> as time zone: time zone
-50	<string> as time: time
-50	<string> as time_of_day: time of day
-50	<string> as trimmed string: string
-50	<string> as uinteger: uinteger
-50	<string> as universal time: time
-50	<string> as universal zoned time_of_day: time of day with time zone
-50	<string> as uppercase: string
-50	<string> as utf16 binary_string: binary_string
-50	<string> as utf8 binary_string: binary_string
-50	<string> as version: version
+52	<string> as time interval: time interval
+52	<string> as time zone: time zone
+52	<string> as time: time
+52	<string> as time_of_day: time of day
+52	<string> as trimmed string: string
+52	<string> as uinteger: uinteger
+52	<string> as universal time: time
+52	<string> as universal zoned time_of_day: time of day with time zone
+52	<string> as uppercase: string
+52	<string> as utf16 binary_string: binary_string
+52	<string> as utf8 binary_string: binary_string
+52	<string> as version: version
 50	<string> as windows display time: time
-50	<string> as year: year
-50	<string> as zoned time_of_day: time of day with time zone
-50	<substring> as string: string
-50	<substring> as substring: substring
+52	<string> as year: year
+52	<string> as zoned time_of_day: time of day with time zone
+52	<substring> as string: string
+52	<substring> as substring: substring
 10	<system access control list> as string: string
 10	<task action> as com handler task action: com handler task action
 10	<task action> as email task action: email task action
@@ -757,31 +780,32 @@ CASTS: str = """\
 10	<task trigger> as session state change task trigger: session state change task trigger
 10	<task trigger> as time task trigger: time task trigger
 10	<task trigger> as weekly task trigger: weekly task trigger
-10	<tcp state> as string: string
-50	<time interval> as string: string
-50	<time of day with time zone> as string: string
-50	<time of day> as string: string
-50	<time range> as string: string
-50	<time zone> as string: string
-50	<time> as local date: date
-50	<time> as local string: string
-50	<time> as string: string
-50	<time> as universal date: date
-50	<time> as universal string: string
-50	<tuple item> as string: string
-50	<type> as string: string
-50	<uinteger> as hexadecimal: string
-50	<uinteger> as integer: integer
-50	<uinteger> as large integer: large integer
-50	<uinteger> as string: string
-50	<uinteger> as uinteger: uinteger
-50	<unary operator> as string: string
-50	<undefined> as string: string
-10	<uuid> as binary_string: binary_string
-10	<uuid> as hexadecimal: string
-10	<uuid> as string: string
-50	<version> as string: string
-50	<version> as version: version
+12	<tcp state> as string: string
+52	<time interval> as string: string
+52	<time of day with time zone> as string: string
+52	<time of day> as string: string
+52	<time range> as string: string
+52	<time zone> as string: string
+52	<time> as local date: date
+52	<time> as local string: string
+52	<time> as string: string
+52	<time> as universal date: date
+52	<time> as universal string: string
+52	<tuple item> as string: string
+52	<type> as string: string
+52	<uinteger> as hexadecimal: string
+52	<uinteger> as integer: integer
+52	<uinteger> as large integer: large integer
+52	<uinteger> as string: string
+52	<uinteger> as uinteger: uinteger
+52	<unary operator> as string: string
+52	<undefined> as string: string
+2	<user attribute> as string: string
+12	<uuid> as binary_string: binary_string
+12	<uuid> as hexadecimal: string
+12	<uuid> as string: string
+52	<version> as string: string
+52	<version> as version: version
 10	<winrt enumeration> as string: string
 10	<winrt package user information> as string: string
 10	<winrt package> as string: string
@@ -789,8 +813,13 @@ CASTS: str = """\
 10	<wmi select> as string: string
 10	<xml dom node> as text: string
 10	<xml dom node> as xml: string
-50	<year> as integer: integer
-50	<year> as string: string
+2	<yaml key> as string: string
+2	<yaml value> as boolean: boolean
+2	<yaml value> as float: floating point
+2	<yaml value> as integer: integer
+2	<yaml value> as string: string
+52	<year> as integer: integer
+52	<year> as string: string
 """
 
 # 4517 rows
@@ -5314,25 +5343,26 @@ bf	zone of <time of day with time zone>: time zone
 bf	zoned time_of_day <string>: time of day with time zone
 """
 
-# 392 rows
+# 427 rows
 TYPES: str = """\
 10	access control entry
 10	access control list
-10	action
-10	action lock state
+12	action
+12	action lock state
 10	active device
-10	active directory group
-10	active directory local computer
-10	active directory local user
-10	active directory server
+12	active directory group
+12	active directory local computer
+12	active directory local user
+12	active directory server
 10	activity history
-10	administrative rights
-10	agent interface
-10	agent interface capability
-10	analysis
-10	application
-10	application usage summary
-10	application usage summary instance
+12	administrative rights
+12	agent interface
+12	agent interface capability
+12	analysis
+12	application
+12	application usage summary
+12	application usage summary instance
+2	array
 10	audit policy
 10	audit policy category
 10	audit policy information
@@ -5378,7 +5408,7 @@ TYPES: str = """\
 40	bes ldap directory with multiplicity
 40	bes peer download
 40	bes peer download with multiplicity
-50	bes product
+52	bes product
 40	bes property
 40	bes property result
 40	bes property set
@@ -5410,104 +5440,118 @@ TYPES: str = """\
 40	bes wizard set
 40	bes wizard variable
 40	bes wizard with multiplicity
-50	binary operator
-50	binary position
-50	binary_string
-50	binary_substring
-10	bios
-50	bit set
-50	boolean
+52	binary operator
+52	binary position
+52	binary_string
+52	binary_substring
+12	bios
+52	bit set
+52	boolean
 10	boot task trigger
-50	cast
-10	cidr subnet
-10	client
-10	client_cryptography
-10	cloud provider
+2	bundle
+52	cast
+12	cidr subnet
+12	client
+2	client process owner
+12	client_cryptography
+12	cloud provider
 10	com handler task action
+2	component
+2	computer
 10	connection
 10	connection status
-10	cpupackage
-50	cryptography
-10	current relay
+2	country
+12	cpupackage
+52	cryptography
+12	current relay
 10	daily task trigger
-50	date
-50	date with multiplicity
-50	day of month
-50	day of month with multiplicity
-50	day of week
-50	day of week with multiplicity
-50	day of year
-50	day of year with multiplicity
+2	datafork
+52	date
+52	date with multiplicity
+52	day of month
+52	day of month with multiplicity
+52	day of week
+52	day of week with multiplicity
+52	day of year
+52	day of year with multiplicity
+2	dictionary
+2	dictionaryentry
 10	discretionary access control list
 10	distinguished name
 10	distinguished name component
 10	dmi
-10	dmi additional_information
-10	dmi b32_bit_memory_error_information
-10	dmi b64_bit_memory_error_information
-10	dmi base_board_information
-10	dmi bios_information
-10	dmi bios_language_information
-10	dmi built_in_pointing_device
-10	dmi cache_information
-10	dmi cooling_device
-10	dmi electrical_current_probe
-10	dmi end_of_table
-10	dmi group_associations
-10	dmi hardware_security
-10	dmi inactive
-10	dmi ipmi_device_information
-10	dmi management_device
-10	dmi management_device_component
-10	dmi management_device_threshold_data
-10	dmi memory_array_mapped_address
-10	dmi memory_channel
-10	dmi memory_controller_information
-10	dmi memory_device
-10	dmi memory_device_mapped_address
-10	dmi memory_module_information
-10	dmi oem_strings
-10	dmi on_board_devices_information
-10	dmi onboard_devices_extended_information
-10	dmi out_of_band_remote_access
-10	dmi physical_memory_array
-10	dmi port_connector_information
-10	dmi portable_battery
-10	dmi processor_information
-10	dmi system_boot_information
-10	dmi system_configuration_option
-10	dmi system_enclosure_or_chassis
-10	dmi system_information
-10	dmi system_power_controls
-10	dmi system_power_supply
-10	dmi system_reset
-10	dmi system_slots
-10	dmi temperature_probe
-10	dmi voltage_probe
-10	download server
-10	download storage folder
+12	dmi additional_information
+12	dmi b32_bit_memory_error_information
+12	dmi b64_bit_memory_error_information
+12	dmi base_board_information
+12	dmi bios_information
+12	dmi bios_language_information
+12	dmi built_in_pointing_device
+12	dmi cache_information
+12	dmi cooling_device
+12	dmi electrical_current_probe
+12	dmi end_of_table
+12	dmi group_associations
+12	dmi hardware_security
+12	dmi inactive
+12	dmi ipmi_device_information
+12	dmi management_device
+12	dmi management_device_component
+12	dmi management_device_threshold_data
+12	dmi memory_array_mapped_address
+12	dmi memory_channel
+12	dmi memory_controller_information
+12	dmi memory_device
+12	dmi memory_device_mapped_address
+12	dmi memory_module_information
+12	dmi oem_strings
+12	dmi on_board_devices_information
+12	dmi onboard_devices_extended_information
+12	dmi out_of_band_remote_access
+12	dmi physical_memory_array
+12	dmi port_connector_information
+12	dmi portable_battery
+12	dmi processor_information
+12	dmi system_boot_information
+12	dmi system_configuration_option
+12	dmi system_enclosure_or_chassis
+12	dmi system_information
+12	dmi system_power_controls
+12	dmi system_power_supply
+12	dmi system_reset
+12	dmi system_slots
+12	dmi temperature_probe
+12	dmi voltage_probe
+2	domain
+12	download server
+12	download storage folder
 10	drive
+2	dummy
+2	dummy type
 10	email task action
-10	encoding
-10	environment
-10	environment variable
-10	evaluation cycle
+2	enableable_file
+12	encoding
+12	environment
+12	environment variable
+12	evaluation cycle
 10	event log
 10	event log event type
 10	event log record
 10	event task trigger
 10	exec task action
-10	execution
-40	exponential projection
-10	file
-10	file content
-10	file line
-10	file section
+12	execution
+42	exponential projection
+12	file
+12	file content
+12	file line
+12	file section
 10	file shortcut
+2	file signature
+2	file type
 10	file version block
-10	filesystem object
-10	firewall
-10	firewall action
+12	filesystem object
+12	firewall
+12	firewall action
 10	firewall authorized application
 10	firewall icmp settings
 10	firewall local policy modify state
@@ -5516,53 +5560,53 @@ TYPES: str = """\
 10	firewall profile
 10	firewall profile type
 10	firewall remote admin settings
-10	firewall rule
+12	firewall rule
 10	firewall scope
 10	firewall service
 10	firewall service restriction
 10	firewall service type
-10	fixlet
+12	fixlet
 40	fixlet count pair
-10	fixlet_header
-50	floating point
-50	floating point with multiplicity
-10	folder
-50	format
-10	hardware
-50	hertz
-50	hertz with multiplicity
+12	fixlet_header
+52	floating point
+52	floating point with multiplicity
+12	folder
+52	format
+12	hardware
+52	hertz
+52	hertz with multiplicity
 40	historical computer count
 40	historical fixlet count
-50	html
-50	html attribute list
+52	html
+52	html attribute list
 10	idle task trigger
-10	instance data
-50	integer
-50	integer range
-50	integer set
-50	integer with multiplicity
+12	instance data
+52	integer
+52	integer range
+52	integer set
+52	integer with multiplicity
 10	internet connection firewall
 10	internet protocol
-50	ip version
-50	ipv4 address
-50	ipv4 address with multiplicity
-50	ipv4or6 address
-50	ipv4or6 address with multiplicity
-50	ipv6 address
-50	ipv6 address with multiplicity
-50	json key
-50	json value
+52	ip version
+52	ipv4 address
+52	ipv4 address with multiplicity
+52	ipv4or6 address
+52	ipv4or6 address with multiplicity
+52	ipv6 address
+52	ipv6 address with multiplicity
+52	json key
+52	json value
 10	language
-50	large integer
-50	large integer with multiplicity
-50	license
-40	linear projection
+52	large integer
+52	large integer with multiplicity
+52	license
+42	linear projection
 10	local group
 10	local group member
 10	local mssql database
-10	logged on user
+12	logged on user
 10	logon task trigger
-10	manual group
+12	manual group
 10	media type
 10	metabase
 10	metabase identifier
@@ -5571,89 +5615,104 @@ TYPES: str = """\
 10	metabase user type
 10	metabase value
 40	mime field
-50	module
-10	monitor power interval
-50	month
-50	month and year
-50	month and year with multiplicity
-50	month with multiplicity
+52	module
+12	monitor power interval
+52	month
+52	month and year
+52	month and year with multiplicity
+52	month with multiplicity
 10	monthly task trigger
 10	monthlydow task trigger
-10	network
-10	network adapter
-10	network adapter interface
+12	network
+12	network adapter
+12	network adapter interface
 10	network address list
-10	network interface
-10	network ip interface
+12	network interface
+12	network ip interface
+2	network link interface
 10	network share
-50	number of months
-50	number of months with multiplicity
-10	operating system
+2	nothing
+52	number of months
+52	number of months with multiplicity
+12	operating system
 10	operating system product type
 10	operating system suite mask
+2	os log entry log
+2	os log store
+2	osxvalue
 10	plugin store
 10	plugin store key
 10	port mapping
-10	power history
-10	power level
-10	power state
+12	power history
+12	power level
+12	power state
+2	preference
 10	primary language
 10	priority class
-10	process
-10	processor
-50	property
-10	ram
-40	rate
-40	rate with multiplicity
-10	registration server
+12	process
+12	processor
+52	property
+12	ram
+42	rate
+42	rate with multiplicity
+12	registration server
 10	registration task trigger
 10	registry
 10	registry key
 10	registry key value
 10	registry key value type
-50	regular expression
-50	regular expression match
-10	restricted site
-10	root server
-50	rope
+2	registrynode
+2	registryroot
+52	regular expression
+52	regular expression match
+2	resfork
+12	restricted site
+12	root server
+52	rope
+2	route
+2	routing table
 10	running task
 10	scheduled task
+2	scsibus
+2	scsidevice
 10	security account
 10	security database
 10	security descriptor
-10	security identifier
-10	selected server
-10	server based group
+12	security identifier
+12	selected server
+12	server based group
 10	service
 10	session state change task trigger
-10	setting
+12	setting
 10	show message task action
-10	site
-10	site group
+12	site
+12	site group
 10	site profile
 10	site profile variable
-50	site version list
-50	site version list with multiplicity
-10	smbios
-10	smbios structure
-10	smbios value
-10	socket
-10	sqlite column
-10	sqlite column type
-10	sqlite database
-10	sqlite row
-10	sqlite statement
-10	sqlite table
+52	site version list
+52	site version list with multiplicity
+12	smbios
+12	smbios structure
+12	smbios value
+12	socket
+12	sqlite column
+12	sqlite column type
+12	sqlite database
+12	sqlite row
+12	sqlite statement
+12	sqlite table
+2	stage
 40	statistic range
 40	statistical bin
-50	string
-50	string position
-50	string set
-50	string with multiplicity
+52	string
+52	string position
+52	string set
+52	string with multiplicity
 40	strverscmp version
-50	substring
+52	substring
+2	swap
 10	system access control list
-10	system power interval
+12	system power interval
 10	task action
 10	task action type
 10	task definition
@@ -5667,35 +5726,38 @@ TYPES: str = """\
 10	task settings
 10	task trigger
 10	task trigger type
-10	tcp state
-50	time
-50	time interval
-50	time interval with multiplicity
-50	time of day
-50	time of day with multiplicity
-50	time of day with time zone
-50	time of day with time zone with multiplicity
-50	time range
-50	time range with multiplicity
+12	tcp state
+52	time
+52	time interval
+52	time interval with multiplicity
+52	time of day
+52	time of day with multiplicity
+52	time of day with time zone
+52	time of day with time zone with multiplicity
+52	time range
+52	time range with multiplicity
 10	time task trigger
-50	time with multiplicity
-50	time zone
-50	time zone with multiplicity
-50	tuple item
-50	type
-50	uinteger
-50	uinteger with multiplicity
-50	unary operator
-50	undefined
-10	user
-50	utf8 string
-10	uuid
-10	uuid with multiplicity
-50	version
-50	version with multiplicity
+52	time with multiplicity
+52	time zone
+52	time zone with multiplicity
+52	tuple item
+52	type
+52	uinteger
+52	uinteger with multiplicity
+52	unary operator
+52	undefined
+2	usb
+12	user
+2	user attribute
+52	utf8 string
+12	uuid
+12	uuid with multiplicity
+52	version
+52	version with multiplicity
+2	volume
 10	weekly task trigger
-10	wifi
-10	wifi network
+12	wifi
+12	wifi network
 10	winrt enumeration
 10	winrt package
 10	winrt package id
@@ -5703,20 +5765,22 @@ TYPES: str = """\
 10	wmi
 10	wmi object
 10	wmi select
-50	x509 certificate
+52	x509 certificate
 10	xml dom document
 10	xml dom node
-50	year
-50	year with multiplicity
+2	yaml key
+2	yaml value
+52	year
+52	year with multiplicity
 """
 
 # 7 rows
 UNARY_OPERATORS: str = """\
-50	- <floating point>: floating point
-50	- <hertz>: hertz
-50	- <integer>: integer
-50	- <large integer>: large integer
-50	- <number of months>: number of months
-40	- <rate>: rate
-50	- <time interval>: time interval
+52	- <floating point>: floating point
+52	- <hertz>: hertz
+52	- <integer>: integer
+52	- <large integer>: large integer
+52	- <number of months>: number of months
+42	- <rate>: rate
+52	- <time interval>: time interval
 """
