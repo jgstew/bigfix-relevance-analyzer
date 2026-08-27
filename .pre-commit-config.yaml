@@ -226,6 +226,12 @@ repos:
         stages: [pre-push, manual]
         # built into a temp dir so the repo's own dist/ is not created or stale-filled
         entry: sh -c 'out="$(mktemp -d)"; trap "rm -rf \"$out\"" EXIT; uv build --wheel --out-dir "$out"'
+      - id: inspector-data
+        name: inspector tables match the dumps
+        language: system
+        pass_filenames: false
+        files: ^(tests/examples/relevance_inspectors/|tools/generate_inspector_data\.py|src/bigfix_relevance_analyzer/_inspector_data\.py)
+        entry: uv run python tools/generate_inspector_data.py --check
       - id: pytest
         name: pytest (see config in pyproject.toml)
         language: system

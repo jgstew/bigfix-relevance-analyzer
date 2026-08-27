@@ -1,0 +1,230 @@
+<binary operator> as string: string
+<binary_string> as string: string
+<binary_string> as utf8 string: string
+<binary_string> as utf16 string: string
+<binary_string> as local string: string
+<binary_string> as fxf string: string
+<binary_substring> as string: string
+<binary_substring> as binary_substring: binary_substring
+<bit set> as integer: integer
+<integer> as bit set: bit set
+<integer> as bits: bit set
+<bit set> as string: string
+<string> as boolean: boolean
+<boolean> as string: string
+<boolean> as boolean: boolean
+<cidr subnet> as string: string
+<integer> as day_of_month: day of month
+<day of month> as integer: integer
+<string> as day_of_month: day of month
+<day of month> as string: string
+<day of month> as two digits: string
+<string> as day_of_week: day of week
+<day of week> as string: string
+<day of week> as three letters: string
+<day of year> as string: string
+<integer> as floating point: floating point
+<floating point> as integer: integer
+<floating point> as string: string
+<floating point> as scientific notation: string
+<floating point> as standard notation: string
+<string> as floating point: floating point
+<floating point> as floating point: floating point
+<hertz> as string: string
+<cast> as string: string
+<string> as date: date
+<date> as string: string
+<property> as string: string
+<string> as uppercase: string
+<string> as lowercase: string
+<string> as string: string
+<string> as binary_string: binary_string
+<string> as utf8 binary_string: binary_string
+<string> as utf16 binary_string: binary_string
+<string> as local binary_string: binary_string
+<string> as fxf binary_string: binary_string
+<type> as string: string
+<string> as integer: integer
+<uinteger> as integer: integer
+<large integer> as integer: integer
+<integer> as string: string
+<integer> as integer: integer
+<integer> as hexadecimal: string
+<uinteger> as hexadecimal: string
+<large integer> as hexadecimal: string
+<string> as hexadecimal: string
+<binary_string> as hexadecimal: string
+<ipv4 address> as string: string
+<ipv6 address> as string: string
+<ipv4or6 address> as string: string
+<ipv6 address> as string with leading zeros: string
+<ipv4or6 address> as string with leading zeros: string
+<ipv6 address> as string with ipv4: string
+<ipv4or6 address> as string with ipv4: string
+<ipv6 address> as compressed string: string
+<ipv4or6 address> as compressed string: string
+<ipv6 address> as compressed string with ipv4: string
+<ipv4or6 address> as compressed string with ipv4: string
+<ipv6 address> as string with zone index: string
+<ipv4or6 address> as string with zone index: string
+<ipv6 address> as string with leading zeros with zone index: string
+<ipv4or6 address> as string with leading zeros with zone index: string
+<ipv6 address> as string with ipv4 with zone index: string
+<ipv4or6 address> as string with ipv4 with zone index: string
+<ipv6 address> as compressed string with zone index: string
+<ipv4or6 address> as compressed string with zone index: string
+<ipv6 address> as compressed string with ipv4 with zone index: string
+<ipv4or6 address> as compressed string with ipv4 with zone index: string
+<string> as ipv6 address: ipv6 address
+<string> as ipv4or6 address: ipv4or6 address
+<ipv4 address> as ipv6 address: ipv6 address
+<ipv4 address> as ipv4or6 address: ipv4or6 address
+<ipv6 address> as ipv4or6 address: ipv4or6 address
+<ip version> as string: string
+<string> as large integer: large integer
+<integer> as large integer: large integer
+<uinteger> as large integer: large integer
+<large integer> as string: string
+<large integer> as large integer: large integer
+<time> as local date: date
+<time> as universal date: date
+<string> as time: time
+<string> as local time: time
+<string> as universal time: time
+<time> as string: string
+<time> as local string: string
+<time> as universal string: string
+<month and year> as string: string
+<number of months> as string: string
+<integer> as month: month
+<month> as integer: integer
+<string> as month: month
+<month> as string: string
+<month> as three letters: string
+<month> as two digits: string
+<site version list> as string: string
+<string> as site version list: site version list
+<substring> as string: string
+<substring> as substring: substring
+<string> as time interval: time interval
+<time interval> as string: string
+<string> as time_of_day: time of day
+<time of day> as string: string
+<time range> as string: string
+<string> as time zone: time zone
+<time zone> as string: string
+<string> as uinteger: uinteger
+<integer> as uinteger: uinteger
+<large integer> as uinteger: uinteger
+<uinteger> as string: string
+<uinteger> as uinteger: uinteger
+<unary operator> as string: string
+<undefined> as string: string
+<version> as string: string
+<string> as version: version
+<version> as version: version
+<string> as windows display time: time
+<integer> as year: year
+<year> as integer: integer
+<string> as year: year
+<year> as string: string
+<string> as zoned time_of_day: time of day with time zone
+<string> as universal zoned time_of_day: time of day with time zone
+<string> as local zoned time_of_day: time of day with time zone
+<time of day with time zone> as string: string
+<format> as string: string
+<html> as string: string
+<html> as decoded string: string
+<string> as html: html
+<html> as html: html
+<json key> as string: string
+<json value> as string: string
+<json value> as integer: integer
+<json value> as float: floating point
+<json value> as boolean: boolean
+<rope> as string: string
+<string> as left trimmed string: string
+<string> as right trimmed string: string
+<string> as trimmed string: string
+<tuple item> as string: string
+<xml dom node> as xml: string
+<xml dom node> as text: string
+<discretionary access control list> as string: string
+<system access control list> as string: string
+<action> as string: string
+<action lock state> as string: string
+<bios> as string: string
+<environment variable> as string: string
+<file> as string: string
+<filesystem object> as string: string
+<file content> as uppercase: file content
+<file content> as lowercase: file content
+<firewall profile type> as string: string
+<agent interface capability> as string: string
+<language> as string: string
+<local group member> as string: string
+<manual group> as string: string
+<metabase value> as string: string
+<metabase value> as integer: integer
+<metabase identifier> as string: string
+<metabase type> as string: string
+<metabase user type> as string: string
+<metabase identifier> as integer: integer
+<metabase type> as integer: integer
+<metabase user type> as integer: integer
+<operating system> as string: string
+<plugin store> as string: string
+<plugin store key> as string: string
+<power level> as string: string
+<power state> as string: string
+<primary language> as string: string
+<registry key> as string: string
+<registry key value type> as string: string
+<registry key value> as string: string
+<registry key value> as integer: integer
+<registry key value> as uinteger: uinteger
+<registry key value> as large integer: large integer
+<registry key value> as file: file
+<registry key value> as system file: file
+<registry key value> as system x32 file: file
+<registry key value> as system x64 file: file
+<registry key value> as application: application
+<registry key value> as folder: folder
+<registry key value> as time: time
+<security descriptor> as string: string
+<security identifier> as string: string
+<server based group> as string: string
+<service> as string: string
+<setting> as string: string
+<site profile variable> as string: string
+<smbios value> as string: string
+<smbios value> as hexadecimal: string
+<sqlite column> as string: string
+<sqlite column type> as string: string
+<sqlite database> as string: string
+<sqlite row> as string: string
+<sqlite table> as string: string
+<task action> as com handler task action: com handler task action
+<task action> as exec task action: exec task action
+<task action> as email task action: email task action
+<task action> as show message task action: show message task action
+<task trigger> as event task trigger: event task trigger
+<task trigger> as time task trigger: time task trigger
+<task trigger> as daily task trigger: daily task trigger
+<task trigger> as weekly task trigger: weekly task trigger
+<task trigger> as monthly task trigger: monthly task trigger
+<task trigger> as monthlydow task trigger: monthlydow task trigger
+<task trigger> as idle task trigger: idle task trigger
+<task trigger> as registration task trigger: registration task trigger
+<task trigger> as boot task trigger: boot task trigger
+<task trigger> as logon task trigger: logon task trigger
+<task trigger> as session state change task trigger: session state change task trigger
+<tcp state> as string: string
+<uuid> as string: string
+<uuid> as hexadecimal: string
+<uuid> as binary_string: binary_string
+<winrt enumeration> as string: string
+<winrt package> as string: string
+<winrt package user information> as string: string
+<wmi object> as string: string
+<wmi select> as string: string

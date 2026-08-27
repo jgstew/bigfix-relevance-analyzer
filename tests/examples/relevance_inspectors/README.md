@@ -162,9 +162,10 @@ One inspector per line:
 
 - `<property signature>` is the inspector as you would write it in relevance,
   with placeholders in angle brackets for its argument/direct-object types,
-  e.g. `registry values <string> of <registry key>`. A bare placeholder type
-  like `<string>` or `<html>` is itself the name of a first-class relevance
-  type, not markup for "any string".
+  e.g. `key <string> of <registry>` (a real line from the Windows dump; the
+  index argument is not always a `<string>` - see `current user key <logged on
+  user> of <registry>`). A bare placeholder type like `<string>` or `<html>` is
+  itself the name of a first-class relevance type, not markup for "any string".
 - `<return type>` is the name of the type the inspector evaluates to, e.g.
   `boolean`, `string`, `registry key`. This is BigFix's own string
   representation of a property (`(it as string) of properties` produces this

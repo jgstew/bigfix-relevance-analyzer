@@ -2,10 +2,21 @@
 # "thead"/"theads" are real BigFix session relevance inspectors (HTML table
 # head element / plural), not typos for "thread"/"threads". They show up in
 # tests/examples/session_relevance/**.
-ignore-words-list = thead,theads
+#
+# "oprating" is half of a deliberately garbled name in
+# tests/test_inspectors.py ("wnidows of oprating system"), proving lookup()
+# returns nothing for an unknown name rather than "correcting" it. codespell's
+# dictionary maps oprating->operating unambiguously, so it needs an explicit
+# override; _typos.toml carries the matching entry for "wnidows".
+ignore-words-list = thead,theads,oprating,wnidows
 
 # tests/examples/ holds real-world BigFix content copied verbatim from
 # https://github.com/jgstew/bigfix-content for fidelity (see its README) -
 # including whatever typos already exist in that third-party content. Don't
 # flag those; fixing them here would misrepresent what was actually copied.
-skip = tests/examples
+#
+# _inspector_data.py is generated from tests/examples/relevance_inspectors/ by
+# tools/generate_inspector_data.py - the same verbatim BigFix inspector names
+# (e.g. `additional_information of <dmi>`), just relocated into src/ so the
+# library can read them at runtime. Same rationale, same exclusion.
+skip = tests/examples,src/bigfix_relevance_analyzer/_inspector_data.py

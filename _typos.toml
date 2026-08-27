@@ -8,9 +8,20 @@
 thead = "thead"
 theads = "theads"
 
+# A deliberately garbled name in tests/test_inspectors.py ("wnidows of
+# oprating system"), proving lookup() returns nothing for an unknown name
+# rather than "correcting" it. .codespellrc carries the matching entries.
+wnidows = "wnidows"
+oprating = "oprating"
+
 [files]
 # tests/examples/ holds real-world BigFix content copied verbatim from
 # https://github.com/jgstew/bigfix-content for fidelity (see its README) -
 # including whatever typos already exist in that third-party content. Don't
 # flag those; fixing them here would misrepresent what was actually copied.
-extend-exclude = ["tests/examples/**"]
+#
+# _inspector_data.py is generated from tests/examples/relevance_inspectors/ by
+# tools/generate_inspector_data.py - the same verbatim BigFix inspector names,
+# just relocated into src/ so the library can read them at runtime. Same
+# rationale, same exclusion.
+extend-exclude = ["tests/examples/**", "src/bigfix_relevance_analyzer/_inspector_data.py"]

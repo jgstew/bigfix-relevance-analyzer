@@ -131,6 +131,51 @@ Both paths report identical line numbers, including for a start tag whose
 attributes span several lines - a test pins this across the whole example
 corpus, since an off-by-one there would shift every reported line in a file.
 
+## The inspector table
+
+`bigfix_relevance_analyzer.inspectors` is the structured table of what relevance
+actually defines - properties, casts, binary and unary operators, and the type
+universe - parsed from the dumps in `tests/examples/relevance_inspectors/`.
+
+This is a **parser prerequisite, not a parser dependent**. Relevance has no
+reserved words and multi-word inspector names, so nothing about the text of
+`logged on users of bes computers` says where one name ends and the next begins;
+resolving that needs a name table, which is what this is.
+
+```python
+from bigfix_relevance_analyzer import inspectors
+
+for entry in inspectors.lookup("drives"):
+    print(entry.signature, "->", entry.return_type, sorted(entry.platforms))
+# drives -> drive ['windows']
+# drives -> filesystem ['debian', 'rhel', 'ubuntu']
+# drives -> volume ['macos']
+```
+
+Each row keeps the **sources** that defined it, so `dialects` and `platforms`
+are derived rather than baked in. That is what makes the example above possible:
+`drives` genuinely returns a different type per platform family, and collapsing
+rows into one "client" verdict would have destroyed that. It is imported
+explicitly rather than from the package root, since most callers only extract.
+
+The table is a **snapshot, not a specification**. New BigFix versions add
+inspectors, and the dumps only cover what someone captured - so absence is
+grounds for a warning at most, never proof that a name is invalid. Only positive
+evidence should be drawn from it, the same discipline the dialect classifier
+applies.
+
+`src/bigfix_relevance_analyzer/_inspector_data.py` is generated; the dumps are
+the source of truth. Regenerate after adding or editing one:
+
+```bash
+python tools/generate_inspector_data.py
+```
+
+A pre-commit hook and `tests/test_inspector_data.py` both fail if the two have
+drifted. Dump filenames carry their own provenance as
+`{dialect}_relevance_{category}[_{context}].txt`, so a newly captured dump is
+picked up with no code change.
+
 ## Development
 
 This project uses [uv](https://docs.astral.sh/uv/) for dependency management and packaging

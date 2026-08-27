@@ -1,0 +1,6 @@
+- <floating point>: floating point
+- <hertz>: hertz
+- <integer>: integer
+- <large integer>: large integer
+- <number of months>: number of months
+- <time interval>: time interval
