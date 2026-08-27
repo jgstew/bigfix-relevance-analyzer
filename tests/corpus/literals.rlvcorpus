@@ -1,0 +1,71 @@
+==== an integer literal
+42
+----
+(num "42")
+
+==== a decimal literal keeps its verbatim text
+1.5
+----
+(num "1.5")
+
+==== a string literal, quotes stripped in the s-expression only
+"abc"
+----
+(str "abc")
+
+==== percent escapes stay verbatim
+"a%22b"
+----
+(str "a%22b")
+
+==== a string may span lines
+"a
+b"
+----
+(str "a
+b")
+
+==== it is a distinguished operand
+it
+----
+it
+
+==== it is case-insensitive
+IT
+----
+it
+
+==== parens group without a node
+(42)
+----
+(num "42")
+
+==== nested parens still group without a node
+((42))
+----
+(num "42")
+
+==== a comment is trivia around an expression
+/* pre */ 42 /* post */
+----
+(num "42")
+
+==== an unterminated string is an error at the quote
+("abc
+----
+ERROR line 1 column 2
+
+==== empty parens are an error at the closing paren
+()
+----
+ERROR line 1 column 2
+
+==== an unclosed paren is an error at end of input
+(1
+----
+ERROR line 1 column 3
+
+==== trailing input after a complete expression
+1 2
+----
+ERROR line 1 column 3

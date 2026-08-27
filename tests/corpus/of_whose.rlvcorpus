@@ -1,0 +1,144 @@
+==== a bare word is a reference
+computer
+----
+(ref "computer")
+
+==== adjacent words are one multi-word reference
+operating system
+----
+(ref "operating system")
+
+==== a reference phrase is case-folded and space-normalized
+OPERATING    System
+----
+(ref "operating system")
+
+==== of joins a property to its object
+windows of operating system
+----
+(of (ref "windows") (ref "operating system"))
+
+==== of is right-associative
+a of b of c
+----
+(of (ref "a") (of (ref "b") (ref "c")))
+
+==== a string index binds to the name before any of
+key "foo" of registry
+----
+(of (ref "key" (str "foo")) (ref "registry"))
+
+==== a number index binds the same way
+item 0 of it
+----
+(of (ref "item" (num "0")) it)
+
+==== [unverified] a parenthesized index binds the same way
+key (name of it) of registry
+----
+(of (ref "key" (of (ref "name") it)) (ref "registry"))
+
+==== of binds tighter than comparison
+name of it = "x"
+----
+(bin "=" (of (ref "name") it) (str "x"))
+
+==== of binds tighter than arithmetic
+1 + number of processors
+----
+(bin "+" (num "1") (of (ref "number") (ref "processors")))
+
+==== a phrase stops at a word operator
+a b and c
+----
+(bin "and" (ref "a b") (ref "c"))
+
+==== whose filters the collection before it
+files whose (name of it = "x")
+----
+(whose (ref "files") (bin "=" (of (ref "name") it) (str "x")))
+
+==== whose needs no space before its paren
+files whose(name of it = "x")
+----
+(whose (ref "files") (bin "=" (of (ref "name") it) (str "x")))
+
+==== whose binds tighter than of on the left
+files whose (name of it = "a") of folder "/tmp"
+----
+(of
+  (whose (ref "files") (bin "=" (of (ref "name") it) (str "a")))
+  (ref "folder" (str "/tmp")))
+
+==== whose binds tighter than of on the right
+a of b whose (it = 1)
+----
+(of (ref "a") (whose (ref "b") (bin "=" it (num "1"))))
+
+==== exists takes a reference
+exists files
+----
+(exists (ref "files"))
+
+==== exist is the singular spelling of exists
+exist files
+----
+(exists (ref "files"))
+
+==== not exists is one negated quantifier
+not exists files
+----
+(not-exists (ref "files"))
+
+==== exists swallows the whole of chain
+exists file "x" of folder "y"
+----
+(exists (of (ref "file" (str "x")) (ref "folder" (str "y"))))
+
+==== exists swallows a whose filter
+exists files whose (name of it = "x")
+----
+(exists (whose (ref "files") (bin "=" (of (ref "name") it) (str "x"))))
+
+==== exists does not swallow a boolean operator
+exists a and exists b
+----
+(bin "and" (exists (ref "a")) (exists (ref "b")))
+
+==== [unverified] exists does not swallow a comparison
+exists a = 2
+----
+(bin "=" (exists (ref "a")) (num "2"))
+
+==== exists accepts a parenthesized operand
+exists (files of folder "/tmp")
+----
+(exists (of (ref "files") (ref "folder" (str "/tmp"))))
+
+==== the realistic statement from the tokenizer tests
+exists files whose (name of it = "bes") of folder "/tmp"
+----
+(exists
+  (of
+    (whose (ref "files") (bin "=" (of (ref "name") it) (str "bes")))
+    (ref "folder" (str "/tmp"))))
+
+==== a structural word cannot start a reference
+1 + of
+----
+ERROR line 1 column 5
+
+==== whose without its parenthesized predicate is an error
+files whose name
+----
+ERROR line 1 column 13
+
+==== it can be the argument of a name
+html it
+----
+(ref "html" it)
+
+==== an it argument inside a group, from the dashboard examples
+(html it) of x
+----
+(of (ref "html" it) (ref "x"))

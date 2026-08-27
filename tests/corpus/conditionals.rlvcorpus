@@ -1,0 +1,44 @@
+==== if then else is an expression
+if 1 then 2 else 3
+----
+(if (num "1") (num "2") (num "3"))
+
+==== the condition may hold boolean structure
+if 1 and 2 then 3 else 4
+----
+(if (bin "and" (num "1") (num "2")) (num "3") (num "4"))
+
+==== the then branch runs to the else
+if 1 then 2 + 3 else 4
+----
+(if (num "1") (bin "+" (num "2") (num "3")) (num "4"))
+
+==== [unverified] the else branch is greedy to the right
+if 1 then 2 else 3 + 4
+----
+(if (num "1") (num "2") (bin "+" (num "3") (num "4")))
+
+==== else if chains by nesting
+if a then "x" else if b then "p" else "q"
+----
+(if (ref "a") (str "x") (if (ref "b") (str "p") (str "q")))
+
+==== a parenthesized conditional is an of operand
+a of (if 1 then b else c)
+----
+(of (ref "a") (if (num "1") (ref "b") (ref "c")))
+
+==== a conditional inside a whose predicate
+files whose(if exists a then b else true)
+----
+(whose (ref "files") (if (exists (ref "a")) (ref "b") (ref "true")))
+
+==== a conditional missing its else is an error
+if 1 then 2
+----
+ERROR line 1 column 12
+
+==== a conditional missing its then is an error
+if 1 else 2
+----
+ERROR line 1 column 6

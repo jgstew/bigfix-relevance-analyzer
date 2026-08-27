@@ -1,0 +1,61 @@
+==== a comma builds a tuple
+1, 2
+----
+(tuple (num "1") (num "2"))
+
+==== tuples are flat, not nested pairs
+1, 2, 3
+----
+(tuple (num "1") (num "2") (num "3"))
+
+==== [unverified] parens do not nest a tuple inside a tuple
+(1, 2), 3
+----
+(tuple (num "1") (num "2") (num "3"))
+
+==== a semicolon builds a collection
+1; 2; 3
+----
+(coll (num "1") (num "2") (num "3"))
+
+==== comma binds tighter than semicolon
+1, 2; 3, 4
+----
+(coll (tuple (num "1") (num "2")) (tuple (num "3") (num "4")))
+
+==== the error fallback binds tighter than a comma
+1 | 0, 2 | 0
+----
+(tuple (bin "|" (num "1") (num "0")) (bin "|" (num "2") (num "0")))
+
+==== [unverified] the error fallback is looser than or
+1 or 2 | 3
+----
+(bin "|" (bin "or" (num "1") (num "2")) (num "3"))
+
+==== the error fallback is looser than an of chain
+name of it | "none"
+----
+(bin "|" (of (ref "name") it) (str "none"))
+
+==== a set literal is a collection under of
+set of (2; 78; 80)
+----
+(of (ref "set") (coll (num "2") (num "78") (num "80")))
+
+==== a tuple is an of operand
+(a, b) of c
+----
+(of (tuple (ref "a") (ref "b")) (ref "c"))
+
+==== a collection of of-chains
+(packages "docker-ce" of it; packages "docker" of it)
+----
+(coll
+  (of (ref "packages" (str "docker-ce")) it)
+  (of (ref "packages" (str "docker")) it))
+
+==== a trailing comma is an error
+1, 2,
+----
+ERROR line 1 column 6

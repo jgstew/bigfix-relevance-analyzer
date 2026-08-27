@@ -1,0 +1,39 @@
+==== a cast names its target type
+it as string
+----
+(cast it "string")
+
+==== casts chain leftward
+it as string as lowercase
+----
+(cast (cast it "string") "lowercase")
+
+==== a cast target may be a multi-word type name
+it as trimmed string
+----
+(cast it "trimmed string")
+
+==== a cast binds tighter than comparison
+it as string = "x"
+----
+(bin "=" (cast it "string") (str "x"))
+
+==== a cast applies to a whole of chain
+name of it as lowercase
+----
+(cast (of (ref "name") it) "lowercase")
+
+==== parens keep a cast inside an of chain
+(it as string) of x
+----
+(of (cast it "string") (ref "x"))
+
+==== a literal casts like anything else
+"1.2" as version
+----
+(cast (str "1.2") "version")
+
+==== a cast target must be a name
+it as 5
+----
+ERROR line 1 column 7

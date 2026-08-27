@@ -1,0 +1,79 @@
+==== the client relevance example from the corpus
+windows of operating system AND not exists files "C:\Windows\Temp\EventLogBackupSecurity.evt"
+----
+(bin "and"
+  (of (ref "windows") (ref "operating system"))
+  (not-exists (ref "files" (str "C:\\Windows\\Temp\\EventLogBackupSecurity.evt"))))
+
+==== the session relevance example from the corpus
+(id of site of it | 0, id of it | 0, applicable computer count of it | 0)
+of fixlets of bes sites whose(id of it is contained by set of (2;78;80))
+----
+(of
+  (tuple
+    (bin "|" (of (ref "id") (of (ref "site") it)) (num "0"))
+    (bin "|" (of (ref "id") it) (num "0"))
+    (bin "|" (of (ref "applicable computer count") it) (num "0")))
+  (of (ref "fixlets")
+    (whose (ref "bes sites")
+      (bin "is contained by"
+        (of (ref "id") it)
+        (of (ref "set") (coll (num "2") (num "78") (num "80")))))))
+
+==== the docker package check, with conditionals as of operands
+exists (packages "docker-ce" of it; packages "docker" of it)
+whose(if exists properties whose(it as string contains "currently installed of ")
+then (currently installed of it) else TRUE)
+of (if exists properties whose(it as string contains "debianpackage:")
+then debianpackages else ERROR "The operators are not defined.")
+----
+(exists
+  (of
+    (whose
+      (coll
+        (of (ref "packages" (str "docker-ce")) it)
+        (of (ref "packages" (str "docker")) it))
+      (if
+        (exists (whose (ref "properties")
+          (bin "contains" (cast it "string") (str "currently installed of "))))
+        (of (ref "currently installed") it)
+        (ref "true")))
+    (if
+      (exists (whose (ref "properties")
+        (bin "contains" (cast it "string") (str "debianpackage:"))))
+      (ref "debianpackages")
+      (ref "error" (str "The operators are not defined.")))))
+
+==== the registry search list walk, casts and filters chained under of
+exists (it as trimmed string) whose(it != "") of substrings separated by ","
+of (it as string as lowercase) of values "SearchList" of keys "HKLM\Tcpip\Parameters"
+of registries
+----
+(exists
+  (of
+    (whose (cast it "trimmed string") (bin "!=" it (str "")))
+    (of (ref "substrings separated by" (str ","))
+      (of (cast (cast it "string") "lowercase")
+        (of (ref "values" (str "SearchList"))
+          (of (ref "keys" (str "HKLM\\Tcpip\\Parameters")) (ref "registries")))))))
+
+==== negation of a bare phrase
+NOT in proxy agent context
+----
+(un "not" (ref "in proxy agent context"))
+
+==== the smbios structure check with tuple indexing
+exists ( (it as string) of values "manufacturer" of it, (it as string) of values "version" of it )
+whose(item 0 of it starts with "Xen" AND item 1 of it as lowercase contains "amazon")
+of structures "system_information" of smbioses
+----
+(exists
+  (of
+    (whose
+      (tuple
+        (of (cast it "string") (of (ref "values" (str "manufacturer")) it))
+        (of (cast it "string") (of (ref "values" (str "version")) it)))
+      (bin "and"
+        (bin "starts with" (of (ref "item" (num "0")) it) (str "Xen"))
+        (bin "contains" (cast (of (ref "item" (num "1")) it) "lowercase") (str "amazon"))))
+    (of (ref "structures" (str "system_information")) (ref "smbioses"))))

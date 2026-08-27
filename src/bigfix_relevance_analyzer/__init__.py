@@ -18,6 +18,10 @@ from bigfix_relevance_analyzer.extract import (
     extract_relevance_from_markdown,
     looks_like_clientui,
 )
+from bigfix_relevance_analyzer.nodes import to_sexpr
+from bigfix_relevance_analyzer.parser import ParseError, ParseResult
+from bigfix_relevance_analyzer.parser import parse as parse_relevance
+from bigfix_relevance_analyzer.parser import try_parse as try_parse_relevance
 
 try:
     __version__ = version("bigfix-relevance-analyzer")
@@ -33,6 +37,8 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 __all__ = [
     "Dialect",
     "HtmlContext",
+    "ParseError",
+    "ParseResult",
     "RelevanceComplexity",
     "RelevanceSite",
     "SiteKind",
@@ -46,5 +52,8 @@ __all__ = [
     "extract_relevance_from_markdown",
     "is_definite",
     "looks_like_clientui",
+    "parse_relevance",
     "score_relevance_complexity",
+    "to_sexpr",
+    "try_parse_relevance",
 ]

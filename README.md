@@ -29,14 +29,20 @@ decisions made here; read it before making a structural change.
 The short-term goal is **pure Python** - it keeps iteration fast while the hard
 part is still unsolved. Relevance has no published grammar, so a real parser
 means reverse-engineering one from the console, the docs, and real content;
-that research is the long pole, and Python is the cheapest place to do it. The
-plan of record is a hand-rolled Pratt parser with the operator, precedence, and
-keyword data kept in declarative tables, plus a shared corpus of input to
-expected parse trees as the primary asset.
+that research is the long pole, and Python is the cheapest place to do it.
 
-The tokenizer for that parser already exists and is in use by the complexity
-scorer, so the grammar research starts from a lexer that is exercised against
-the whole example corpus rather than from raw text.
+The parser now exists: a hand-rolled Pratt parser (`parser.py`) over the
+existing tokenizer, producing frozen AST nodes (`nodes.py`) with the operator,
+precedence, and keyword data kept in declarative tables (`grammar.py`). The
+primary asset is the shared corpus of input to expected S-expression parse
+trees in `tests/corpus/*.rlvcorpus` - a port is proven equivalent by making the
+same corpus pass. `parse_relevance` raises a positioned `ParseError`;
+`try_parse_relevance` never raises, which is the conservative "unknown, skip"
+interface for scorers and hooks. Every relevance site in the example corpus
+currently parses; grammar decisions that have not been spot-checked against a
+real evaluator are tagged `[unverified]` in their corpus record titles. Not
+done yet, deliberately: type-directed disambiguation, error-recovery nodes,
+and rebasing the complexity scorer onto the AST.
 
 The long-term goal may be to **translate the core to Rust**, exposed as PyO3
 wheels for Python consumers and as WebAssembly for a VS Code extension. That is

@@ -1,0 +1,76 @@
+==== contains is a comparison
+it contains "x"
+----
+(bin "contains" it (str "x"))
+
+==== starts with is one operator across two words
+"ab" starts with "a"
+----
+(bin "starts with" (str "ab") (str "a"))
+
+==== word operators fold their case
+"ab" Starts With "a"
+----
+(bin "starts with" (str "ab") (str "a"))
+
+==== ends with
+"ab" ends with "b"
+----
+(bin "ends with" (str "ab") (str "b"))
+
+==== negated word operators are one operator
+"ab" does not contain "c"
+----
+(bin "does not contain" (str "ab") (str "c"))
+
+==== does not start with
+"ab" does not start with "b"
+----
+(bin "does not start with" (str "ab") (str "b"))
+
+==== is compares like =, keeping its spelling
+1 is 2
+----
+(bin "is" (num "1") (num "2"))
+
+==== is not is one operator, not is around a not
+1 is not 2
+----
+(bin "is not" (num "1") (num "2"))
+
+==== equals keeps its spelling
+1 equals 2
+----
+(bin "equals" (num "1") (num "2"))
+
+==== the trie takes the longest operator that matches
+1 is greater than or equal to 2
+----
+(bin "is greater than or equal to" (num "1") (num "2"))
+
+==== a shorter prefix still matches when the longer form does not continue
+1 is greater than 2
+----
+(bin "is greater than" (num "1") (num "2"))
+
+==== is contained by
+id of it is contained by y
+----
+(bin "is contained by" (of (ref "id") it) (ref "y"))
+
+==== word comparisons bind looser than of on both sides
+item 0 of it starts with "Xen"
+----
+(bin "starts with" (of (ref "item" (num "0")) it) (str "Xen"))
+
+==== word comparisons bind tighter than and
+it contains "a" and it contains "b"
+----
+(bin "and"
+  (bin "contains" it (str "a"))
+  (bin "contains" it (str "b")))
+
+==== a real filter: trimmed substrings
+(it as trimmed string) whose(it != "")
+----
+(whose (cast it "trimmed string") (bin "!=" it (str "")))

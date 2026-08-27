@@ -1,0 +1,104 @@
+==== multiplication binds tighter than addition
+1 + 2 * 3
+----
+(bin "+" (num "1") (bin "*" (num "2") (num "3")))
+
+==== parens override precedence
+(1 + 2) * 3
+----
+(bin "*" (bin "+" (num "1") (num "2")) (num "3"))
+
+==== addition is left-associative
+1 - 2 - 3
+----
+(bin "-" (bin "-" (num "1") (num "2")) (num "3"))
+
+==== division and mod sit with multiplication
+4 / 2 mod 3
+----
+(bin "mod" (bin "/" (num "4") (num "2")) (num "3"))
+
+==== concatenation is looser than addition
+1 & 2 + 3
+----
+(bin "&" (num "1") (bin "+" (num "2") (num "3")))
+
+==== concatenation is left-associative
+"a" & "b" & "c"
+----
+(bin "&" (bin "&" (str "a") (str "b")) (str "c"))
+
+==== comparison is looser than concatenation
+"a" & "b" = "ab"
+----
+(bin "=" (bin "&" (str "a") (str "b")) (str "ab"))
+
+==== each comparison spelling is preserved
+1 != 2
+----
+(bin "!=" (num "1") (num "2"))
+
+==== two-character comparisons lex and parse whole
+1 <= 2
+----
+(bin "<=" (num "1") (num "2"))
+
+==== [unverified] comparisons chain left, resolving at type checking
+1 = 2 = 3
+----
+(bin "=" (bin "=" (num "1") (num "2")) (num "3"))
+
+==== and binds tighter than or
+1 and 2 or 3
+----
+(bin "or" (bin "and" (num "1") (num "2")) (num "3"))
+
+==== or is looser on both sides
+1 or 2 and 3
+----
+(bin "or" (num "1") (bin "and" (num "2") (num "3")))
+
+==== boolean operators are case-insensitive and keep folded spelling
+1 AND 2
+----
+(bin "and" (num "1") (num "2"))
+
+==== comparison binds tighter than and
+1 = 2 and 3 = 4
+----
+(bin "and" (bin "=" (num "1") (num "2")) (bin "=" (num "3") (num "4")))
+
+==== not swallows a comparison
+not 1 = 2
+----
+(un "not" (bin "=" (num "1") (num "2")))
+
+==== not does not swallow an and
+not 1 and 2
+----
+(bin "and" (un "not" (num "1")) (num "2"))
+
+==== not nests
+not not 1
+----
+(un "not" (un "not" (num "1")))
+
+==== unary minus binds only its operand
+- 1 + 2
+----
+(bin "+" (un "-" (num "1")) (num "2"))
+
+==== unary minus on the right of a binary minus
+1 - - 2
+----
+(bin "-" (num "1") (un "-" (num "2")))
+
+==== a trailing operator is an error at end of input
+1 +
+----
+ERROR line 1 column 4
+
+==== a doubled operator is an error at the second operator
+1 + * 2
+----
+ERROR line 1 column 5
