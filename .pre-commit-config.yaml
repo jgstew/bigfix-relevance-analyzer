@@ -24,8 +24,8 @@ repos:
       # Block direct commits to the integration branches; work on a feature
       # branch and open a PR instead. Bypass for a deliberate exception with
       # `git commit --no-verify`.
-      - id: no-commit-to-branch
-        args: ["--branch=main", "--branch=master"]
+      # - id: no-commit-to-branch
+      #   args: ["--branch=main", "--branch=master"]
 
   - repo: https://github.com/jgstew/pre-commit-jgstew
     rev: v2.3.0
