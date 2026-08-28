@@ -79,6 +79,38 @@ EXPECTED: dict[str, Expected] = {
         ),
         note="Two substitutions on the same ActionScript line.",
     ),
+    "client_relevance/tasks/task_power_management_sleep_when_idle.bes": Expected(
+        sites=(
+            (REL, CLIENT, 7),
+            (REL, CLIENT, 8),
+            (REL, CLIENT, 9),
+            (REL, CLIENT, 10),
+            (REL, CLIENT, 11),
+            (REL, CLIENT, 12),
+            (REL, CLIENT, 13),
+            (SUB, CLIENT, 33),
+            (SUB, CLIENT, 39),
+            (SUB, CLIENT, 45),
+        ),
+        text_prefixes=(
+            "/* PowerManagement not applicable to Proxy",
+            "/* script for sleep NOT IMPLEMENTED",
+            "/* PowerManagement not applicable to LastManStanding",
+            "/* PowerManagement not applicable to machines",
+            "/* PowerManagement not applicable to VirtualMachines",
+            "/* PowerManagement not applicable to Servers",
+            "/* System idle for more than 8 hours */ exists",
+            "windows of operating system",
+            "mac of operating system",
+            "unix of operating system",
+        ),
+        note=(
+            "Real content. Clause 7 reads `starts of ranges of ...`, where `starts` is "
+            "the plural of the `start` inspector and not the `starts with` operator -- "
+            "the regression that motivated phrase termination on a complete operator "
+            "match rather than an operator's first word."
+        ),
+    ),
     # ---------------- client relevance: analyses ----------------
     "client_relevance/analyses/analysis_relevance_simple_property.bes": Expected(
         sites=((REL, CLIENT, 6), (PROP, CLIENT, 14)),

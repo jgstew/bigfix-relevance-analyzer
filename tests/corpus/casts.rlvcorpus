@@ -37,3 +37,8 @@ name of it as lowercase
 it as 5
 ----
 ERROR line 1 column 7
+
+==== a cast target may be a word that starts an operator
+x as starts
+----
+(cast (ref "x") "starts")

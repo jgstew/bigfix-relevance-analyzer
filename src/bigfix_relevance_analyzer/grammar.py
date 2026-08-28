@@ -19,8 +19,9 @@ from dataclasses import dataclass
 __all__ = [
     "CANONICAL_BINARY",
     "GRAMMAR_LEVEL_BINARY",
-    "PHRASE_TERMINATORS",
+    "OPERATOR_FIRST_WORDS",
     "PUNCT_INFIX",
+    "STRUCTURAL_WORDS",
     "WORD_INFIX",
     "WORD_INFIX_TRIE",
     "InfixOp",
@@ -140,16 +141,26 @@ def _build_word_trie(table: dict[tuple[str, ...], InfixOp]) -> WordTrieNode:
 
 WORD_INFIX_TRIE: WordTrieNode = _build_word_trie(WORD_INFIX)
 
-# Words that end a name phrase. Derived from the structural words plus the
-# first word of every word operator, so the two lists cannot drift apart.
+# Words that end a name phrase unconditionally, wherever they appear.
 # Relevance has no reserved words; this set is a parsing *policy*, and
-# tests/test_grammar_tables.py checks it against the inspector snapshot so a
-# platform release that ships a colliding name fails loudly.
-_STRUCTURAL_WORDS: frozenset[str] = frozenset(
+# tests/test_grammar_tables.py checks it against every written form in the
+# inspector snapshot so a platform release that ships a colliding name fails
+# loudly.
+STRUCTURAL_WORDS: frozenset[str] = frozenset(
     {"of", "whose", "then", "else", "as", "it", "not", "exists", "exist", "if"}
 )
 
-PHRASE_TERMINATORS: frozenset[str] = _STRUCTURAL_WORDS | {words[0] for words in WORD_INFIX}
+# The words a word operator can begin with. NOT terminators in their own right:
+# an operator ends a phrase only when the trie matches it in *full*, so `starts`
+# is the plural `start` inspector in `starts of ranges` and the `starts with`
+# operator only in `starts with "a"`. Treating the first word as a terminator
+# made nine real inspector spellings -- `starts`, `date range ends`,
+# `stop on idle ends` among them -- impossible to write.
+#
+# The parser uses this only as a fast path: a word outside it can never begin an
+# operator, so the trie walk is skipped. Derived from WORD_INFIX so it cannot
+# drift from the trie.
+OPERATOR_FIRST_WORDS: frozenset[str] = frozenset(words[0] for words in WORD_INFIX)
 
 
 # ---------------------------------------------------------------------------

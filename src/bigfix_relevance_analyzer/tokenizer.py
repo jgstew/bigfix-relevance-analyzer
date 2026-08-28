@@ -11,17 +11,20 @@ out as three ``WORD`` tokens, not one name; deciding where a name begins and
 ends is the parser's job, using the tables in
 :mod:`bigfix_relevance_analyzer.inspectors`.
 
-That split matters. Relevance has no reserved words, so ``of``, ``whose`` and
-``and`` are ordinary words that also appear *inside* inspector names -- there is
-a real inspector called ``day of month``. Binding those phrases needs the name
-table, and the name table is a snapshot: it covers the platforms and versions
+That split matters. Relevance has no reserved words, so a word that reads as
+grammar can also *be* an inspector name: ``starts`` is the plural of ``start``,
+and ``date range starts`` and ``stop on idle ends`` are real names, yet all
+three collide with the operators ``starts with`` and ``ends with``. Which
+reading applies depends on what follows, and resolving that needs the name
+table. The name table is a snapshot: it covers the platforms and versions
 someone happened to dump, so a tokenizer keyed on it would lex the same text
 differently as dumps are added, and would lex relevance for an unsampled
-platform wrong. Worse, longest-match is not even the right answer -- whether
-``day of month of now`` groups as ``(day of month) of now`` depends on operand
-types, which is type-directed disambiguation and squarely parser work. Keeping
-this layer table-free makes it total: any input lexes, and the same input always
-lexes the same way.
+platform wrong. Worse, longest-match is not even the right answer: 1175 real
+names have another real name as a prefix (``action`` and ``action flags`` among
+them), so whether ``action flags of it`` is one name or two depends on operand
+types -- type-directed disambiguation, squarely parser work. Keeping this layer
+table-free makes it total: any input lexes, and the same input always lexes the
+same way.
 
 Guarantees
 ----------

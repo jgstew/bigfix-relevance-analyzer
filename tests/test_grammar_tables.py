@@ -1,10 +1,10 @@
 """Guards on the declarative grammar tables.
 
-The parser decides where a name phrase ends using ``PHRASE_TERMINATORS``
-alone -- never the inspector snapshot -- so these tests make the underlying
-assumption loud: no known inspector name contains a terminator word. If a
-future dump regeneration breaks that, the right response is a parser design
-discussion, not a silent misparse.
+The parser decides where a name phrase ends from these tables alone -- never
+the inspector snapshot -- so these tests make the underlying assumption loud:
+no known inspector spelling collides with a word that unconditionally ends a
+phrase. If a future dump regeneration breaks that, the right response is a
+parser design discussion, not a silent misparse.
 """
 
 from __future__ import annotations
@@ -12,12 +12,13 @@ from __future__ import annotations
 from bigfix_relevance_analyzer.grammar import (
     CANONICAL_BINARY,
     GRAMMAR_LEVEL_BINARY,
-    PHRASE_TERMINATORS,
+    OPERATOR_FIRST_WORDS,
     PUNCT_INFIX,
+    STRUCTURAL_WORDS,
     WORD_INFIX,
     WORD_INFIX_TRIE,
 )
-from bigfix_relevance_analyzer.inspectors import binary_operators, inspector_names
+from bigfix_relevance_analyzer.inspectors import all_inspectors, binary_operators, written_forms
 from bigfix_relevance_analyzer.tokenizer import PUNCTUATION
 
 # ---------------------------------------------------------------------------
@@ -25,31 +26,85 @@ from bigfix_relevance_analyzer.tokenizer import PUNCTUATION
 # ---------------------------------------------------------------------------
 
 
-def test_no_inspector_name_contains_a_phrase_terminator_word() -> None:
-    """A terminator inside a name would cut the phrase short mid-name.
+def test_no_inspector_written_form_contains_a_structural_word() -> None:
+    """A structural word inside a name would cut the phrase short mid-name.
 
-    The inspector dumps list the word operators themselves (`contains`,
-    `starts with`, ...) as names; those are exempt, because the parser
-    treating them as operators *is* the correct reading.
+    Every *written form* has to be checked, not just the signature's. A
+    property's signature records one spelling, but relevance is written with
+    either -- `name of <file>` and `names of <folder>` are one row -- and the
+    plural is the half the signature usually drops. Checking `inspector_names()`
+    alone tested 2900 of the 5389 forms the parser actually meets, and missed
+    that `starts`, `date range ends` and seven others were unparsable as names.
+
+    The dumps list the word operators themselves (`contains`, `starts with`,
+    ...) as names; those are exempt, because the parser treating them as
+    operators *is* the correct reading.
     """
     operator_spellings = {op.canonical for op in WORD_INFIX.values()}
-    offenders = [
-        name
-        for name in inspector_names()
-        if name.lower() not in operator_spellings and PHRASE_TERMINATORS & set(name.lower().split())
-    ]
+    offenders = sorted(
+        {
+            form
+            for entry in all_inspectors()
+            for form in written_forms(entry)
+            if form not in operator_spellings and STRUCTURAL_WORDS & set(form.split())
+        }
+    )
     assert offenders == []
 
 
-def test_interior_operator_words_are_not_phrase_terminators() -> None:
+def test_operator_words_do_not_unconditionally_terminate_a_phrase() -> None:
+    """An operator ends a phrase only on a *complete* trie match, so a name may
+    contain -- or be -- an operator's first word.
+
+    In practice that only frees the first words that begin no single-word
+    operator: `contains` or `and` matches the moment it is seen, so it still
+    always terminates. `does`, `ends` and `starts` are the ones that gain a
+    reading as a name, and nine real inspector spellings depend on it.
+    """
+    always_complete = {words[0] for words in WORD_INFIX if len(words) == 1}
+    conditional = OPERATOR_FIRST_WORDS - always_complete
+    assert conditional == {"does", "ends", "starts"}
+
+    # The operators themselves are inspector rows too (`starts with`); they are
+    # exempt for the same reason as in the guard above.
+    operator_spellings = {op.canonical for op in WORD_INFIX.values()}
+    rescued = sorted(
+        {
+            form
+            for entry in all_inspectors()
+            for form in written_forms(entry)
+            if form not in operator_spellings and conditional & set(form.split())
+        }
+    )
+    assert rescued == [
+        "allow demand starts",
+        "date range ends",
+        "date range starts",
+        "ends",
+        "starts",
+        "stop at duration ends",
+        "stop on idle ends",
+        "time range ends",
+        "time range starts",
+    ]
+
+
+def test_interior_operator_words_are_not_structural() -> None:
     """Words like `by`, `to` and `with` appear inside real names
-    (`substrings separated by`), so only an operator's *first* word may
-    terminate a phrase; the trie handles the rest of the operator."""
+    (`substrings separated by`), so they must stay free for use inside names;
+    the trie handles them as part of an operator."""
     first_words = {words[0] for words in WORD_INFIX}
     interior_words = {word for words in WORD_INFIX for word in words[1:]}
     # `not` and `or` are operators/structural words in their own right; every
     # other interior word must stay free for use inside names.
-    assert (interior_words - first_words - {"not", "or"}) & PHRASE_TERMINATORS == set()
+    assert (interior_words - first_words - {"not", "or"}) & STRUCTURAL_WORDS == set()
+
+
+def test_structural_words_and_operator_first_words_are_disjoint() -> None:
+    """The two sets answer different questions and share no word. Moving `is`
+    or `contains` into the structural set would make it an unconditional
+    terminator again and silently re-break the plural names above."""
+    assert not (STRUCTURAL_WORDS & OPERATOR_FIRST_WORDS)
 
 
 # ---------------------------------------------------------------------------
@@ -57,8 +112,15 @@ def test_interior_operator_words_are_not_phrase_terminators() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_phrase_terminators_cover_every_word_operator_start() -> None:
-    assert {words[0] for words in WORD_INFIX} <= PHRASE_TERMINATORS
+def test_operator_first_words_is_derived_from_word_infix() -> None:
+    """The parser's fast path skips the trie for any word not in this set, so a
+    drift here would make an operator silently stop terminating phrases."""
+    assert {words[0] for words in WORD_INFIX} == OPERATOR_FIRST_WORDS
+
+
+def test_every_operator_first_word_resolves_through_the_trie() -> None:
+    for word in OPERATOR_FIRST_WORDS:
+        assert word in WORD_INFIX_TRIE.children
 
 
 def test_word_operator_spellings_are_normalized() -> None:

@@ -29,6 +29,7 @@ from bigfix_relevance_analyzer.nodes import (
 from bigfix_relevance_analyzer.parser import (
     MAX_PARSE_DEPTH,
     ParseError,
+    _Parser,
     parse,
     try_parse,
 )
@@ -350,6 +351,9 @@ NESTING = {
     "whose": lambda n: "x whose (" * n + "y" + ")" * n,
     "if": lambda n: "if " * n + "c" + " then t else e" * n,
     "index": lambda n: "key (" * n + "1" + ")" * n,
+    # A name that is also a word operator's first word: routes through the
+    # lookahead in `phrase_ends_here` on every level.
+    "colliding-name": lambda n: "starts" + " of starts" * n,
 }
 
 
@@ -470,6 +474,26 @@ def test_number_is_not_an_inspector_so_the_specialisation_is_unambiguous() -> No
     """`number of x` can only be aggregation: the table defines no such
     property, which is what lets the parser decide this without types."""
     assert inspectors.lookup("number") == ()
+
+
+def test_a_name_colliding_with_an_operator_binds_to_a_real_inspector() -> None:
+    """Why phrase termination waits for a complete operator match.
+
+    These names were always in the table -- `starts` is the plural of `start`.
+    They were just unreachable, because `starts` also begins `starts with` and
+    the parser used to end a phrase on an operator's first word alone.
+    """
+    assert len(inspectors.lookup("starts")) == 5
+    assert len(inspectors.lookup("date range starts")) == 1
+
+
+def test_match_word_infix_does_not_consume_on_a_partial_match() -> None:
+    """`phrase_ends_here` asks the trie a question and then may decline to act
+    on the answer, so the matcher has to be free of side effects."""
+    parser = _Parser("does not start of it")
+    before = parser.at
+    assert parser.match_word_infix() is None
+    assert parser.at == before
 
 
 def test_an_integer_index_makes_a_tuple_subscript() -> None:

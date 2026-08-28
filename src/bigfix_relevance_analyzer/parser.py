@@ -13,10 +13,14 @@ Two entry points, two policies:
   interface for scorers and hooks that must survive broken input.
 
 Non-goals, deliberately: no backtracking, no type-directed disambiguation,
-and no error-recovery/partial-AST nodes. If a future platform ships an
-inspector name containing a grammar word, the failure mode is a wrong tree
-or a precise ParseError, never a crash; ``tests/test_grammar_tables.py``
-guards the assumption against the inspector snapshot so it breaks loudly.
+and no error-recovery/partial-AST nodes. Deciding where a name phrase ends
+does use *bounded* lookahead -- at most one operator's worth of tokens, in a
+single forward pass that never rewinds (see :meth:`_Parser.phrase_ends_here`).
+If a future platform ships an inspector name containing a structural word, the
+failure mode is a wrong tree or a precise ParseError, never a crash;
+``tests/test_grammar_tables.py`` guards that against every written form in the
+inspector snapshot -- both spellings of every row, not just the signature's --
+so it breaks loudly.
 """
 
 from __future__ import annotations
@@ -250,7 +254,7 @@ class _Parser:
                 return _exists(negated=False, op_token=token, operand=operand)
             if token.normalized == "if":
                 return self.parse_conditional()
-            if token.normalized not in grammar.PHRASE_TERMINATORS:
+            if not self.phrase_ends_here():
                 return self.parse_reference()
 
         raise self.error_at(token, f"expected an expression, found {token.text!r}")
@@ -282,14 +286,7 @@ class _Parser:
         """A name phrase -- greedy words -- plus its optional index argument."""
         first = self.advance()
         words = [first]
-        while True:
-            token = self.peek()
-            if (
-                token is None
-                or token.kind is not TokenKind.WORD
-                or token.normalized in grammar.PHRASE_TERMINATORS
-            ):
-                break
+        while not self.phrase_ends_here():
             words.append(self.advance())
         phrase = " ".join(word.normalized for word in words)
         index = self.parse_index()
@@ -368,14 +365,7 @@ class _Parser:
             if token.normalized == "as" and min_bp < grammar.BP_CAST:
                 self.advance()
                 target_words: list[Token] = []
-                while True:
-                    word = self.peek()
-                    if (
-                        word is None
-                        or word.kind is not TokenKind.WORD
-                        or word.normalized in grammar.PHRASE_TERMINATORS
-                    ):
-                        break
+                while not self.phrase_ends_here():
                     target_words.append(self.advance())
                 if not target_words:
                     raise self.error_at(self.peek(), "expected a type name after 'as'")
@@ -397,6 +387,35 @@ class _Parser:
                     return _binary(op.canonical, left, right)
 
         return None
+
+    def phrase_ends_here(self) -> bool:
+        """Whether a name phrase must stop at the current token.
+
+        A structural word always stops it. An operator word stops it only when
+        the trie matches the operator in *full*: `starts` is the plural `start`
+        inspector in `starts of ranges`, and the `starts with` operator only in
+        `starts with "a"`. Single-word operators (`and`, `contains`, ...) always
+        match, so they stop a phrase exactly as an unconditional terminator
+        would.
+
+        Bounded lookahead, never backtracking -- `match_word_infix` walks at
+        most one operator's worth of tokens forward and does not move `self.at`.
+
+        The consequence to know about: a trailing word that *could* start an
+        operator but does not complete one is absorbed into the phrase, so
+        `x ends "a"` reads as the name `x ends` indexed by `"a"` rather than
+        failing. That shape already existed for words *inside* an operator
+        (`x start with "a"`), and refusing it would refuse the real names
+        `date range starts` and `stop on idle ends`.
+        """
+        token = self.peek()
+        if token is None or token.kind is not TokenKind.WORD:
+            return True
+        if token.normalized in grammar.STRUCTURAL_WORDS:
+            return True
+        if token.normalized not in grammar.OPERATOR_FIRST_WORDS:
+            return False
+        return self.match_word_infix() is not None
 
     def match_word_infix(self) -> tuple[grammar.InfixOp, int] | None:
         """Max-munch the word-operator trie at the current position.

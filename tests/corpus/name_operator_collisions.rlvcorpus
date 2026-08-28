@@ -1,0 +1,106 @@
+Names that collide with the first word of a word operator.
+
+`starts` is the plural of the `start` inspector *and* the first word of
+`starts with`; likewise `ends`, and `does` for the `does not ...` family.
+A phrase ends at one of these only when the trie matches the operator in
+full, so the reading is decided by what follows, never by the word alone.
+
+(Everything above the first ==== is ignored by the loader. Do not put notes
+*between* records -- they would be read as part of the previous expected tree.)
+
+==== a plural inspector name that is also an operator's first word
+starts of ranges of current system intervals of power histories
+----
+(of (ref "starts")
+  (of (ref "ranges")
+    (of (ref "current system intervals") (ref "power histories"))))
+
+==== a multi-word name ending in `starts`
+date range starts of bes actions
+----
+(of (ref "date range starts") (ref "bes actions"))
+
+==== a multi-word name ending in `ends`
+stop on idle ends of task settings
+----
+(of (ref "stop on idle ends") (ref "task settings"))
+
+==== a colliding name is an ordinary comparison operand
+date range starts of bes actions is greater than now
+----
+(bin "is greater than"
+  (of (ref "date range starts") (ref "bes actions"))
+  (ref "now"))
+
+==== exists takes a colliding name as its operand
+exists starts of ranges
+----
+(exists (of (ref "starts") (ref "ranges")))
+
+==== not exists takes a colliding name as its operand
+not exists starts of it
+----
+(not-exists (of (ref "starts") it))
+
+==== aggregation over a colliding name
+number of starts of it
+----
+(number-of (of (ref "starts") it))
+
+==== a colliding name filters like any other collection
+exists starts whose (it > now)
+----
+(exists (whose (ref "starts") (bin ">" it (ref "now"))))
+
+==== the real-world clause this fix was written for
+exists (now - it) whose(it > 8 * hour) of starts of ranges of current system intervals whose(idle state = state of it) of power histories
+----
+(exists
+  (of
+    (whose (bin "-" (ref "now") it) (bin ">" it (bin "*" (num "8") (ref "hour"))))
+    (of (ref "starts")
+      (of (ref "ranges")
+        (of
+          (whose (ref "current system intervals")
+            (bin "=" (ref "idle state") (of (ref "state") it)))
+          (ref "power histories"))))))
+
+==== `starts with` wins when the name could have absorbed `starts`
+starts starts with "a"
+----
+(bin "starts with" (ref "starts") (str "a"))
+
+==== `ends with` wins even when the phrase itself ends in `ends`
+date range ends ends with "z"
+----
+(bin "ends with" (ref "date range ends") (str "z"))
+
+==== the operator wins on both sides at once
+starts of it starts with starts of it
+----
+(bin "starts with" (of (ref "starts") it) (of (ref "starts") it))
+
+==== `does not start with` still matches in full over a colliding name
+starts of it does not start with "a"
+----
+(bin "does not start with" (of (ref "starts") it) (str "a"))
+
+==== a cast target still stops at a real operator
+x as string starts with "a"
+----
+(bin "starts with" (cast (ref "x") "string") (str "a"))
+
+==== a partial `does not ...` is still an error, at the structural word
+x does not start of it
+----
+ERROR line 1 column 8
+
+==== a dangling operator word after a non-reference operand is still an error
+it ends "a"
+----
+ERROR line 1 column 4
+
+==== a dangling operator word after a parenthesized operand is still an error
+(x) ends "a"
+----
+ERROR line 1 column 5
