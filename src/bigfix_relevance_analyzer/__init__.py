@@ -3,6 +3,8 @@
 import logging
 from importlib.metadata import PackageNotFoundError, version
 
+from bigfix_relevance_analyzer.analyzer import ReferenceReport, RelevanceAnalysis
+from bigfix_relevance_analyzer.analyzer import analyze as analyze_relevance
 from bigfix_relevance_analyzer.binding import Binder, ItBinding, resolve_it_bindings
 from bigfix_relevance_analyzer.breakdown import (
     Level,
@@ -57,10 +59,13 @@ __all__ = [
     "Probe",
     "ProbeKind",
     "ProbeOutcome",
+    "ReferenceReport",
+    "RelevanceAnalysis",
     "RelevanceComplexity",
     "RelevanceSite",
     "SiteKind",
     "__version__",
+    "analyze_relevance",
     "analyze_relevance_complexity",
     "breakdown_probes",
     "classify_relevance_dialect",

@@ -78,6 +78,55 @@ grammar was also considered and deferred; it fights relevance's
 keyword-versus-identifier ambiguity, since relevance has no reserved words and
 multi-word inspector names.)
 
+## Analysing one statement
+
+Everything below can be run at once. `analyze_relevance` classifies the dialect,
+lexes, parses, type-checks, resolves every name against the inspector tables,
+binds each `it`, generates breakdown probes and scores complexity, and returns
+the results together as a frozen `RelevanceAnalysis`.
+
+```python
+from bigfix_relevance_analyzer import analyze_relevance
+
+report = analyze_relevance(r'exists file "C:\foo.txt" whose (size of it > 100)')
+
+report.dialect            # Dialect.CLIENT  (report.dialect_assumed says if it was a guess)
+report.parsed             # True; report.parse_error is None
+report.sexpr              # '(exists (whose (ref "file" ...'
+report.check.value.types  # frozenset({'boolean'})
+report.platforms          # frozenset({'windows', 'macos', 'debian', 'rhel', 'ubuntu'})
+report.unknown_references # () - every name resolved
+report.unbound_its        # () - the `it` is bound by the `whose`
+report.complexity.score   # 22.0
+report.levels             # breakdown probe text, one per measurable level
+```
+
+Pass the `dialect` extraction already worked out rather than having it guessed
+again from a fragment, and `platform` to narrow client lookups to one platform:
+`analyze_relevance(site.text, site.dialect, platform="windows")`.
+
+Analysis never raises on bad relevance. A statement that does not parse comes
+back with `parse_error` set, `parsed` false, and the tree-dependent fields
+empty; the dialect, the token stream with its error tokens positioned, and the
+complexity metrics - which are counted lexically - are still there. That is the
+same conservative contract as `try_parse_relevance`, for the same reason: the
+callers this exists for are handed half-written statements constantly.
+
+`report.to_dict()` renders the whole thing as JSON-serializable plain data, for
+consumers across a wire.
+
+### From the command line
+
+```bash
+python -m bigfix_relevance_analyzer 'exists file "C:\foo.txt" whose (size of it > 100)'
+```
+
+One section per analysis, or `--json` for `to_dict()` output. `--dialect
+client|session` forces the dialect and `--platform windows` narrows the lookups;
+with no argument the statement is read from stdin. The exit status is 1 when the
+statement does not parse, so a shell check can use it. This is the only part of
+the package that writes to stdout - importing the library still prints nothing.
+
 ## Extracting relevance
 
 `extract_relevance_from_file` finds every relevance statement in a file and
@@ -294,6 +343,9 @@ evaluates it, against `qna.exe`, session relevance, the REST `clientquery` API,
 or anything else it has. Nothing is added to the dependency list, and the
 capability stops being Windows-GUI-only.
 
+`analyze_relevance` runs this for you and returns the levels; the pieces are
+here for a caller that wants them directly.
+
 ```python
 from bigfix_relevance_analyzer import breakdown_probes, parse_relevance
 
@@ -418,6 +470,10 @@ table and reports findings in BigFix's own wording. It is imported explicitly,
 like `inspectors`. This is the first slice: literals, casts, operators,
 aggregation, tuples and conditionals are typed; `of` chains and `whose` filters
 still need property resolution and come back as unknown.
+
+`analyze_relevance` calls this with an environment built from the dialect and
+platform it was given; reach for the module directly to control the environment
+yourself.
 
 ```python
 from bigfix_relevance_analyzer import Dialect
