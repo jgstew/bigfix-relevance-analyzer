@@ -10,13 +10,17 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 
 import pytest
+from test_examples import corpus_files
 
 from bigfix_relevance_analyzer.dialect import Dialect
+from bigfix_relevance_analyzer.extract import extract_relevance_from_file
 from bigfix_relevance_analyzer.inspectors import (
     Inspector,
     InspectorKind,
+    WrittenForm,
     _parse_property,
     all_inspectors,
+    ancestors,
     binary_operators,
     casts,
     inspector_names,
@@ -26,7 +30,10 @@ from bigfix_relevance_analyzer.inspectors import (
     relevance_types,
     sources,
     unary_operators,
+    written_form_of,
 )
+from bigfix_relevance_analyzer.nodes import Reference
+from bigfix_relevance_analyzer.parser import try_parse
 
 
 def only(name: str, signature: str) -> Inspector:
@@ -211,9 +218,18 @@ def test_lookup_is_case_insensitive_and_ignores_surrounding_space() -> None:
 
 
 def test_lookup_returns_every_overload_of_a_name() -> None:
-    """A name is usually overloaded across object types."""
+    """A name is usually overloaded across object types.
+
+    Rows come back under every spelling the engine reports, so `key` also finds
+    the ones whose signature reads `keys`: `key <string> of <json value>` and
+    `keys of <json value>` are the same property, singular and plural, and both
+    are written in real relevance. Use `written_form_of` to tell which was used.
+    """
     assert len(lookup("key")) > 1
-    assert {entry.name for entry in lookup("key")} == {"key"}
+    assert {entry.name for entry in lookup("key")} == {"key", "keys"}
+    assert all(
+        "key" in (entry.singular_name, entry.plural_name, entry.name) for entry in lookup("key")
+    )
 
 
 def test_lookup_can_filter_by_kind() -> None:
@@ -310,3 +326,59 @@ def test_a_type_records_its_internal_size_when_known() -> None:
     types = {t.name: t for t in relevance_types()}
     assert types["integer"].size == 8
     assert types["boolean"].size == 1
+
+
+def test_lookup_finds_both_written_forms() -> None:
+    """A signature records one spelling; relevance is written with either.
+
+    `names of <folder>` and `name of <file>` are the same rows read plural and
+    singular, and indexing only the signature's form loses whichever one it did
+    not happen to record.
+    """
+    assert lookup("names")
+    assert lookup("name")
+    entry = lookup("names")[0]
+    assert written_form_of(entry, "names") is WrittenForm.PLURAL
+    assert written_form_of(entry, entry.singular_name or "") is WrittenForm.SINGULAR
+
+
+def test_every_reference_in_the_example_corpus_resolves() -> None:
+    """Before both forms were indexed, 14% of real references found nothing --
+    all of them real inspectors, keyed under a spelling `lookup` never saw."""
+    unresolved = {
+        node.phrase
+        for path in corpus_files()
+        for site in extract_relevance_from_file(path)
+        if (parsed := try_parse(site.text)).ok and parsed.node is not None
+        for node in _walk(parsed.node)
+        if isinstance(node, Reference) and not lookup(node.phrase)
+    }
+    assert unresolved == set()
+
+
+def test_ancestors_walks_to_the_root() -> None:
+    """Resolution depends on this: a property is declared on the base type."""
+    assert ancestors("client") == ("client", "application", "file", "filesystem object")
+    assert ancestors("string") == ("string",)
+
+
+def test_ancestors_of_an_unknown_type_is_just_itself() -> None:
+    """Absence from the snapshot is never treated as a finding."""
+    assert ancestors("no such type") == ("no such type",)
+
+
+def _walk(node: object) -> list[object]:
+    found: list[object] = []
+    stack = [node]
+    while stack:
+        current = stack.pop()
+        found.append(current)
+        for name in getattr(current, "__slots__", ()):
+            if name == "span":
+                continue
+            child = getattr(current, name, None)
+            if isinstance(child, tuple):
+                stack.extend(x for x in child if hasattr(x, "span"))
+            elif hasattr(child, "span"):
+                stack.append(child)
+    return found

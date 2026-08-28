@@ -50,6 +50,8 @@ __all__ = [
     "Inspector",
     "InspectorKind",
     "RelevanceType",
+    "WrittenForm",
+    "ancestors",
     "binary_operators",
     "casts",
     "inspector_names",
@@ -58,7 +60,20 @@ __all__ = [
     "properties",
     "sources",
     "unary_operators",
+    "written_form_of",
+    "written_forms",
 ]
+
+
+class WrittenForm(enum.Enum):
+    """Which spelling of an inspector an expression used."""
+
+    SINGULAR = "singular"
+    PLURAL = "plural"
+    UNKNOWN = "unknown"
+    """The row records no name matching what was written -- an older dump that
+    predates the singular/plural capture, or a match on the signature's own
+    form only."""
 
 
 class InspectorKind(enum.Enum):
@@ -402,6 +417,38 @@ def relevance_types() -> tuple[RelevanceType, ...]:
 
 
 @functools.cache
+def _by_type_name() -> dict[str, RelevanceType]:
+    """Types indexed by name, for the ancestor walk."""
+    return {entry.name: entry for entry in relevance_types()}
+
+
+@functools.cache
+def ancestors(name: str) -> tuple[str, ...]:
+    """``name`` and every type it inherits from, nearest first.
+
+    Resolving a property against a type **requires** this walk rather than
+    merely benefiting from it: a property is declared on the base type, so
+    ``size`` lives on ``file`` and resolving ``size of <application>`` against
+    ``application`` alone finds nothing. The real chain is
+    ``client -> application -> file -> filesystem object``.
+
+    Most types are roots and the walk stops immediately -- that is what the
+    engine reports, not missing data. An unknown name comes back as itself, on
+    the usual rule that absence from this snapshot proves nothing.
+    """
+    index = _by_type_name()
+    chain = [name]
+    seen = {name}
+    while (entry := index.get(chain[-1])) is not None:
+        parent = entry.parent
+        if parent is None or parent in seen:  # cycle-safe, though none is known
+            break
+        chain.append(parent)
+        seen.add(parent)
+    return tuple(chain)
+
+
+@functools.cache
 def known_types() -> frozenset[str]:
     """Just the type names, for membership tests."""
     return frozenset(entry.name for entry in relevance_types())
@@ -424,26 +471,61 @@ def inspector_names() -> frozenset[str]:
     return frozenset(entry.name for entry in all_inspectors())
 
 
+def written_forms(entry: Inspector) -> tuple[str, ...]:
+    """Every spelling ``entry`` can be written as, lowercased.
+
+    A property's signature carries one form, but relevance is written with
+    either: ``name of <file>`` and ``names of <folder>`` are the same row seen
+    singular and plural. Indexing only the signature's form loses whichever one
+    it did not happen to record.
+    """
+    forms = (entry.name, entry.singular_name, entry.plural_name)
+    return tuple(dict.fromkeys(form.lower() for form in forms if form))
+
+
 @functools.cache
 def _by_name() -> dict[str, tuple[Inspector, ...]]:
     index: dict[str, list[Inspector]] = {}
     for entry in all_inspectors():
-        index.setdefault(entry.name.lower(), []).append(entry)
+        for form in written_forms(entry):
+            index.setdefault(form, []).append(entry)
     return {name: tuple(entries) for name, entries in index.items()}
 
 
 def lookup(name: str, *, kind: InspectorKind | None = None) -> tuple[Inspector, ...]:
-    """Every inspector whose :attr:`~Inspector.name` is ``name``, case-insensitively.
+    """Every inspector that can be written as ``name``, case-insensitively.
 
     A name is usually overloaded -- the same property applies to several object
     types, each with its own return type -- so this returns all of them and
     lets the caller pick by operand type. Empty when nothing matches, which
     means "not in this snapshot", not "invalid".
+
+    Matching covers every form the engine reports a row under, not just the one
+    its signature happens to use: ``lookup("names")`` finds the rows whose
+    signature reads ``name``. Use :func:`written_form_of` to recover which form
+    matched, which is what says whether the expression is singular or plural.
     """
     found = _by_name().get(name.strip().lower(), ())
     if kind is not None:
         found = tuple(entry for entry in found if entry.kind is kind)
     return found
+
+
+def written_form_of(entry: Inspector, name: str) -> WrittenForm:
+    """Which of ``entry``'s spellings ``name`` is.
+
+    The distinction is the plurality of the *expression*, and it is not the same
+    question as :attr:`Inspector.multivalued`, which is a fact about the row:
+    ``name of <SELinux Boolean>`` is not multivalued and still has the plural
+    form ``names``. So plurality is derived here, at the point of use, rather
+    than stored.
+    """
+    wanted = name.strip().lower()
+    if entry.plural_name and entry.plural_name.lower() == wanted:
+        return WrittenForm.PLURAL
+    if entry.singular_name and entry.singular_name.lower() == wanted:
+        return WrittenForm.SINGULAR
+    return WrittenForm.UNKNOWN
 
 
 def sources() -> tuple[str, ...]:

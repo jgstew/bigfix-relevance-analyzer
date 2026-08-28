@@ -61,7 +61,7 @@ id of it is contained by y
 ==== word comparisons bind looser than of on both sides
 item 0 of it starts with "Xen"
 ----
-(bin "starts with" (of (ref "item" (num "0")) it) (str "Xen"))
+(bin "starts with" (item-of (num "0") it) (str "Xen"))
 
 ==== word comparisons bind tighter than and
 it contains "a" and it contains "b"

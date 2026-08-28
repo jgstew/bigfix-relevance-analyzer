@@ -24,6 +24,14 @@ measured text has to be written relative to that context. For the level
 ``files``: a property without its direct object is not a valid expression, and
 splicing the raw source yields ``The operator "files" is not defined.``
 
+**A context has to be made self-contained.** A node's source text is written
+relative to wherever it sits, so it cannot simply be quoted as another node's
+context. A sub-expression reaches its context in one of two ways, and they need
+opposite treatment: through ``it``, which is replaced by the context's text; or
+by being applied to it below an ``of``, in which case it is composed back on
+with ``of``. Getting that backwards turns an absolute ``file "a"`` inside a
+filter into ``file "a" of files``.
+
 **A probe returns a list, not a scalar.** When the context is plural, ``of``
 distributes and the probe answers once per context object. That is exactly what a
 breakdown graph wants -- not "this level produced N objects" but "each of the M
@@ -38,15 +46,19 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import assert_never
 
+from bigfix_relevance_analyzer.binding import resolve_it_bindings
 from bigfix_relevance_analyzer.nodes import (
+    Bar,
     Binary,
     Cast,
     Collection,
     Exists,
     If,
     It,
+    ItemOf,
     Node,
     NumberLiteral,
+    NumberOf,
     Of,
     Reference,
     Span,
@@ -177,6 +189,31 @@ class ProbeOutcome:
     :attr:`Outcome.NOT_EVALUABLE`."""
 
 
+@dataclass(frozen=True, slots=True)
+class _Visit:
+    """Walk this node, in this context."""
+
+    node: Node
+    context: str | None
+    applied: bool
+    """Whether the context is this node's **direct object**.
+
+    True below an ``of``'s property, where everything is applied to the object.
+    False in an *ambient* position -- a ``whose`` filter, an ``if`` branch, an
+    operand, an index -- where the context is reachable only through ``it``.
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class _Emit:
+    """Report this level, once its object has been walked."""
+
+    level: Node
+    head: Node | None
+    head_source: str
+    context: str
+
+
 def breakdown_probes(
     source: str, node: Node, *, kind: ProbeKind = ProbeKind.COUNT
 ) -> tuple[Level, ...]:
@@ -187,13 +224,24 @@ def breakdown_probes(
     :attr:`~bigfix_relevance_analyzer.nodes.Reference.phrase` is case-folded and
     space-normalized, so it is not what the engine should be handed back.
 
-    The whole expression comes first as a contextless level, then the ``of``
-    spine from the innermost level outwards -- the order the debugger's own
-    worked example reports, and the order a graph is drawn in.
+    The whole expression comes first as a contextless level, then the rest in
+    post-order -- an object before the level that consumes it -- which is the
+    order the debugger's own worked example reports and the order a graph is
+    drawn in.
 
-    Levels are the root plus each ``of``. Other constructs are transparent: they
-    are measured as part of whichever level encloses them, which is what the
-    debugger does too.
+    A level is any ``of``-shaped node (:class:`~bigfix_relevance_analyzer.nodes.Of`,
+    :class:`~bigfix_relevance_analyzer.nodes.ItemOf`,
+    :class:`~bigfix_relevance_analyzer.nodes.NumberOf`) **wherever it appears** --
+    inside a ``whose`` filter, an operator's operand, an ``if`` branch or a tuple
+    item, not only along the outermost chain. Other constructs are not levels
+    themselves but are walked through to find the ones inside them.
+
+    What makes that possible is threading a *self-contained* context rather than
+    reading one off a single node; see :func:`_self_text`. A node's own source
+    text is only self-contained on the object side of an ``of``. On the property
+    side it is written relative to a context further out, and probing it as
+    written yields either an unbound ``it`` or a property stripped of its direct
+    object.
     """
     contextless_template, context_template = _TEMPLATES[kind]
 
@@ -207,6 +255,18 @@ def breakdown_probes(
             relevance = context_template.format(r1=measured, r2=measured, c=context)
         return Probe(relevance=relevance, kind=kind, measured=measured, context=context)
 
+    def head_text(level: Node, operand: Node) -> str:
+        """The text a level is written with, before its `of`.
+
+        `ItemOf` and `NumberOf` keep no node for their head the way `Of` keeps a
+        `prop`, so it is sliced back out of the source -- which also keeps it
+        verbatim, spacing and comments included.
+        """
+        head = source[level.span.start : operand.span.start].rstrip()
+        if head.lower().endswith("of"):
+            head = head[:-2].rstrip()
+        return head
+
     def unfiltered_probe(measured_head: Node, context: str | None) -> Probe | None:
         """The paired probe for a filtered level: the collection without its filter."""
         if not isinstance(measured_head, Whose):
@@ -214,7 +274,59 @@ def breakdown_probes(
         collection = text_of(measured_head.collection)
         return build(collection if context is None else f"{collection} of it", context)
 
+    def self_text(target: Node, context: str | None, applied: bool) -> str:
+        """``target``'s text, rewritten so it evaluates on its own.
+
+        Source text is written *relative to* wherever the node sits, so it is
+        self-contained only at the outermost level. A node reaches its context
+        in one of two ways, and they need opposite treatment:
+
+        * **Through ``it``.** Every ``it`` in ``target`` that binds outside it is
+          replaced by the context's text. ``it`` alone is the degenerate case
+          and comes back as the context itself.
+        * **By being applied to it.** Below an ``of``'s property everything is
+          applied to that object, so a node with no ``it`` of its own is
+          composed back onto the context with ``of``.
+
+        The distinction matters because a sub-expression in an ambient position
+        may be perfectly absolute -- ``file "a"`` inside a filter means the same
+        thing wherever it sits, and composing it into ``file "a" of files``
+        would be nonsense. Only a node that actually reaches out for its context
+        gets rewritten.
+        """
+        if context is None:
+            return text_of(target)
+
+        free = [
+            binding.it
+            for binding in resolve_it_bindings(target)
+            if binding.context is None  # unbound *within target* -- so bound outside it
+        ]
+        if free:
+            # Splice by span rather than replacing the text `it`, which would
+            # also hit `it` inside a string literal or a longer word.
+            rendered = []
+            at = target.span.start
+            for it_node in free:
+                rendered.append(source[at : it_node.span.start])
+                rendered.append(context)
+                at = it_node.span.end
+            rendered.append(source[at : target.span.end])
+            return "".join(rendered)
+
+        return f"{text_of(target)} of {context}" if applied else text_of(target)
+
     levels: list[Level] = []
+
+    def emit(level_node: Node, head: Node | None, head_source: str, context: str) -> None:
+        levels.append(
+            Level(
+                label=text_of(level_node),
+                span=level_node.span,
+                probe=build(f"{head_source} of it", context),
+                unfiltered=None if head is None else unfiltered_probe(head, context),
+            )
+        )
 
     # The root, measured as written and with no context to bind `it` to.
     levels.append(
@@ -226,43 +338,72 @@ def breakdown_probes(
         )
     )
 
-    # Then the `of` spine, walked object-first so the innermost level is
-    # reported before the ones that consume it.
-    stack: list[Node] = [node]
-    spine: list[Of] = []
-    while stack:
-        current = stack.pop()
+    # An explicit worklist rather than recursion, for the reason
+    # `binding.py` gives: this is handed whole trees and must stay total on
+    # them. Emission is post-order, so a level is pushed back as a deferred
+    # `_Emit` after its object has been walked.
+    work: list[_Visit | _Emit] = [_Visit(node, None, applied=False)]
+    while work:
+        item = work.pop()
+        if isinstance(item, _Emit):
+            emit(item.level, item.head, item.head_source, item.context)
+            continue
+
+        current, context, applied = item.node, item.context, item.applied
         match current:
             case Of(prop=prop, obj=obj):
-                spine.append(current)
-                stack.append(obj)
-                stack.append(prop)
-            case Whose(collection=collection, predicate=_predicate):
-                # The predicate is measured as part of this level, not as one of
-                # its own: it is a filter, not a step in the `of` chain.
-                stack.append(collection)
+                obj_self = self_text(obj, context, applied)
+                # Popped in reverse: object first, then this level, then the
+                # property -- everything in which is applied to the object.
+                work.append(_Visit(prop, obj_self, applied=True))
+                work.append(_Emit(current, prop, text_of(prop), obj_self))
+                work.append(_Visit(obj, context, applied=applied))
+            case ItemOf(operand=operand) | NumberOf(operand=operand):
+                # Written with `of` and measured like one. Splitting them out of
+                # `Of` was a change to the taxonomy, not to what gets probed.
+                work.append(
+                    _Emit(
+                        current,
+                        None,
+                        head_text(current, operand),
+                        self_text(operand, context, applied),
+                    )
+                )
+                work.append(_Visit(operand, context, applied=applied))
+            case Whose(collection=collection, predicate=predicate):
+                # The filter is not a level of its own, but the expressions
+                # inside it are -- measured against the collection *before*
+                # filtering, which is what `it` means in there. Inside the
+                # filter the context is ambient, not a direct object.
+                work.append(
+                    _Visit(predicate, self_text(collection, context, applied), applied=False)
+                )
+                work.append(_Visit(collection, context, applied=applied))
             case Unary(operand=operand) | Exists(operand=operand) | Cast(operand=operand):
-                stack.append(operand)
-            case Reference() | It() | NumberLiteral() | StringLiteral():
-                pass
-            case Binary() | If() | TupleExpr() | Collection():
-                # Compound values, not levels of a single chain. Their parts are
-                # measured within whichever level encloses them.
+                work.append(_Visit(operand, context, applied=applied))
+            case Binary(left=left, right=right) | Bar(left=left, right=right):
+                # Not levels themselves, but their operands are walked: an `of`
+                # chain inside one is still a level.
+                work.append(_Visit(right, context, applied=False))
+                work.append(_Visit(left, context, applied=False))
+            case If(condition=condition, then_branch=then_branch, else_branch=else_branch):
+                # `if` passes its context through to all three branches.
+                work.append(_Visit(else_branch, context, applied=False))
+                work.append(_Visit(then_branch, context, applied=False))
+                work.append(_Visit(condition, context, applied=False))
+            case TupleExpr(items=items) | Collection(items=items):
+                for item_node in reversed(items):
+                    work.append(_Visit(item_node, context, applied=False))
+            case Reference(index=index):
+                # An index is an argument, not something applied to the object:
+                # `it` inside it means the object, but an absolute expression
+                # there stands on its own.
+                if index is not None:
+                    work.append(_Visit(index, context, applied=False))
+            case It() | NumberLiteral() | StringLiteral():
                 pass
             case _:  # pragma: no cover - exhaustiveness over the Node union
                 assert_never(current)
-
-    for of_node in reversed(spine):
-        context = text_of(of_node.obj)
-        measured = f"{text_of(of_node.prop)} of it"
-        levels.append(
-            Level(
-                label=text_of(of_node),
-                span=of_node.span,
-                probe=build(measured, context),
-                unfiltered=unfiltered_probe(of_node.prop, context),
-            )
-        )
 
     return tuple(levels)
 

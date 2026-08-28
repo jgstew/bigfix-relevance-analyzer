@@ -10,12 +10,14 @@ discussion, not a silent misparse.
 from __future__ import annotations
 
 from bigfix_relevance_analyzer.grammar import (
+    CANONICAL_BINARY,
+    GRAMMAR_LEVEL_BINARY,
     PHRASE_TERMINATORS,
     PUNCT_INFIX,
     WORD_INFIX,
     WORD_INFIX_TRIE,
 )
-from bigfix_relevance_analyzer.inspectors import inspector_names
+from bigfix_relevance_analyzer.inspectors import binary_operators, inspector_names
 from bigfix_relevance_analyzer.tokenizer import PUNCTUATION
 
 # ---------------------------------------------------------------------------
@@ -85,3 +87,43 @@ def test_the_trie_resolves_every_operator_to_itself() -> None:
         for word in words:
             state = state.children[word]
         assert state.op is op
+
+
+def test_every_operator_the_parser_emits_can_be_resolved() -> None:
+    """Written spelling is not what the engine's table is keyed on.
+
+    `nodes.py` keeps the spelling deliberately and defers canonicalization to a
+    later pass. Until that pass existed, two thirds of what the parser can emit
+    resolved to nothing: the engine defines only twelve binary operators, and
+    everything else is a synonym, a negation or an operand swap of one of them.
+    """
+    emitted = {op.canonical for op in PUNCT_INFIX.values()} | {
+        op.canonical for op in WORD_INFIX.values()
+    }
+    unresolvable = sorted(
+        spelling
+        for spelling in emitted
+        if spelling not in CANONICAL_BINARY and spelling not in GRAMMAR_LEVEL_BINARY
+    )
+    assert unresolvable == []
+
+
+def test_every_canonical_target_is_a_name_the_table_defines() -> None:
+    """Canonicalizing onto a name the engine does not define would be worse than
+    not canonicalizing at all -- it would look resolved and find nothing."""
+    defined = {entry.name for entry in binary_operators()}
+    unbacked = sorted(
+        f"{spelling} -> {form.operator}"
+        for spelling, form in CANONICAL_BINARY.items()
+        if form.operator not in defined
+    )
+    assert unbacked == []
+
+
+def test_the_grammar_level_operators_really_have_no_rows() -> None:
+    """`and`, `or` and `|` are defined by the grammar, not the operator table.
+    If a dump ever gains rows for them, they should stop being special-cased."""
+    named = {entry.name for entry in binary_operators()} | {
+        entry.written_name for entry in binary_operators() if entry.written_name
+    }
+    assert not (GRAMMAR_LEVEL_BINARY & named)

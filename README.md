@@ -38,11 +38,30 @@ primary asset is the shared corpus of input to expected S-expression parse
 trees in `tests/corpus/*.rlvcorpus` - a port is proven equivalent by making the
 same corpus pass. `parse_relevance` raises a positioned `ParseError`;
 `try_parse_relevance` never raises, which is the conservative "unknown, skip"
-interface for scorers and hooks. Every relevance site in the example corpus
+interface for scorers and hooks - including for an expression nested deeper than
+`MAX_PARSE_DEPTH`, since parsing recurses and the alternative is a
+`RecursionError` escaping an interface whose whole promise is that nothing
+escapes it. Every relevance site in the example corpus
 currently parses; grammar decisions that have not been spot-checked against a
 real evaluator are tagged `[unverified]` in their corpus record titles. Not
 done yet, deliberately: type-directed disambiguation, error-recovery nodes,
 and rebasing the complexity scorer onto the AST.
+
+The node set follows the engine's own, so that later analysis is a translation
+rather than a mapping exercise. Three constructs the engine gives dedicated
+nodes are dedicated here too rather than modelled generically - `|` is `Bar`,
+not a binary operator, because it is error fallback and has no row in the
+operator table; `item 0 of (...)` is `ItemOf`, whose index is 0-based and must
+be an integer literal; and `number of x` is `NumberOf`, the sibling of the
+`Exists` node that already existed. Numerals carry the engine's magnitude
+classification (`NumberKind`) as a derived property rather than as three
+separate node classes, which keeps the literal verbatim and the corpus stable.
+
+Recognising `item 0 of (...)` without also swallowing `item "foo" of folder "c"`
+is the one place this needs care: `item <string> of <folder>` is a real
+inspector, and telling the two apart in general needs the object's type. Only an
+integer-literal index is specialised, on the same positive-evidence-only rule
+the rest of the package follows.
 
 The long-term goal may be to **translate the core to Rust**, exposed as PyO3
 wheels for Python consumers and as WebAssembly for a VS Code extension. That is
@@ -301,6 +320,20 @@ ambiguities are properties of the probe design rather than something a caller
 can resolve, so they are named in the API instead of being reported as a
 confident zero.
 
+Levels are found throughout the expression, not only along its outermost `of`
+chain - a chain inside a `whose` filter, an operator's operand, an `if` branch
+or a tuple item is a level too. One inside a filter is measured against the
+collection *before* filtering, which is what `it` means in there: in the example
+above, `size of it` is probed against all 25 files rather than the 21 that
+survive.
+
+Making that work means rewriting each level's context so it stands on its own,
+since a node's source text is written relative to wherever it sits. Where a
+sub-expression reaches its context through `it`, that `it` is replaced; where it
+is applied to an object below an `of`, it is composed back on. Only the second
+of those is a composition, which is why `file "a"` inside a filter stays
+`file "a"`.
+
 A `whose` level counts what survived its filter, so the number alone says
 nothing about how selective the filter was. Those levels come back paired: a
 `Level.unfiltered` probe measures the same collection without its filter, and
@@ -377,6 +410,59 @@ A pre-commit hook and `tests/test_inspector_data.py` both fail if the two have
 drifted. Dump filenames carry their own provenance as
 `{dialect}_relevance_{category}[_{context}].txt`, so a newly captured dump is
 picked up with no code change.
+
+## Type checking
+
+`bigfix_relevance_analyzer.typecheck` types an expression against the inspector
+table and reports findings in BigFix's own wording. It is imported explicitly,
+like `inspectors`. This is the first slice: literals, casts, operators,
+aggregation, tuples and conditionals are typed; `of` chains and `whose` filters
+still need property resolution and come back as unknown.
+
+```python
+from bigfix_relevance_analyzer import Dialect
+from bigfix_relevance_analyzer.typecheck import TypeEnvironment, check, resolve_property
+
+env = TypeEnvironment.create(Dialect.CLIENT)
+print(check(parse_relevance('1 + "a"'), env).diagnostics[0].message)
+# the operator '+' is not defined for the types '<integer> + <string>'
+```
+
+A value's type is a **set**, because inspectors are overloaded and because the
+same name resolves differently per platform. Later inspectors narrow it:
+
+```python
+drives = resolve_property("drives", None, env)
+# {drive, filesystem, volume} on all five platforms
+resolve_property("block size", drives.types, env)
+# {integer} on debian, rhel, ubuntu - `block size` exists on none of the others
+```
+
+So "where can this run?" falls out of typing rather than needing to be declared.
+Pass a `platform` to `TypeEnvironment` if you know it; leaving it out keeps every
+platform in play and lets the narrowing report the answer.
+
+`types` distinguishes `None` from the empty set deliberately. `None` means the
+table said nothing, which - as everywhere in this package - is grounds for a
+warning at most, never proof. Empty means every candidate was ruled out.
+
+### Platform coverage is reported, not enforced
+
+A single statement routinely targets several platforms at once, guarding
+platform-specific inspectors behind `if`/`then`/`else` so the wrong platform
+never evaluates the branch that would fail on it. The statement is correct; each
+branch is correct only somewhere. The example corpus has a fixlet whose `then`
+branch is Debian/Ubuntu-only and whose `else` branch is RHEL-only.
+
+So platform sets **intersect along a chain** and **union across alternatives** -
+`if` branches, and the two sides of `|`. An empty platform set is never an error
+by itself: findings live on the type axis and have to hold on every platform.
+Treating platforms as a constraint instead would report valid, shipped relevance
+as broken, which is the worst thing this package could do.
+
+The engine agrees. Its own checker carries `at most one branch of an
+if-statement may have type errors` - deliberate tolerance for exactly this
+idiom, and `check` implements it: one failing branch is survivable, two is not.
 
 ## Development
 

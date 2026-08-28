@@ -40,14 +40,17 @@ from dataclasses import dataclass
 from typing import assert_never
 
 from bigfix_relevance_analyzer.nodes import (
+    Bar,
     Binary,
     Cast,
     Collection,
     Exists,
     If,
     It,
+    ItemOf,
     Node,
     NumberLiteral,
+    NumberOf,
     Of,
     Reference,
     StringLiteral,
@@ -126,9 +129,16 @@ def resolve_it_bindings(node: Node) -> tuple[ItBinding, ...]:
             case Reference(index=index):
                 if index is not None:
                     stack.append((index, context, binder))
-            case Binary(left=left, right=right):
+            case Binary(left=left, right=right) | Bar(left=left, right=right):
+                # `|` is error fallback rather than an operator, but it is not a
+                # context either: both sides see the enclosing one.
                 stack.append((right, context, binder))
                 stack.append((left, context, binder))
+            case ItemOf(operand=operand) | NumberOf(operand=operand):
+                # Written with `of`, but neither introduces a context. A tuple
+                # index is an integer literal, so there is nothing in it to bind;
+                # aggregation measures its operand without rebinding it.
+                stack.append((operand, context, binder))
             case Unary(operand=operand) | Exists(operand=operand) | Cast(operand=operand):
                 stack.append((operand, context, binder))
             case If(condition=condition, then_branch=then_branch, else_branch=else_branch):

@@ -130,3 +130,27 @@ def test_deep_nesting_does_not_exhaust_the_python_stack() -> None:
         tree = Of(span=span, prop=tree, obj=Reference(span=span, phrase="x"))
 
     assert len(resolve_it_bindings(tree)) == 1
+
+
+def test_the_specialised_of_forms_introduce_no_context() -> None:
+    """`number of` aggregates and `item N of` subscripts; neither rebinds `it`.
+
+    A tuple index is an integer literal, so there is nothing inside one to
+    bind, and aggregation measures its operand without changing what `it`
+    means. Both were `Of` before the taxonomy change and neither bound `it`
+    then either -- this pins that the split did not quietly alter scoping.
+    """
+    assert bindings_as_text('number of files whose (name of it = "x")') == [
+        ("it", "files", Binder.WHOSE)
+    ]
+    assert bindings_as_text("item 0 of (1, 2)") == []
+    assert bindings_as_text("number of it") == [("it", None, None)]
+
+
+def test_error_fallback_passes_its_context_through_to_both_sides() -> None:
+    """`|` chooses between its operands at runtime; it is not a context."""
+    assert bindings_as_text("files whose (size of it | version of it)") == [
+        ("it", "files", Binder.WHOSE),
+        ("it", "files", Binder.WHOSE),
+    ]
+    assert bindings_as_text("size of it | 42") == [("it", None, None)]

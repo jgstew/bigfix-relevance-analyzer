@@ -76,7 +76,7 @@ wheels = [
 
 [[package]]
 name = "bigfix-relevance-analyzer"
-version = "1.0.1"
+version = "1.2.0"
 source = { editable = "." }
 
 [package.optional-dependencies]

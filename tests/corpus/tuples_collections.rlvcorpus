@@ -26,17 +26,17 @@
 ==== the error fallback binds tighter than a comma
 1 | 0, 2 | 0
 ----
-(tuple (bin "|" (num "1") (num "0")) (bin "|" (num "2") (num "0")))
+(tuple (bar (num "1") (num "0")) (bar (num "2") (num "0")))
 
 ==== [unverified] the error fallback is looser than or
 1 or 2 | 3
 ----
-(bin "|" (bin "or" (num "1") (num "2")) (num "3"))
+(bar (bin "or" (num "1") (num "2")) (num "3"))
 
 ==== the error fallback is looser than an of chain
 name of it | "none"
 ----
-(bin "|" (of (ref "name") it) (str "none"))
+(bar (of (ref "name") it) (str "none"))
 
 ==== a set literal is a collection under of
 set of (2; 78; 80)
@@ -59,3 +59,33 @@ set of (2; 78; 80)
 1, 2,
 ----
 ERROR line 1 column 6
+
+==== a tuple index is its own node, not a property access
+item 0 of (1, 2, 3)
+----
+(item-of (num "0") (tuple (num "1") (num "2") (num "3")))
+
+==== [unverified] a tuple index too big for an integer is still a tuple index
+item 99999999999999999999 of (1, 2)
+----
+(item-of (num "99999999999999999999") (tuple (num "1") (num "2")))
+
+==== a string index stays a property: `item <string> of <folder>` is a real one
+item "foo" of folder "c:\temp"
+----
+(of (ref "item" (str "foo")) (ref "folder" (str "c:\\temp")))
+
+==== the plural `items` is a property too, not aggregation
+items of folder "c:\temp"
+----
+(of (ref "items") (ref "folder" (str "c:\\temp")))
+
+==== [unverified] a non-integer index is not a tuple index
+item 1.5 of (1, 2)
+----
+(of (ref "item" (num "1.5")) (tuple (num "1") (num "2")))
+
+==== the error fallback is its own node, not a binary operator
+size of file "c:\nope.txt" | 42
+----
+(bar (of (ref "size") (ref "file" (str "c:\\nope.txt"))) (num "42"))

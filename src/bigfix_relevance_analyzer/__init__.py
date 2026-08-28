@@ -29,7 +29,7 @@ from bigfix_relevance_analyzer.extract import (
     looks_like_clientui,
 )
 from bigfix_relevance_analyzer.nodes import to_sexpr
-from bigfix_relevance_analyzer.parser import ParseError, ParseResult
+from bigfix_relevance_analyzer.parser import MAX_PARSE_DEPTH, ParseError, ParseResult
 from bigfix_relevance_analyzer.parser import parse as parse_relevance
 from bigfix_relevance_analyzer.parser import try_parse as try_parse_relevance
 
@@ -45,6 +45,7 @@ except PackageNotFoundError:  # pragma: no cover - only hit for an uninstalled c
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
+    "MAX_PARSE_DEPTH",
     "Binder",
     "Dialect",
     "HtmlContext",

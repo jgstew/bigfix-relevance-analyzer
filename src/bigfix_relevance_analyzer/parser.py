@@ -23,17 +23,22 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
+from typing import Final
 
 from bigfix_relevance_analyzer import grammar
+from bigfix_relevance_analyzer.diagnostics import DIAGNOSTICS
 from bigfix_relevance_analyzer.nodes import (
+    Bar,
     Binary,
     Cast,
     Collection,
     Exists,
     If,
     It,
+    ItemOf,
     Node,
     NumberLiteral,
+    NumberOf,
     Of,
     Reference,
     Span,
@@ -45,11 +50,35 @@ from bigfix_relevance_analyzer.nodes import (
 from bigfix_relevance_analyzer.tokenizer import Token, TokenKind, code_tokens
 
 __all__ = [
+    "MAX_PARSE_DEPTH",
     "ParseError",
     "ParseResult",
     "parse",
     "try_parse",
 ]
+
+MAX_PARSE_DEPTH: Final = 200
+"""How deeply this parser will nest before giving up.
+
+Parsing is recursive, so an expression nested deeply enough exhausts the Python
+stack. Left unguarded that surfaces as ``RecursionError`` -- which escapes
+:func:`try_parse`, whose whole contract is that it never raises, and which is
+not something a caller handling extracted content can reasonably be asked to
+catch. So depth is counted and refused as an ordinary positioned
+:class:`ParseError` instead.
+
+The engine has its own limit and it is higher (``MAX_EXPR_DEPTH`` is 1000, see
+:mod:`bigfix_relevance_analyzer.diagnostics`), so between this number and that
+one there are expressions BigFix accepts and this parser declines to read. That
+is the conservative direction -- :func:`try_parse` reports "unknown, skip" --
+and it is deliberate: the interpreter runs out of stack around 495 levels, and
+a limit set close to that would be a crash waiting on a differently-configured
+consumer rather than a limit.
+
+Real content is nowhere near either number. This bound exists for truncated and
+hostile input, which is exactly what extraction turns up. It also protects the
+recursive consumers of the tree it returns, ``to_sexpr`` among them.
+"""
 
 
 class ParseError(ValueError):
@@ -97,6 +126,7 @@ class _Parser:
         self.text = text
         self.tokens = list(code_tokens(text))
         self.at = 0
+        self.depth = 0
 
     # -- token stream -------------------------------------------------------
 
@@ -146,12 +176,32 @@ class _Parser:
         return node
 
     def parse_expression(self, min_bp: int) -> Node:
-        node = self.parse_prefix()
-        while True:
-            continued = self.parse_infix(node, min_bp)
-            if continued is None:
-                return node
-            node = continued
+        """One precedence level. Every nesting construct routes through here --
+        parentheses, prefix operators, `of`, `whose`, `if`, and index arguments
+        -- so counting depth here counts all of them."""
+        self.depth += 1
+        try:
+            if self.depth > MAX_PARSE_DEPTH:
+                raise self.too_deep()
+            node = self.parse_prefix()
+            while True:
+                continued = self.parse_infix(node, min_bp)
+                if continued is None:
+                    return node
+                node = continued
+        finally:
+            self.depth -= 1
+
+    def too_deep(self) -> ParseError:
+        """Refuse a too-deeply-nested expression, in the engine's own wording.
+
+        Read the token directly rather than through `peek`, which raises on an
+        ERROR token: at this point the depth is the thing worth reporting, and a
+        lexical complaint about whatever happens to sit here would bury it.
+        """
+        token = self.tokens[self.at] if self.at < len(self.tokens) else None
+        message = DIAGNOSTICS["expression-too-deep"].format(max_depth=MAX_PARSE_DEPTH)
+        return self.error_at(token, message)
 
     def parse_prefix(self) -> Node:
         token = self.peek()
@@ -292,13 +342,15 @@ class _Parser:
             if op is not None and op.lbp > min_bp:
                 self.advance()
                 right = self.parse_expression(op.lbp - 1 if op.right_assoc else op.lbp)
+                if op.canonical == "|":
+                    return Bar(span=_join_spans(left.span, right.span), left=left, right=right)
                 return _binary(op.canonical, left, right)
 
         if token.kind is TokenKind.WORD:
             if token.normalized == "of" and min_bp < grammar.BP_OF:
                 self.advance()
                 obj = self.parse_expression(grammar.BP_OF - 1)  # right-associative
-                return Of(span=_join_spans(left.span, obj.span), prop=left, obj=obj)
+                return _of(left, obj)
 
             if token.normalized == "whose" and min_bp < grammar.BP_WHOSE:
                 self.advance()
@@ -408,6 +460,28 @@ def _sequence(kind: type[TupleExpr] | type[Collection], left: Node, right: Node)
         span=_join_spans(left.span, right.span),
         items=items_of(left) + items_of(right),
     )
+
+
+def _of(prop: Node, obj: Node) -> Node:
+    """Build ``prop of obj``, specialising the two forms that are not property
+    access.
+
+    Both are recognised syntactically, from the phrase and its index alone.
+    Neither needs the object's type, which is what keeps this in the parser:
+    `number` is not an inspector at all, so `number of x` can only be
+    aggregation, and a numeric index can only be a tuple subscript.
+    """
+    span = _join_spans(prop.span, obj.span)
+    if isinstance(prop, Reference):
+        if prop.phrase == "number" and prop.index is None:
+            return NumberOf(span=span, operand=obj)
+        if (
+            prop.phrase == "item"
+            and isinstance(prop.index, NumberLiteral)
+            and prop.index.is_integer_literal
+        ):
+            return ItemOf(span=span, index=prop.index, operand=obj)
+    return Of(span=span, prop=prop, obj=obj)
 
 
 def _binary(op: str, left: Node, right: Node) -> Node:

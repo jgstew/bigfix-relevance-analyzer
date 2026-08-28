@@ -31,7 +31,7 @@ key "foo" of registry
 ==== a number index binds the same way
 item 0 of it
 ----
-(of (ref "item" (num "0")) it)
+(item-of (num "0") it)
 
 ==== [unverified] a parenthesized index binds the same way
 key (name of it) of registry
@@ -46,7 +46,7 @@ name of it = "x"
 ==== of binds tighter than arithmetic
 1 + number of processors
 ----
-(bin "+" (num "1") (of (ref "number") (ref "processors")))
+(bin "+" (num "1") (number-of (ref "processors")))
 
 ==== a phrase stops at a word operator
 a b and c
@@ -142,3 +142,18 @@ html it
 (html it) of x
 ----
 (of (ref "html" it) (ref "x"))
+
+==== `number of` is aggregation, the sibling of `exists`
+number of files of folder "c:\windows"
+----
+(number-of (of (ref "files") (ref "folder" (str "c:\\windows"))))
+
+==== aggregation over a filtered collection
+number of files whose (size of it > 1000)
+----
+(number-of (whose (ref "files") (bin ">" (of (ref "size") it) (num "1000"))))
+
+==== an indexed `number` is not aggregation
+number "x" of y
+----
+(of (ref "number" (str "x")) (ref "y"))

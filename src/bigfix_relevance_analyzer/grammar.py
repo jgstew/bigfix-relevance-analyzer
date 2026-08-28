@@ -17,11 +17,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 __all__ = [
+    "CANONICAL_BINARY",
+    "GRAMMAR_LEVEL_BINARY",
     "PHRASE_TERMINATORS",
     "PUNCT_INFIX",
     "WORD_INFIX",
     "WORD_INFIX_TRIE",
     "InfixOp",
+    "OperatorForm",
     "WordTrieNode",
 ]
 
@@ -147,3 +150,82 @@ _STRUCTURAL_WORDS: frozenset[str] = frozenset(
 )
 
 PHRASE_TERMINATORS: frozenset[str] = _STRUCTURAL_WORDS | {words[0] for words in WORD_INFIX}
+
+
+# ---------------------------------------------------------------------------
+# Canonicalization
+# ---------------------------------------------------------------------------
+#
+# `nodes.py` keeps an operator's written spelling, deliberately, and defers
+# canonicalization to a separate pass. This is that pass's table.
+#
+# The engine defines only twelve binary operators -- `%`, `&`, `*`, `+`, `-`,
+# `/`, `<`, `<=`, `=`, `contains`, `ends with`, `starts with`. Every other
+# spelling relevance accepts is one of those three transformations away, and
+# resolving an operator against the inspector table without applying them finds
+# nothing for two thirds of what the parser can emit.
+
+
+@dataclass(frozen=True, slots=True)
+class OperatorForm:
+    """How a written operator maps onto one the engine actually defines."""
+
+    operator: str
+    """The engine's own name for it, as the binary-operator table spells it."""
+
+    negated: bool = False
+    """The written form is the negation of :attr:`operator`."""
+
+    swapped: bool = False
+    """The written form takes its operands in the opposite order.
+
+    The engine defines no `>`: `a > b` is `b < a`. Operand types must be
+    swapped before looking the overload up, and a diagnostic naming them has to
+    swap them back to match what was written.
+    """
+
+
+CANONICAL_BINARY: dict[str, OperatorForm] = {
+    # Spelled as themselves.
+    "=": OperatorForm("="),
+    "<": OperatorForm("<"),
+    "<=": OperatorForm("<="),
+    "&": OperatorForm("&"),
+    "+": OperatorForm("+"),
+    "-": OperatorForm("-"),
+    "*": OperatorForm("*"),
+    "/": OperatorForm("/"),
+    "mod": OperatorForm("%"),
+    "contains": OperatorForm("contains"),
+    "starts with": OperatorForm("starts with"),
+    "ends with": OperatorForm("ends with"),
+    # Synonyms for equality.
+    "is": OperatorForm("="),
+    "equals": OperatorForm("="),
+    "is equal to": OperatorForm("="),
+    # Negations.
+    "!=": OperatorForm("=", negated=True),
+    "is not": OperatorForm("=", negated=True),
+    "is not equal to": OperatorForm("=", negated=True),
+    "does not contain": OperatorForm("contains", negated=True),
+    "does not start with": OperatorForm("starts with", negated=True),
+    "does not end with": OperatorForm("ends with", negated=True),
+    "is not contained by": OperatorForm("contains", negated=True, swapped=True),
+    # Operand swaps. `>` and `>=` have no rows of their own.
+    ">": OperatorForm("<", swapped=True),
+    ">=": OperatorForm("<=", swapped=True),
+    "is greater than": OperatorForm("<", swapped=True),
+    "is greater than or equal to": OperatorForm("<=", swapped=True),
+    "is less than": OperatorForm("<"),
+    "is less than or equal to": OperatorForm("<="),
+    "is contained by": OperatorForm("contains", swapped=True),
+}
+
+GRAMMAR_LEVEL_BINARY: frozenset[str] = frozenset({"and", "or", "|"})
+"""Operators with no row in any table, because the grammar defines them.
+
+`and` and `or` take singular booleans and yield one; `|` is error fallback,
+choosing its right side only when the left one fails. Their typing rules are
+fixed rather than looked up, and the wording for breaking them is already in
+:mod:`bigfix_relevance_analyzer.diagnostics`.
+"""

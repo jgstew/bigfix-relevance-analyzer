@@ -11,9 +11,9 @@ of fixlets of bes sites whose(id of it is contained by set of (2;78;80))
 ----
 (of
   (tuple
-    (bin "|" (of (ref "id") (of (ref "site") it)) (num "0"))
-    (bin "|" (of (ref "id") it) (num "0"))
-    (bin "|" (of (ref "applicable computer count") it) (num "0")))
+    (bar (of (ref "id") (of (ref "site") it)) (num "0"))
+    (bar (of (ref "id") it) (num "0"))
+    (bar (of (ref "applicable computer count") it) (num "0")))
   (of (ref "fixlets")
     (whose (ref "bes sites")
       (bin "is contained by"
@@ -74,6 +74,6 @@ of structures "system_information" of smbioses
         (of (cast it "string") (of (ref "values" (str "manufacturer")) it))
         (of (cast it "string") (of (ref "values" (str "version")) it)))
       (bin "and"
-        (bin "starts with" (of (ref "item" (num "0")) it) (str "Xen"))
-        (bin "contains" (cast (of (ref "item" (num "1")) it) "lowercase") (str "amazon"))))
+        (bin "starts with" (item-of (num "0") it) (str "Xen"))
+        (bin "contains" (cast (item-of (num "1") it) "lowercase") (str "amazon"))))
     (of (ref "structures" (str "system_information")) (ref "smbioses"))))
