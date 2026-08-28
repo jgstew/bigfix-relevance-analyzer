@@ -23,7 +23,7 @@ SOURCES: tuple[str, ...] = (
     "session:web_reports",
 )
 
-# 599 rows
+# 589 rows
 BINARY_OPERATORS: str = """\
 40	<bes action set> * <bes action set>: bes action set	times	*	bes action set	bes action set	bes action set
 40	<bes action set> + <bes action set>: bes action set	plus	+	bes action set	bes action set	bes action set
@@ -251,8 +251,7 @@ BINARY_OPERATORS: str = """\
 5f	<format> + <time interval>: format	plus	+	format	time interval	format
 5f	<format> + <time of day>: format	plus	+	format	time of day	format
 5f	<format> + <time>: format	plus	+	format	time	format
-52	<hertz> % <hertz>: hertz	mod	%	hertz	hertz	hertz
-d	<hertz> %25 <hertz>: hertz	mod	%25	hertz	hertz	hertz
+5f	<hertz> % <hertz>: hertz	mod	%	hertz	hertz	hertz
 5f	<hertz> * <integer>: hertz	times	*	hertz	integer	hertz
 5f	<hertz> + <hertz>: hertz	plus	+	hertz	hertz	hertz
 5f	<hertz> - <hertz>: hertz	minus	-	hertz	hertz	hertz
@@ -269,12 +268,9 @@ d	<hertz> %25 <hertz>: hertz	mod	%25	hertz	hertz	hertz
 5f	<integer set> = <integer set>: boolean	equal	=	integer set	integer set	boolean
 5f	<integer set> contains <integer set>: boolean	contains	contains	integer set	integer set	boolean
 5f	<integer set> contains <integer>: boolean	contains	contains	integer set	integer	boolean
-52	<integer> % <integer>: integer	mod	%	integer	integer	integer
-52	<integer> % <large integer>: large integer	mod	%	integer	large integer	large integer
-52	<integer> % <uinteger>: uinteger	mod	%	integer	uinteger	uinteger
-d	<integer> %25 <integer>: integer	mod	%25	integer	integer	integer
-d	<integer> %25 <large integer>: large integer	mod	%25	integer	large integer	large integer
-d	<integer> %25 <uinteger>: uinteger	mod	%25	integer	uinteger	uinteger
+5f	<integer> % <integer>: integer	mod	%	integer	integer	integer
+5f	<integer> % <large integer>: large integer	mod	%	integer	large integer	large integer
+5f	<integer> % <uinteger>: uinteger	mod	%	integer	uinteger	uinteger
 5f	<integer> * <floating point>: floating point	times	*	integer	floating point	floating point
 5f	<integer> * <hertz>: hertz	times	*	integer	hertz	hertz
 5f	<integer> * <integer>: integer	times	*	integer	integer	integer
@@ -332,10 +328,8 @@ d	<integer> %25 <uinteger>: uinteger	mod	%25	integer	uinteger	uinteger
 5f	<ipv6 address> = <ipv6 address>: boolean	equal	=	ipv6 address	ipv6 address	boolean
 5f	<json key> = <json key>: boolean	equal	=	json key	json key	boolean
 5f	<json value> = <json value>: boolean	equal	=	json value	json value	boolean
-52	<large integer> % <integer>: large integer	mod	%	large integer	integer	large integer
-52	<large integer> % <large integer>: large integer	mod	%	large integer	large integer	large integer
-d	<large integer> %25 <integer>: large integer	mod	%25	large integer	integer	large integer
-d	<large integer> %25 <large integer>: large integer	mod	%25	large integer	large integer	large integer
+5f	<large integer> % <integer>: large integer	mod	%	large integer	integer	large integer
+5f	<large integer> % <large integer>: large integer	mod	%	large integer	large integer	large integer
 5f	<large integer> * <integer>: large integer	times	*	large integer	integer	large integer
 5f	<large integer> * <large integer>: large integer	times	*	large integer	large integer	large integer
 5f	<large integer> + <integer>: large integer	plus	+	large integer	integer	large integer
@@ -370,8 +364,7 @@ d	<large integer> %25 <large integer>: large integer	mod	%25	large integer	large
 5f	<month> < <month>: boolean	less than	<	month	month	boolean
 5f	<month> <= <month>: boolean	less than or equal	<=	month	month	boolean
 5f	<month> = <month>: boolean	equal	=	month	month	boolean
-52	<number of months> % <number of months>: number of months	mod	%	number of months	number of months	number of months
-d	<number of months> %25 <number of months>: number of months	mod	%25	number of months	number of months	number of months
+5f	<number of months> % <number of months>: number of months	mod	%	number of months	number of months	number of months
 5f	<number of months> * <integer>: number of months	times	*	number of months	integer	number of months
 5f	<number of months> + <date>: date	plus	+	number of months	date	date
 5f	<number of months> + <day of year>: day of year	plus	+	number of months	day of year	day of year
@@ -523,8 +516,7 @@ d	<number of months> %25 <number of months>: number of months	mod	%25	number of 
 4d	<strverscmp version> = <strverscmp version>: boolean	equal	=	strverscmp version	strverscmp version	boolean
 10	<task action type> = <task action type>: boolean	equal	=	task action type	task action type	boolean
 10	<task trigger type> = <task trigger type>: boolean	equal	=	task trigger type	task trigger type	boolean
-52	<time interval> % <time interval>: time interval	mod	%	time interval	time interval	time interval
-d	<time interval> %25 <time interval>: time interval	mod	%25	time interval	time interval	time interval
+5f	<time interval> % <time interval>: time interval	mod	%	time interval	time interval	time interval
 5f	<time interval> & <time>: time range	concatenate	&	time interval	time	time range
 5f	<time interval> * <integer>: time interval	times	*	time interval	integer	time interval
 42	<time interval> * <rate>: floating point	times	*	time interval	rate	floating point
@@ -583,10 +575,8 @@ d	<time interval> %25 <time interval>: time interval	mod	%25	time interval	time 
 5f	<time> <= <time>: boolean	less than or equal	<=	time	time	boolean
 5f	<time> = <time>: boolean	equal	=	time	time	boolean
 5f	<type> = <type>: boolean	equal	=	type	type	boolean
-52	<uinteger> % <integer>: uinteger	mod	%	uinteger	integer	uinteger
-52	<uinteger> % <uinteger>: uinteger	mod	%	uinteger	uinteger	uinteger
-d	<uinteger> %25 <integer>: uinteger	mod	%25	uinteger	integer	uinteger
-d	<uinteger> %25 <uinteger>: uinteger	mod	%25	uinteger	uinteger	uinteger
+5f	<uinteger> % <integer>: uinteger	mod	%	uinteger	integer	uinteger
+5f	<uinteger> % <uinteger>: uinteger	mod	%	uinteger	uinteger	uinteger
 5f	<uinteger> * <integer>: uinteger	times	*	uinteger	integer	uinteger
 5f	<uinteger> * <uinteger>: uinteger	times	*	uinteger	uinteger	uinteger
 5f	<uinteger> + <integer>: uinteger	plus	+	uinteger	integer	uinteger

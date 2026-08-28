@@ -431,12 +431,29 @@ bigfix-remote-client-relevance --container <image> --qna-version 11.0
 -f <query-file>` (the `-f` flag reads the query from a file, avoiding shell
 escaping issues with `&`/quoting that `--container image "query text"` runs
 into). Column 1 of every re-capture matched the previously committed bare file
-exactly for `casts`, `binary_operators`, `unary_operators` and `types` (all
-three platforms, 0 lines different); `properties` came back a strict superset
-on all three (new `yaml`-related lines only, nothing removed), the same
-qna-version-bump effect the paragraph above this section already documented
-for the bare properties re-run - it applied here too, so those three
-`properties` files were updated along with the meta-layer ones.
+exactly for `casts`, `unary_operators` and `types` (all three platforms, 0
+lines different); `properties` came back a strict superset on all three (new
+`yaml`-related lines only, nothing removed), the same qna-version-bump effect
+the paragraph above this section already documented for the bare properties
+re-run - it applied here too, so those three `properties` files were updated
+along with the meta-layer ones.
+
+`binary_operators` also showed 0 lines different at the time - but that
+was two wrongs matching, not a clean result: the committed bare file already
+had `%25` in place of a literal `%` in its 10 `mod`-operator lines
+(`<hertz> %25 <hertz>`), a pre-existing bug going back to the very first bare
+capture in this project (commit `36caa72`, no tab delimiter involved at all -
+`(it as string) of binary operators` alone triggers it). Column 1 of the
+fresh enriched capture reproduced that same `%25` byte-for-byte because the
+`%25`->`%` decode step wasn't identified yet at this point in the work (it
+surfaced later, capturing Windows - see "Re-capturing Windows" below), so the
+comparison matched two identically-wrong strings. It has since been corrected
+in all three Linux files along with Windows and macOS - see the note under
+"Producing the enriched format" below for why `%` needs decoding independent
+of the tab, and note this confirms the escaping is a **QnA-client quirk, not
+a relevance-engine-wide behavior**: `session_relevance_binary_operators_rest_api.txt`,
+captured through the REST API/session path rather than through `QnA`, has
+always had a literal `%`.
 
 A Windows host was reachable this pass over `ssh <user>@<host>` (its `qna.exe`
 found via `dir "C:\Program Files (x86)\BigFix Enterprise\BES Client"`, queries
@@ -490,16 +507,22 @@ path unnecessary.
   garbage rows - `grep '^A: '` (drop non-matching lines) before stripping the
   prefix, not just substitution, e.g.:
   `grep -E '^(Q: )?A: ' out.txt | sed -E 's/^Q: A: //; s/^A: //'`.
-- The `<hertz> % <hertz>` (mod) operator's `%` renders as `%25` in the
-  Windows capture, on top of the tab-as-`%09` quirk already documented under
-  Regenerating - `%` is the one other character percent-encoding must itself
-  escape to stay unambiguous. `grep -o '%[0-9A-Fa-f][0-9A-Fa-f]' file | sort -u`
-  across every capture confirmed `%09` and `%25` are the *only* two sequences
-  that appear anywhere; decode both (`sed 's/%09/\t/g; s/%25/%/g'`), in either
-  order - a genuine tab or `%` in the source text never appears next to a
-  digit pair that would make the two substitutions collide. `scp`'d output
-  also carried CRLF line endings, stripped with `s/\r$//` before either
-  percent-decode.
+- The `<hertz> % <hertz>` (mod) operator's `%` renders as `%25` in a client
+  capture, on top of the tab-as-`%09` quirk already documented under
+  Regenerating. This is **not specific to the tab delimiter** - `QnA`
+  percent-encodes a literal `%` in its own answer-printing regardless of
+  what else is in the string, confirmed by the very first bare capture in
+  this project (commit `36caa72`, `(it as string) of binary operators`
+  alone, no tab anywhere) already showing `%25`, undetected until this pass.
+  It is also **specific to `QnA` itself, not the relevance engine**: the
+  session/REST API path (`session_relevance_binary_operators_rest_api.txt`)
+  has always printed a literal `%`. `grep -o '%[0-9A-Fa-f][0-9A-Fa-f]' file |
+  sort -u` across every capture from every platform confirmed `%09` and
+  `%25` are the *only* two sequences `QnA` ever produces; decode both
+  (`sed 's/%09/\t/g; s/%25/%/g'`), in either order - a genuine tab or `%` in
+  the source text never appears next to a digit pair that would make the two
+  substitutions collide. `scp`'d output also carried CRLF line endings,
+  stripped with `s/\r$//` before either percent-decode.
 
 Column 1 of the result matched the previously committed bare file's content
 as a strict superset for all five categories (`casts` +5, `binary_operators`

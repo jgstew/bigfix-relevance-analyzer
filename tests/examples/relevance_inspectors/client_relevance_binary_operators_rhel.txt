@@ -29,7 +29,7 @@
 <integer> * <hertz>: hertz	times	*	integer	hertz	hertz
 <hertz> / <hertz>: integer	divide	/	hertz	hertz	integer
 <hertz> / <integer>: hertz	divide	/	hertz	integer	hertz
-<hertz> %25 <hertz>: hertz	mod	%25	hertz	hertz	hertz
+<hertz> % <hertz>: hertz	mod	%	hertz	hertz	hertz
 <time> = <time>: boolean	equal	=	time	time	boolean
 <time> < <time>: boolean	less than	<	time	time	boolean
 <time> <= <time>: boolean	less than or equal	<=	time	time	boolean
@@ -46,7 +46,7 @@
 <integer> * <time interval>: time interval	times	*	integer	time interval	time interval
 <time interval> / <time interval>: integer	divide	/	time interval	time interval	integer
 <time interval> / <integer>: time interval	divide	/	time interval	integer	time interval
-<time interval> %25 <time interval>: time interval	mod	%25	time interval	time interval	time interval
+<time interval> % <time interval>: time interval	mod	%	time interval	time interval	time interval
 <time zone> + <time interval>: time zone	plus	+	time zone	time interval	time zone
 <time interval> + <time zone>: time zone	plus	+	time interval	time zone	time zone
 <time zone> - <time interval>: time zone	minus	-	time zone	time interval	time zone
@@ -75,7 +75,7 @@
 <integer> - <integer>: integer	minus	-	integer	integer	integer
 <integer> * <integer>: integer	times	*	integer	integer	integer
 <integer> / <integer>: integer	divide	/	integer	integer	integer
-<integer> %25 <integer>: integer	mod	%25	integer	integer	integer
+<integer> % <integer>: integer	mod	%	integer	integer	integer
 <large integer> = <large integer>: boolean	equal	=	large integer	large integer	boolean
 <large integer> < <large integer>: boolean	less than	<	large integer	large integer	boolean
 <large integer> <= <large integer>: boolean	less than or equal	<=	large integer	large integer	boolean
@@ -89,17 +89,17 @@
 <large integer> - <large integer>: large integer	minus	-	large integer	large integer	large integer
 <large integer> * <large integer>: large integer	times	*	large integer	large integer	large integer
 <large integer> / <large integer>: large integer	divide	/	large integer	large integer	large integer
-<large integer> %25 <large integer>: large integer	mod	%25	large integer	large integer	large integer
+<large integer> % <large integer>: large integer	mod	%	large integer	large integer	large integer
 <large integer> + <integer>: large integer	plus	+	large integer	integer	large integer
 <large integer> - <integer>: large integer	minus	-	large integer	integer	large integer
 <large integer> * <integer>: large integer	times	*	large integer	integer	large integer
 <large integer> / <integer>: large integer	divide	/	large integer	integer	large integer
-<large integer> %25 <integer>: large integer	mod	%25	large integer	integer	large integer
+<large integer> % <integer>: large integer	mod	%	large integer	integer	large integer
 <integer> + <large integer>: large integer	plus	+	integer	large integer	large integer
 <integer> - <large integer>: large integer	minus	-	integer	large integer	large integer
 <integer> * <large integer>: large integer	times	*	integer	large integer	large integer
 <integer> / <large integer>: large integer	divide	/	integer	large integer	large integer
-<integer> %25 <large integer>: large integer	mod	%25	integer	large integer	large integer
+<integer> % <large integer>: large integer	mod	%	integer	large integer	large integer
 <uinteger> = <uinteger>: boolean	equal	=	uinteger	uinteger	boolean
 <uinteger> < <uinteger>: boolean	less than	<	uinteger	uinteger	boolean
 <uinteger> <= <uinteger>: boolean	less than or equal	<=	uinteger	uinteger	boolean
@@ -113,17 +113,17 @@
 <uinteger> - <uinteger>: uinteger	minus	-	uinteger	uinteger	uinteger
 <uinteger> * <uinteger>: uinteger	times	*	uinteger	uinteger	uinteger
 <uinteger> / <uinteger>: uinteger	divide	/	uinteger	uinteger	uinteger
-<uinteger> %25 <uinteger>: uinteger	mod	%25	uinteger	uinteger	uinteger
+<uinteger> % <uinteger>: uinteger	mod	%	uinteger	uinteger	uinteger
 <uinteger> + <integer>: uinteger	plus	+	uinteger	integer	uinteger
 <uinteger> - <integer>: uinteger	minus	-	uinteger	integer	uinteger
 <uinteger> * <integer>: uinteger	times	*	uinteger	integer	uinteger
 <uinteger> / <integer>: uinteger	divide	/	uinteger	integer	uinteger
-<uinteger> %25 <integer>: uinteger	mod	%25	uinteger	integer	uinteger
+<uinteger> % <integer>: uinteger	mod	%	uinteger	integer	uinteger
 <integer> + <uinteger>: uinteger	plus	+	integer	uinteger	uinteger
 <integer> - <uinteger>: uinteger	minus	-	integer	uinteger	uinteger
 <integer> * <uinteger>: uinteger	times	*	integer	uinteger	uinteger
 <integer> / <uinteger>: uinteger	divide	/	integer	uinteger	uinteger
-<integer> %25 <uinteger>: uinteger	mod	%25	integer	uinteger	uinteger
+<integer> % <uinteger>: uinteger	mod	%	integer	uinteger	uinteger
 <day of month> = <day of month>: boolean	equal	=	day of month	day of month	boolean
 <day of month> < <day of month>: boolean	less than	<	day of month	day of month	boolean
 <day of month> <= <day of month>: boolean	less than or equal	<=	day of month	day of month	boolean
@@ -184,7 +184,7 @@
 <number of months> * <integer>: number of months	times	*	number of months	integer	number of months
 <number of months> / <number of months>: integer	divide	/	number of months	number of months	integer
 <number of months> / <integer>: number of months	divide	/	number of months	integer	number of months
-<number of months> %25 <number of months>: number of months	mod	%25	number of months	number of months	number of months
+<number of months> % <number of months>: number of months	mod	%	number of months	number of months	number of months
 <month> = <month>: boolean	equal	=	month	month	boolean
 <month> < <month>: boolean	less than	<	month	month	boolean
 <month> <= <month>: boolean	less than or equal	<=	month	month	boolean
