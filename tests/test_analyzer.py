@@ -33,6 +33,13 @@ def test_public_alias_is_the_module_function() -> None:
     assert analyze_relevance is analyze
 
 
+def test_lint_api_is_exported_from_the_package_root() -> None:
+    import bigfix_relevance_analyzer as package
+    from bigfix_relevance_analyzer.lint import lint_paths as module_lint_paths
+
+    assert package.lint_paths is module_lint_paths
+
+
 def test_client_statement_reaches_every_analysis() -> None:
     report = analyze(CLIENT)
 
@@ -368,3 +375,43 @@ def test_cli_forced_dialect_overrides_every_site_in_a_file(
     out = capsys.readouterr().out
 
     assert out.count("| Dialect | `client`") == 2
+
+
+def test_cli_check_lints_files_instead_of_analysing_a_single_statement(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    clean = tmp_path / "clean.rel"
+    clean.write_text(CLIENT)
+    broken = tmp_path / "broken.rel"
+    broken.write_text(BROKEN)
+
+    assert main(["--check", str(clean), str(broken)]) == 1
+    out = capsys.readouterr().out
+    assert f"{broken}:1: error [parse-error]" in out
+    assert str(clean) not in out
+
+
+def test_cli_check_accepts_multiple_paths(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    clean_a = tmp_path / "a.rel"
+    clean_a.write_text(CLIENT)
+    clean_b = tmp_path / "b.rel"
+    clean_b.write_text(CLIENT)
+
+    assert main(["--check", str(clean_a), str(clean_b)]) == 0
+
+
+def test_cli_check_requires_at_least_one_path() -> None:
+    with pytest.raises(SystemExit):
+        main(["--check"])
+
+
+def test_cli_check_wires_max_score_flag(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    path = tmp_path / "client.rel"
+    path.write_text(CLIENT)
+
+    assert main(["--check", "--max-score=1", str(path)]) == 1
+    out = capsys.readouterr().out
+    assert "[complexity]" in out

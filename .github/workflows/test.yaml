@@ -88,14 +88,16 @@ jobs:
 
       # Exercise the artifact a release would actually ship, not just the
       # source tree: install the wheel into a throwaway venv and import it.
-      # No console scripts exist, so an import plus __version__ (which comes
-      # from installed package metadata) is the whole surface to smoke-test.
+      # The one console script (bigfix-relevance-lint, for a pre-commit hook)
+      # gets its own smoke check alongside the import + __version__ (which
+      # comes from installed package metadata) check.
       - name: install the built wheel and smoke-import it
         run: |
           uv venv "${RUNNER_TEMP}/wheeltest"
           VIRTUAL_ENV="${RUNNER_TEMP}/wheeltest" uv pip install dist/*.whl
           "${RUNNER_TEMP}/wheeltest/bin/python" -c \
             "import bigfix_relevance_analyzer as m; print(m.__version__)"
+          "${RUNNER_TEMP}/wheeltest/bin/bigfix-relevance-lint" --help
 
       # cheap, and makes a test run's hashes comparable to the released ones
       - name: sha256 of the built artifacts

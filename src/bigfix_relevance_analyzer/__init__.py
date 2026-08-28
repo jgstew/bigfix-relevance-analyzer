@@ -30,6 +30,14 @@ from bigfix_relevance_analyzer.extract import (
     extract_relevance_from_markdown,
     looks_like_clientui,
 )
+from bigfix_relevance_analyzer.lint import (
+    Finding,
+    LintConfig,
+    Severity,
+    lint_analysis,
+    lint_file,
+    lint_paths,
+)
 from bigfix_relevance_analyzer.nodes import to_mermaid, to_sexpr
 from bigfix_relevance_analyzer.parser import MAX_PARSE_DEPTH, ParseError, ParseResult
 from bigfix_relevance_analyzer.parser import parse as parse_relevance
@@ -50,9 +58,11 @@ __all__ = [
     "MAX_PARSE_DEPTH",
     "Binder",
     "Dialect",
+    "Finding",
     "HtmlContext",
     "ItBinding",
     "Level",
+    "LintConfig",
     "Outcome",
     "ParseError",
     "ParseResult",
@@ -63,6 +73,7 @@ __all__ = [
     "RelevanceAnalysis",
     "RelevanceComplexity",
     "RelevanceSite",
+    "Severity",
     "SiteKind",
     "__version__",
     "analyze_relevance",
@@ -76,6 +87,9 @@ __all__ = [
     "extract_relevance_from_markdown",
     "interpret_count_results",
     "is_definite",
+    "lint_analysis",
+    "lint_file",
+    "lint_paths",
     "looks_like_clientui",
     "parse_relevance",
     "resolve_it_bindings",

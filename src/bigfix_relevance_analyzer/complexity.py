@@ -764,6 +764,58 @@ class RelevanceComplexity:
     costly_inspectors: tuple[str, ...] = ()
     """The :attr:`CostRule.label` of each family charged for, in table order."""
 
+    def _terms(self) -> tuple[tuple[str, float], ...]:
+        """Every metric's weighted contribution, in declaration order.
+
+        The one place the weights are applied, so :attr:`score` and any message
+        explaining that score cannot drift apart.
+        """
+        return (
+            ("token_count", WEIGHT_TOKEN * self.token_count),
+            ("max_paren_depth", depth_cost(self.max_paren_depth, WEIGHT_PAREN_DEPTH)),
+            ("boolean_operators", WEIGHT_BOOLEAN_OPERATOR * self.boolean_operators),
+            ("of_count", WEIGHT_OF * self.of_count),
+            # Linear on purpose -- see WEIGHT_MAX_OF_CHAIN.
+            ("max_of_chain", WEIGHT_MAX_OF_CHAIN * self.max_of_chain),
+            ("whose_clauses", WEIGHT_WHOSE_CLAUSE * self.whose_clauses),
+            (
+                "unfiltered_tuple_commas",
+                WEIGHT_UNFILTERED_TUPLE_COMMA * self.unfiltered_tuple_commas,
+            ),
+            (
+                "max_unfiltered_tuple_commas",
+                depth_cost(self.max_unfiltered_tuple_commas, WEIGHT_TUPLE_FANOUT),
+            ),
+            ("conditional_branches", WEIGHT_CONDITIONAL * self.conditional_branches),
+            (
+                "max_conditional_depth",
+                depth_cost(self.max_conditional_depth, WEIGHT_CONDITIONAL_DEPTH),
+            ),
+            ("iteration_keywords", WEIGHT_ITERATION_KEYWORD * self.iteration_keywords),
+            ("semicolon_clauses", WEIGHT_SEMICOLON_CLAUSE * self.semicolon_clauses),
+            ("string_literals", WEIGHT_STRING_LITERAL * self.string_literals),
+            ("unique_identifiers", WEIGHT_UNIQUE_IDENTIFIER * self.unique_identifiers),
+            ("error_tokens", WEIGHT_ERROR_TOKEN * self.error_tokens),
+            ("evaluation_cost", WEIGHT_EVALUATION_COST * self.evaluation_cost),
+        )
+
+    @property
+    def contributions(self) -> tuple[tuple[str, float], ...]:
+        """Which metrics produced :attr:`score`, largest share first.
+
+        For a consumer that has to say *why* something scored high -- a hook
+        naming the three worst offenders rather than printing a bare number.
+        Metrics contributing nothing are dropped: one a statement does not
+        exercise says nothing about how it got its score. Ties break by name so
+        the order is stable across runs.
+        """
+        return tuple(
+            sorted(
+                ((name, value) for name, value in self._terms() if value),
+                key=lambda term: (-term[1], term[0]),
+            )
+        )
+
     @property
     def score(self) -> float:
         """The weighted sum of every metric. Higher is worse.
@@ -774,25 +826,7 @@ class RelevanceComplexity:
         :attr:`evaluation_cost` directly, or set
         :data:`WEIGHT_EVALUATION_COST` to 0.0.
         """
-        return (
-            WEIGHT_TOKEN * self.token_count
-            + depth_cost(self.max_paren_depth, WEIGHT_PAREN_DEPTH)
-            + WEIGHT_BOOLEAN_OPERATOR * self.boolean_operators
-            + WEIGHT_OF * self.of_count
-            # Linear on purpose -- see WEIGHT_MAX_OF_CHAIN.
-            + WEIGHT_MAX_OF_CHAIN * self.max_of_chain
-            + WEIGHT_WHOSE_CLAUSE * self.whose_clauses
-            + WEIGHT_UNFILTERED_TUPLE_COMMA * self.unfiltered_tuple_commas
-            + depth_cost(self.max_unfiltered_tuple_commas, WEIGHT_TUPLE_FANOUT)
-            + WEIGHT_CONDITIONAL * self.conditional_branches
-            + depth_cost(self.max_conditional_depth, WEIGHT_CONDITIONAL_DEPTH)
-            + WEIGHT_ITERATION_KEYWORD * self.iteration_keywords
-            + WEIGHT_SEMICOLON_CLAUSE * self.semicolon_clauses
-            + WEIGHT_STRING_LITERAL * self.string_literals
-            + WEIGHT_UNIQUE_IDENTIFIER * self.unique_identifiers
-            + WEIGHT_ERROR_TOKEN * self.error_tokens
-            + WEIGHT_EVALUATION_COST * self.evaluation_cost
-        )
+        return sum(value for _name, value in self._terms())
 
 
 def analyze(text: str, dialect: Dialect | None = None) -> RelevanceComplexity:

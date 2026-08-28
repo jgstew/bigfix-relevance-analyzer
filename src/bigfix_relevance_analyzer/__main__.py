@@ -40,6 +40,7 @@ from pathlib import Path
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis, analyze
 from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 from bigfix_relevance_analyzer.extract import RelevanceSite, extract_relevance_from_file
+from bigfix_relevance_analyzer.lint import LintConfig, Severity, lint_paths
 from bigfix_relevance_analyzer.typecheck import Plurality
 
 
@@ -343,6 +344,35 @@ def _run_file(
     return 0 if all(report.parsed for _site, report in reports) else 1
 
 
+def _run_check(
+    paths: list[str],
+    forced: Dialect | None,
+    platform: str | None,
+    *,
+    max_score: float | None,
+    max_evaluation_cost: float | None,
+) -> int:
+    """Lint every path: one grep-able line per finding, for a hook or CI.
+
+    The full rule set and its severities live in
+    :mod:`~bigfix_relevance_analyzer.lint`; ``bigfix-relevance-lint`` (see
+    :mod:`~bigfix_relevance_analyzer._lint_cli`) offers the rest of that
+    module's knobs (per-code severity overrides, ``--fail-on-warning``,
+    ``--quiet``) for a caller that needs them -- this flag exists so the same
+    judgement is reachable without a second console script installed.
+    """
+    config = LintConfig(
+        max_score=max_score,
+        max_evaluation_cost=max_evaluation_cost,
+        dialect=forced,
+        platform=platform,
+    )
+    findings = lint_paths(paths, config)
+    for finding in findings:
+        print(finding)
+    return 1 if any(f.severity is Severity.ERROR for f in findings) else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments, analyse, print. Returns a process exit status."""
     parser = argparse.ArgumentParser(
@@ -355,7 +385,12 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
-        "relevance", nargs="?", help="the statement, or a file path; omit to read stdin"
+        "relevance",
+        nargs="*",
+        help=(
+            "the statement, or a file path; omit to read stdin. "
+            "With --check, one or more files to lint"
+        ),
     )
     parser.add_argument(
         "--dialect",
@@ -369,11 +404,45 @@ def main(argv: list[str] | None = None) -> int:
         help="add the parse tree as a Mermaid flowchart (verbose: a line per box and edge)",
     )
     parser.add_argument("--json", action="store_true", help="emit the analysis as JSON")
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help=(
+            "lint the given files instead of analysing a single statement -- "
+            "one grep-able line per finding, for a pre-commit hook or CI"
+        ),
+    )
+    parser.add_argument(
+        "--max-score",
+        type=float,
+        default=None,
+        help="with --check, fail a site scoring above this",
+    )
+    parser.add_argument(
+        "--max-evaluation-cost",
+        type=float,
+        default=None,
+        help="with --check, fail a site whose evaluation cost is above this",
+    )
     args = parser.parse_args(argv)
     forced = Dialect(args.dialect) if args.dialect else None
 
-    if args.relevance is not None:
-        candidate = Path(args.relevance)
+    if args.check:
+        if not args.relevance:
+            parser.error("--check needs at least one file path")
+        return _run_check(
+            args.relevance,
+            forced,
+            args.platform,
+            max_score=args.max_score,
+            max_evaluation_cost=args.max_evaluation_cost,
+        )
+
+    if len(args.relevance) > 1:
+        parser.error("only one statement or file is accepted without --check")
+
+    if args.relevance:
+        candidate = Path(args.relevance[0])
         try:
             is_file = candidate.is_file()
         except OSError:
@@ -385,7 +454,7 @@ def main(argv: list[str] | None = None) -> int:
             return _run_file(
                 candidate, forced, args.platform, as_json=args.json, mermaid=args.mermaid
             )
-        text = args.relevance.strip()
+        text = args.relevance[0].strip()
     else:
         text = sys.stdin.read().strip()
 

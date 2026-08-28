@@ -234,6 +234,24 @@ repos:
         always_run: true
         stages: [pre-push, manual]
         entry: uv run --frozen pytest
+      # Dogfoods lint.py against the package's own example corpus. Scoped to
+      # tests/examples/ and to the suffixes extract_relevance_from_file()
+      # actually recognizes, minus markdown: the .md examples are documentation
+      # prose containing deliberately-broken snippets and bare XML/JS fragments
+      # for illustration, not real relevance sites, so the parse-error and
+      # unknown-inspector rules would fire on the prose itself rather than a
+      # real finding. pre-commit passes only the changed matching files, so
+      # this scales with the corpus instead of listing it by hand. Thresholds
+      # are set from what the corpus actually scores today (see the PR that
+      # added this hook) plus headroom, so this stays a regression guard on
+      # genuinely broken content rather than a wall that blocks legitimate
+      # examples from growing.
+      - id: bigfix-relevance-lint-examples
+        name: lint the example corpus (see lint.py)
+        language: system
+        files: ^tests/examples/.*\.(bes|bes\.xml|ojo|besrpt|beswrpt|webreport|bsr|rel|html?)$
+        stages: [pre-push, manual]
+        entry: uv run python -m bigfix_relevance_analyzer --check --max-score=500 --max-evaluation-cost=20
       # A second, differently-implemented type checker (same config the editor
       # uses via pyrightconfig.json) as a cross-check on mypy - not a
       # replacement. Deferred to pre-push/CI rather than every commit: it's

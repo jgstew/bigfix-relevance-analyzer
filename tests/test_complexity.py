@@ -43,6 +43,25 @@ def test_empty_text_is_all_zeros() -> None:
     assert result.score == 0.0
 
 
+def test_contributions_is_empty_for_zero_score() -> None:
+    assert analyze("").contributions == ()
+
+
+def test_contributions_sums_back_to_score() -> None:
+    result = analyze('exists files whose (name of it starts with "bes") of folder "/tmp"')
+    assert result.contributions
+    assert sum(value for _name, value in result.contributions) == pytest.approx(result.score)
+
+
+def test_contributions_omits_zero_metrics_and_orders_largest_first() -> None:
+    result = analyze("windows of operating system")
+    names = [name for name, _value in result.contributions]
+    assert "whose_clauses" not in names  # zero for this statement
+    assert "boolean_operators" not in names
+    values = [value for _name, value in result.contributions]
+    assert values == sorted(values, reverse=True)
+
+
 def test_a_simple_property_chain() -> None:
     result = analyze("windows of operating system")
     assert result.token_count == 4

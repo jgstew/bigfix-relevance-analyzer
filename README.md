@@ -349,6 +349,55 @@ inspector table below and type-directed disambiguation, both of which are parser
 work. Keeping this layer table-free makes it total: any input lexes, and the
 same input always lexes the same way, regardless of which dumps happen to exist.
 
+## Linting content
+
+`bigfix_relevance_analyzer.lint` turns the analyses above into pre-commit-shaped
+verdicts: parse failures and an `it` with nothing to bind to are always errors,
+an inspector no dump defines is always a warning, and the complexity score and
+evaluation cost from the section above are checked only once a threshold is
+configured - a baked-in number would fail every existing content repo on day
+one, so the ceiling is the adopting repo's ratchet to set, not this package's
+to assume.
+
+```python
+from bigfix_relevance_analyzer import LintConfig, lint_paths
+
+findings = lint_paths(changed_paths, LintConfig(max_score=350, max_evaluation_cost=40))
+for finding in findings:
+    print(finding)
+```
+
+```
+MyFixlet.bes:41: error [parse-error] col 18: expected ')'
+MyTask.bes:88: error [complexity] score 412 > 350 (whose_clauses=6, max_of_chain=5, tokens=214)
+MyDashboard.ojo:12: warning [unknown-inspector] no dump defines `bes computer group`
+```
+
+The same rules are reachable two other ways: `python -m bigfix_relevance_analyzer
+--check --max-score=350 file1.bes file2.bes` for a one-off run, or the
+`bigfix-relevance-lint` console script this package installs, which is what a
+pre-commit hook's `entry:` calls:
+
+```yaml
+- repo: https://github.com/jgstew/pre-commit-bigfix
+  rev: <sha>
+  hooks:
+    - id: bigfix-relevance-lint
+      args: [--max-score=350, --max-evaluation-cost=40]
+```
+
+`bigfix-relevance-lint` adds `--error CODE` / `--warn CODE` / `--ignore CODE`
+(each repeatable) to override a rule's default severity per repo, and
+`--fail-on-warning` for a repo that wants zero tolerance even for an unknown
+inspector name.
+
+Not gated by any of the three entry points: `RelevanceAnalysis.missing_platforms`
+(a platform absent from the dumps is not proof it's unsupported there) and
+`CheckResult.diagnostics` beyond unbound `it` (too noisy as a default until the
+type layer has more mileage). Read `RelevanceComplexity` or `RelevanceAnalysis`
+directly for those - `lint.py` has no monopoly on the facts, only an opinion
+about which of them should fail a commit by default.
+
 ## What `it` refers to
 
 This section and the two after it come out of
