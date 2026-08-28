@@ -391,6 +391,29 @@ pre-commit hook's `entry:` calls:
 `--fail-on-warning` for a repo that wants zero tolerance even for an unknown
 inspector name.
 
+Called with **no path arguments at all**, either entry point walks the current
+directory instead of erroring - `bigfix-relevance-lint` on its own, or
+`--check` with nothing after it. This is only for the argument-less case: an
+*explicit* path, including `.`, is never expanded - it's taken literally, the
+same as any other path, so `bigfix-relevance-lint .` finds nothing rather than
+walking (`.` matches no recognized suffix, same as any other unrecognized
+file). The walk skips `.git`, `__pycache__`, `node_modules`, `dist`, `build`,
+`venv`, `env`, and any other dot-prefixed directory - a fixed list rather than
+`.gitignore`-awareness, since honoring `.gitignore` would mean depending on a
+`git` binary and a repository actually being present, and this package stays
+zero-dependency and works on a bare checkout of content. It also stops after
+`--max-depth` directory levels (6 by default) and reports a
+`max-depth-exceeded` error for wherever it stopped, rather than silently
+skipping whatever was deeper - a limit this generous being hit at all is worth
+a human looking at the tree, not a quiet truncation that would look identical
+to a clean, fully-scanned run:
+
+```bash
+bigfix-relevance-lint                    # walk .
+bigfix-relevance-lint --max-depth=10     # walk ., 10 levels deep
+bigfix-relevance-lint .                  # NOT a walk -- one literal path, "."
+```
+
 Not gated by any of the three entry points: `RelevanceAnalysis.missing_platforms`
 (a platform absent from the dumps is not proof it's unsupported there) and
 `CheckResult.diagnostics` beyond unbound `it` (too noisy as a default until the

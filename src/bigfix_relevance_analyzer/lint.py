@@ -19,7 +19,7 @@ itself something to report, not something to crash over.
     if any(f.severity is Severity.ERROR for f in findings):
         raise SystemExit(1)
 
-Six rules, three of them always on and three opt-in:
+Seven rules, four of them always on and three opt-in:
 
 - ``parse-error`` / ``error-token`` -- the statement is broken. Always an
   error; nothing to configure.
@@ -33,6 +33,11 @@ Six rules, three of them always on and three opt-in:
   :attr:`LintConfig.max_score` / ``.max_evaluation_cost`` is set, because a
   baked-in number would fail every existing repo on day one; the ceiling is
   the adopting repo's ratchet to set, not this package's to assume.
+- ``max-depth-exceeded`` -- only from :func:`lint_directory`: a directory tree
+  deeper than its ``max_depth`` was not fully walked. Always an error, because
+  a limit this generous (6 levels, by default) being hit at all is itself
+  worth a human's attention, and a silently truncated walk would look
+  identical to a clean, fully-scanned one.
 
 Deliberately not a rule here: :attr:`RelevanceAnalysis.missing_platforms`
 (absence from the dumps is not proof of lack of support) and any
@@ -41,6 +46,12 @@ unbound ``it`` (too noisy for a default until the type layer has more
 mileage). A caller that wants either can still read them off the analysis
 directly -- this module has no monopoly on the facts, only an opinion about
 which of them should fail a commit by default.
+
+:func:`lint_paths` and :func:`lint_file` never expand a directory argument --
+a path is taken literally, exactly like the extractor they wrap. Only
+:func:`lint_directory` recurses, and only when a caller asks it to (both CLIs
+reach for it solely when given zero path arguments, so an explicit ``.`` still
+behaves like any other literal path).
 """
 
 from __future__ import annotations
@@ -56,13 +67,34 @@ from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 from bigfix_relevance_analyzer.extract import RelevanceSite, extract_relevance_from_file
 
 __all__ = [
+    "DEFAULT_MAX_DEPTH",
     "Finding",
     "LintConfig",
     "Severity",
     "lint_analysis",
+    "lint_directory",
     "lint_file",
     "lint_paths",
 ]
+
+DEFAULT_MAX_DEPTH = 6
+"""How many directory levels below a :func:`lint_directory` root to descend.
+
+The root itself is depth 0, so is a file directly inside it; each subdirectory
+adds one. Chosen as a generous default rather than an unbounded walk, and
+never exceeded silently -- see the ``max-depth-exceeded`` rule above.
+"""
+
+_SKIP_DIR_NAMES = frozenset({"__pycache__", "node_modules", "dist", "build", "venv", "env"})
+"""Directory names :func:`lint_directory` never descends into, by name alone.
+
+Plus, unconditionally, any directory whose name starts with ``.`` (``.git``,
+``.venv``, ``.mypy_cache``, ``.pytest_cache``, ``.ruff_cache``, ``.tox``, ...) --
+common enough as a class that a single rule covers all of them without its own
+entry per tool. Not ``.gitignore``-aware: that would mean depending on a `git`
+binary and a repository being present, which this stdlib-only package does not
+assume either of.
+"""
 
 
 class Severity(enum.Enum):
@@ -83,6 +115,7 @@ DEFAULT_SEVERITIES: Mapping[str, Severity] = {
     "unknown-inspector": Severity.WARNING,
     "complexity": Severity.ERROR,
     "evaluation-cost": Severity.ERROR,
+    "max-depth-exceeded": Severity.ERROR,
 }
 
 
@@ -243,8 +276,88 @@ def lint_file(path: str | bytes | os.PathLike[str], config: LintConfig) -> tuple
 def lint_paths(
     paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfig
 ) -> tuple[Finding, ...]:
-    """:func:`lint_file` over many paths, in order, skipping ones that error out."""
+    """:func:`lint_file` over many paths, in order, skipping ones that error out.
+
+    Each path is taken literally -- a directory here is not descended into; use
+    :func:`lint_directory` for that.
+    """
     findings: list[Finding] = []
     for path in paths:
         findings.extend(lint_file(path, config))
+    return tuple(findings)
+
+
+def _walk(root: Path, max_depth: int) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
+    """Discover files under ``root`` up to ``max_depth`` levels deep.
+
+    Returns ``(files, exceeded)``: every file found (default-excluded directories
+    pruned), and every directory that was *not* descended into because doing so
+    would have gone past ``max_depth``. Sorted within each directory for a
+    deterministic order across runs and platforms. Does no linting itself --
+    that stays in :func:`lint_directory`, which turns ``exceeded`` into findings.
+    """
+    if root.is_file():
+        return (root,), ()
+    if not root.is_dir():
+        return (), ()
+
+    files: list[Path] = []
+    exceeded: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        current = Path(dirpath)
+        rel = current.relative_to(root)
+        depth = 0 if rel == Path() else len(rel.parts)
+
+        dirnames[:] = sorted(
+            name for name in dirnames if name not in _SKIP_DIR_NAMES and not name.startswith(".")
+        )
+
+        if depth >= max_depth and dirnames:
+            exceeded.extend(current / name for name in dirnames)
+            dirnames[:] = []  # stop os.walk from descending into them
+
+        files.extend(current / name for name in sorted(filenames))
+
+    return tuple(files), tuple(exceeded)
+
+
+def lint_directory(
+    root: str | bytes | os.PathLike[str],
+    config: LintConfig,
+    *,
+    max_depth: int = DEFAULT_MAX_DEPTH,
+) -> tuple[Finding, ...]:
+    """Walk ``root`` and :func:`lint_file` everything found under it.
+
+    The only entry point that recurses into a directory -- :func:`lint_paths`
+    and :func:`lint_file` take a path exactly as given. Both CLIs reach for this
+    solely when given zero path arguments, so passing a directory explicitly
+    keeps behaving like any other literal path; this is the "walk `.`" behind a
+    bare invocation, not a general directory-expansion feature.
+
+    A branch deeper than ``max_depth`` is not silently dropped: each directory
+    where descent stopped is reported as its own ``max-depth-exceeded`` finding,
+    same as any other rule in this module, and everything below it is skipped.
+    """
+    root_path = Path(os.fsdecode(root))
+    files, exceeded = _walk(root_path, max_depth)
+
+    findings: list[Finding] = []
+    for directory in exceeded:
+        severity = config.severity_for("max-depth-exceeded")
+        if severity is not Severity.IGNORE:
+            findings.append(
+                Finding(
+                    code="max-depth-exceeded",
+                    severity=severity,
+                    message=(
+                        f"more than {max_depth} directory levels below {root_path}; "
+                        f"not descending into {directory}"
+                    ),
+                    path=directory,
+                    line=1,
+                )
+            )
+    for file_path in files:
+        findings.extend(lint_file(file_path, config))
     return tuple(findings)

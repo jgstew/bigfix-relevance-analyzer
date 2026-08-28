@@ -403,9 +403,26 @@ def test_cli_check_accepts_multiple_paths(
     assert main(["--check", str(clean_a), str(clean_b)]) == 0
 
 
-def test_cli_check_requires_at_least_one_path() -> None:
-    with pytest.raises(SystemExit):
-        main(["--check"])
+def test_cli_check_with_no_paths_walks_the_current_directory(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "broken.rel").write_text(BROKEN)
+
+    assert main(["--check"]) == 1
+    out = capsys.readouterr().out
+    assert "broken.rel:1: error [parse-error]" in out
+
+
+def test_cli_check_explicit_dot_is_not_walked(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "broken.rel").write_text(BROKEN)
+
+    assert main(["--check", "."]) == 0
+    out = capsys.readouterr().out
+    assert out == ""
 
 
 def test_cli_check_wires_max_score_flag(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

@@ -13,10 +13,12 @@ from pathlib import Path
 from bigfix_relevance_analyzer.analyzer import analyze
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.lint import (
+    DEFAULT_MAX_DEPTH,
     Finding,
     LintConfig,
     Severity,
     lint_analysis,
+    lint_directory,
     lint_file,
     lint_paths,
 )
@@ -166,3 +168,80 @@ def test_lint_paths_skips_missing_or_unreadable_paths_gracefully(tmp_path: Path)
     missing = tmp_path / "does-not-exist.rel"
     findings = lint_paths([missing], LintConfig())
     assert findings == ()
+
+
+def test_lint_paths_never_expands_a_directory_argument(tmp_path: Path) -> None:
+    # An explicit path, even a directory with lintable content inside it, is
+    # taken literally -- only lint_directory() recurses. This is deliberate,
+    # confirmed behavior, not a gap: see the module docstring.
+    (tmp_path / "broken.rel").write_text(BROKEN)
+    assert lint_paths([tmp_path], LintConfig()) == ()
+    assert lint_file(tmp_path, LintConfig()) == ()
+
+
+# ---------------------------------------------------------------------------
+# lint_directory: the one entry point that walks
+# ---------------------------------------------------------------------------
+
+
+def test_lint_directory_finds_sites_in_nested_files_of_different_types(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "top.rel").write_text(CLIENT)
+    nested = tmp_path / "sub" / "deeper"
+    nested.mkdir(parents=True)
+    (nested / "broken.rel").write_text(BROKEN)
+
+    findings = lint_directory(tmp_path, LintConfig())
+    assert codes(findings) == {"parse-error", "error-token"}
+    assert all(f.path == nested / "broken.rel" for f in findings)
+
+
+def test_lint_directory_prunes_default_excluded_directories(tmp_path: Path) -> None:
+    for name in (".git", "__pycache__", "venv", ".mypy_cache"):
+        excluded = tmp_path / name
+        excluded.mkdir()
+        (excluded / "broken.rel").write_text(BROKEN)
+    (tmp_path / "clean.rel").write_text(CLIENT)
+
+    findings = lint_directory(tmp_path, LintConfig())
+    assert findings == ()
+
+
+def test_lint_directory_scans_a_tree_exactly_max_depth_levels_deep(tmp_path: Path) -> None:
+    deep = tmp_path
+    for _ in range(DEFAULT_MAX_DEPTH):
+        deep = deep / "d"
+        deep.mkdir()
+    (deep / "broken.rel").write_text(BROKEN)
+
+    findings = lint_directory(tmp_path, LintConfig())
+    assert "parse-error" in codes(findings)
+    assert "max-depth-exceeded" not in codes(findings)
+
+
+def test_lint_directory_reports_and_stops_one_level_past_max_depth(tmp_path: Path) -> None:
+    deep = tmp_path
+    for _ in range(DEFAULT_MAX_DEPTH + 1):
+        deep = deep / "d"
+        deep.mkdir()
+    (deep / "broken.rel").write_text(BROKEN)
+
+    findings = lint_directory(tmp_path, LintConfig())
+    assert codes(findings) == {"max-depth-exceeded"}
+    exceeded = findings[0]
+    assert exceeded.severity is Severity.ERROR
+    # The too-deep file itself must not have been visited.
+    assert exceeded.path != deep / "broken.rel"
+
+
+def test_lint_directory_max_depth_override_reaches_deeper_content(tmp_path: Path) -> None:
+    deep = tmp_path
+    for _ in range(DEFAULT_MAX_DEPTH + 1):
+        deep = deep / "d"
+        deep.mkdir()
+    (deep / "broken.rel").write_text(BROKEN)
+
+    findings = lint_directory(tmp_path, LintConfig(), max_depth=DEFAULT_MAX_DEPTH + 2)
+    assert "max-depth-exceeded" not in codes(findings)
+    assert "parse-error" in codes(findings)

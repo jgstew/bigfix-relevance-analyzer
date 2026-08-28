@@ -122,10 +122,60 @@ def test_quiet_suppresses_findings_but_keeps_exit_code(
     assert out == ""
 
 
-def test_no_paths_is_a_usage_error() -> None:
-    with pytest.raises(SystemExit) as excinfo:
-        main([])
-    assert excinfo.value.code == 2
+def test_no_paths_walks_the_current_directory(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "broken.rel").write_text(BROKEN)
+
+    assert main([]) == 1
+    out = capsys.readouterr().out
+    assert "broken.rel:1: error [parse-error]" in out
+
+
+def test_explicit_dot_is_not_walked(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "broken.rel").write_text(BROKEN)
+
+    # An explicit "." is a literal path argument, not a walk root: extract_relevance_from_file(".")
+    # matches no recognized suffix, so this finds nothing -- same as any other explicit path.
+    assert main(["."]) == 0
+    out = capsys.readouterr().out
+    assert out == ""
+
+
+def test_max_depth_is_wired_through_on_the_walk_branch(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    deep = tmp_path
+    for _ in range(7):
+        deep = deep / "d"
+        deep.mkdir()
+    (deep / "broken.rel").write_text(BROKEN)
+
+    assert main([]) == 1
+    out = capsys.readouterr().out
+    assert "max-depth-exceeded" in out
+    assert "parse-error" not in out
+
+    assert main(["--max-depth=8"]) == 1
+    out = capsys.readouterr().out
+    assert "parse-error" in out
+    assert "max-depth-exceeded" not in out
+
+
+def test_another_flag_with_no_paths_still_walks(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "client.rel").write_text(CLIENT)
+
+    assert main(["--max-score=1"]) == 1
+    out = capsys.readouterr().out
+    assert "[complexity]" in out
 
 
 def test_multiple_paths_all_get_linted(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

@@ -2,6 +2,7 @@
 
     bigfix-relevance-lint MyFixlet.bes MyTask.bes
     bigfix-relevance-lint --max-score=350 --max-evaluation-cost=40 *.bes
+    bigfix-relevance-lint
 
 Shaped for a pre-commit hook, not a human report -- see ``__main__`` for that.
 Findings go to stdout, one per line, in the compact form a hook or CI log can
@@ -10,6 +11,11 @@ cleanly into something else. Exit status is ``0`` when nothing at
 error-severity was found (warnings do not fail a commit unless
 ``--fail-on-warning`` says otherwise), ``1`` when something did, ``2`` on a
 usage error.
+
+Called with no paths at all, this walks the current directory (see
+:func:`~bigfix_relevance_analyzer.lint.lint_directory`) instead of erroring --
+an *explicit* path, including ``.``, is never expanded this way; it is taken
+literally, the same as any other path argument.
 
 This is the console script (``[project.scripts]`` in ``pyproject.toml``)
 ``pre-commit-bigfix``'s hook entry calls; kept out of ``__main__.py`` because
@@ -24,7 +30,13 @@ import argparse
 import sys
 
 from bigfix_relevance_analyzer.dialect import Dialect
-from bigfix_relevance_analyzer.lint import LintConfig, Severity, lint_paths
+from bigfix_relevance_analyzer.lint import (
+    DEFAULT_MAX_DEPTH,
+    LintConfig,
+    Severity,
+    lint_directory,
+    lint_paths,
+)
 
 __all__ = ["main"]
 
@@ -44,9 +56,19 @@ def main(argv: list[str] | None = None) -> int:
             "threshold is given."
         ),
     )
-    parser.add_argument("paths", nargs="+", help="files to lint")
+    parser.add_argument(
+        "paths", nargs="*", help="files to lint; omit entirely to walk the current directory"
+    )
     parser.add_argument(
         "--max-score", type=float, default=None, help="fail a site scoring above this"
+    )
+    parser.add_argument(
+        "--max-depth",
+        type=int,
+        default=DEFAULT_MAX_DEPTH,
+        help=(
+            f"with no paths given, how many directory levels to walk (default {DEFAULT_MAX_DEPTH})"
+        ),
     )
     parser.add_argument(
         "--max-evaluation-cost",
@@ -99,23 +121,28 @@ def main(argv: list[str] | None = None) -> int:
         platform=args.platform,
     )
 
-    findings = lint_paths(args.paths, config)
+    if args.paths:
+        findings = lint_paths(args.paths, config)
+        scope = f"{len(args.paths)} file(s)"
+    else:
+        findings = lint_directory(".", config, max_depth=args.max_depth)
+        scope = "the current directory"
+
     if not args.quiet:
         for finding in findings:
             print(finding)
 
     errors = sum(1 for f in findings if f.severity is Severity.ERROR)
     warnings = sum(1 for f in findings if f.severity is Severity.WARNING)
-    print(_summary(errors, warnings, len(args.paths)), file=sys.stderr)
+    print(_summary(errors, warnings, scope), file=sys.stderr)
 
     if errors or (args.fail_on_warning and warnings):
         return 1
     return 0
 
 
-def _summary(errors: int, warnings: int, file_count: int) -> str:
-    noun = "file" if file_count == 1 else "files"
-    return f"{errors} error(s), {warnings} warning(s) in {file_count} {noun}"
+def _summary(errors: int, warnings: int, scope: str) -> str:
+    return f"{errors} error(s), {warnings} warning(s) in {scope}"
 
 
 if __name__ == "__main__":

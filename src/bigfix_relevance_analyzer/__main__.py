@@ -40,7 +40,13 @@ from pathlib import Path
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis, analyze
 from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 from bigfix_relevance_analyzer.extract import RelevanceSite, extract_relevance_from_file
-from bigfix_relevance_analyzer.lint import LintConfig, Severity, lint_paths
+from bigfix_relevance_analyzer.lint import (
+    DEFAULT_MAX_DEPTH,
+    LintConfig,
+    Severity,
+    lint_directory,
+    lint_paths,
+)
 from bigfix_relevance_analyzer.typecheck import Plurality
 
 
@@ -351,8 +357,13 @@ def _run_check(
     *,
     max_score: float | None,
     max_evaluation_cost: float | None,
+    max_depth: int,
 ) -> int:
     """Lint every path: one grep-able line per finding, for a hook or CI.
+
+    Given no paths at all, walks the current directory (see
+    :func:`~bigfix_relevance_analyzer.lint.lint_directory`) instead of erroring --
+    an *explicit* path, including ``.``, is never expanded this way.
 
     The full rule set and its severities live in
     :mod:`~bigfix_relevance_analyzer.lint`; ``bigfix-relevance-lint`` (see
@@ -367,7 +378,10 @@ def _run_check(
         dialect=forced,
         platform=platform,
     )
-    findings = lint_paths(paths, config)
+    if paths:
+        findings = lint_paths(paths, config)
+    else:
+        findings = lint_directory(".", config, max_depth=max_depth)
     for finding in findings:
         print(finding)
     return 1 if any(f.severity is Severity.ERROR for f in findings) else 0
@@ -424,18 +438,26 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="with --check, fail a site whose evaluation cost is above this",
     )
+    parser.add_argument(
+        "--max-depth",
+        type=int,
+        default=DEFAULT_MAX_DEPTH,
+        help=(
+            "with --check and no paths, how many directory levels to walk "
+            f"(default {DEFAULT_MAX_DEPTH})"
+        ),
+    )
     args = parser.parse_args(argv)
     forced = Dialect(args.dialect) if args.dialect else None
 
     if args.check:
-        if not args.relevance:
-            parser.error("--check needs at least one file path")
         return _run_check(
             args.relevance,
             forced,
             args.platform,
             max_score=args.max_score,
             max_evaluation_cost=args.max_evaluation_cost,
+            max_depth=args.max_depth,
         )
 
     if len(args.relevance) > 1:
