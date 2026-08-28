@@ -79,11 +79,28 @@ def source_label(dialect: str, context: str) -> str:
     return f"{dialect}:{context}" if context else dialect
 
 
-def collect() -> tuple[tuple[str, ...], dict[str, dict[str, int]]]:
-    """Read every dump into ``(source_labels, {category: {line: source_mask}})``.
+def _row_key(line: str) -> str:
+    """The identity a line is merged on: everything before its first tab.
 
-    A line is stored once per category no matter how many dumps hold it; which
-    dumps those were is recorded as a bitmask over ``source_labels``.
+    A dump line is either bare (``signature: type``, no tabs) or that same
+    text followed by tab-separated enrichment columns from a richer capture
+    (see ``session_relevance_properties_rest_api.txt``). Two dumps naming the
+    same inspector must merge into one row even when only one of them was
+    captured with enrichment -- keying on the pre-tab text is what makes that
+    possible instead of the bare and enriched spellings splitting into two.
+    """
+    return line.partition("\t")[0]
+
+
+def collect() -> tuple[tuple[str, ...], dict[str, dict[str, tuple[int, str]]]]:
+    """Read every dump into ``(source_labels, {category: {key: (mask, line)}})``.
+
+    A row is stored once per category no matter how many dumps hold it; which
+    dumps those were is recorded as a bitmask over ``source_labels``. When
+    dumps disagree on enrichment for the same row, the line with the most
+    tab-separated columns wins as the stored text -- the richer capture is
+    strictly more informative, never contradictory, since enrichment only
+    adds columns a bare line lacks.
     """
     by_source: dict[tuple[str, str], list[str]] = {}
     for path in sorted(DUMPS.glob("*.txt")):
@@ -104,14 +121,18 @@ def collect() -> tuple[tuple[str, ...], dict[str, dict[str, int]]]:
     labels = tuple(sorted({label for _category, label in by_source}))
     bit = {label: 1 << index for index, label in enumerate(labels)}
 
-    tables: dict[str, dict[str, int]] = defaultdict(dict)
+    tables: dict[str, dict[str, tuple[int, str]]] = defaultdict(dict)
     for (category, label), lines in sorted(by_source.items()):
         for line in lines:
-            tables[category][line] = tables[category].get(line, 0) | bit[label]
+            row_key = _row_key(line)
+            mask, chosen = tables[category].get(row_key, (0, line))
+            if line.count("\t") > chosen.count("\t"):
+                chosen = line
+            tables[category][row_key] = (mask | bit[label], chosen)
     return labels, tables
 
 
-def render(labels: tuple[str, ...], tables: dict[str, dict[str, int]]) -> str:
+def render(labels: tuple[str, ...], tables: dict[str, dict[str, tuple[int, str]]]) -> str:
     """Render the generated module source."""
     out = [
         '"""Inspector tables, generated from the dumps. Do not edit by hand.',
@@ -137,7 +158,7 @@ def render(labels: tuple[str, ...], tables: dict[str, dict[str, int]]) -> str:
         rows = tables[category]
         out.append(f"# {len(rows)} rows")
         out.append(f'{category.upper()}: str = """\\')
-        out += [f"{mask:x}\t{line}" for line, mask in sorted(rows.items())]
+        out += [f"{mask:x}\t{line}" for _key, (mask, line) in sorted(rows.items())]
         out.append('"""')
         out.append("")
     return "\n".join(out)

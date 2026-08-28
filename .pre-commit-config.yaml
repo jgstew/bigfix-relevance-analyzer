@@ -19,6 +19,12 @@ repos:
       - id: check-merge-conflict
       - id: end-of-file-fixer
       - id: trailing-whitespace
+        # A row with no direct-object or index type ends in an empty tab
+        # column (see the "Enriched columns" section of this dump's README) --
+        # that trailing tab is data, not incidental whitespace to strip. The
+        # generated module embeds these dump lines verbatim, so it needs the
+        # same exclusion.
+        exclude: ^(tests/examples/relevance_inspectors/session_relevance_properties_rest_api\.txt|src/bigfix_relevance_analyzer/_inspector_data\.py)$
       - id: mixed-line-ending
       - id: detect-private-key
       # Block direct commits to the integration branches; work on a feature

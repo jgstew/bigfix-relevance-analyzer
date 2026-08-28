@@ -149,6 +149,51 @@ class Inspector(_Sourced):
     right. A unary operator's single operand.
     """
 
+    singular_name: str | None = None
+    """A property's singular written form, e.g. ``key``.
+
+    From the session engine's own introspection of the ``property`` type
+    (``singular name of <property>``) -- see
+    ``session_relevance_properties_rest_api.txt``. ``None`` for dumps that
+    predate this capture, which is every client dump today.
+    """
+
+    plural_name: str | None = None
+    """A property's plural written form, e.g. ``keys``. See :attr:`singular_name`."""
+
+    usual_name: str | None = None
+    """Which form -- singular or plural -- this row is normally written as.
+
+    ``plural name`` when :attr:`multivalued`, ``singular name`` otherwise; the
+    engine computes it directly (``usual name of <property>``) rather than
+    this package deriving it, so it survives if that rule ever changes.
+    """
+
+    multivalued: bool | None = None
+    """Whether this property yields multiple values per input.
+
+    This is the plurality fact the earlier, signature-only dumps could not
+    carry: ``key <string> of <json value>`` and ``keys of <json value>`` are
+    the same property with :attr:`singular_name` and :attr:`plural_name`
+    swapped as :attr:`usual_name`, distinguished only by this flag.
+    """
+
+    written_name: str | None = None
+    """A binary or unary operator's written name, e.g. ``mod`` for ``%``.
+
+    :attr:`name` stays the symbol-shaped text the signature itself uses (see
+    its docstring) so existing lookups by symbol keep working; this is the
+    separate spoken form the session engine's own introspection reports
+    (``name of <binary operator>``), not recoverable from the signature.
+    """
+
+    symbol: str | None = None
+    """A binary or unary operator's engine-reported symbol, e.g. ``%``.
+
+    Usually identical to :attr:`name`; kept distinct because the two are
+    conceptually different fields upstream (``symbol of <binary operator>``).
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class RelevanceType(_Sourced):
@@ -156,6 +201,19 @@ class RelevanceType(_Sourced):
 
     name: str
     """The type name, e.g. ``bes computer``, ``registry key``, ``string``."""
+
+    parent: str | None = None
+    """This type's supertype, e.g. ``string`` for ``substring``.
+
+    From the session engine's own introspection (``parent of <type>``) --
+    see ``session_relevance_types_rest_api.txt``. ``None`` for a root type
+    (``string`` itself has none) or for a dump that predates this capture.
+    Every ``X with multiplicity`` type is a child of ``X``, which is how
+    plurality is expressed in the type system itself.
+    """
+
+    size: int | None = None
+    """This type's internal size, in bytes, when the engine reports one."""
 
 
 # ---------------------------------------------------------------------------
@@ -191,13 +249,37 @@ def _split_return_type(line: str) -> tuple[str, str]:
     return signature, return_type
 
 
+def _split_enrichment(line: str, width: int) -> tuple[str, tuple[str, ...] | None]:
+    """Split a dump line into its legacy ``signature: type`` text and, when
+    present, exactly ``width`` extra tab-separated enrichment columns.
+
+    A dump captured before the introspection meta-layer was queried directly
+    (every client dump today) carries no tabs at all, and this returns
+    ``None`` for the enrichment half -- callers must treat every enriched
+    field as optional, never inferring absence as a negative fact.
+    """
+    base, _, rest = line.partition("\t")
+    if not rest:
+        return base, None
+    fields = tuple(rest.split("\t"))
+    if len(fields) != width:  # pragma: no cover - guarded by test_inspector_data.py
+        raise ValueError(f"expected {width} enrichment columns, got {len(fields)}: {line!r}")
+    return base, fields
+
+
 def _parse_property(sources: frozenset[str], line: str) -> Inspector:
-    signature, return_type = _split_return_type(line)
+    base, enrichment = _split_enrichment(line, width=7)
+    signature, return_type = _split_return_type(base)
     match = _PROPERTY_RE.match(signature)
     if match is None:  # pragma: no cover - every sampled signature parses
         raise ValueError(f"unparsed property signature: {signature!r}")
     index = match.group("index").strip()
     obj = match.group("object")
+    singular = plural = usual = None
+    multivalued = None
+    if enrichment is not None:
+        singular, plural, usual, multivalued_text, _result, _obj, _index = enrichment
+        multivalued = multivalued_text == "1"
     return Inspector(
         sources=sources,
         kind=InspectorKind.PROPERTY,
@@ -206,11 +288,16 @@ def _parse_property(sources: frozenset[str], line: str) -> Inspector:
         return_type=return_type,
         index_type=index.strip("<>") if index else None,
         operands=(obj.strip("<>"),) if obj else (),
+        singular_name=singular or None,
+        plural_name=plural or None,
+        usual_name=usual or None,
+        multivalued=multivalued,
     )
 
 
 def _parse_cast(sources: frozenset[str], line: str) -> Inspector:
-    signature, return_type = _split_return_type(line)
+    base, _enrichment = _split_enrichment(line, width=3)
+    signature, return_type = _split_return_type(base)
     match = _CAST_RE.match(signature)
     if match is None:  # pragma: no cover - every sampled signature parses
         raise ValueError(f"unparsed cast signature: {signature!r}")
@@ -225,10 +312,14 @@ def _parse_cast(sources: frozenset[str], line: str) -> Inspector:
 
 
 def _parse_binary(sources: frozenset[str], line: str) -> Inspector:
-    signature, return_type = _split_return_type(line)
+    base, enrichment = _split_enrichment(line, width=5)
+    signature, return_type = _split_return_type(base)
     match = _BINARY_RE.match(signature)
     if match is None:  # pragma: no cover - every sampled signature parses
         raise ValueError(f"unparsed binary operator signature: {signature!r}")
+    written_name = symbol = None
+    if enrichment is not None:
+        written_name, symbol, _left, _right, _result = enrichment
     return Inspector(
         sources=sources,
         kind=InspectorKind.BINARY_OPERATOR,
@@ -236,14 +327,20 @@ def _parse_binary(sources: frozenset[str], line: str) -> Inspector:
         name=match.group("name"),
         return_type=return_type,
         operands=(match.group("left"), match.group("right")),
+        written_name=written_name,
+        symbol=symbol,
     )
 
 
 def _parse_unary(sources: frozenset[str], line: str) -> Inspector:
-    signature, return_type = _split_return_type(line)
+    base, enrichment = _split_enrichment(line, width=4)
+    signature, return_type = _split_return_type(base)
     match = _UNARY_RE.match(signature)
     if match is None:  # pragma: no cover - every sampled signature parses
         raise ValueError(f"unparsed unary operator signature: {signature!r}")
+    written_name = symbol = None
+    if enrichment is not None:
+        written_name, symbol, _operand, _result = enrichment
     return Inspector(
         sources=sources,
         kind=InspectorKind.UNARY_OPERATOR,
@@ -251,6 +348,8 @@ def _parse_unary(sources: frozenset[str], line: str) -> Inspector:
         name=match.group("name"),
         return_type=return_type,
         operands=(match.group("operand"),),
+        written_name=written_name,
+        symbol=symbol,
     )
 
 
@@ -283,10 +382,23 @@ def unary_operators() -> tuple[Inspector, ...]:
     return tuple(_parse_unary(s, line) for s, line in _rows(_inspector_data.UNARY_OPERATORS))
 
 
+def _parse_type(sources: frozenset[str], line: str) -> RelevanceType:
+    name, enrichment = _split_enrichment(line, width=2)
+    if enrichment is None:
+        return RelevanceType(sources=sources, name=name)
+    parent, size_text = enrichment
+    return RelevanceType(
+        sources=sources,
+        name=name,
+        parent=parent or None,
+        size=int(size_text) if size_text else None,
+    )
+
+
 @functools.cache
 def relevance_types() -> tuple[RelevanceType, ...]:
     """Every type name, e.g. ``bes computer``, ``registry key``, ``string``."""
-    return tuple(RelevanceType(sources=s, name=line) for s, line in _rows(_inspector_data.TYPES))
+    return tuple(_parse_type(s, line) for s, line in _rows(_inspector_data.TYPES))
 
 
 @functools.cache

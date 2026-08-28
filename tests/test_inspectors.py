@@ -248,3 +248,60 @@ def test_known_types_covers_the_common_scalars() -> None:
 def test_every_inspector_name_is_non_empty_and_stripped() -> None:
     for entry in all_inspectors():
         assert entry.name == entry.name.strip() != ""
+
+
+# --------------------------------------------------------------------------
+# Enrichment: singular/plural/usual name and multivalued, from the session
+# REST API's own introspection of the `property` type (see
+# tests/examples/relevance_inspectors/session_relevance_properties_rest_api.txt).
+# Older dumps carry none of this, so every field is optional.
+# --------------------------------------------------------------------------
+
+
+def test_a_multivalued_property_records_its_plural_and_usual_names() -> None:
+    entry = only("keys", "keys of <json value>")
+    assert entry.singular_name == "key"
+    assert entry.plural_name == "keys"
+    assert entry.usual_name == "keys"
+    assert entry.multivalued is True
+
+
+def test_a_single_valued_property_is_not_multivalued() -> None:
+    entry = only("key", "key <string> of <json value>")
+    assert entry.singular_name == "key"
+    assert entry.plural_name == "keys"
+    assert entry.usual_name == "key"
+    assert entry.multivalued is False
+
+
+def test_enrichment_is_absent_for_a_dump_that_never_carried_it() -> None:
+    """A client-only property has no session enrichment columns."""
+    entry = only("current user key", "current user key <logged on user> of <registry>")
+    assert entry.singular_name is None
+    assert entry.plural_name is None
+    assert entry.usual_name is None
+    assert entry.multivalued is None
+
+
+def test_a_binary_operator_records_its_written_name_and_symbol() -> None:
+    entry = only("%", "<integer> % <integer>")
+    assert entry.written_name == "mod"
+    assert entry.symbol == "%"
+
+
+def test_a_unary_operator_records_its_written_name_and_symbol() -> None:
+    entry = only("-", "- <integer>")
+    assert entry.written_name == "minus"
+    assert entry.symbol == "-"
+
+
+def test_a_type_with_a_parent_records_the_subtyping_relationship() -> None:
+    types = {t.name: t for t in relevance_types()}
+    assert types["substring"].parent == "string"
+    assert types["string"].parent is None
+
+
+def test_a_type_records_its_internal_size_when_known() -> None:
+    types = {t.name: t for t in relevance_types()}
+    assert types["integer"].size == 8
+    assert types["boolean"].size == 1

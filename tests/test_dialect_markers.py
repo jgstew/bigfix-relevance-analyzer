@@ -57,7 +57,7 @@ SESSION_DUMPS = sorted(INSPECTORS.glob("session_relevance_properties_*.txt"))
 def test_the_dumps_are_where_the_tests_expect() -> None:
     """Guard against a silent rename turning every check below into a no-op."""
     assert len(CLIENT_DUMPS) == 5
-    assert len(SESSION_DUMPS) == 2
+    assert len(SESSION_DUMPS) == 3
 
 
 def _variants(marker: str) -> set[str]:

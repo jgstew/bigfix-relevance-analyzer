@@ -33,8 +33,9 @@ Session relevance:
 | --- | --- | --- |
 | `session_relevance_properties_web_reports.txt` | 1644 | A **Web Reports** session |
 | `session_relevance_properties_console.txt` | 1644 | A **console** session |
+| `session_relevance_properties_rest_api.txt` | 1756 | The REST API, enriched (see below) |
 
-The two session dumps are byte-identical: the console and Web Reports expose the
+The two console/Web Reports session dumps are byte-identical: the console and Web Reports expose the
 same inspector surface, so "session relevance" below means either.
 
 Counts are lines; the three Linux files each contain 3 duplicate lines
@@ -213,6 +214,33 @@ One inspector per line:
   every file).
 - No header, footer, or blank lines; every line in every file is a
   `signature: type` entry with no exceptions.
+
+### Enriched columns
+
+`session_relevance_properties_rest_api.txt`, and the `casts`/`binary_operators`/
+`unary_operators`/`types` REST API dumps, carry extra tab-separated columns
+after the legacy text, queried from BigFix's own introspection of the
+`property`, `binary operator`, `unary operator`, and `type` types (see
+`developer.bigfix.com/relevance/reference/property.html`). Column 1 is always
+the legacy `signature: type` text verbatim, so these files are a strict
+superset of the bare format:
+
+- `properties`: `signature: type`, singular name, plural name, usual name,
+  `1`/`0` for multivalued, result type, direct object type (empty if none),
+  index type (empty if none).
+- `casts`: `signature: type`, name, operand type, result type.
+- `binary_operators`: `signature: type`, name, symbol, left operand type,
+  right operand type, result type.
+- `unary_operators`: `signature: type`, name, symbol, operand type, result
+  type.
+- `types`: name, parent type (empty for a root type), size in bytes (empty
+  if unknown) - no `signature: type` column, since a type's own `as string`
+  form is just its name.
+
+A dump without these columns (every client dump today) leaves the
+corresponding `Inspector`/`RelevanceType` fields as `None`; the generator
+merges rows across dumps by their pre-tab text, so a bare client line and an
+enriched session line for the same inspector become one row, not two.
 
 ## Provenance
 

@@ -1,7 +1,7 @@
-- <hertz>: hertz
-- <time interval>: time interval
-- <integer>: integer
-- <large integer>: large integer
-- <number of months>: number of months
-- <floating point>: floating point
-- <rate>: rate
+- <hertz>: hertz	minus	-	hertz	hertz
+- <time interval>: time interval	minus	-	time interval	time interval
+- <integer>: integer	minus	-	integer	integer
+- <large integer>: large integer	minus	-	large integer	large integer
+- <number of months>: number of months	minus	-	number of months	number of months
+- <floating point>: floating point	minus	-	floating point	floating point
+- <rate>: rate	minus	-	rate	rate

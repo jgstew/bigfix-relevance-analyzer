@@ -1,0 +1,1756 @@
+attr lists of <( string, string )>: html attribute list	attr list	attr lists	attr lists	1	html attribute list	( string, string )	
+address of <string>: html	address	addresss	address	0	html	string	
+address of <html>: html	address	addresss	address	0	html	html	
+address <string> of <string>: html	address	addresss	address	0	html	string	string
+address <string> of <html>: html	address	addresss	address	0	html	html	string
+abbr of <string>: html	abbr	abbrs	abbr	0	html	string	
+abbr of <html>: html	abbr	abbrs	abbr	0	html	html	
+abbr <string> of <string>: html	abbr	abbrs	abbr	0	html	string	string
+abbr <string> of <html>: html	abbr	abbrs	abbr	0	html	html	string
+acronym of <string>: html	acronym	acronyms	acronym	0	html	string	
+acronym of <html>: html	acronym	acronyms	acronym	0	html	html	
+acronym <string> of <string>: html	acronym	acronyms	acronym	0	html	string	string
+acronym <string> of <html>: html	acronym	acronyms	acronym	0	html	html	string
+anchor of <string>: html	anchor	anchors	anchor	0	html	string	
+anchor of <html>: html	anchor	anchors	anchor	0	html	html	
+anchor <string> of <string>: html	anchor	anchors	anchor	0	html	string	string
+anchor <string> of <html>: html	anchor	anchors	anchor	0	html	html	string
+absolute value of <hertz>: hertz	absolute value	absolute values	absolute value	0	hertz	hertz	
+absolute value of <time interval>: time interval	absolute value	absolute values	absolute value	0	time interval	time interval	
+absolute value of <integer>: integer	absolute value	absolute values	absolute value	0	integer	integer	
+april <integer>: day of year	april	aprils	april	0	day of year		integer
+august <integer>: day of year	august	augusts	august	0	day of year		integer
+april <integer> of <integer>: date	april	aprils	april	0	date	integer	integer
+august <integer> of <integer>: date	august	augusts	august	0	date	integer	integer
+april of <integer>: month and year	april	aprils	april	0	month and year	integer	
+august of <integer>: month and year	august	augusts	august	0	month and year	integer	
+april: month	april	aprils	april	0	month		
+august: month	august	augusts	august	0	month		
+action of <bes action result>: bes action	action	actions	action	0	bes action	bes action result	
+apply count of <bes action result>: integer	apply count	apply counts	apply count	0	integer	bes action result	
+all fixlet counts: historical fixlet count	all fixlet count	all fixlet counts	all fixlet counts	1	historical fixlet count		
+all computer counts: historical computer count	all computer count	all computer counts	all computer counts	1	historical computer count		
+applicability relevance of <bes action>: string	applicability relevance	applicability relevances	applicability relevance	0	string	bes action	
+action script of <bes action>: string	action script	action scripts	action script	0	string	bes action	
+action script type of <bes action>: string	action script type	action script types	action script type	0	string	bes action	
+action dependencies of <bes action>: bes action	action dependency	action dependencies	action dependencies	1	bes action	bes action	
+active flag of <bes activation>: boolean	active flag	active flags	active flag	0	boolean	bes activation	
+analysis of <bes activation>: bes fixlet	analysis	analyses	analysis	0	bes fixlet	bes activation	
+action of <bes baseline component>: bes fixlet action	action	actions	action	0	bes fixlet action	bes baseline component	
+applicable computer set of <bes baseline component>: bes computer set	applicable computer set	applicable computer sets	applicable computer set	0	bes computer set	bes baseline component	
+applicable computer count of <bes baseline component>: integer	applicable computer count	applicable computer counts	applicable computer count	0	integer	bes baseline component	
+author of <bes comment>: bes user	author	authors	author	0	bes user	bes comment	
+agent type of <bes computer>: string	agent type	agent types	agent type	0	string	bes computer	
+agent version of <bes computer>: string	agent version	agent versions	agent version	0	string	bes computer	
+action results of <bes computer>: bes action result	action result	action results	action results	1	bes action result	bes computer	
+administrator set of <bes computer>: bes user set	administrator set	administrator sets	administrator set	0	bes user set	bes computer	
+administrators of <bes computer>: bes user	administrator	administrators	administrators	1	bes user	bes computer	
+automatic flag of <bes computer group>: boolean	automatic flag	automatic flags	automatic flag	0	boolean	bes computer group	
+action set of <bes domain>: bes action set	action set	action sets	action set	0	bes action set	bes domain	
+actions of <bes domain>: bes action	action	actions	actions	1	bes action	bes domain	
+action flag of <bes filter>: boolean	action flag	action flags	action flag	0	boolean	bes filter	
+analysis flag of <bes filter>: boolean	analysis flag	analysis flags	analysis flag	0	boolean	bes filter	
+action set of <bes filter>: bes action set	action set	action sets	action set	0	bes action set	bes filter	
+analysis set of <bes filter>: bes fixlet set	analysis set	analysis sets	analysis set	0	bes fixlet set	bes filter	
+analysis flag of <bes fixlet>: boolean	analysis flag	analysis flags	analysis flag	0	boolean	bes fixlet	
+action <integer> of <bes fixlet>: bes fixlet action	action	actions	action	0	bes fixlet action	bes fixlet	integer
+action <string> of <bes fixlet>: bes fixlet action	action	actions	action	0	bes fixlet action	bes fixlet	string
+actions of <bes fixlet>: bes fixlet action	action	actions	actions	1	bes fixlet action	bes fixlet	
+activations of <bes fixlet>: bes activation	activation	activations	activations	1	bes activation	bes fixlet	
+applicable computer count of <bes fixlet>: integer	applicable computer count	applicable computer counts	applicable computer count	0	integer	bes fixlet	
+applicable computer set of <bes fixlet>: bes computer set	applicable computer set	applicable computer sets	applicable computer set	0	bes computer set	bes fixlet	
+applicable computers of <bes fixlet>: bes computer	applicable computer	applicable computers	applicable computers	1	bes computer	bes fixlet	
+active directory of <bes ldap directory>: boolean	active directory	active directories	active directory	0	boolean	bes ldap directory	
+active directory of <bes idp directory>: boolean	active directory	active directories	active directory	0	boolean	bes idp directory	
+azure entra id of <bes idp directory>: boolean	azure entra id	azure entra ids	azure entra id	0	boolean	bes idp directory	
+action of <bes peer download>: bes action	action	actions	action	0	bes action	bes peer download	
+action id of <bes peer download>: integer	action id	action ids	action id	0	integer	bes peer download	
+analysis flag of <bes property>: boolean	analysis flag	analysis flags	analysis flag	0	boolean	bes property	
+all bes sites: bes site	all bes site	all bes sites	all bes sites	1	bes site		
+action set of <bes site>: bes action set	action set	action sets	action set	0	bes action set	bes site	
+actions of <bes site>: bes action	action	actions	actions	1	bes action	bes site	
+author of <bes tag>: bes user	author	authors	author	0	bes user	bes tag	
+asset of <bes unmanagedasset field>: bes unmanagedasset	asset	assets	asset	0	bes unmanagedasset	bes unmanagedasset field	
+approver role of <bes user>: bes role	approver role	approver roles	approver role	0	bes role	bes user	
+administered computer set of <bes user>: bes computer set	administered computer set	administered computer sets	administered computer set	0	bes computer set	bes user	
+administered computers of <bes user>: bes computer	administered computer	administered computers	administered computers	1	bes computer	bes user	
+administrator <bes user> of <bes computer>: boolean	administrator	administrators	administrator	0	boolean	bes computer	bes user
+administrator <bes computer> of <bes user>: boolean	administrator	administrators	administrator	0	boolean	bes user	bes computer
+administrator <( bes user, bes computer )>: boolean	administrator	administrators	administrator	0	boolean		( bes user, bes computer )
+administrator <( bes computer, bes user )>: boolean	administrator	administrators	administrator	0	boolean		( bes computer, bes user )
+action site of <bes user>: bes site	action site	action sites	action site	0	bes site	bes user	
+allow unmentioned site of <license>: boolean	allow unmentioned site	allow unmentioned sites	allow unmentioned site	0	boolean	license	
+active container count of <bes product>: integer	active container count	active container counts	active container count	0	integer	bes product	
+any ip version: ip version	any ip version	any ip versions	any ip version	0	ip version		
+base of <string>: html	base	bases	base	0	html	string	
+base of <html>: html	base	bases	base	0	html	html	
+base <string> of <string>: html	base	bases	base	0	html	string	string
+base <string> of <html>: html	base	bases	base	0	html	html	string
+b of <string>: html	b	bs	b	0	html	string	
+b of <html>: html	b	bs	b	0	html	html	
+b <string> of <string>: html	b	bs	b	0	html	string	string
+b <string> of <html>: html	b	bs	b	0	html	html	string
+base64 encode <string>: string	base64 encode	base64 encodes	base64 encode	0	string		string
+base64 decode <string>: string	base64 decode	base64 decodes	base64 decode	0	string		string
+baseline flag of <bes filter>: boolean	baseline flag	baseline flags	baseline flag	0	boolean	bes filter	
+baseline set of <bes filter>: bes fixlet set	baseline set	baseline sets	baseline set	0	bes fixlet set	bes filter	
+baseline flag of <bes fixlet>: boolean	baseline flag	baseline flags	baseline flag	0	boolean	bes fixlet	
+base distinguished name of <bes ldap directory>: string	base distinguished name	base distinguished names	base distinguished name	0	string	bes ldap directory	
+base distinguished name of <bes idp directory>: string	base distinguished name	base distinguished names	base distinguished name	0	string	bes idp directory	
+bes action set: bes action set	bes action set	bes action sets	bes action set	0	bes action set		
+bes actions: bes action	bes action	bes actions	bes actions	1	bes action		
+bes action status fixed: bes action status	bes action status fixed	bes action statuses fixed	bes action status fixed	0	bes action status		
+bes action status running: bes action status	bes action status running	bes action statuses running	bes action status running	0	bes action status		
+bes action status evaluating: bes action status	bes action status evaluating	bes action statuses evaluating	bes action status evaluating	0	bes action status		
+bes action status failed: bes action status	bes action status failed	bes action statuses failed	bes action status failed	0	bes action status		
+bes action status user cancelled: bes action status	bes action status user cancelled	bes action statuses user cancelled	bes action status user cancelled	0	bes action status		
+bes action status download failed: bes action status	bes action status download failed	bes action statuses download failed	bes action status download failed	0	bes action status		
+bes action status locked: bes action status	bes action status locked	bes action statuses locked	bes action status locked	0	bes action status		
+bes action status waiting: bes action status	bes action status waiting	bes action statuses waiting	bes action status waiting	0	bes action status		
+bes action status pending downloads: bes action status	bes action status pending downloads	bes action statuses pending downloads	bes action status pending downloads	0	bes action status		
+bes action status pending restart: bes action status	bes action status pending restart	bes action statuses pending restart	bes action status pending restart	0	bes action status		
+bes action status pending message: bes action status	bes action status pending message	bes action statuses pending message	bes action status pending message	0	bes action status		
+bes action status pending login: bes action status	bes action status pending login	bes action statuses pending login	bes action status pending login	0	bes action status		
+bes action status constrained: bes action status	bes action status constrained	bes action statuses constrained	bes action status constrained	0	bes action status		
+bes action status expired: bes action status	bes action status expired	bes action statuses expired	bes action status expired	0	bes action status		
+bes action status postponed: bes action status	bes action status postponed	bes action statuses postponed	bes action status postponed	0	bes action status		
+bes action status invalid signature: bes action status	bes action status invalid signature	bes action statuses invalid signature	bes action status invalid signature	0	bes action status		
+bes action status error: bes action status	bes action status error	bes action statuses error	bes action status error	0	bes action status		
+bes action status irrelevant: bes action status	bes action status irrelevant	bes action statuses irrelevant	bes action status irrelevant	0	bes action status		
+bes action status unreported: bes action status	bes action status unreported	bes action statuses unreported	bes action status unreported	0	bes action status		
+bes action status pending offer: bes action status	bes action status pending offer	bes action statuses pending offer	bes action status pending offer	0	bes action status		
+bes action status offers disabled: bes action status	bes action status offers disabled	bes action statuses offers disabled	bes action status offers disabled	0	bes action status		
+bes action status disk limited: bes action status	bes action status disk limited	bes action statuses disk limited	bes action status disk limited	0	bes action status		
+bes action status disk free limited: bes action status	bes action status disk free limited	bes action statuses disk free limited	bes action status disk free limited	0	bes action status		
+bes action status hash mismatch: bes action status	bes action status hash mismatch	bes action statuses hash mismatch	bes action status hash mismatch	0	bes action status		
+bes action status timeout reached: bes action status	bes action status timeout reached	bes action statuses timeout reached	bes action status timeout reached	0	bes action status		
+bes action status plugin interrupted: bes action status	bes action status plugin interrupted	bes action statuses plugin interrupted	bes action status plugin interrupted	0	bes action status		
+bes action status download size limited: bes action status	bes action status download size limited	bes action statuses download size limited	bes action status download size limited	0	bes action status		
+bes action status script unavailable: bes action status	bes action status script unavailable	bes action statuses script unavailable	bes action status script unavailable	0	bes action status		
+bes action status locked site: bes action status	bes action status locked site	bes action statuses locked site	bes action status locked site	0	bes action status		
+bes action status no space in active downloads: bes action status	bes action status no space in active downloads	bes action statuses no space in active downloads	bes action status no space in active downloads	0	bes action status		
+bes brand: string	bes brand	bes brands	bes brand	0	string		
+bes computer set: bes computer set	bes computer set	bes computer sets	bes computer set	0	bes computer set		
+bes computers: bes computer	bes computer	bes computers	bes computers	1	bes computer		
+bes computer with extensions set: bes computer set	bes computer with extensions set	bes computer with extensions sets	bes computer with extensions set	0	bes computer set		
+bes computers with extensions: bes computer	bes computer with extensions	bes computers with extensions	bes computers with extensions	1	bes computer		
+bes computer <integer>: bes computer	bes computer	bes computers	bes computer	0	bes computer		integer
+bes computer group set of <bes computer>: bes computer group set	bes computer group set	bes computer group sets	bes computer group set	0	bes computer group set	bes computer	
+bes computer groups of <bes computer>: bes computer group	bes computer group	bes computer groups	bes computer groups	1	bes computer group	bes computer	
+bes computer group set: bes computer group set	bes computer group set	bes computer group sets	bes computer group set	0	bes computer group set		
+bes computer groups: bes computer group	bes computer group	bes computer groups	bes computer groups	1	bes computer group		
+bes deployment options: bes deployment option	bes deployment option	bes deployment options	bes deployment options	1	bes deployment option		
+bes deployment options <string>: bes deployment option	bes deployment option	bes deployment options	bes deployment options	1	bes deployment option		string
+bes domain set: bes domain set	bes domain set	bes domain sets	bes domain set	0	bes domain set		
+bes domains: bes domain	bes domain	bes domains	bes domains	1	bes domain		
+bes domain <string>: bes domain	bes domain	bes domains	bes domain	0	bes domain		string
+bes filter set: bes filter set	bes filter set	bes filter sets	bes filter set	0	bes filter set		
+bes filters: bes filter	bes filter	bes filters	bes filters	1	bes filter		
+bes filter <integer>: bes filter	bes filter	bes filters	bes filter	0	bes filter		integer
+bes fixlet set: bes fixlet set	bes fixlet set	bes fixlet sets	bes fixlet set	0	bes fixlet set		
+bes fixlets: bes fixlet	bes fixlet	bes fixlets	bes fixlets	1	bes fixlet		
+bes task set: bes fixlet set	bes task set	bes task sets	bes task set	0	bes fixlet set		
+bes tasks: bes fixlet	bes task	bes tasks	bes tasks	1	bes fixlet		
+bes analysis set: bes fixlet set	bes analysis set	bes analysis sets	bes analysis set	0	bes fixlet set		
+bes analyses: bes fixlet	bes analysis	bes analyses	bes analyses	1	bes fixlet		
+bes baseline set: bes fixlet set	bes baseline set	bes baseline sets	bes baseline set	0	bes fixlet set		
+bes baselines: bes fixlet	bes baseline	bes baselines	bes baselines	1	bes fixlet		
+best activation of <bes fixlet>: bes activation	best activation	best activations	best activation	0	bes activation	bes fixlet	
+bes languages: string	bes language	bes languages	bes languages	1	string		
+bes ldap directory set: bes ldap directory set	bes ldap directory set	bes ldap directory sets	bes ldap directory set	0	bes ldap directory set		
+bes ldap directories: bes ldap directory	bes ldap directory	bes ldap directories	bes ldap directories	1	bes ldap directory		
+bes idp directory set: bes idp directory set	bes idp directory set	bes idp directory sets	bes idp directory set	0	bes idp directory set		
+bes idp directories: bes idp directory	bes idp directory	bes idp directories	bes idp directories	1	bes idp directory		
+bes peer downloads: bes peer download	bes peer download	bes peer downloads	bes peer downloads	1	bes peer download		
+bes property set: bes property set	bes property set	bes property sets	bes property set	0	bes property set		
+bes properties: bes property	bes property	bes properties	bes properties	1	bes property		
+bes property <string>: bes property	bes property	bes properties	bes property	0	bes property		string
+bes role set: bes role set	bes role set	bes role sets	bes role set	0	bes role set		
+bes roles: bes role	bes role	bes roles	bes roles	1	bes role		
+bes sites: bes site	bes site	bes sites	bes sites	1	bes site		
+bes custom sites: bes site	bes custom site	bes custom sites	bes custom sites	1	bes site		
+bes unmanagedasset set: bes unmanagedasset set	bes unmanagedasset set	bes unmanagedasset sets	bes unmanagedasset set	0	bes unmanagedasset set		
+bes unmanagedassets: bes unmanagedasset	bes unmanagedasset	bes unmanagedassets	bes unmanagedassets	1	bes unmanagedasset		
+bes user set: bes user set	bes user set	bes user sets	bes user set	0	bes user set		
+bes users: bes user	bes user	bes users	bes users	1	bes user		
+bes license: license	bes license	bes licenses	bes license	0	license		
+bes wakeonlan statuses: bes wakeonlan status	bes wakeonlan status	bes wakeonlan statuses	bes wakeonlan statuses	1	bes wakeonlan status		
+bes current wruser: string	bes current wruser	bes current wrusers	bes current wruser	0	string		
+bes wizard set: bes wizard set	bes wizard set	bes wizard sets	bes wizard set	0	bes wizard set		
+bes wizards: bes wizard	bes wizard	bes wizards	bes wizards	1	bes wizard		
+bes webui app set: bes webui app set	bes webui app set	bes webui app sets	bes webui app set	0	bes webui app set		
+bes webui apps: bes webui app	bes webui app	bes webui apps	bes webui apps	1	bes webui app		
+bes webui: bes webui	bes webui	bes webuis	bes webui	0	bes webui		
+big of <string>: html	big	bigs	big	0	html	string	
+big of <html>: html	big	bigs	big	0	html	html	
+big <string> of <string>: html	big	bigs	big	0	html	string	string
+big <string> of <html>: html	big	bigs	big	0	html	html	string
+bit set <string>: bit set	bit set	bit sets	bit set	0	bit set		string
+bit <integer>: bit set	bit	bits	bit	0	bit set		integer
+bit <integer> of <bit set>: boolean	bit	bits	bit	0	boolean	bit set	integer
+binary operators: binary operator	binary operator	binary operators	binary operators	1	binary operator		
+binary operators <string>: binary operator	binary operator	binary operators	binary operators	1	binary operator		string
+binary operators returning <type>: binary operator	binary operator returning	binary operators returning	binary operators returning	1	binary operator		type
+binary_string <string>: binary_string	binary_string	binary_strings	binary_string	0	binary_string		string
+bit <integer> of <integer>: boolean	bit	bits	bit	0	boolean	integer	integer
+bit <integer> of <large integer>: boolean	bit	bits	bit	0	boolean	large integer	integer
+bit <integer> of <uinteger>: boolean	bit	bits	bit	0	boolean	uinteger	integer
+binary_substring <( integer, integer )> of <binary_string>: binary_substring	binary_substring	binary_substrings	binary_substring	0	binary_substring	binary_string	( integer, integer )
+binary_substrings <binary_string> of <binary_string>: binary_substring	binary_substring	binary_substrings	binary_substrings	1	binary_substring	binary_string	binary_string
+bin at <time> of <statistic range>: statistical bin	bin at	bins at	bin at	0	statistical bin	statistic range	time
+bins of <statistic range>: statistical bin	bin	bins	bins	1	statistical bin	statistic range	
+body of <string>: html	body	bodys	body	0	html	string	
+body of <html>: html	body	bodys	body	0	html	html	
+body <string> of <string>: html	body	bodys	body	0	html	string	string
+body <string> of <html>: html	body	bodys	body	0	html	html	string
+blockquote of <string>: html	blockquote	blockquotes	blockquote	0	html	string	
+blockquote of <html>: html	blockquote	blockquotes	blockquote	0	html	html	
+blockquote <string> of <string>: html	blockquote	blockquotes	blockquote	0	html	string	string
+blockquote <string> of <html>: html	blockquote	blockquotes	blockquote	0	html	html	string
+br: html	br	brs	br	0	html		
+br <string>: html	br	brs	br	0	html		string
+byte <integer>: binary_string	byte	bytes	byte	0	binary_string		integer
+boolean <string>: boolean	boolean	booleans	boolean	0	boolean		string
+build revision of <version>: integer	build revision	build revisions	build revision	0	integer	version	
+byte <integer> of <binary_string>: binary_substring	byte	bytes	byte	0	binary_substring	binary_string	integer
+bytes of <binary_string>: binary_substring	byte	bytes	bytes	1	binary_substring	binary_string	
+body of <bes fixlet>: html	body	bodies	body	0	html	bes fixlet	
+cite of <string>: html	cite	cites	cite	0	html	string	
+cite of <html>: html	cite	cites	cite	0	html	html	
+cite <string> of <string>: html	cite	cites	cite	0	html	string	string
+cite <string> of <html>: html	cite	cites	cite	0	html	html	string
+caption of <string>: html	caption	captions	caption	0	html	string	
+caption of <html>: html	caption	captions	caption	0	html	html	
+caption <string> of <string>: html	caption	captions	caption	0	html	string	string
+caption <string> of <html>: html	caption	captions	caption	0	html	html	string
+character <integer> of <string>: substring	character	characters	character	0	substring	string	integer
+characters of <string>: substring	character	characters	characters	1	substring	string	
+casts: cast	cast	casts	casts	1	cast		
+casts <string>: cast	cast	casts	casts	1	cast		string
+casts from of <type>: cast	cast from	casts from	casts from	1	cast	type	
+casts returning <type>: cast	cast returning	casts returning	casts returning	1	cast		type
+character <integer>: string	character	characters	character	0	string		integer
+case insensitive regexes <string>: regular expression	case insensitive regex	case insensitive regexes	case insensitive regexes	1	regular expression		string
+case insensitive regular expressions <string>: regular expression	case insensitive regular expression	case insensitive regular expressions	case insensitive regular expressions	1	regular expression		string
+client settings of <bes computer>: bes client setting	client setting	client settings	client settings	1	bes client setting	bes computer	
+client evaluated flag of <bes computer group>: boolean	client evaluated flag	client evaluated flags	client evaluated flag	0	boolean	bes computer group	
+category of <bes fixlet>: string	category	categories	category	0	string	bes fixlet	
+charset of <bes fixlet>: string	charset	charsets	charset	0	string	bes fixlet	
+client id of <bes idp directory>: string	client id	client ids	client id	0	string	bes idp directory	
+category of <bes property>: string	category	categories	category	0	string	bes property	
+can submit queries flag of <bes role>: boolean	can submit queries flag	can submit queries flags	can submit queries flag	0	boolean	bes role	
+client installed flag of <bes unmanagedasset>: boolean	client installed flag	client installed flags	client installed flag	0	boolean	bes unmanagedasset	
+can create actions flag of <bes user>: boolean	can create actions flag	can create actions flags	can create actions flag	0	boolean	bes user	
+can send multiple refresh flag of <bes user>: boolean	can send multiple refresh flag	can send multiple refresh flags	can send multiple refresh flag	0	boolean	bes user	
+can submit queries flag of <bes user>: boolean	can submit queries flag	can submit queries flags	can submit queries flag	0	boolean	bes user	
+can lock flag of <bes user>: boolean	can lock flag	can lock flags	can lock flag	0	boolean	bes user	
+client license: license	client license	client licenses	client license	0	license		
+charset of <bes wizard>: string	charset	charsets	charset	0	string	bes wizard	
+client device count of <bes product>: integer	client device count	client device counts	client device count	0	integer	bes product	
+cloud count of <bes product>: integer	cloud count	cloud counts	cloud count	0	integer	bes product	
+concatenations of <html>: html	concatenation	concatenations	concatenations	1	html	html	
+concatenations <string> of <html>: html	concatenation	concatenations	concatenations	1	html	html	string
+concatenations <html> of <string>: html	concatenation	concatenations	concatenations	1	html	string	html
+concatenations <html> of <html>: html	concatenation	concatenations	concatenations	1	html	html	html
+code of <string>: html	code	codes	code	0	html	string	
+code of <html>: html	code	codes	code	0	html	html	
+code <string> of <string>: html	code	codes	code	0	html	string	string
+code <string> of <html>: html	code	codes	code	0	html	html	string
+colgroup of <string>: html	colgroup	colgroups	colgroup	0	html	string	
+colgroup of <html>: html	colgroup	colgroups	colgroup	0	html	html	
+colgroup <string> of <string>: html	colgroup	colgroups	colgroup	0	html	string	string
+colgroup <string> of <html>: html	colgroup	colgroups	colgroup	0	html	html	string
+col of <string>: html	col	cols	col	0	html	string	
+col of <html>: html	col	cols	col	0	html	html	
+col <string> of <string>: html	col	cols	col	0	html	string	string
+col <string> of <html>: html	col	cols	col	0	html	html	string
+conjunctions of <boolean>: boolean	conjunction	conjunctions	conjunctions	1	boolean	boolean	
+cryptography: cryptography	cryptography	cryptographies	cryptography	0	cryptography		
+concatenations of <string>: string	concatenation	concatenations	concatenations	1	string	string	
+concatenations <string> of <string>: string	concatenation	concatenations	concatenations	1	string	string	string
+current date: date	current date	current dates	current date	0	date		
+current day_of_week: day of week	current day_of_week	current days_of_week	current day_of_week	0	day of week		
+current day_of_month: day of month	current day_of_month	current days_of_month	current day_of_month	0	day of month		
+current month: month	current month	current months	current month	0	month		
+current year: year	current year	current years	current year	0	year		
+current day_of_year: day of year	current day_of_year	current days_of_year	current day_of_year	0	day of year		
+current month_and_year: month and year	current month_and_year	current months_and_years	current month_and_year	0	month and year		
+current time_of_day <time zone>: time of day with time zone	current time_of_day	current times_of_day	current time_of_day	0	time of day with time zone		time zone
+current time_of_day: time of day with time zone	current time_of_day	current times_of_day	current time_of_day	0	time of day with time zone		
+component <integer> of <site version list>: integer	component	components	component	0	integer	site version list	integer
+computer of <bes action result>: bes computer	computer	computers	computer	0	bes computer	bes action result	
+count maps of <historical fixlet count>: fixlet count pair	count map	count maps	count maps	1	fixlet count pair	historical fixlet count	
+count of <fixlet count pair>: integer	count	counts	count	0	integer	fixlet count pair	
+count of <historical computer count>: integer	count	counts	count	0	integer	historical computer count	
+correlation coefficient of <linear projection>: floating point	correlation coefficient	correlation coefficients	correlation coefficient	0	floating point	linear projection	
+correlation coefficient of <exponential projection>: floating point	correlation coefficient	correlation coefficients	correlation coefficient	0	floating point	exponential projection	
+computer group flag of <bes action>: boolean	computer group flag	computer group flags	computer group flag	0	boolean	bes action	
+constrain by property name of <bes action>: string	constrain by property name	constrain by property names	constrain by property name	0	string	bes action	
+constrain by property relation of <bes action>: string	constrain by property relation	constrain by property relations	constrain by property relation	0	string	bes action	
+constrain by property value of <bes action>: string	constrain by property value	constrain by property values	constrain by property value	0	string	bes action	
+custom success relevance of <bes action>: string	custom success relevance	custom success relevances	custom success relevance	0	string	bes action	
+continue on errors flag of <bes action>: boolean	continue on errors flag	continue on errors flags	continue on errors flag	0	boolean	bes action	
+creation time of <bes activation>: time	creation time	creation times	creation time	0	time	bes activation	
+components of <bes baseline component group>: bes baseline component	component	components	components	1	bes baseline component	bes baseline component group	
+comments of <bes computer>: bes comment	comment	comments	comments	1	bes comment	bes computer	
+comments of <bes action>: bes comment	comment	comments	comments	1	bes comment	bes action	
+comments of <bes fixlet>: bes comment	comment	comments	comments	1	bes comment	bes fixlet	
+current computer: bes computer	current computer	current computers	current computer	0	bes computer		
+cpu of <bes computer>: string	cpu	cpus	cpu	0	string	bes computer	
+correlation flag of <bes computer>: boolean	correlation flag	correlation flags	correlation flag	0	boolean	bes computer	
+correlation id of <bes computer>: integer	correlation id	correlation ids	correlation id	0	integer	bes computer	
+correlation of <bes computer>: bes computer	correlation	correlations	correlation	0	bes computer	bes computer	
+creation time of <bes computer group>: time	creation time	creation times	creation time	0	time	bes computer group	
+custom refresh interval flag of <bes computer group>: boolean	custom refresh interval flag	custom refresh interval flags	custom refresh interval flag	0	boolean	bes computer group	
+custom refresh interval of <bes computer group>: time interval	custom refresh interval	custom refresh intervals	custom refresh interval	0	time interval	bes computer group	
+current domain: bes domain	current domain	current domains	current domain	0	bes domain		
+custom fixlet set of <bes domain>: bes fixlet set	custom fixlet set	custom fixlet sets	custom fixlet set	0	bes fixlet set	bes domain	
+custom fixlets of <bes domain>: bes fixlet	custom fixlet	custom fixlets	custom fixlets	1	bes fixlet	bes domain	
+custom site set of <bes domain>: bes site set	custom site set	custom site sets	custom site set	0	bes site set	bes domain	
+custom sites of <bes domain>: bes site	custom site	custom sites	custom sites	1	bes site	bes domain	
+computer group set of <bes domain>: bes computer group set	computer group set	computer group sets	computer group set	0	bes computer group set	bes domain	
+computer groups of <bes domain>: bes computer group	computer group	computer groups	computer groups	1	bes computer group	bes domain	
+computer flag of <bes filter>: boolean	computer flag	computer flags	computer flag	0	boolean	bes filter	
+computer set of <bes filter>: bes computer set	computer set	computer sets	computer set	0	bes computer set	bes filter	
+computer group set of <bes filter>: bes fixlet set	computer group set	computer group sets	computer group set	0	bes fixlet set	bes filter	
+current fixlet: bes fixlet	current fixlet	current fixlets	current fixlet	0	bes fixlet		
+current task: bes fixlet	current task	current tasks	current task	0	bes fixlet		
+current analysis: bes fixlet	current analysis	current analyses	current analysis	0	bes fixlet		
+cve id list of <bes fixlet>: string	cve id list	cve id lists	cve id list	0	string	bes fixlet	
+creation time of <bes fixlet>: time	creation time	creation times	creation time	0	time	bes fixlet	
+custom flag of <bes fixlet>: boolean	custom flag	custom flags	custom flag	0	boolean	bes fixlet	
+custom bes fixlet set: bes fixlet set	custom bes fixlet set	custom bes fixlet sets	custom bes fixlet set	0	bes fixlet set		
+custom bes fixlets: bes fixlet	custom bes fixlet	custom bes fixlets	custom bes fixlets	1	bes fixlet		
+component groups of <bes fixlet>: bes baseline component group	component group	component groups	component groups	1	bes baseline component group	bes fixlet	
+components xml of <bes fixlet>: string	components xml	components xmls	components xml	0	string	bes fixlet	
+custom site of <bes fixlet>: bes site	custom site	custom sites	custom site	0	bes site	bes fixlet	
+custom site flag of <bes fixlet>: boolean	custom site flag	custom site flags	custom site flag	0	boolean	bes fixlet	
+content id of <bes fixlet action>: string	content id	content ids	content id	0	string	bes fixlet action	
+custom success relevance of <bes fixlet action>: string	custom success relevance	custom success relevances	custom success relevance	0	string	bes fixlet action	
+computer of <bes fixlet result>: bes computer	computer	computers	computer	0	bes computer	bes fixlet result	
+custom flag of <bes property>: boolean	custom flag	custom flags	custom flag	0	boolean	bes property	
+computer of <bes property result>: bes computer	computer	computers	computer	0	bes computer	bes property result	
+current bes servers: bes server	current bes server	current bes servers	current bes servers	1	bes server		
+custom site flag of <bes site>: boolean	custom site flag	custom site flags	custom site flag	0	boolean	bes site	
+creator of <bes site>: bes user	creator	creators	creator	0	bes user	bes site	
+creation date of <bes site>: time	creation date	creation dates	creation date	0	time	bes site	
+current bes site: bes site	current bes site	current bes sites	current bes site	0	bes site		
+current unmanagedasset: bes unmanagedasset	current unmanagedasset	current unmanagedassets	current unmanagedasset	0	bes unmanagedasset		
+current console user: bes user	current console user	current console users	current console user	0	bes user		
+custom content flag of <bes user>: boolean	custom content flag	custom content flags	custom content flag	0	boolean	bes user	
+creation time of <bes user>: time	creation time	creation times	creation time	0	time	bes user	
+current explorer user: bes user	current explorer user	current explorer users	current explorer user	0	bes user		
+current wizard: bes wizard	current wizard	current wizards	current wizard	0	bes wizard		
+common name of <license>: string	common name	common names	common name	0	string	license	
+computer count of <bes product>: integer	computer count	computer counts	computer count	0	integer	bes product	
+div of <string>: html	div	divs	div	0	html	string	
+div of <html>: html	div	divs	div	0	html	html	
+div <string> of <string>: html	div	divs	div	0	html	string	string
+div <string> of <html>: html	div	divs	div	0	html	html	string
+dfn of <string>: html	dfn	dfns	dfn	0	html	string	
+dfn of <html>: html	dfn	dfns	dfn	0	html	html	
+dfn <string> of <string>: html	dfn	dfns	dfn	0	html	string	string
+dfn <string> of <html>: html	dfn	dfns	dfn	0	html	html	string
+del of <string>: html	del	dels	del	0	html	string	
+del of <html>: html	del	dels	del	0	html	html	
+del <string> of <string>: html	del	dels	del	0	html	string	string
+del <string> of <html>: html	del	dels	del	0	html	html	string
+definition lists of <string>: html	definition list	definition lists	definition lists	1	html	string	
+definition lists <string> of <string>: html	definition list	definition lists	definition lists	1	html	string	string
+definition lists of <html>: html	definition list	definition lists	definition lists	1	html	html	
+definition lists <string> of <html>: html	definition list	definition lists	definition lists	1	html	html	string
+dt of <string>: html	dt	dts	dt	0	html	string	
+dt of <html>: html	dt	dts	dt	0	html	html	
+dt <string> of <string>: html	dt	dts	dt	0	html	string	string
+dt <string> of <html>: html	dt	dts	dt	0	html	html	string
+dd of <string>: html	dd	dds	dd	0	html	string	
+dd of <html>: html	dd	dds	dd	0	html	html	
+dd <string> of <string>: html	dd	dds	dd	0	html	string	string
+dd <string> of <html>: html	dd	dds	dd	0	html	html	string
+disjunctions of <boolean>: boolean	disjunction	disjunctions	disjunctions	1	boolean	boolean	
+desired fips mode of <cryptography>: boolean	desired fips mode	desired fips modes	desired fips mode	0	boolean	cryptography	
+day: time interval	day	days	day	0	time interval		
+direct object type of <property>: type	direct object type	direct object types	direct object type	0	type	property	
+dependency known of <property>: boolean	dependency known	dependencies known	dependency known	0	boolean	property	
+day_of_month <integer>: day of month	day_of_month	days_of_month	day_of_month	0	day of month		integer
+day_of_month <string>: day of month	day_of_month	days_of_month	day_of_month	0	day of month		string
+day_of_week <string>: day of week	day_of_week	days_of_week	day_of_week	0	day of week		string
+day of <day of year>: day of month	day	days	day	0	day of month	day of year	
+december <integer>: day of year	december	decembers	december	0	day of year		integer
+day_of_month of <date>: day of month	day_of_month	days_of_month	day_of_month	0	day of month	date	
+day_of_week of <date>: day of week	day_of_week	days_of_week	day_of_week	0	day of week	date	
+day_of_year of <date>: day of year	day_of_year	days_of_year	day_of_year	0	day of year	date	
+december <integer> of <integer>: date	december	decembers	december	0	date	integer	integer
+date <string>: date	date	dates	date	0	date		string
+date <time zone> of <time>: date	date	dates	date	0	date	time	time zone
+december of <integer>: month and year	december	decembers	december	0	month and year	integer	
+december: month	december	decembers	december	0	month		
+divided by zero of <floating point>: boolean	divided by zero	divided by zeroes	divided by zero	0	boolean	floating point	
+datastore inspector: module	datastore inspector	datastore inspectors	datastore inspector	0	module		
+detailed status of <bes action result>: string	detailed status	detailed statuses	detailed status	0	string	bes action result	
+database id of <historical fixlet count>: integer	database id	database ids	database id	0	integer	historical fixlet count	
+database id of <historical computer count>: integer	database id	database ids	database id	0	integer	historical computer count	
+database id of <bes action>: integer	database id	database ids	database id	0	integer	bes action	
+database name of <bes action>: string	database name	database names	database name	0	string	bes action	
+date range start of <bes action>: date	date range start	date range starts	date range start	0	date	bes action	
+date range end of <bes action>: date	date range end	date range ends	date range end	0	date	bes action	
+domain of <bes action>: bes domain	domain	domains	domain	0	bes domain	bes action	
+day_of_week constraints of <bes action>: day of week	day_of_week constraint	day_of_week constraints	day_of_week constraints	1	day of week	bes action	
+database id of <bes activation>: integer	database id	database ids	database id	0	integer	bes activation	
+deleted flag of <bes comment>: boolean	deleted flag	deleted flags	deleted flag	0	boolean	bes comment	
+database id of <bes computer>: integer	database id	database ids	database id	0	integer	bes computer	
+database name of <bes computer>: string	database name	database names	database name	0	string	bes computer	
+device type of <bes computer>: string	device type	device types	device type	0	string	bes computer	
+database id of <bes computer group>: integer	database id	database ids	database id	0	integer	bes computer group	
+domain of <bes computer group>: bes domain	domain	domains	domain	0	bes domain	bes computer group	
+database id of <bes deployment option>: integer	database id	database ids	database id	0	integer	bes deployment option	
+database name of <bes deployment option>: string	database name	database names	database name	0	string	bes deployment option	
+display name of <bes domain>: string	display name	display names	display name	0	string	bes domain	
+domain of <bes filter>: bes domain	domain	domains	domain	0	bes domain	bes filter	
+display name of <bes fixlet>: string	display name	display names	display name	0	string	bes fixlet	
+display source of <bes fixlet>: string	display source	display sources	display source	0	string	bes fixlet	
+display source id of <bes fixlet>: string	display source id	display source ids	display source id	0	string	bes fixlet	
+display source severity of <bes fixlet>: string	display source severity	display source severities	display source severity	0	string	bes fixlet	
+display category of <bes fixlet>: string	display category	display categories	display category	0	string	bes fixlet	
+download size of <bes fixlet>: integer	download size	download sizes	download size	0	integer	bes fixlet	
+display message of <bes fixlet>: html	display message	display messages	display message	0	html	bes fixlet	
+digest file name of <bes fixlet>: string	digest file name	digest file names	digest file name	0	string	bes fixlet	
+default action of <bes fixlet>: bes fixlet action	default action	default actions	default action	0	bes fixlet action	bes fixlet	
+domain of <bes fixlet>: bes domain	domain	domains	domain	0	bes domain	bes fixlet	
+display value of <bes fixlet field value>: string	display value	display values	display value	0	string	bes fixlet field value	
+downloader computer id of <bes peer download>: integer	downloader computer id	downloader computer ids	downloader computer id	0	integer	bes peer download	
+database id of <bes peer download>: integer	database id	database ids	database id	0	integer	bes peer download	
+database name of <bes peer download>: string	database name	database names	database name	0	string	bes peer download	
+database id of <bes property>: integer	database id	database ids	database id	0	integer	bes property	
+display name of <bes property>: string	display name	display names	display name	0	string	bes property	
+display simple name of <bes property>: string	display simple name	display simple names	display simple name	0	string	bes property	
+display category of <bes property>: string	display category	display categories	display category	0	string	bes property	
+definition of <bes property>: string	definition	definitions	definition	0	string	bes property	
+default flag of <bes property>: boolean	default flag	default flags	default flag	0	boolean	bes property	
+disk usage of <bes property>: integer	disk usage	disk usages	disk usage	0	integer	bes property	
+database id of <bes server>: integer	database id	database ids	database id	0	integer	bes server	
+database name of <bes server>: string	database name	database names	database name	0	string	bes server	
+database type of <bes server>: string	database type	database types	database type	0	string	bes server	
+display name of <bes site>: string	display name	display names	display name	0	string	bes site	
+description of <bes site>: string	description	descriptions	description	0	string	bes site	
+domain set of <bes site>: bes domain set	domain set	domain sets	domain set	0	bes domain set	bes site	
+domains of <bes site>: bes domain	domain	domains	domains	1	bes domain	bes site	
+distinguished name of <bes user>: string	distinguished name	distinguished names	distinguished name	0	string	bes user	
+database id of <bes wakeonlan status>: integer	database id	database ids	database id	0	integer	bes wakeonlan status	
+database name of <bes wakeonlan status>: string	database name	database names	database name	0	string	bes wakeonlan status	
+display name of <bes wizard>: string	display name	display names	display name	0	string	bes wizard	
+dashboard id of <bes wizard>: string	dashboard id	dashboard ids	dashboard id	0	string	bes wizard	
+database id of <bes wizard>: integer	database id	database ids	database id	0	integer	bes wizard	
+database name of <bes wizard>: string	database name	database names	database name	0	string	bes wizard	
+dialog flag of <bes wizard>: boolean	dialog flag	dialog flags	dialog flag	0	boolean	bes wizard	
+document flag of <bes wizard>: boolean	document flag	document flags	document flag	0	boolean	bes wizard	
+default page name of <bes wizard>: string	default page name	default page names	default page name	0	string	bes wizard	
+device count of <bes product>: integer	device count	device counts	device count	0	integer	bes product	
+download hash algorithms of <license>: string	download hash algorithm	download hash algorithms	download hash algorithms	1	string	license	
+em of <string>: html	em	ems	em	0	html	string	
+em of <html>: html	em	ems	em	0	html	html	
+em <string> of <string>: html	em	ems	em	0	html	string	string
+em <string> of <html>: html	em	ems	em	0	html	html	string
+element <integer> of <json value>: json value	element	elements	element	0	json value	json value	integer
+elements of <json value>: json value	element	elements	elements	1	json value	json value	
+end of <substring>: string position	end	ends	end	0	string position	substring	
+error <string>: undefined	error	errors	error	0	undefined		string
+end of <time range>: time	end	ends	end	0	time	time range	
+elements of <integer set>: integer	element	elements	elements	1	integer	integer set	
+elements of <string set>: string	element	elements	elements	1	string	string set	
+end of <binary_substring>: binary position	end	ends	end	0	binary position	binary_substring	
+end of <statistic range>: time	end	ends	end	0	time	statistic range	
+end time of <bes action result>: time	end time	end times	end time	0	time	bes action result	
+end of <statistical bin>: time	end	ends	end	0	time	statistical bin	
+elements of <bes action set>: bes action	element	elements	elements	1	bes action	bes action set	
+end date of <bes action>: date	end date	end dates	end date	0	date	bes action	
+end time_of_day of <bes action>: time of day	end time_of_day	end times_of_day	end time_of_day	0	time of day	bes action	
+end flag of <bes action>: boolean	end flag	end flags	end flag	0	boolean	bes action	
+elements of <bes computer set>: bes computer	element	elements	elements	1	bes computer	bes computer set	
+elements of <bes computer group set>: bes computer group	element	elements	elements	1	bes computer group	bes computer group set	
+elements of <bes domain set>: bes domain	element	elements	elements	1	bes domain	bes domain set	
+elements of <bes filter set>: bes filter	element	elements	elements	1	bes filter	bes filter set	
+elements of <bes fixlet set>: bes fixlet	element	elements	elements	1	bes fixlet	bes fixlet set	
+evaluation period of <bes fixlet>: time interval	evaluation period	evaluation periods	evaluation period	0	time interval	bes fixlet	
+elements of <bes ldap directory set>: bes ldap directory	element	elements	elements	1	bes ldap directory	bes ldap directory set	
+elements of <bes idp directory set>: bes idp directory	element	elements	elements	1	bes idp directory	bes idp directory set	
+elements of <bes property set>: bes property	element	elements	elements	1	bes property	bes property set	
+evaluation period of <bes property>: time interval	evaluation period	evaluation periods	evaluation period	0	time interval	bes property	
+error message of <bes property result>: string	error message	error messages	error message	0	string	bes property result	
+error flag of <bes property result>: boolean	error flag	error flags	error flag	0	boolean	bes property result	
+elements of <bes role set>: bes role	element	elements	elements	1	bes role	bes role set	
+elements of <bes site set>: bes site	element	elements	elements	1	bes site	bes site set	
+elements of <bes site file set>: bes site file	element	elements	elements	1	bes site file	bes site file set	
+elements of <bes unmanagedasset set>: bes unmanagedasset	element	elements	elements	1	bes unmanagedasset	bes unmanagedasset set	
+editable flag of <bes unmanagedasset field>: boolean	editable flag	editable flags	editable flag	0	boolean	bes unmanagedasset field	
+elements of <bes user set>: bes user	element	elements	elements	1	bes user	bes user set	
+effective master flag of <bes user>: boolean	effective master flag	effective master flags	effective master flag	0	boolean	bes user	
+effective custom content flag of <bes user>: boolean	effective custom content flag	effective custom content flags	effective custom content flag	0	boolean	bes user	
+effective unmanagedasset privilege scanpoint flag of <bes user>: boolean	effective unmanagedasset privilege scanpoint flag	effective unmanagedasset privilege scanpoint flags	effective unmanagedasset privilege scanpoint flag	0	boolean	bes user	
+effective unmanagedasset privilege showall flag of <bes user>: boolean	effective unmanagedasset privilege showall flag	effective unmanagedasset privilege showall flags	effective unmanagedasset privilege showall flag	0	boolean	bes user	
+effective unmanagedasset privilege shownone flag of <bes user>: boolean	effective unmanagedasset privilege shownone flag	effective unmanagedasset privilege shownone flags	effective unmanagedasset privilege shownone flag	0	boolean	bes user	
+effective show other action flag of <bes user>: boolean	effective show other action flag	effective show other action flags	effective show other action flag	0	boolean	bes user	
+effective stop other actions flag of <bes user>: boolean	effective stop other actions flag	effective stop other actions flags	effective stop other actions flag	0	boolean	bes user	
+effective can create actions flag of <bes user>: boolean	effective can create actions flag	effective can create actions flags	effective can create actions flag	0	boolean	bes user	
+effective restartandshutdown postaction privilege allowboth flag of <bes user>: boolean	effective restartandshutdown postaction privilege allowboth flag	effective restartandshutdown postaction privilege allowboth flags	effective restartandshutdown postaction privilege allowboth flag	0	boolean	bes user	
+effective restartandshutdown postaction privilege allowrestartonly flag of <bes user>: boolean	effective restartandshutdown postaction privilege allowrestartonly flag	effective restartandshutdown postaction privilege allowrestartonly flags	effective restartandshutdown postaction privilege allowrestartonly flag	0	boolean	bes user	
+effective restartandshutdown postaction privilege none flag of <bes user>: boolean	effective restartandshutdown postaction privilege none flag	effective restartandshutdown postaction privilege none flags	effective restartandshutdown postaction privilege none flag	0	boolean	bes user	
+effective restartandshutdown actionscript privilege allowboth flag of <bes user>: boolean	effective restartandshutdown actionscript privilege allowboth flag	effective restartandshutdown actionscript privilege allowboth flags	effective restartandshutdown actionscript privilege allowboth flag	0	boolean	bes user	
+effective restartandshutdown actionscript privilege allowrestartonly flag of <bes user>: boolean	effective restartandshutdown actionscript privilege allowrestartonly flag	effective restartandshutdown actionscript privilege allowrestartonly flags	effective restartandshutdown actionscript privilege allowrestartonly flag	0	boolean	bes user	
+effective restartandshutdown actionscript privilege none flag of <bes user>: boolean	effective restartandshutdown actionscript privilege none flag	effective restartandshutdown actionscript privilege none flags	effective restartandshutdown actionscript privilege none flag	0	boolean	bes user	
+effective can send multiple refresh flag of <bes user>: boolean	effective can send multiple refresh flag	effective can send multiple refresh flags	effective can send multiple refresh flag	0	boolean	bes user	
+effective can submit queries flag of <bes user>: boolean	effective can submit queries flag	effective can submit queries flags	effective can submit queries flag	0	boolean	bes user	
+effective can lock flag of <bes user>: boolean	effective can lock flag	effective can lock flags	effective can lock flag	0	boolean	bes user	
+enabled of <bes wakeonlan status>: boolean	enabled	enableds	enabled	0	boolean	bes wakeonlan status	
+elements of <bes wizard set>: bes wizard	element	elements	elements	1	bes wizard	bes wizard set	
+elements of <bes webui app set>: bes webui app	element	elements	elements	1	bes webui app	bes webui app set	
+email address of <license>: string	email address	email addresses	email address	0	string	license	
+evaluation of <license>: boolean	evaluation	evaluations	evaluation	0	boolean	license	
+encryption certificate of <license>: x509 certificate	encryption certificate	encryption certificates	encryption certificate	0	x509 certificate	license	
+effective download hash algorithm of <license>: string	effective download hash algorithm	effective download hash algorithms	effective download hash algorithm	0	string	license	
+effective signature hash algorithm of <license>: string	effective signature hash algorithm	effective signature hash algorithms	effective signature hash algorithm	0	string	license	
+enhanced security of <license>: boolean	enhanced security	enhanced securities	enhanced security	0	boolean	license	
+extremas of <hertz>: ( hertz, hertz )	extrema	extremas	extremas	1	( hertz, hertz )	hertz	
+extremas of <time>: ( time, time )	extrema	extremas	extremas	1	( time, time )	time	
+extremas of <time interval>: ( time interval, time interval )	extrema	extremas	extremas	1	( time interval, time interval )	time interval	
+extremas of <integer>: ( integer, integer )	extrema	extremas	extremas	1	( integer, integer )	integer	
+extremas of <large integer>: ( large integer, large integer )	extrema	extremas	extremas	1	( large integer, large integer )	large integer	
+extremas of <uinteger>: ( uinteger, uinteger )	extrema	extremas	extremas	1	( uinteger, uinteger )	uinteger	
+extremas of <day of month>: ( day of month, day of month )	extrema	extremas	extremas	1	( day of month, day of month )	day of month	
+extremas of <day of year>: ( day of year, day of year )	extrema	extremas	extremas	1	( day of year, day of year )	day of year	
+extremas of <date>: ( date, date )	extrema	extremas	extremas	1	( date, date )	date	
+extremas of <month and year>: ( month and year, month and year )	extrema	extremas	extremas	1	( month and year, month and year )	month and year	
+extremas of <number of months>: ( number of months, number of months )	extrema	extremas	extremas	1	( number of months, number of months )	number of months	
+extremas of <month>: ( month, month )	extrema	extremas	extremas	1	( month, month )	month	
+extremas of <time of day>: ( time of day, time of day )	extrema	extremas	extremas	1	( time of day, time of day )	time of day	
+extremas of <year>: ( year, year )	extrema	extremas	extremas	1	( year, year )	year	
+extremas of <site version list>: ( site version list, site version list )	extrema	extremas	extremas	1	( site version list, site version list )	site version list	
+extremas of <version>: ( version, version )	extrema	extremas	extremas	1	( version, version )	version	
+extremas of <floating point>: ( floating point, floating point )	extrema	extremas	extremas	1	( floating point, floating point )	floating point	
+exit code of <bes action result>: integer	exit code	exit codes	exit code	0	integer	bes action result	
+extrapolation <time> of <linear projection>: floating point	extrapolation	extrapolations	extrapolation	0	floating point	linear projection	time
+extremas of <rate>: ( rate, rate )	extrema	extremas	extremas	1	( rate, rate )	rate	
+exponential fit of <statistical bin>: exponential projection	exponential fit	exponential fits	exponential fit	0	exponential projection	statistical bin	
+extrapolation <time> of <exponential projection>: floating point	extrapolation	extrapolations	extrapolation	0	floating point	exponential projection	time
+expiration flag of <bes action>: boolean	expiration flag	expiration flags	expiration flag	0	boolean	bes action	
+expiration time of <bes action>: time	expiration time	expiration times	expiration time	0	time	bes action	
+extension flag of <bes computer>: boolean	extension flag	extension flags	extension flag	0	boolean	bes computer	
+external site flag of <bes site>: boolean	external site flag	external site flags	external site flag	0	boolean	bes site	
+explicit owner set of <bes site>: bes user set	explicit owner set	explicit owner sets	explicit owner set	0	bes user set	bes site	
+explicit owners of <bes site>: bes user	explicit owner	explicit owners	explicit owners	1	bes user	bes site	
+explicit reader set of <bes site>: bes user set	explicit reader set	explicit reader sets	explicit reader set	0	bes user set	bes site	
+explicit readers of <bes site>: bes user	explicit reader	explicit readers	explicit readers	1	bes user	bes site	
+explicit writer set of <bes site>: bes user set	explicit writer set	explicit writer sets	explicit writer set	0	bes user set	bes site	
+explicit writers of <bes site>: bes user	explicit writer	explicit writers	explicit writers	1	bes user	bes site	
+explicit master flag of <bes user>: boolean	explicit master flag	explicit master flags	explicit master flag	0	boolean	bes user	
+explicit custom content flag of <bes user>: boolean	explicit custom content flag	explicit custom content flags	explicit custom content flag	0	boolean	bes user	
+explicit unmanagedasset privilege scanpoint flag of <bes user>: boolean	explicit unmanagedasset privilege scanpoint flag	explicit unmanagedasset privilege scanpoint flags	explicit unmanagedasset privilege scanpoint flag	0	boolean	bes user	
+explicit unmanagedasset privilege showall flag of <bes user>: boolean	explicit unmanagedasset privilege showall flag	explicit unmanagedasset privilege showall flags	explicit unmanagedasset privilege showall flag	0	boolean	bes user	
+explicit unmanagedasset privilege shownone flag of <bes user>: boolean	explicit unmanagedasset privilege shownone flag	explicit unmanagedasset privilege shownone flags	explicit unmanagedasset privilege shownone flag	0	boolean	bes user	
+explicit show other action flag of <bes user>: boolean	explicit show other action flag	explicit show other action flags	explicit show other action flag	0	boolean	bes user	
+explicit stop other actions flag of <bes user>: boolean	explicit stop other actions flag	explicit stop other actions flags	explicit stop other actions flag	0	boolean	bes user	
+explicit can create actions flag of <bes user>: boolean	explicit can create actions flag	explicit can create actions flags	explicit can create actions flag	0	boolean	bes user	
+explicit restartandshutdown postaction privilege allowboth flag of <bes user>: boolean	explicit restartandshutdown postaction privilege allowboth flag	explicit restartandshutdown postaction privilege allowboth flags	explicit restartandshutdown postaction privilege allowboth flag	0	boolean	bes user	
+explicit restartandshutdown postaction privilege allowrestartonly flag of <bes user>: boolean	explicit restartandshutdown postaction privilege allowrestartonly flag	explicit restartandshutdown postaction privilege allowrestartonly flags	explicit restartandshutdown postaction privilege allowrestartonly flag	0	boolean	bes user	
+explicit restartandshutdown postaction privilege none flag of <bes user>: boolean	explicit restartandshutdown postaction privilege none flag	explicit restartandshutdown postaction privilege none flags	explicit restartandshutdown postaction privilege none flag	0	boolean	bes user	
+explicit restartandshutdown actionscript privilege allowboth flag of <bes user>: boolean	explicit restartandshutdown actionscript privilege allowboth flag	explicit restartandshutdown actionscript privilege allowboth flags	explicit restartandshutdown actionscript privilege allowboth flag	0	boolean	bes user	
+explicit restartandshutdown actionscript privilege allowrestartonly flag of <bes user>: boolean	explicit restartandshutdown actionscript privilege allowrestartonly flag	explicit restartandshutdown actionscript privilege allowrestartonly flags	explicit restartandshutdown actionscript privilege allowrestartonly flag	0	boolean	bes user	
+explicit restartandshutdown actionscript privilege none flag of <bes user>: boolean	explicit restartandshutdown actionscript privilege none flag	explicit restartandshutdown actionscript privilege none flags	explicit restartandshutdown actionscript privilege none flag	0	boolean	bes user	
+explicit can send multiple refresh flag of <bes user>: boolean	explicit can send multiple refresh flag	explicit can send multiple refresh flags	explicit can send multiple refresh flag	0	boolean	bes user	
+explicit can submit queries flag of <bes user>: boolean	explicit can submit queries flag	explicit can submit queries flags	explicit can submit queries flag	0	boolean	bes user	
+explicit can lock flag of <bes user>: boolean	explicit can lock flag	explicit can lock flags	explicit can lock flag	0	boolean	bes user	
+expiration date of <license>: time	expiration date	expiration dates	expiration date	0	time	license	
+expiration state of <license>: string	expiration state	expiration states	expiration state	0	string	license	
+expiration date of <bes product>: date	expiration date	expiration dates	expiration date	0	date	bes product	
+extremas of <ipv4 address>: ( ipv4 address, ipv4 address )	extrema	extremas	extremas	1	( ipv4 address, ipv4 address )	ipv4 address	
+extremas of <ipv6 address>: ( ipv6 address, ipv6 address )	extrema	extremas	extremas	1	( ipv6 address, ipv6 address )	ipv6 address	
+extremas of <ipv4or6 address>: ( ipv4or6 address, ipv4or6 address )	extrema	extremas	extremas	1	( ipv4or6 address, ipv4or6 address )	ipv4or6 address	
+fips mode of <cryptography>: boolean	fips mode	fips modes	fips mode	0	boolean	cryptography	
+fips mode failure message of <cryptography>: string	fips mode failure message	fips mode failure messages	fips mode failure message	0	string	cryptography	
+format <string>: format	format	formats	format	0	format		string
+fxf encoding concatenations of <string>: string	fxf encoding concatenation	fxf encoding concatenations	fxf encoding concatenations	1	string	string	
+fxf encoding concatenations <string> of <string>: string	fxf encoding concatenation	fxf encoding concatenations	fxf encoding concatenations	1	string	string	string
+following text of <string position>: substring	following text	following texts	following text	0	substring	string position	
+first <integer> of <string>: substring	first	firsts	first	0	substring	string	integer
+first <string> of <string>: substring	first	firsts	first	0	substring	string	string
+following text of <substring>: substring	following text	following texts	following text	0	substring	substring	
+false: boolean	false	falses	false	0	boolean		
+friday: day of week	friday	fridays	friday	0	day of week		
+february <integer>: day of year	february	februarys	february	0	day of year		integer
+february <integer> of <integer>: date	february	februarys	february	0	date	integer	integer
+first <day of week> of <month and year>: date	first	firsts	first	0	date	month and year	day of week
+first sunday of <month and year>: date	first sunday	first sundays	first sunday	0	date	month and year	
+first monday of <month and year>: date	first monday	first mondays	first monday	0	date	month and year	
+first tuesday of <month and year>: date	first tuesday	first tuesdays	first tuesday	0	date	month and year	
+first wednesday of <month and year>: date	first wednesday	first wednesdays	first wednesday	0	date	month and year	
+first thursday of <month and year>: date	first thursday	first thursdays	first thursday	0	date	month and year	
+first friday of <month and year>: date	first friday	first fridays	first friday	0	date	month and year	
+first saturday of <month and year>: date	first saturday	first saturdays	first saturday	0	date	month and year	
+february of <integer>: month and year	february	februarys	february	0	month and year	integer	
+february: month	february	februarys	february	0	month		
+final part <time interval> of <time range>: time range	final part	final parts	final part	0	time range	time range	time interval
+finite of <floating point>: boolean	finite	finites	finite	0	boolean	floating point	
+floating point <string>: floating point	floating point	floating points	floating point	0	floating point		string
+floating point <floating point>: floating point	floating point	floating points	floating point	0	floating point		floating point
+first <integer> of <binary_string>: binary_substring	first	firsts	first	0	binary_substring	binary_string	integer
+following binary_string of <binary_substring>: binary_substring	following binary_string	following binary_strings	following binary_string	0	binary_substring	binary_substring	
+following binary_string of <binary position>: binary_substring	following binary_string	following binary_strings	following binary_string	0	binary_substring	binary position	
+first matches <regular expression> of <string>: regular expression match	first match	first matches	first matches	1	regular expression match	string	regular expression
+failure rate of <statistical bin>: floating point	failure rate	failure rates	failure rate	0	floating point	statistical bin	
+filter set of <bes domain>: bes filter set	filter set	filter sets	filter set	0	bes filter set	bes domain	
+filters of <bes domain>: bes filter	filter	filters	filters	1	bes filter	bes domain	
+fixlet flag of <bes filter>: boolean	fixlet flag	fixlet flags	fixlet flag	0	boolean	bes filter	
+fixlet set of <bes filter>: bes fixlet set	fixlet set	fixlet sets	fixlet set	0	bes fixlet set	bes filter	
+fixlet flag of <bes fixlet>: boolean	fixlet flag	fixlet flags	fixlet flag	0	boolean	bes fixlet	
+fields of <bes fixlet>: bes fixlet field	field	fields	fields	1	bes fixlet field	bes fixlet	
+field <string> of <bes fixlet>: bes fixlet field	field	fields	field	0	bes fixlet field	bes fixlet	string
+fixlet of <bes fixlet result>: bes fixlet	fixlet	fixlets	fixlet	0	bes fixlet	bes fixlet result	
+first became relevant of <bes fixlet result>: time	first became relevant	first became relevants	first became relevant	0	time	bes fixlet result	
+fxf character set of <bes server>: string	fxf character set	fxf character sets	fxf character set	0	string	bes server	
+fixlet set of <bes site>: bes fixlet set	fixlet set	fixlet sets	fixlet set	0	bes fixlet set	bes site	
+fixlets of <bes site>: bes fixlet	fixlet	fixlets	fixlets	1	bes fixlet	bes site	
+fixlet <integer> of <bes site>: bes fixlet	fixlet	fixlets	fixlet	0	bes fixlet	bes site	integer
+fields of <bes unmanagedasset>: bes unmanagedasset field	field	fields	fields	1	bes unmanagedasset field	bes unmanagedasset	
+filterable flag of <bes unmanagedasset field>: boolean	filterable flag	filterable flags	filterable flag	0	boolean	bes unmanagedasset field	
+fips mode of <license>: boolean	fips mode	fips modes	fips mode	0	boolean	license	
+ghz: hertz	ghz	ghzs	ghz	0	hertz		
+greatest hz: hertz	greatest hz	greatest hzs	greatest hz	0	hertz		
+greatest time interval: time interval	greatest time interval	greatest time intervals	greatest time interval	0	time interval		
+greatest integer: integer	greatest integer	greatest integers	greatest integer	0	integer		
+greatest large integer: large integer	greatest large integer	greatest large integers	greatest large integer	0	large integer		
+greatest uinteger: uinteger	greatest uinteger	greatest uintegers	greatest uinteger	0	uinteger		
+geometric mean of <statistical bin>: floating point	geometric mean	geometric means	geometric mean	0	floating point	statistical bin	
+group member flag of <bes action>: boolean	group member flag	group member flags	group member flag	0	boolean	bes action	
+group flag of <bes filter>: boolean	group flag	group flags	group flag	0	boolean	bes filter	
+group flag of <bes fixlet>: boolean	group flag	group flags	group flag	0	boolean	bes fixlet	
+globally visible flag of <bes fixlet>: boolean	globally visible flag	globally visible flags	globally visible flag	0	boolean	bes fixlet	
+global catalog of <bes ldap directory>: boolean	global catalog	global catalogs	global catalog	0	boolean	bes ldap directory	
+global catalog of <bes idp directory>: boolean	global catalog	global catalogs	global catalog	0	boolean	bes idp directory	
+group filter of <bes ldap directory>: string	group filter	group filters	group filter	0	string	bes ldap directory	
+group filter of <bes idp directory>: string	group filter	group filters	group filter	0	string	bes idp directory	
+generic ldap of <bes idp directory>: boolean	generic ldap	generic ldaps	generic ldap	0	boolean	bes idp directory	
+gather flag of <bes peer download>: boolean	gather flag	gather flags	gather flag	0	boolean	bes peer download	
+globally readable flag of <bes site>: boolean	globally readable flag	globally readable flags	globally readable flag	0	boolean	bes site	
+globally allowed flag of <bes webui app>: boolean	globally allowed flag	globally allowed flags	globally allowed flag	0	boolean	bes webui app	
+gather url of <license>: string	gather url	gather urls	gather url	0	string	license	
+html concatenations of <html>: html	html concatenation	html concatenations	html concatenations	1	html	html	
+html concatenations <string> of <html>: html	html concatenation	html concatenations	html concatenations	1	html	html	string
+html <string>: html	html	htmls	html	0	html		string
+html tag <string> of <string>: html	html tag	html tags	html tag	0	html	string	string
+html tag <string> of <html>: html	html tag	html tags	html tag	0	html	html	string
+html tag <( string, string )>: html	html tag	html tags	html tag	0	html		( string, string )
+html tag <( string, html )>: html	html tag	html tags	html tag	0	html		( string, html )
+html tag <( string, html attribute list )>: html	html tag	html tags	html tag	0	html		( string, html attribute list )
+html tag <( string, html attribute list, string )>: html	html tag	html tags	html tag	0	html		( string, html attribute list, string )
+html tag <( string, html attribute list, html )>: html	html tag	html tags	html tag	0	html		( string, html attribute list, html )
+html of <string>: html	html	htmls	html	0	html	string	
+html of <html>: html	html	htmls	html	0	html	html	
+html <string> of <string>: html	html	htmls	html	0	html	string	string
+html <string> of <html>: html	html	htmls	html	0	html	html	string
+head of <string>: html	head	heads	head	0	html	string	
+head of <html>: html	head	heads	head	0	html	html	
+head <string> of <string>: html	head	heads	head	0	html	string	string
+head <string> of <html>: html	head	heads	head	0	html	html	string
+h1 of <string>: html	h1	h1s	h1	0	html	string	
+h1 of <html>: html	h1	h1s	h1	0	html	html	
+h1 <string> of <string>: html	h1	h1s	h1	0	html	string	string
+h1 <string> of <html>: html	h1	h1s	h1	0	html	html	string
+h2 of <string>: html	h2	h2s	h2	0	html	string	
+h2 of <html>: html	h2	h2s	h2	0	html	html	
+h2 <string> of <string>: html	h2	h2s	h2	0	html	string	string
+h2 <string> of <html>: html	h2	h2s	h2	0	html	html	string
+h3 of <string>: html	h3	h3s	h3	0	html	string	
+h3 of <html>: html	h3	h3s	h3	0	html	html	
+h3 <string> of <string>: html	h3	h3s	h3	0	html	string	string
+h3 <string> of <html>: html	h3	h3s	h3	0	html	html	string
+h4 of <string>: html	h4	h4s	h4	0	html	string	
+h4 of <html>: html	h4	h4s	h4	0	html	html	
+h4 <string> of <string>: html	h4	h4s	h4	0	html	string	string
+h4 <string> of <html>: html	h4	h4s	h4	0	html	html	string
+h5 of <string>: html	h5	h5s	h5	0	html	string	
+h5 of <html>: html	h5	h5s	h5	0	html	html	
+h5 <string> of <string>: html	h5	h5s	h5	0	html	string	string
+h5 <string> of <html>: html	h5	h5s	h5	0	html	html	string
+h6 of <string>: html	h6	h6s	h6	0	html	string	
+h6 of <html>: html	h6	h6s	h6	0	html	html	
+h6 <string> of <string>: html	h6	h6s	h6	0	html	string	string
+h6 <string> of <html>: html	h6	h6s	h6	0	html	html	string
+hr: html	hr	hrs	hr	0	html		
+hr <string>: html	hr	hrs	hr	0	html		string
+hexadecimal integer <string>: integer	hexadecimal integer	hexadecimal integers	hexadecimal integer	0	integer		string
+hexadecimal uinteger <string>: uinteger	hexadecimal uinteger	hexadecimal uintegers	hexadecimal uinteger	0	uinteger		string
+hexadecimal large integer <string>: large integer	hexadecimal large integer	hexadecimal large integers	hexadecimal large integer	0	large integer		string
+hexadecimal string <string>: string	hexadecimal string	hexadecimal strings	hexadecimal string	0	string		string
+hz: hertz	hz	hzs	hz	0	hertz		
+hour: time interval	hour	hours	hour	0	time interval		
+hour_of_day of <time of day>: integer	hour_of_day	hours_of_day	hour_of_day	0	integer	time of day	
+hour_of_day of <time of day with time zone>: integer	hour_of_day	hours_of_day	hour_of_day	0	integer	time of day with time zone	
+hidden bes action set: bes action set	hidden bes action set	hidden bes action sets	hidden bes action set	0	bes action set		
+hidden bes actions: bes action	hidden bes action	hidden bes actions	hidden bes actions	1	bes action		
+hidden flag of <bes action>: boolean	hidden flag	hidden flags	hidden flag	0	boolean	bes action	
+hostname of <bes computer>: string	hostname	hostnames	hostname	0	string	bes computer	
+host of <bes ldap directory server>: string	host	hosts	host	0	string	bes ldap directory server	
+host of <bes idp directory server>: string	host	hosts	host	0	string	bes idp directory server	
+hash of <bes peer download>: string	hash	hashes	hash	0	string	bes peer download	
+hexadecet <integer> of <ipv6 address>: integer	hexadecet	hexadecets	hexadecet	0	integer	ipv6 address	integer
+hexadecet <integer> of <ipv4or6 address>: integer	hexadecet	hexadecets	hexadecet	0	integer	ipv4or6 address	integer
+ins of <string>: html	ins	inss	ins	0	html	string	
+ins of <html>: html	ins	inss	ins	0	html	html	
+ins <string> of <string>: html	ins	inss	ins	0	html	string	string
+ins <string> of <html>: html	ins	inss	ins	0	html	html	string
+italic of <string>: html	italic	italics	italic	0	html	string	
+italic of <html>: html	italic	italics	italic	0	html	html	
+italic <string> of <string>: html	italic	italics	italic	0	html	string	string
+italic <string> of <html>: html	italic	italics	italic	0	html	html	string
+integers to <integer>: integer	integer to	integers to	integers to	1	integer		integer
+integers in <( integer, integer )>: integer	integer in	integers in	integers in	1	integer		( integer, integer )
+integers in <( integer, integer, integer )>: integer	integer in	integers in	integers in	1	integer		( integer, integer, integer )
+index of <tuple item>: integer	index	indexes	index	0	integer	tuple item	
+index type of <property>: type	index type	index types	index type	0	type	property	
+integer <integer>: integer	integer	integers	integer	0	integer		integer
+integer <string>: integer	integer	integers	integer	0	integer		string
+initial part <time interval> of <time range>: time range	initial part	initial parts	initial part	0	time range	time range	time interval
+intersections of <integer set>: integer set	intersection	intersections	intersections	1	integer set	integer set	
+intersections of <string set>: string set	intersection	intersections	intersections	1	string set	string set	
+inexact of <floating point>: boolean	inexact	inexacts	inexact	0	boolean	floating point	
+invalid of <floating point>: boolean	invalid	invalids	invalid	0	boolean	floating point	
+infinite of <floating point>: boolean	infinite	infinites	infinite	0	boolean	floating point	
+integer floor of <floating point>: integer	integer floor	integer floors	integer floor	0	integer	floating point	
+integer ceiling of <floating point>: integer	integer ceiling	integer ceilings	integer ceiling	0	integer	floating point	
+invalid before of <x509 certificate>: time	invalid before	invalid befores	invalid before	0	time	x509 certificate	
+invalid after of <x509 certificate>: time	invalid after	invalid afters	invalid after	0	time	x509 certificate	
+issuer of <x509 certificate>: string	issuer	issuers	issuer	0	string	x509 certificate	
+in console context: boolean	in console context	in console contexts	in console context	0	boolean		
+in web reports context: boolean	in web reports context	in web reports contexts	in web reports context	0	boolean		
+in explorer context: boolean	in explorer context	in explorer contexts	in explorer context	0	boolean		
+intersections of <bes action set>: bes action set	intersection	intersections	intersections	1	bes action set	bes action set	
+id of <bes action>: integer	id	ids	id	0	integer	bes action	
+issuer of <bes action>: bes user	issuer	issuers	issuer	0	bes user	bes action	
+id of <bes activation>: integer	id	ids	id	0	integer	bes activation	
+issuer of <bes activation>: bes user	issuer	issuers	issuer	0	bes user	bes activation	
+id of <bes baseline component>: integer	id	ids	id	0	integer	bes baseline component	
+include in relevance flag of <bes baseline component>: boolean	include in relevance flag	include in relevance flags	include in relevance flag	0	boolean	bes baseline component	
+intersections of <bes computer set>: bes computer set	intersection	intersections	intersections	1	bes computer set	bes computer set	
+id of <bes computer>: integer	id	ids	id	0	integer	bes computer	
+ip addresses of <bes computer>: ipv4or6 address	ip address	ip addresses	ip addresses	1	ipv4or6 address	bes computer	
+intersections of <bes computer group set>: bes computer group set	intersection	intersections	intersections	1	bes computer group set	bes computer group set	
+issuer of <bes computer group>: bes user	issuer	issuers	issuer	0	bes user	bes computer group	
+id of <bes computer group>: integer	id	ids	id	0	integer	bes computer group	
+intersections of <bes domain set>: bes domain set	intersection	intersections	intersections	1	bes domain set	bes domain set	
+id of <bes domain>: string	id	ids	id	0	string	bes domain	
+intersections of <bes filter set>: bes filter set	intersection	intersections	intersections	1	bes filter set	bes filter set	
+id of <bes filter>: integer	id	ids	id	0	integer	bes filter	
+intersections of <bes fixlet set>: bes fixlet set	intersection	intersections	intersections	1	bes fixlet set	bes fixlet set	
+id of <bes fixlet>: integer	id	ids	id	0	integer	bes fixlet	
+issuer of <bes fixlet>: bes user	issuer	issuers	issuer	0	bes user	bes fixlet	
+intersections of <bes ldap directory set>: bes ldap directory set	intersection	intersections	intersections	1	bes ldap directory set	bes ldap directory set	
+intersections of <bes idp directory set>: bes idp directory set	intersection	intersections	intersections	1	bes idp directory set	bes idp directory set	
+id of <bes ldap directory>: integer	id	ids	id	0	integer	bes ldap directory	
+id of <bes idp directory>: integer	id	ids	id	0	integer	bes idp directory	
+intersections of <bes property set>: bes property set	intersection	intersections	intersections	1	bes property set	bes property set	
+id of <bes property>: ( integer, integer, integer )	id	ids	id	0	( integer, integer, integer )	bes property	
+intersections of <bes role set>: bes role set	intersection	intersections	intersections	1	bes role set	bes role set	
+id of <bes role>: integer	id	ids	id	0	integer	bes role	
+intersections of <bes site set>: bes site set	intersection	intersections	intersections	1	bes site set	bes site set	
+id of <bes site>: integer	id	ids	id	0	integer	bes site	
+id of <bes site file>: integer	id	ids	id	0	integer	bes site file	
+intersections of <bes site file set>: bes site file set	intersection	intersections	intersections	1	bes site file set	bes site file set	
+id of <bes tag>: uinteger	id	ids	id	0	uinteger	bes tag	
+intersections of <bes unmanagedasset set>: bes unmanagedasset set	intersection	intersections	intersections	1	bes unmanagedasset set	bes unmanagedasset set	
+id of <bes unmanagedasset>: integer	id	ids	id	0	integer	bes unmanagedasset	
+intersections of <bes user set>: bes user set	intersection	intersections	intersections	1	bes user set	bes user set	
+id of <bes user>: integer	id	ids	id	0	integer	bes user	
+idp directory of <bes user>: bes idp directory	idp directory	idp directories	idp directory	0	bes idp directory	bes user	
+issued action set of <bes user>: bes action set	issued action set	issued action sets	issued action set	0	bes action set	bes user	
+issued actions of <bes user>: bes action	issued action	issued actions	issued actions	1	bes action	bes user	
+issued fixlet set of <bes user>: bes fixlet set	issued fixlet set	issued fixlet sets	issued fixlet set	0	bes fixlet set	bes user	
+issued fixlets of <bes user>: bes fixlet	issued fixlet	issued fixlets	issued fixlets	1	bes fixlet	bes user	
+issued computer group set of <bes user>: bes computer group set	issued computer group set	issued computer group sets	issued computer group set	0	bes computer group set	bes user	
+issued computer groups of <bes user>: bes computer group	issued computer group	issued computer groups	issued computer groups	1	bes computer group	bes user	
+intersections of <bes wizard set>: bes wizard set	intersection	intersections	intersections	1	bes wizard set	bes wizard set	
+intersections of <bes webui app set>: bes webui app set	intersection	intersections	intersections	1	bes webui app set	bes webui app set	
+ipv4 address <string>: ipv4 address	ipv4 address	ipv4 addresses	ipv4 address	0	ipv4 address		string
+ipv6 address <string>: ipv6 address	ipv6 address	ipv6 addresses	ipv6 address	0	ipv6 address		string
+ipv4or6 address <string>: ipv4or6 address	ipv4or6 address	ipv4or6 addresses	ipv4or6 address	0	ipv4or6 address		string
+ipv4 part of <ipv6 address>: ipv4 address	ipv4 part	ipv4 parts	ipv4 part	0	ipv4 address	ipv6 address	
+ipv4 part of <ipv4or6 address>: ipv4 address	ipv4 part	ipv4 parts	ipv4 part	0	ipv4 address	ipv4or6 address	
+ip version of <ipv4or6 address>: ip version	ip version	ip versions	ip version	0	ip version	ipv4or6 address	
+ipv4: ip version	ipv4	ipv4s	ipv4	0	ip version		
+ipv6: ip version	ipv6	ipv6s	ipv6	0	ip version		
+ip version <integer>: ip version	ip version	ip versions	ip version	0	ip version		integer
+json of <string>: json value	json	jsons	json	0	json value	string	
+january <integer>: day of year	january	januarys	january	0	day of year		integer
+june <integer>: day of year	june	junes	june	0	day of year		integer
+july <integer>: day of year	july	julys	july	0	day of year		integer
+january <integer> of <integer>: date	january	januarys	january	0	date	integer	integer
+june <integer> of <integer>: date	june	junes	june	0	date	integer	integer
+july <integer> of <integer>: date	july	julys	july	0	date	integer	integer
+january of <integer>: month and year	january	januarys	january	0	month and year	integer	
+june of <integer>: month and year	june	junes	june	0	month and year	integer	
+july of <integer>: month and year	july	julys	july	0	month and year	integer	
+january: month	january	januarys	january	0	month		
+june: month	june	junes	june	0	month		
+july: month	july	julys	july	0	month		
+javascript arrays <string> of <boolean>: html	javascript array	javascript arrays	javascript arrays	1	html	boolean	string
+javascript arrays <string> of <integer>: html	javascript array	javascript arrays	javascript arrays	1	html	integer	string
+javascript arrays <string> of <string>: html	javascript array	javascript arrays	javascript arrays	1	html	string	string
+javascript arrays <string> of <statistical bin>: html	javascript array	javascript arrays	javascript arrays	1	html	statistical bin	string
+join by intersection flag of <bes filter>: boolean	join by intersection flag	join by intersection flags	join by intersection flag	0	boolean	bes filter	
+kbd of <string>: html	kbd	kbds	kbd	0	html	string	
+kbd of <html>: html	kbd	kbds	kbd	0	html	html	
+kbd <string> of <string>: html	kbd	kbds	kbd	0	html	string	string
+kbd <string> of <html>: html	kbd	kbds	kbd	0	html	html	string
+key <string> of <json value>: json key	key	keys	key	0	json key	json value	string
+keys of <json value>: json key	key	keys	keys	1	json key	json value	
+khz: hertz	khz	khzs	khz	0	hertz		
+kurtosis of <statistical bin>: floating point	kurtosis	kurtoses	kurtosis	0	floating point	statistical bin	
+keep statistics flag of <bes property>: boolean	keep statistics flag	keep statistics flags	keep statistics flag	0	boolean	bes property	
+li of <string>: html	li	lis	li	0	html	string	
+li of <html>: html	li	lis	li	0	html	html	
+li <string> of <string>: html	li	lis	li	0	html	string	string
+li <string> of <html>: html	li	lis	li	0	html	html	string
+link of <string>: html	link	links	link	0	html	string	
+link of <html>: html	link	links	link	0	html	html	
+link <string> of <string>: html	link	links	link	0	html	string	string
+link <string> of <html>: html	link	links	link	0	html	html	string
+length of <rope>: integer	length	lengths	length	0	integer	rope	
+least significant one bit of <bit set>: integer	least significant one bit	least significant one bits	least significant one bit	0	integer	bit set	
+left shift <integer> of <bit set>: bit set	left shift	left shifts	left shift	0	bit set	bit set	integer
+least hz: hertz	least hz	least hzs	least hz	0	hertz		
+local time <string>: time	local time	local times	local time	0	time		string
+local encoding concatenations of <string>: string	local encoding concatenation	local encoding concatenations	local encoding concatenations	1	string	string	
+local encoding concatenations <string> of <string>: string	local encoding concatenation	local encoding concatenations	local encoding concatenations	1	string	string	string
+last <integer> of <string>: substring	last	lasts	last	0	substring	string	integer
+last <string> of <string>: substring	last	lasts	last	0	substring	string	string
+least time interval: time interval	least time interval	least time intervals	least time interval	0	time interval		
+local time zone: time zone	local time zone	local time zones	local time zone	0	time zone		
+left operand type of <binary operator>: type	left operand type	left operand types	left operand type	0	type	binary operator	
+length of <binary_string>: integer	length	lengths	length	0	integer	binary_string	
+length of <string>: integer	length	lengths	length	0	integer	string	
+least integer: integer	least integer	least integers	least integer	0	integer		
+lower bound of <integer range>: integer	lower bound	lower bounds	lower bound	0	integer	integer range	
+large integer <integer>: large integer	large integer	large integers	large integer	0	large integer		integer
+least large integer: large integer	least large integer	least large integers	least large integer	0	large integer		
+large integer <string>: large integer	large integer	large integers	large integer	0	large integer		string
+least uinteger: uinteger	least uinteger	least uintegers	least uinteger	0	uinteger		
+length of <month and year>: time interval	length	lengths	length	0	time interval	month and year	
+length of <time range>: time interval	length	lengths	length	0	time interval	time range	
+leap of <year>: boolean	leap	leaps	leap	0	boolean	year	
+length of <year>: time interval	length	lengths	length	0	time interval	year	
+less significance <integer> of <floating point>: floating point	less significance	less significances	less significance	0	floating point	floating point	integer
+last <integer> of <binary_string>: binary_substring	last	lasts	last	0	binary_substring	binary_string	integer
+line number of <bes action result>: integer	line number	line numbers	line number	0	integer	bes action result	
+link of <bes action>: html	link	links	link	0	html	bes action	
+link href of <bes action>: string	link href	link hrefs	link href	0	string	bes action	
+link <string> of <bes action>: html	link	links	link	0	html	bes action	string
+link <html> of <bes action>: html	link	links	link	0	html	bes action	html
+link of <bes computer>: html	link	links	link	0	html	bes computer	
+link href of <bes computer>: string	link href	link hrefs	link href	0	string	bes computer	
+link <string> of <bes computer>: html	link	links	link	0	html	bes computer	string
+link <html> of <bes computer>: html	link	links	link	0	html	bes computer	html
+link of <bes fixlet>: html	link	links	link	0	html	bes fixlet	
+link href of <bes fixlet>: string	link href	link hrefs	link href	0	string	bes fixlet	
+link <string> of <bes fixlet>: html	link	links	link	0	html	bes fixlet	string
+link <html> of <bes fixlet>: html	link	links	link	0	html	bes fixlet	html
+link of <bes user>: html	link	links	link	0	html	bes user	
+link href of <bes user>: string	link href	link hrefs	link href	0	string	bes user	
+link <string> of <bes user>: html	link	links	link	0	html	bes user	string
+link <html> of <bes user>: html	link	links	link	0	html	bes user	html
+link of <bes wizard>: html	link	links	link	0	html	bes wizard	
+link href of <bes wizard>: string	link href	link hrefs	link href	0	string	bes wizard	
+link <string> of <bes wizard>: html	link	links	link	0	html	bes wizard	string
+link <html> of <bes wizard>: html	link	links	link	0	html	bes wizard	html
+link of <bes unmanagedasset>: html	link	links	link	0	html	bes unmanagedasset	
+link href of <bes unmanagedasset>: string	link href	link hrefs	link href	0	string	bes unmanagedasset	
+link <string> of <bes unmanagedasset>: html	link	links	link	0	html	bes unmanagedasset	string
+link <html> of <bes unmanagedasset>: html	link	links	link	0	html	bes unmanagedasset	html
+link of <bes domain>: html	link	links	link	0	html	bes domain	
+link href of <bes domain>: string	link href	link hrefs	link href	0	string	bes domain	
+link <string> of <bes domain>: html	link	links	link	0	html	bes domain	string
+link <html> of <bes domain>: html	link	links	link	0	html	bes domain	html
+length of <statistical bin>: time interval	length	lengths	length	0	time interval	statistical bin	
+linear fit of <statistical bin>: linear projection	linear fit	linear fits	linear fit	0	linear projection	statistical bin	
+logarithm variance of <statistical bin>: floating point	logarithm variance	logarithm variances	logarithm variance	0	floating point	statistical bin	
+logarithm standard deviation of <statistical bin>: floating point	logarithm standard deviation	logarithm standard deviations	logarithm standard deviation	0	floating point	statistical bin	
+logarithm skewness of <statistical bin>: floating point	logarithm skewness	logarithm skewnesses	logarithm skewness	0	floating point	statistical bin	
+logarithm kurtosis of <statistical bin>: floating point	logarithm kurtosis	logarithm kurtoses	logarithm kurtosis	0	floating point	statistical bin	
+last report time of <bes computer>: time	last report time	last report times	last report time	0	time	bes computer	
+locked flag of <bes computer>: boolean	locked flag	locked flags	locked flag	0	boolean	bes computer	
+license type of <bes computer>: string	license type	license types	license type	0	string	bes computer	
+last refresh time of <bes computer group>: time	last refresh time	last refresh times	last refresh time	0	time	bes computer group	
+locally visible flag of <bes fixlet>: boolean	locally visible flag	locally visible flags	locally visible flag	0	boolean	bes fixlet	
+last became relevant of <bes fixlet result>: time	last became relevant	last became relevants	last became relevant	0	time	bes fixlet result	
+last became nonrelevant of <bes fixlet result>: time	last became nonrelevant	last became nonrelevants	last became nonrelevant	0	time	bes fixlet result	
+login user of <bes ldap directory>: string	login user	login users	login user	0	string	bes ldap directory	
+login user of <bes idp directory>: string	login user	login users	login user	0	string	bes idp directory	
+last login time of <bes user>: time	last login time	last login times	last login time	0	time	bes user	
+ldap directory of <bes user>: bes ldap directory	ldap directory	ldap directories	ldap directory	0	bes ldap directory	bes user	
+legacy of <bes product>: boolean	legacy	legacies	legacy	0	boolean	bes product	
+maxima of <hertz>: hertz	maximum	maxima	maxima	1	hertz	hertz	
+maxima of <time>: time	maximum	maxima	maxima	1	time	time	
+maxima of <time interval>: time interval	maximum	maxima	maxima	1	time interval	time interval	
+maxima of <integer>: integer	maximum	maxima	maxima	1	integer	integer	
+maxima of <large integer>: large integer	maximum	maxima	maxima	1	large integer	large integer	
+maxima of <uinteger>: uinteger	maximum	maxima	maxima	1	uinteger	uinteger	
+maxima of <day of month>: day of month	maximum	maxima	maxima	1	day of month	day of month	
+maxima of <day of year>: day of year	maximum	maxima	maxima	1	day of year	day of year	
+march <integer>: day of year	march	marchs	march	0	day of year		integer
+may <integer>: day of year	may	mays	may	0	day of year		integer
+maxima of <date>: date	maximum	maxima	maxima	1	date	date	
+march <integer> of <integer>: date	march	marchs	march	0	date	integer	integer
+may <integer> of <integer>: date	may	mays	may	0	date	integer	integer
+maxima of <month and year>: month and year	maximum	maxima	maxima	1	month and year	month and year	
+march of <integer>: month and year	march	marchs	march	0	month and year	integer	
+may of <integer>: month and year	may	mays	may	0	month and year	integer	
+maxima of <number of months>: number of months	maximum	maxima	maxima	1	number of months	number of months	
+maxima of <month>: month	maximum	maxima	maxima	1	month	month	
+march: month	march	marchs	march	0	month		
+may: month	may	mays	may	0	month		
+maxima of <time of day>: time of day	maximum	maxima	maxima	1	time of day	time of day	
+maxima of <year>: year	maximum	maxima	maxima	1	year	year	
+maxima of <site version list>: site version list	maximum	maxima	maxima	1	site version list	site version list	
+major revision of <version>: integer	major revision	major revisions	major revision	0	integer	version	
+maxima of <version>: version	maximum	maxima	maxima	1	version	version	
+md5 of <string>: string	md5	md5s	md5	0	string	string	
+maxima of <floating point>: floating point	maximum	maxima	maxima	1	floating point	floating point	
+matches <regular expression> of <string>: regular expression match	match	matches	matches	1	regular expression match	string	regular expression
+maxima of <rate>: rate	maximum	maxima	maxima	1	rate	rate	
+maximum value of <statistical bin>: floating point	maximum value	maximum values	maximum value	0	floating point	statistical bin	
+maximum single computer total of <statistical bin>: floating point	maximum single computer total	maximum single computer totals	maximum single computer total	0	floating point	statistical bin	
+management rights flag of <bes action>: boolean	management rights flag	management rights flags	management rights flag	0	boolean	bes action	
+management extensions of <bes computer>: bes computer	management extension	management extensions	management extensions	1	bes computer	bes computer	
+manual flag of <bes computer group>: boolean	manual flag	manual flags	manual flag	0	boolean	bes computer group	
+master site flag of <bes fixlet>: boolean	master site flag	master site flags	master site flag	0	boolean	bes fixlet	
+master flag of <bes role>: boolean	master flag	master flags	master flag	0	boolean	bes role	
+master site flag of <bes site>: boolean	master site flag	master site flags	master site flag	0	boolean	bes site	
+masthead operator name of <bes user>: string	masthead operator name	masthead operator names	masthead operator name	0	string	bes user	
+master flag of <bes user>: boolean	master flag	master flags	master flag	0	boolean	bes user	
+maximum seat count of <license>: integer	maximum seat count	maximum seat counts	maximum seat count	0	integer	license	
+maxima of <ipv4 address>: ipv4 address	maximum	maxima	maxima	1	ipv4 address	ipv4 address	
+maxima of <ipv6 address>: ipv6 address	maximum	maxima	maxima	1	ipv6 address	ipv6 address	
+maxima of <ipv4or6 address>: ipv4or6 address	maximum	maxima	maxima	1	ipv4or6 address	ipv4or6 address	
+meta of <string>: html	meta	metas	meta	0	html	string	
+meta of <html>: html	meta	metas	meta	0	html	html	
+meta <string> of <string>: html	meta	metas	meta	0	html	string	string
+meta <string> of <html>: html	meta	metas	meta	0	html	html	string
+means of <floating point>: floating point	mean	means	means	1	floating point	floating point	
+means of <integer>: floating point	mean	means	means	1	floating point	integer	
+mhz: hertz	mhz	mhzs	mhz	0	hertz		
+minima of <hertz>: hertz	minimum	minima	minima	1	hertz	hertz	
+minima of <time>: time	minimum	minima	minima	1	time	time	
+microsecond: time interval	microsecond	microseconds	microsecond	0	time interval		
+millisecond: time interval	millisecond	milliseconds	millisecond	0	time interval		
+minute: time interval	minute	minutes	minute	0	time interval		
+minima of <time interval>: time interval	minimum	minima	minima	1	time interval	time interval	
+minima of <integer>: integer	minimum	minima	minima	1	integer	integer	
+minima of <large integer>: large integer	minimum	minima	minima	1	large integer	large integer	
+minima of <uinteger>: uinteger	minimum	minima	minima	1	uinteger	uinteger	
+minima of <day of month>: day of month	minimum	minima	minima	1	day of month	day of month	
+minima of <day of year>: day of year	minimum	minima	minima	1	day of year	day of year	
+minima of <date>: date	minimum	minima	minima	1	date	date	
+minima of <month and year>: month and year	minimum	minima	minima	1	month and year	month and year	
+minima of <number of months>: number of months	minimum	minima	minima	1	number of months	number of months	
+minima of <month>: month	minimum	minima	minima	1	month	month	
+minima of <time of day>: time of day	minimum	minima	minima	1	time of day	time of day	
+midnight: time of day	midnight	midnights	midnight	0	time of day		
+minute_of_hour of <time of day>: integer	minute_of_hour	minutes_of_hour	minute_of_hour	0	integer	time of day	
+minima of <year>: year	minimum	minima	minima	1	year	year	
+minute_of_hour of <time of day with time zone>: integer	minute_of_hour	minutes_of_hour	minute_of_hour	0	integer	time of day with time zone	
+minima of <site version list>: site version list	minimum	minima	minima	1	site version list	site version list	
+minor revision of <version>: integer	minor revision	minor revisions	minor revision	0	integer	version	
+minima of <version>: version	minimum	minima	minima	1	version	version	
+minima of <floating point>: floating point	minimum	minima	minima	1	floating point	floating point	
+minima of <rate>: rate	minimum	minima	minima	1	rate	rate	
+mean computer count of <statistical bin>: floating point	mean computer count	mean computer counts	mean computer count	0	floating point	statistical bin	
+mean successful computer count of <statistical bin>: floating point	mean successful computer count	mean successful computer counts	mean successful computer count	0	floating point	statistical bin	
+mean failing computer count of <statistical bin>: floating point	mean failing computer count	mean failing computer counts	mean failing computer count	0	floating point	statistical bin	
+mean sample rate of <statistical bin>: rate	mean sample rate	mean sample rates	mean sample rate	0	rate	statistical bin	
+mean sample interval of <statistical bin>: time interval	mean sample interval	mean sample intervals	mean sample interval	0	time interval	statistical bin	
+mean value count of <statistical bin>: floating point	mean value count	mean value counts	mean value count	0	floating point	statistical bin	
+mean zero value count of <statistical bin>: floating point	mean zero value count	mean zero value counts	mean zero value count	0	floating point	statistical bin	
+mean nonzero value count of <statistical bin>: floating point	mean nonzero value count	mean nonzero value counts	mean nonzero value count	0	floating point	statistical bin	
+mean of <statistical bin>: floating point	mean	means	mean	0	floating point	statistical bin	
+mean logarithm of <statistical bin>: floating point	mean logarithm	mean logarithms	mean logarithm	0	floating point	statistical bin	
+minimum value of <statistical bin>: floating point	minimum value	minimum values	minimum value	0	floating point	statistical bin	
+minimum single computer total of <statistical bin>: floating point	minimum single computer total	minimum single computer totals	minimum single computer total	0	floating point	statistical bin	
+mean total of <statistical bin>: floating point	mean total	mean totals	mean total	0	floating point	statistical bin	
+member action set of <bes action>: bes action set	member action set	member action sets	member action set	0	bes action set	bes action	
+member actions of <bes action>: bes action	member action	member actions	member actions	1	bes action	bes action	
+message title of <bes action>: string	message title	message titles	message title	0	string	bes action	
+message text of <bes action>: string	message text	message texts	message text	0	string	bes action	
+message action button flag of <bes action>: boolean	message action button flag	message action button flags	message action button flag	0	boolean	bes action	
+message allow cancel flag of <bes action>: boolean	message allow cancel flag	message allow cancel flags	message allow cancel flag	0	boolean	bes action	
+message postpone delay of <bes action>: time interval	message postpone delay	message postpone delays	message postpone delay	0	time interval	bes action	
+message timeout delay of <bes action>: time interval	message timeout delay	message timeout delays	message timeout delay	0	time interval	bes action	
+mime fields of <bes action>: mime field	mime field	mime fields	mime fields	1	mime field	bes action	
+mime field <string> of <bes action>: string	mime field	mime fields	mime field	0	string	bes action	string
+middle actions of <bes action>: bes action	middle action	middle actions	middle actions	1	bes action	bes action	
+member set of <bes computer group>: bes computer set	member set	member sets	member set	0	bes computer set	bes computer group	
+members of <bes computer group>: bes computer	member	members	members	1	bes computer	bes computer group	
+mime fields of <bes fixlet>: mime field	mime field	mime fields	mime fields	1	mime field	bes fixlet	
+mime field <string> of <bes fixlet>: string	mime field	mime fields	mime field	0	string	bes fixlet	string
+message of <bes fixlet>: html	message	messages	message	0	html	bes fixlet	
+memory usage of <bes property>: integer	memory usage	memory usages	memory usage	0	integer	bes property	
+menu path of <bes wizard>: string	menu path	menu paths	menu path	0	string	bes wizard	
+minima of <ipv4 address>: ipv4 address	minimum	minima	minima	1	ipv4 address	ipv4 address	
+minima of <ipv6 address>: ipv6 address	minimum	minima	minima	1	ipv6 address	ipv6 address	
+minima of <ipv4or6 address>: ipv4or6 address	minimum	minima	minima	1	ipv4or6 address	ipv4or6 address	
+most significant one bit of <bit set>: integer	most significant one bit	most significant one bits	most significant one bit	0	integer	bit set	
+multiplicity of <hertz with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	hertz with multiplicity	
+multiplicity of <time with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	time with multiplicity	
+multiplicity of <time interval with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	time interval with multiplicity	
+multiplicity of <time zone with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	time zone with multiplicity	
+multiplicity of <string with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	string with multiplicity	
+multivalued of <property>: boolean	multivalued	multivalueds	multivalued	0	boolean	property	
+multiplicity of <integer with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	integer with multiplicity	
+multiplicity of <large integer with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	large integer with multiplicity	
+multiplicity of <uinteger with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	uinteger with multiplicity	
+multiplicity of <day of month with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	day of month with multiplicity	
+multiplicity of <day of week with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	day of week with multiplicity	
+monday: day of week	monday	mondays	monday	0	day of week		
+multiplicity of <day of year with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	day of year with multiplicity	
+month of <day of year>: month	month	months	month	0	month	day of year	
+multiplicity of <date with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	date with multiplicity	
+month of <date>: month	month	months	month	0	month	date	
+month_and_year of <date>: month and year	month_and_year	months_and_years	month_and_year	0	month and year	date	
+multiplicity of <month and year with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	month and year with multiplicity	
+month of <month and year>: month	month	months	month	0	month	month and year	
+multiplicity of <number of months with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	number of months with multiplicity	
+month: number of months	month	months	month	0	number of months		
+multiplicity of <month with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	month with multiplicity	
+month <integer>: month	month	months	month	0	month		integer
+month <string>: month	month	months	month	0	month		string
+multiplicity of <time of day with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	time of day with multiplicity	
+multiplicity of <time range with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	time range with multiplicity	
+multiplicity of <year with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	year with multiplicity	
+multiplicity of <time of day with time zone with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	time of day with time zone with multiplicity	
+multiplicity of <site version list with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	site version list with multiplicity	
+multiplicity of <version with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	version with multiplicity	
+multiplicity of <floating point with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	floating point with multiplicity	
+more significance <integer> of <floating point>: floating point	more significance	more significances	more significance	0	floating point	floating point	integer
+module <string>: module	module	modules	module	0	module		string
+modules: module	module	modules	modules	1	module		
+multiplicity of <rate with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	rate with multiplicity	
+multiplicity of <bes action with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes action with multiplicity	
+multiple flag of <bes action>: boolean	multiple flag	multiple flags	multiple flag	0	boolean	bes action	
+modification time of <bes activation>: time	modification time	modification times	modification time	0	time	bes activation	
+multiplicity of <bes computer with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes computer with multiplicity	
+multiplicity of <bes computer group with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes computer group with multiplicity	
+multiplicity of <bes domain with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes domain with multiplicity	
+multiplicity of <bes filter with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes filter with multiplicity	
+multiplicity of <bes fixlet with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes fixlet with multiplicity	
+modification user of <bes fixlet>: bes user	modification user	modification users	modification user	0	bes user	bes fixlet	
+modification time of <bes fixlet>: time	modification time	modification times	modification time	0	time	bes fixlet	
+multiplicity of <bes ldap directory with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes ldap directory with multiplicity	
+multiplicity of <bes idp directory with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes idp directory with multiplicity	
+multiplicity of <bes peer download with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes peer download with multiplicity	
+multiplicity of <bes property with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes property with multiplicity	
+multiplicity of <bes role with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes role with multiplicity	
+multiplicity of <bes site with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes site with multiplicity	
+multiplicity of <bes site file with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes site file with multiplicity	
+multiplicity of <bes unmanagedasset with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes unmanagedasset with multiplicity	
+multiplicity of <bes user with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes user with multiplicity	
+multiplicity of <bes wizard with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes wizard with multiplicity	
+multiplicity of <bes webui app with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	bes webui app with multiplicity	
+mvs count of <bes product>: integer	mvs count	mvs counts	mvs count	0	integer	bes product	
+mobile count of <bes product>: integer	mobile count	mobile counts	mobile count	0	integer	bes product	
+multiplicity of <ipv4 address with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	ipv4 address with multiplicity	
+multiplicity of <ipv6 address with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	ipv6 address with multiplicity	
+multiplicity of <ipv4or6 address with multiplicity>: integer	multiplicity	multiplicities	multiplicity	0	integer	ipv4or6 address with multiplicity	
+name of <json key>: string	name	names	name	0	string	json key	
+numeric value of <string>: integer	numeric value	numeric values	numeric value	0	integer	string	
+now: time	now	nows	now	0	time		
+name of <binary operator>: string	name	names	name	0	string	binary operator	
+name of <cast>: string	name	names	name	0	string	cast	
+name of <type>: string	name	names	name	0	string	type	
+name of <unary operator>: string	name	names	name	0	string	unary operator	
+null: undefined	null	nothing	null	0	undefined		
+nil: undefined	nil	nothings	nil	0	undefined		
+november <integer>: day of year	november	novembers	november	0	day of year		integer
+november <integer> of <integer>: date	november	novembers	november	0	date	integer	integer
+november of <integer>: month and year	november	novembers	november	0	month and year	integer	
+november: month	november	novembers	november	0	month		
+noon: time of day	noon	noons	noon	0	time of day		
+nan of <floating point>: boolean	nan	nans	nan	0	boolean	floating point	
+normal of <floating point>: boolean	normal	normals	normal	0	boolean	floating point	
+name of <mime field>: string	name	names	name	0	string	mime field	
+name of <module>: string	name	names	name	0	string	module	
+name of <bes action>: string	name	names	name	0	string	bes action	
+name of <bes action parameter>: string	name	names	name	0	string	bes action parameter	
+name of <bes activation>: string	name	names	name	0	string	bes activation	
+name of <bes baseline component group>: string	name	names	name	0	string	bes baseline component group	
+name of <bes baseline component>: string	name	names	name	0	string	bes baseline component	
+name of <bes client setting>: string	name	names	name	0	string	bes client setting	
+name of <bes computer>: string	name	names	name	0	string	bes computer	
+name of <bes computer group>: string	name	names	name	0	string	bes computer group	
+name of <bes deployment option>: string	name	names	name	0	string	bes deployment option	
+name of <bes domain>: string	name	names	name	0	string	bes domain	
+name of <bes filter>: string	name	names	name	0	string	bes filter	
+name of <bes fixlet>: string	name	names	name	0	string	bes fixlet	
+name of <bes fixlet field>: string	name	names	name	0	string	bes fixlet field	
+name of <bes ldap directory>: string	name	names	name	0	string	bes ldap directory	
+name of <bes idp directory>: string	name	names	name	0	string	bes idp directory	
+name of <bes property>: string	name	names	name	0	string	bes property	
+name of <bes role>: string	name	names	name	0	string	bes role	
+name of <bes site>: string	name	names	name	0	string	bes site	
+name of <bes unmanagedasset field>: string	name	names	name	0	string	bes unmanagedasset field	
+name of <bes user>: string	name	names	name	0	string	bes user	
+name of <bes wizard>: string	name	names	name	0	string	bes wizard	
+navbar name of <bes wizard>: string	navbar name	navbar names	navbar name	0	string	bes wizard	
+name of <bes wizard variable>: string	name	names	name	0	string	bes wizard variable	
+name of <bes webui app>: string	name	names	name	0	string	bes webui app	
+name of <bes product>: string	name	names	name	0	string	bes product	
+non windows server count of <bes product>: integer	non windows server count	non windows server counts	non windows server count	0	integer	bes product	
+ordered lists of <string>: html	ordered list	ordered lists	ordered lists	1	html	string	
+ordered lists <string> of <string>: html	ordered list	ordered lists	ordered lists	1	html	string	string
+ordered lists of <html>: html	ordered list	ordered lists	ordered lists	1	html	html	
+ordered lists <string> of <html>: html	ordered list	ordered lists	ordered lists	1	html	html	string
+ol of <string>: html	ol	ols	ol	0	html	string	
+ol of <html>: html	ol	ols	ol	0	html	html	
+ol <string> of <string>: html	ol	ols	ol	0	html	string	string
+ol <string> of <html>: html	ol	ols	ol	0	html	html	string
+one bits of <bit set>: integer	one bit	one bits	one bits	1	integer	bit set	
+operand type of <cast>: type	operand type	operand types	operand type	0	type	cast	
+operand type of <unary operator>: type	operand type	operand types	operand type	0	type	unary operator	
+october <integer>: day of year	october	octobers	october	0	day of year		integer
+october <integer> of <integer>: date	october	octobers	october	0	date	integer	integer
+october of <integer>: month and year	october	octobers	october	0	month and year	integer	
+october: month	october	octobers	october	0	month		
+overflow of <floating point>: boolean	overflow	overflows	overflow	0	boolean	floating point	
+operator site flag of <bes action>: boolean	operator site flag	operator site flags	operator site flag	0	boolean	bes action	
+offer flag of <bes action>: boolean	offer flag	offer flags	offer flag	0	boolean	bes action	
+offer description html of <bes action>: html	offer description html	offer description htmls	offer description html	0	html	bes action	
+offer category of <bes action>: string	offer category	offer categories	offer category	0	string	bes action	
+operating system of <bes computer>: string	operating system	operating systems	operating system	0	string	bes computer	
+open action count of <bes fixlet>: integer	open action count	open action counts	open action count	0	integer	bes fixlet	
+operator site flag of <bes fixlet>: boolean	operator site flag	operator site flags	operator site flag	0	boolean	bes fixlet	
+operator site flag of <bes site>: boolean	operator site flag	operator site flags	operator site flag	0	boolean	bes site	
+operator of <bes site>: bes user	operator	operators	operator	0	bes user	bes site	
+owner set of <bes site>: bes user set	owner set	owner sets	owner set	0	bes user set	bes site	
+owners of <bes site>: bes user	owner	owners	owners	1	bes user	bes site	
+owner flag <bes user> of <bes site>: boolean	owner flag	owner flags	owner flag	0	boolean	bes site	bes user
+operator site of <bes user>: bes site	operator site	operator sites	operator site	0	bes site	bes user	
+organization of <license>: string	organization	organizations	organization	0	string	license	
+p of <string>: html	p	ps	p	0	html	string	
+p of <html>: html	p	ps	p	0	html	html	
+p <string> of <string>: html	p	ps	p	0	html	string	string
+p <string> of <html>: html	p	ps	p	0	html	html	string
+pre of <string>: html	pre	pres	pre	0	html	string	
+pre of <html>: html	pre	pres	pre	0	html	html	
+pre <string> of <string>: html	pre	pres	pre	0	html	string	string
+pre <string> of <html>: html	pre	pres	pre	0	html	html	string
+path <string> of <json value>: json value	path	paths	path	0	json value	json value	string
+products of <integer>: integer	product	products	products	1	integer	integer	
+percent encode <string>: string	percent encode	percent encodes	percent encode	0	string		string
+percent decode <string>: string	percent decode	percent decodes	percent decode	0	string		string
+percent encode <binary_string>: string	percent encode	percent encodes	percent encode	0	string		binary_string
+padded string of <bit set>: string	padded string	padded strings	padded string	0	string	bit set	
+position <integer> of <string>: string position	position	positions	position	0	string position	string	integer
+preceding text of <string position>: substring	preceding text	preceding texts	preceding text	0	substring	string position	
+positions of <string>: string position	position	positions	positions	1	string position	string	
+preceding text of <substring>: substring	preceding text	preceding texts	preceding text	0	substring	substring	
+properties: property	property	properties	properties	1	property		
+properties <string>: property	property	properties	properties	1	property		string
+properties of <type>: property	property	properties	properties	1	property	type	
+properties <string> of <type>: property	property	properties	properties	1	property	type	string
+properties returning <type>: property	property returning	properties returning	properties returning	1	property		type
+properties returning <type> of <type>: property	property returning	properties returning	properties returning	1	property	type	type
+plural name of <property>: string	plural name	plural names	plural name	0	string	property	
+parent of <type>: type	parent	parents	parent	0	type	type	
+patch revision of <version>: integer	patch revision	patch revisions	patch revision	0	integer	version	
+pad of <version>: version	pad	pads	pad	0	version	version	
+products of <floating point>: floating point	product	products	products	1	floating point	floating point	
+public key algorithm of <x509 certificate>: string	public key algorithm	public key algorithms	public key algorithm	0	string	x509 certificate	
+preceding binary_string of <binary_substring>: binary_substring	preceding binary_string	preceding binary_strings	preceding binary_string	0	binary_substring	binary_substring	
+position <integer> of <binary_string>: binary position	position	positions	position	0	binary position	binary_string	integer
+preceding binary_string of <binary position>: binary_substring	preceding binary_string	preceding binary_strings	preceding binary_string	0	binary_substring	binary position	
+positions of <binary_string>: binary position	position	positions	positions	1	binary position	binary_string	
+pending license update: boolean	pending license update	pending license updates	pending license update	0	boolean		
+parenthesized parts of <regular expression match>: substring	parenthesized part	parenthesized parts	parenthesized parts	1	substring	regular expression match	
+parenthesized part <integer> of <regular expression match>: substring	parenthesized part	parenthesized parts	parenthesized part	0	substring	regular expression match	integer
+parent group of <bes action>: bes action	parent group	parent groups	parent group	0	bes action	bes action	
+postaction message title of <bes action>: string	postaction message title	postaction message titles	postaction message title	0	string	bes action	
+postaction message text of <bes action>: string	postaction message text	postaction message texts	postaction message text	0	string	bes action	
+postaction allow cancel flag of <bes action>: boolean	postaction allow cancel flag	postaction allow cancel flags	postaction allow cancel flag	0	boolean	bes action	
+postaction postpone delay of <bes action>: time interval	postaction postpone delay	postaction postpone delays	postaction postpone delay	0	time interval	bes action	
+postaction force delay of <bes action>: time interval	postaction force delay	postaction force delays	postaction force delay	0	time interval	bes action	
+parameter <string> of <bes action>: string	parameter	parameters	parameter	0	string	bes action	string
+parameters of <bes action>: bes action parameter	parameter	parameters	parameters	1	bes action parameter	bes action	
+precache flag of <bes action>: boolean	precache flag	precache flags	precache flag	0	boolean	bes action	
+property results of <bes computer>: bes property result	property result	property results	property results	1	bes property result	bes computer	
+private flag of <bes filter>: boolean	private flag	private flags	private flag	0	boolean	bes filter	
+plain bes fixlet set: bes fixlet set	plain bes fixlet set	plain bes fixlet sets	plain bes fixlet set	0	bes fixlet set		
+plain bes fixlets: bes fixlet	plain bes fixlet	plain bes fixlets	plain bes fixlets	1	bes fixlet		
+parent relevances of <bes fixlet>: string	parent relevance	parent relevances	parent relevances	1	string	bes fixlet	
+properties of <bes fixlet>: bes property	property	properties	properties	1	bes property	bes fixlet	
+property <integer> of <bes fixlet>: bes property	property	properties	property	0	bes property	bes fixlet	integer
+preferred bes language: string	preferred bes language	preferred bes languages	preferred bes language	0	string		
+priority of <bes ldap directory server>: integer	priority	priorities	priority	0	integer	bes ldap directory server	
+port of <bes ldap directory server>: integer	port	ports	port	0	integer	bes ldap directory server	
+priority of <bes idp directory server>: integer	priority	priorities	priority	0	integer	bes idp directory server	
+port of <bes idp directory server>: integer	port	ports	port	0	integer	bes idp directory server	
+peer flag of <bes peer download>: boolean	peer flag	peer flags	peer flag	0	boolean	bes peer download	
+prefetch flag of <bes peer download>: boolean	prefetch flag	prefetch flags	prefetch flag	0	boolean	bes peer download	
+property of <bes property result>: bes property	property	properties	property	0	bes property	bes property result	
+plural flag of <bes property result>: boolean	plural flag	plural flags	plural flag	0	boolean	bes property result	
+private flag of <bes tag>: boolean	private flag	private flags	private flag	0	boolean	bes tag	
+public flag of <bes tag>: boolean	public flag	public flags	public flag	0	boolean	bes tag	
+pre60 flag of <bes wizard>: boolean	pre60 flag	pre60 flags	pre60 flag	0	boolean	bes wizard	
+private variable <string> of <bes wizard>: string	private variable	private variables	private variable	0	string	bes wizard	string
+private variable <( string, string )>: string	private variable	private variables	private variable	0	string		( string, string )
+private variables of <bes wizard>: bes wizard variable	private variable	private variables	private variables	1	bes wizard variable	bes wizard	
+private flag of <bes wizard variable>: boolean	private flag	private flags	private flag	0	boolean	bes wizard variable	
+products of <license>: bes product	product	products	products	1	bes product	license	
+perpetual of <bes product>: boolean	perpetual	perpetuals	perpetual	0	boolean	bes product	
+perpetual maintenance of <bes product>: boolean	perpetual maintenance	perpetual maintenances	perpetual maintenance	0	boolean	bes product	
+q of <string>: html	q	qs	q	0	html	string	
+q of <html>: html	q	qs	q	0	html	html	
+q <string> of <string>: html	q	qs	q	0	html	string	string
+q <string> of <html>: html	q	qs	q	0	html	html	string
+rope <string>: rope	rope	ropes	rope	0	rope		string
+right shift <integer> of <bit set>: bit set	right shift	right shifts	right shift	0	bit set	bit set	integer
+result type of <binary operator>: type	result type	result types	result type	0	type	binary operator	
+right operand type of <binary operator>: type	right operand type	right operand types	right operand type	0	type	binary operator	
+representable of <binary_string>: boolean	representable	representables	representable	0	boolean	binary_string	
+representable in utf8 of <binary_string>: boolean	representable in utf8	representables in utf8	representable in utf8	0	boolean	binary_string	
+representable in utf16 of <binary_string>: boolean	representable in utf16	representables in utf16	representable in utf16	0	boolean	binary_string	
+representable in <string> of <binary_string>: boolean	representable in	representables in	representable in	0	boolean	binary_string	string
+representation in <string> of <binary_string>: string	representation in	representations in	representation in	0	string	binary_string	string
+result type of <cast>: type	result type	result types	result type	0	type	cast	
+result type of <property>: type	result type	result types	result type	0	type	property	
+result type of <unary operator>: type	result type	result types	result type	0	type	unary operator	
+range before <time> of <time range>: time range	range before	ranges before	range before	0	time range	time range	time
+range after <time> of <time range>: time range	range after	ranges after	range after	0	time range	time range	time
+relative significance place of <floating point>: floating point	relative significance place	relative significance places	relative significance place	0	floating point	floating point	
+relative significance place <integer> of <floating point>: floating point	relative significance place	relative significance places	relative significance place	0	floating point	floating point	integer
+random floating point: floating point	random floating point	random floating points	random floating point	0	floating point		
+random integer: integer	random integer	random integers	random integer	0	integer		
+random integer of <integer>: integer	random integer	random integers	random integer	0	integer	integer	
+range <time range> of <statistic range>: statistic range	range	ranges	range	0	statistic range	statistic range	time range
+retry count of <bes action result>: integer	retry count	retry counts	retry count	0	integer	bes action result	
+regexes <string>: regular expression	regex	regexes	regexes	1	regular expression		string
+regular expressions <string>: regular expression	regular expression	regular expressions	regular expressions	1	regular expression		string
+regex escape of <string>: string	regex escape	regex escapes	regex escape	0	string	string	
+rate of <linear projection>: rate	rate	rates	rate	0	rate	linear projection	
+rate <time interval> of <exponential projection>: floating point	rate	rates	rate	0	floating point	exponential projection	time interval
+result from <bes action> of <bes computer>: bes action result	result from	results from	result from	0	bes action result	bes computer	bes action
+result from <bes computer> of <bes action>: bes action result	result from	results from	result from	0	bes action result	bes action	bes computer
+result <( bes action, bes computer )>: bes action result	result	results	result	0	bes action result		( bes action, bes computer )
+result <( bes computer, bes action )>: bes action result	result	results	result	0	bes action result		( bes computer, bes action )
+reported computer set of <bes action>: bes computer set	reported computer set	reported computer sets	reported computer set	0	bes computer set	bes action	
+results of <bes action>: bes action result	result	results	results	1	bes action result	bes action	
+reapply flag of <bes action>: boolean	reapply flag	reapply flags	reapply flag	0	boolean	bes action	
+reapplication limit of <bes action>: integer	reapplication limit	reapplication limits	reapplication limit	0	integer	bes action	
+reapplication interval of <bes action>: time interval	reapplication interval	reapplication intervals	reapplication interval	0	time interval	bes action	
+retry limit of <bes action>: integer	retry limit	retry limits	retry limit	0	integer	bes action	
+retry wait for reboot flag of <bes action>: boolean	retry wait for reboot flag	retry wait for reboot flags	retry wait for reboot flag	0	boolean	bes action	
+retry delay of <bes action>: time interval	retry delay	retry delays	retry delay	0	time interval	bes action	
+restart flag of <bes action>: boolean	restart flag	restart flags	restart flag	0	boolean	bes action	
+running message title of <bes action>: string	running message title	running message titles	running message title	0	string	bes action	
+running message text of <bes action>: string	running message text	running message texts	running message text	0	string	bes action	
+require user presence of <bes action>: boolean	require user presence	require user presences	require user presence	0	boolean	bes action	
+require user absence of <bes action>: boolean	require user absence	require user absences	require user absence	0	boolean	bes action	
+relevance of <bes baseline component>: string	relevance	relevances	relevance	0	string	bes baseline component	
+relay server of <bes computer>: string	relay server	relay servers	relay server	0	string	bes computer	
+root server of <bes computer>: string	root server	root servers	root server	0	string	bes computer	
+relay selection method of <bes computer>: string	relay selection method	relay selection methods	relay selection method	0	string	bes computer	
+relay distance of <bes computer>: integer	relay distance	relay distances	relay distance	0	integer	bes computer	
+relay server flag of <bes computer>: boolean	relay server flag	relay server flags	relay server flag	0	boolean	bes computer	
+root server flag of <bes computer>: boolean	root server flag	root server flags	root server flag	0	boolean	bes computer	
+relay hostname of <bes computer>: string	relay hostname	relay hostnames	relay hostname	0	string	bes computer	
+reported property set of <bes computer>: bes property set	reported property set	reported property sets	reported property set	0	bes property set	bes computer	
+reported action set of <bes computer>: bes action set	reported action set	reported action sets	reported action set	0	bes action set	bes computer	
+relevant fixlet set of <bes computer>: bes fixlet set	relevant fixlet set	relevant fixlet sets	relevant fixlet set	0	bes fixlet set	bes computer	
+relevant fixlets of <bes computer>: bes fixlet	relevant fixlet	relevant fixlets	relevant fixlets	1	bes fixlet	bes computer	
+remediated fixlet set of <bes computer>: bes fixlet set	remediated fixlet set	remediated fixlet sets	remediated fixlet set	0	bes fixlet set	bes computer	
+remediated fixlets of <bes computer>: bes fixlet	remediated fixlet	remediated fixlets	remediated fixlets	1	bes fixlet	bes computer	
+relevant fixlet count of <bes computer>: integer	relevant fixlet count	relevant fixlet counts	relevant fixlet count	0	integer	bes computer	
+remediated fixlet count of <bes computer>: integer	remediated fixlet count	remediated fixlet counts	remediated fixlet count	0	integer	bes computer	
+relevance of <bes fixlet>: string	relevance	relevances	relevance	0	string	bes fixlet	
+relevance clauses of <bes fixlet>: string	relevance clause	relevance clauses	relevance clauses	1	string	bes fixlet	
+remediated computer count of <bes fixlet>: integer	remediated computer count	remediated computer counts	remediated computer count	0	integer	bes fixlet	
+remediated computer set of <bes fixlet>: bes computer set	remediated computer set	remediated computer sets	remediated computer set	0	bes computer set	bes fixlet	
+remediated computers of <bes fixlet>: bes computer	remediated computer	remediated computers	remediated computers	1	bes computer	bes fixlet	
+results of <bes fixlet>: bes fixlet result	result	results	results	1	bes fixlet result	bes fixlet	
+result from <bes fixlet> of <bes computer>: bes fixlet result	result from	results from	result from	0	bes fixlet result	bes computer	bes fixlet
+result from <bes computer> of <bes fixlet>: bes fixlet result	result from	results from	result from	0	bes fixlet result	bes fixlet	bes computer
+result <( bes fixlet, bes computer )>: bes fixlet result	result	results	result	0	bes fixlet result		( bes fixlet, bes computer )
+result <( bes computer, bes fixlet )>: bes fixlet result	result	results	result	0	bes fixlet result		( bes computer, bes fixlet )
+relevant <bes fixlet> of <bes computer>: boolean	relevant	relevants	relevant	0	boolean	bes computer	bes fixlet
+relevant <bes computer> of <bes fixlet>: boolean	relevant	relevants	relevant	0	boolean	bes fixlet	bes computer
+relevant <( bes fixlet, bes computer )>: boolean	relevant	relevants	relevant	0	boolean		( bes fixlet, bes computer )
+relevant <( bes computer, bes fixlet )>: boolean	relevant	relevants	relevant	0	boolean		( bes computer, bes fixlet )
+remediated <bes fixlet> of <bes computer>: boolean	remediated	remediateds	remediated	0	boolean	bes computer	bes fixlet
+remediated <bes computer> of <bes fixlet>: boolean	remediated	remediateds	remediated	0	boolean	bes fixlet	bes computer
+remediated <( bes fixlet, bes computer )>: boolean	remediated	remediateds	remediated	0	boolean		( bes fixlet, bes computer )
+remediated <( bes computer, bes fixlet )>: boolean	remediated	remediateds	remediated	0	boolean		( bes computer, bes fixlet )
+relevant flag of <bes fixlet result>: boolean	relevant flag	relevant flags	relevant flag	0	boolean	bes fixlet result	
+remediated flag of <bes fixlet result>: boolean	remediated flag	remediated flags	remediated flag	0	boolean	bes fixlet result	
+report time of <bes peer download>: time	report time	report times	report time	0	time	bes peer download	
+relay of <bes peer download>: string	relay	relays	relay	0	string	bes peer download	
+reserved flag of <bes property>: boolean	reserved flag	reserved flags	reserved flag	0	boolean	bes property	
+reported computer set of <bes property>: bes computer set	reported computer set	reported computer sets	reported computer set	0	bes computer set	bes property	
+results of <bes property>: bes property result	result	results	results	1	bes property result	bes property	
+result from <bes property> of <bes computer>: bes property result	result from	results from	result from	0	bes property result	bes computer	bes property
+result from <bes computer> of <bes property>: bes property result	result from	results from	result from	0	bes property result	bes property	bes computer
+result <( bes property, bes computer )>: bes property result	result	results	result	0	bes property result		( bes property, bes computer )
+result <( bes computer, bes property )>: bes property result	result	results	result	0	bes property result		( bes computer, bes property )
+reader set of <bes site>: bes user set	reader set	reader sets	reader set	0	bes user set	bes site	
+readers of <bes site>: bes user	reader	readers	readers	1	bes user	bes site	
+restartandshutdown postaction privilege allowboth flag of <bes user>: boolean	restartandshutdown postaction privilege allowboth flag	restartandshutdown postaction privilege allowboth flags	restartandshutdown postaction privilege allowboth flag	0	boolean	bes user	
+restartandshutdown postaction privilege allowrestartonly flag of <bes user>: boolean	restartandshutdown postaction privilege allowrestartonly flag	restartandshutdown postaction privilege allowrestartonly flags	restartandshutdown postaction privilege allowrestartonly flag	0	boolean	bes user	
+restartandshutdown postaction privilege none flag of <bes user>: boolean	restartandshutdown postaction privilege none flag	restartandshutdown postaction privilege none flags	restartandshutdown postaction privilege none flag	0	boolean	bes user	
+restartandshutdown actionscript privilege allowboth flag of <bes user>: boolean	restartandshutdown actionscript privilege allowboth flag	restartandshutdown actionscript privilege allowboth flags	restartandshutdown actionscript privilege allowboth flag	0	boolean	bes user	
+restartandshutdown actionscript privilege allowrestartonly flag of <bes user>: boolean	restartandshutdown actionscript privilege allowrestartonly flag	restartandshutdown actionscript privilege allowrestartonly flags	restartandshutdown actionscript privilege allowrestartonly flag	0	boolean	bes user	
+restartandshutdown actionscript privilege none flag of <bes user>: boolean	restartandshutdown actionscript privilege none flag	restartandshutdown actionscript privilege none flags	restartandshutdown actionscript privilege none flag	0	boolean	bes user	
+role set of <bes user>: bes role set	role set	role sets	role set	0	bes role set	bes user	
+roles of <bes user>: bes role	role	roles	roles	1	bes role	bes user	
+requires authoring flag of <bes wizard>: boolean	requires authoring flag	requires authoring flags	requires authoring flag	0	boolean	bes wizard	
+registrar number of <license>: integer	registrar number	registrar numbers	registrar number	0	integer	license	
+rvu count of <bes product>: integer	rvu count	rvu counts	rvu count	0	integer	bes product	
+samp of <string>: html	samp	samps	samp	0	html	string	
+samp of <html>: html	samp	samps	samp	0	html	html	
+samp <string> of <string>: html	samp	samps	samp	0	html	string	string
+samp <string> of <html>: html	samp	samps	samp	0	html	html	string
+second: time interval	second	seconds	second	0	time interval		
+saturday: day of week	saturday	saturdays	saturday	0	day of week		
+september <integer>: day of year	september	septembers	september	0	day of year		integer
+september <integer> of <integer>: date	september	septembers	september	0	date	integer	integer
+september of <integer>: month and year	september	septembers	september	0	month and year	integer	
+september: month	september	septembers	september	0	month		
+second_of_minute of <time of day>: integer	second_of_minute	seconds_of_minute	second_of_minute	0	integer	time of day	
+second_of_minute of <time of day with time zone>: integer	second_of_minute	seconds_of_minute	second_of_minute	0	integer	time of day with time zone	
+sets of <integer>: integer set	set	sets	sets	1	integer set	integer	
+sets of <string>: string set	set	sets	sets	1	string set	string	
+sha1 of <string>: string	sha1	sha1s	sha1	0	string	string	
+sha2_224 of <string>: string	sha2_224	sha2_224s	sha2_224	0	string	string	
+sha2_256 of <string>: string	sha2_256	sha2_256s	sha2_256	0	string	string	
+sha2_384 of <string>: string	sha2_384	sha2_384s	sha2_384	0	string	string	
+sha2_512 of <string>: string	sha2_512	sha2_512s	sha2_512	0	string	string	
+sha224 of <string>: string	sha224	sha224s	sha224	0	string	string	
+sha256 of <string>: string	sha256	sha256s	sha256	0	string	string	
+sha384 of <string>: string	sha384	sha384s	sha384	0	string	string	
+sha512 of <string>: string	sha512	sha512s	sha512	0	string	string	
+sha1 of <x509 certificate>: string	sha1	sha1s	sha1	0	string	x509 certificate	
+serial number of <x509 certificate>: string	serial number	serial numbers	serial number	0	string	x509 certificate	
+sets of <bes action>: bes action set	set	sets	sets	1	bes action set	bes action	
+selected groups string of <bes action>: string	selected groups string	selected groups strings	selected groups string	0	string	bes action	
+shutdown flag of <bes action>: boolean	shutdown flag	shutdown flags	shutdown flag	0	boolean	bes action	
+show message flag of <bes action>: boolean	show message flag	show message flags	show message flag	0	boolean	bes action	
+show running message flag of <bes action>: boolean	show running message flag	show running message flags	show running message flag	0	boolean	bes action	
+secure parameter flag of <bes action>: boolean	secure parameter flag	secure parameter flags	secure parameter flag	0	boolean	bes action	
+settings flag of <bes action>: boolean	settings flag	settings flags	settings flag	0	boolean	bes action	
+scope of <bes client setting>: string	scope	scopes	scope	0	string	bes client setting	
+sets of <bes computer>: bes computer set	set	sets	sets	1	bes computer set	bes computer	
+sets of <bes computer group>: bes computer group set	set	sets	sets	1	bes computer group set	bes computer group	
+server based flag of <bes computer group>: boolean	server based flag	server based flags	server based flag	0	boolean	bes computer group	
+sets of <bes domain>: bes domain set	set	sets	sets	1	bes domain set	bes domain	
+sets of <bes filter>: bes filter set	set	sets	sets	1	bes filter set	bes filter	
+sets of <bes fixlet>: bes fixlet set	set	sets	sets	1	bes fixlet set	bes fixlet	
+sans id list of <bes fixlet>: string	sans id list	sans id lists	sans id list	0	string	bes fixlet	
+script of <bes fixlet action>: string	script	scripts	script	0	string	bes fixlet action	
+script type of <bes fixlet action>: string	script type	script types	script type	0	string	bes fixlet action	
+sets of <bes ldap directory>: bes ldap directory set	set	sets	sets	1	bes ldap directory set	bes ldap directory	
+sets of <bes idp directory>: bes idp directory set	set	sets	sets	1	bes idp directory set	bes idp directory	
+servers of <bes ldap directory>: bes ldap directory server	server	servers	servers	1	bes ldap directory server	bes ldap directory	
+servers of <bes idp directory>: bes idp directory server	server	servers	servers	1	bes idp directory server	bes idp directory	
+sets of <bes property>: bes property set	set	sets	sets	1	bes property set	bes property	
+sets of <bes role>: bes role set	set	sets	sets	1	bes role set	bes role	
+sets of <bes site>: bes site set	set	sets	sets	1	bes site set	bes site	
+sets of <bes site file>: bes site file set	set	sets	sets	1	bes site file set	bes site file	
+sets of <bes unmanagedasset>: bes unmanagedasset set	set	sets	sets	1	bes unmanagedasset set	bes unmanagedasset	
+sets of <bes user>: bes user set	set	sets	sets	1	bes user set	bes user	
+show other action flag of <bes user>: boolean	show other action flag	show other action flags	show other action flag	0	boolean	bes user	
+sets of <bes wizard>: bes wizard set	set	sets	sets	1	bes wizard set	bes wizard	
+shared variable <string> of <bes wizard>: string	shared variable	shared variables	shared variable	0	string	bes wizard	string
+shared variable <( string, string )>: string	shared variable	shared variables	shared variable	0	string		( string, string )
+shared variables of <bes wizard>: bes wizard variable	shared variable	shared variables	shared variables	1	bes wizard variable	bes wizard	
+sets of <bes webui app>: bes webui app set	set	sets	sets	1	bes webui app set	bes webui app	
+seat of <license>: integer	seat	seats	seat	0	integer	license	
+seat count state of <license>: string	seat count state	seat count states	seat count state	0	string	license	
+sha384 signature of <license>: boolean	sha384 signature	sha384 signatures	sha384 signature	0	boolean	license	
+sha256 download of <license>: boolean	sha256 download	sha256 downloads	sha256 download	0	boolean	license	
+significant digits <integer> of <integer>: integer	significant digits	significant digitss	significant digits	0	integer	integer	integer
+significant digits <integer> of <hertz>: hertz	significant digits	significant digitss	significant digits	0	hertz	hertz	integer
+singular name of <property>: string	singular name	singular names	singular name	0	string	property	
+size of <type>: integer	size	sizes	size	0	integer	type	
+site version list <string>: site version list	site version list	site version lists	site version list	0	site version list		string
+size of <integer set>: integer	size	sizes	size	0	integer	integer set	
+size of <string set>: integer	size	sizes	size	0	integer	string set	
+significance threshold of <floating point>: floating point	significance threshold	significance thresholds	significance threshold	0	floating point	floating point	
+significance place of <floating point>: floating point	significance place	significance places	significance place	0	floating point	floating point	
+significance place <integer> of <floating point>: floating point	significance place	significance places	significance place	0	floating point	floating point	integer
+signature algorithm of <x509 certificate>: string	signature algorithm	signature algorithms	signature algorithm	0	string	x509 certificate	
+size of <bes action set>: integer	size	sizes	size	0	integer	bes action set	
+single flag of <bes action>: boolean	single flag	single flags	single flag	0	boolean	bes action	
+size of <bes computer set>: integer	size	sizes	size	0	integer	bes computer set	
+size of <bes computer group set>: integer	size	sizes	size	0	integer	bes computer group set	
+site of <bes computer group>: bes site	site	sites	site	0	bes site	bes computer group	
+size of <bes domain set>: integer	size	sizes	size	0	integer	bes domain set	
+size of <bes filter set>: integer	size	sizes	size	0	integer	bes filter set	
+size of <bes fixlet set>: integer	size	sizes	size	0	integer	bes fixlet set	
+site of <bes fixlet>: bes site	site	sites	site	0	bes site	bes fixlet	
+size of <bes ldap directory set>: integer	size	sizes	size	0	integer	bes ldap directory set	
+size of <bes idp directory set>: integer	size	sizes	size	0	integer	bes idp directory set	
+site of <bes peer download>: bes site	site	sites	site	0	bes site	bes peer download	
+size of <bes peer download>: integer	size	sizes	size	0	integer	bes peer download	
+site version of <bes peer download>: integer	site version	site versions	site version	0	integer	bes peer download	
+site id of <bes peer download>: integer	site id	site ids	site id	0	integer	bes peer download	
+size of <bes property set>: integer	size	sizes	size	0	integer	bes property set	
+simple name of <bes property>: string	simple name	simple names	simple name	0	string	bes property	
+size of <bes role set>: integer	size	sizes	size	0	integer	bes role set	
+size of <bes site set>: integer	size	sizes	size	0	integer	bes site set	
+site level relevance of <bes site>: string	site level relevance	site level relevances	site level relevance	0	string	bes site	
+site file set of <bes site>: bes site file set	site file set	site files sets	site file set	0	bes site file set	bes site	
+site files of <bes site>: bes site file	site file	site files	site files	1	bes site file	bes site	
+size of <bes site file set>: integer	size	sizes	size	0	integer	bes site file set	
+size of <bes unmanagedasset set>: integer	size	sizes	size	0	integer	bes unmanagedasset set	
+size of <bes user set>: integer	size	sizes	size	0	integer	bes user set	
+size of <bes wizard set>: integer	size	sizes	size	0	integer	bes wizard set	
+site of <bes wizard>: bes site	site	sites	site	0	bes site	bes wizard	
+size of <bes webui app set>: integer	size	sizes	size	0	integer	bes webui app set	
+site number of <license>: integer	site number	site numbers	site number	0	integer	license	
+site urls of <bes product>: string	site url	site urls	site urls	1	string	bes product	
+signature hash algorithms of <license>: string	signature hash algorithm	signature hash algorithms	signature hash algorithms	1	string	license	
+span of <string>: html	span	spans	span	0	html	string	
+span of <html>: html	span	spans	span	0	html	html	
+span <string> of <string>: html	span	spans	span	0	html	string	string
+span <string> of <html>: html	span	spans	span	0	html	html	string
+strong of <string>: html	strong	strongs	strong	0	html	string	
+strong of <html>: html	strong	strongs	strong	0	html	html	
+strong <string> of <string>: html	strong	strongs	strong	0	html	string	string
+strong <string> of <html>: html	strong	strongs	strong	0	html	html	string
+sub of <string>: html	sub	subs	sub	0	html	string	
+sub of <html>: html	sub	subs	sub	0	html	html	
+sub <string> of <string>: html	sub	subs	sub	0	html	string	string
+sub <string> of <html>: html	sub	subs	sub	0	html	html	string
+sup of <string>: html	sup	sups	sup	0	html	string	
+sup of <html>: html	sup	sups	sup	0	html	html	
+sup <string> of <string>: html	sup	sups	sup	0	html	string	string
+sup <string> of <html>: html	sup	sups	sup	0	html	html	string
+small of <string>: html	small	smalls	small	0	html	string	
+small of <html>: html	small	smalls	small	0	html	html	
+small <string> of <string>: html	small	smalls	small	0	html	string	string
+small <string> of <html>: html	small	smalls	small	0	html	html	string
+standard deviations of <floating point>: floating point	standard deviation	standard deviations	standard deviations	1	floating point	floating point	
+standard deviations of <integer>: floating point	standard deviation	standard deviations	standard deviations	1	floating point	integer	
+string of <tuple item>: string	string	strings	string	0	string	tuple item	
+sums of <integer>: integer	sum	sums	sums	1	integer	integer	
+start of <substring>: string position	start	starts	start	0	string position	substring	
+substring <( integer, integer )> of <string>: substring	substring	substrings	substring	0	substring	string	( integer, integer )
+substrings <string> of <string>: substring	substring	substrings	substrings	1	substring	string	string
+substrings before <string> of <string>: substring	substring before	substrings before	substrings before	1	substring	string	string
+substrings after <string> of <string>: substring	substring after	substrings after	substrings after	1	substring	string	string
+substrings between <string> of <string>: substring	substring between	substrings between	substrings between	1	substring	string	string
+substrings separated by <string> of <string>: substring	substring separated by	substrings separated by	substrings separated by	1	substring	string	string
+symbol of <binary operator>: string	symbol	symbols	symbol	0	string	binary operator	
+string <string>: string	string	strings	string	0	string		string
+symbol of <unary operator>: string	symbol	symbols	symbol	0	string	unary operator	
+sunday: day of week	sunday	sundays	sunday	0	day of week		
+start of <time range>: time	start	starts	start	0	time	time range	
+strverscmp version <string>: strverscmp version	strverscmp version	strverscmp versions	strverscmp version	0	strverscmp version		string
+sums of <time interval>: time interval	sum	sums	sums	1	time interval	time interval	
+sums of <floating point>: floating point	sum	sums	sums	1	floating point	floating point	
+sqrt of <floating point>: floating point	sqrt	sqrts	sqrt	0	floating point	floating point	
+sqrt of <integer>: floating point	sqrt	sqrts	sqrt	0	floating point	integer	
+subject of <x509 certificate>: string	subject	subjects	subject	0	string	x509 certificate	
+subject common name of <x509 certificate>: string	subject common name	subject common names	subject common name	0	string	x509 certificate	
+start of <binary_substring>: binary position	start	starts	start	0	binary position	binary_substring	
+statistic range of <bes property>: statistic range	statistic range	statistic ranges	statistic range	0	statistic range	bes property	
+start of <statistic range>: time	start	starts	start	0	time	statistic range	
+status of <bes action result>: bes action status	status	statuses	status	0	bes action status	bes action result	
+start time of <bes action result>: time	start time	start times	start time	0	time	bes action result	
+source severity of <fixlet count pair>: string	source severity	source severitys	source severity	0	string	fixlet count pair	
+start of <statistical bin>: time	start	starts	start	0	time	statistical bin	
+success rate of <statistical bin>: floating point	success rate	success rates	success rate	0	floating point	statistical bin	
+standard deviation of <statistical bin>: floating point	standard deviation	standard deviations	standard deviation	0	floating point	statistical bin	
+skewness of <statistical bin>: floating point	skewness	skewnesses	skewness	0	floating point	statistical bin	
+state of <bes action>: string	state	states	state	0	string	bes action	
+stopper of <bes action>: bes user	stopper	stoppers	stopper	0	bes user	bes action	
+source fixlet of <bes action>: bes fixlet	source fixlet	source fixlets	source fixlet	0	bes fixlet	bes action	
+start date of <bes action>: date	start date	start dates	start date	0	date	bes action	
+start time_of_day of <bes action>: time of day	start time_of_day	start times_of_day	start time_of_day	0	time of day	bes action	
+success on original relevance of <bes action>: boolean	success on original relevance	success on original relevances	success on original relevance	0	boolean	bes action	
+success on custom relevance of <bes action>: boolean	success on custom relevance	success on custom relevances	success on custom relevance	0	boolean	bes action	
+success on run to completion of <bes action>: boolean	success on run to completion	success on run to completions	success on run to completion	0	boolean	bes action	
+source relevance of <bes action>: string	source relevance	source relevances	source relevance	0	string	bes action	
+subscription flag of <bes action>: boolean	subscription flag	subscription flags	subscription flag	0	boolean	bes action	
+start flag of <bes action>: boolean	start flag	start flags	start flag	0	boolean	bes action	
+status of <bes activation>: string	status	statuses	status	0	string	bes activation	
+source fixlet of <bes baseline component>: bes fixlet	source fixlet	source fixlets	source fixlet	0	bes fixlet	bes baseline component	
+subscribed site set of <bes computer>: bes site set	subscribed site set	subscribed site sets	subscribed site set	0	bes site set	bes computer	
+subscribed sites of <bes computer>: bes site	subscribed site	subscribed sites	subscribed sites	1	bes site	bes computer	
+source of <bes fixlet>: string	source	sources	source	0	string	bes fixlet	
+source id of <bes fixlet>: string	source id	source ids	source id	0	string	bes fixlet	
+source release date of <bes fixlet>: date	source release date	source release dates	source release date	0	date	bes fixlet	
+source severity of <bes fixlet>: string	source severity	source severities	source severity	0	string	bes fixlet	
+success on original relevance of <bes fixlet action>: boolean	success on original relevance	success on original relevances	success on original relevance	0	boolean	bes fixlet action	
+success on custom relevance of <bes fixlet action>: boolean	success on custom relevance	success on custom relevances	success on custom relevance	0	boolean	bes fixlet action	
+success on run to completion of <bes fixlet action>: boolean	success on run to completion	success on run to completions	success on run to completion	0	boolean	bes fixlet action	
+source host of <bes peer download>: string	source host	source hosts	source host	0	string	bes peer download	
+subnet of <bes peer download>: string	subnet	subnets	subnet	0	string	bes peer download	
+source analysis of <bes property>: bes fixlet	source analysis	source analyses	source analysis	0	bes fixlet	bes property	
+source name of <bes property>: string	source name	source names	source name	0	string	bes property	
+source evaluation period of <bes property>: time interval	source evaluation period	source evaluation periods	source evaluation period	0	time interval	bes property	
+source id of <bes property>: integer	source id	source ids	source id	0	integer	bes property	
+subscribed computer set of <bes site>: bes computer set	subscribed computer set	subscribed computer sets	subscribed computer set	0	bes computer set	bes site	
+subscribed computers of <bes site>: bes computer	subscribed computer	subscribed computers	subscribed computers	1	bes computer	bes site	
+subscription mode of <bes site>: string	subscription mode	subscription modes	subscription mode	0	string	bes site	
+subscribed <bes site> of <bes computer>: boolean	subscribed	subscribeds	subscribed	0	boolean	bes computer	bes site
+subscribed <bes computer> of <bes site>: boolean	subscribed	subscribeds	subscribed	0	boolean	bes site	bes computer
+subscribed <( bes site, bes computer )>: boolean	subscribed	subscribeds	subscribed	0	boolean		( bes site, bes computer )
+subscribed <( bes computer, bes site )>: boolean	subscribed	subscribeds	subscribed	0	boolean		( bes computer, bes site )
+source of <bes unmanagedasset>: string	source	sources	source	0	string	bes unmanagedasset	
+stop other actions flag of <bes user>: boolean	stop other actions flag	stop other actions flags	stop other actions flag	0	boolean	bes user	
+start date of <license>: time	start date	start dates	start date	0	time	license	
+state of <bes product>: string	state	states	state	0	string	bes product	
+title of <string>: html	title	titles	title	0	html	string	
+title of <html>: html	title	titles	title	0	html	html	
+title <string> of <string>: html	title	titles	title	0	html	string	string
+title <string> of <html>: html	title	titles	title	0	html	html	string
+table of <string>: html	table	tables	table	0	html	string	
+table of <html>: html	table	tables	table	0	html	html	
+table <string> of <string>: html	table	tables	table	0	html	string	string
+table <string> of <html>: html	table	tables	table	0	html	html	string
+thead of <string>: html	thead	theads	thead	0	html	string	
+thead of <html>: html	thead	theads	thead	0	html	html	
+thead <string> of <string>: html	thead	theads	thead	0	html	string	string
+thead <string> of <html>: html	thead	theads	thead	0	html	html	string
+tfoot of <string>: html	tfoot	tfoots	tfoot	0	html	string	
+tfoot of <html>: html	tfoot	tfoots	tfoot	0	html	html	
+tfoot <string> of <string>: html	tfoot	tfoots	tfoot	0	html	string	string
+tfoot <string> of <html>: html	tfoot	tfoots	tfoot	0	html	html	string
+tbody of <string>: html	tbody	tbodys	tbody	0	html	string	
+tbody of <html>: html	tbody	tbodys	tbody	0	html	html	
+tbody <string> of <string>: html	tbody	tbodys	tbody	0	html	string	string
+tbody <string> of <html>: html	tbody	tbodys	tbody	0	html	html	string
+tr of <string>: html	tr	trs	tr	0	html	string	
+tr of <html>: html	tr	trs	tr	0	html	html	
+tr <string> of <string>: html	tr	trs	tr	0	html	string	string
+tr <string> of <html>: html	tr	trs	tr	0	html	html	string
+th of <string>: html	th	ths	th	0	html	string	
+th of <html>: html	th	ths	th	0	html	html	
+th <string> of <string>: html	th	ths	th	0	html	string	string
+th <string> of <html>: html	th	ths	th	0	html	html	string
+td of <string>: html	td	tds	td	0	html	string	
+td of <html>: html	td	tds	td	0	html	html	
+td <string> of <string>: html	td	tds	td	0	html	string	string
+td <string> of <html>: html	td	tds	td	0	html	html	string
+tt of <string>: html	tt	tts	tt	0	html	string	
+tt of <html>: html	tt	tts	tt	0	html	html	
+tt <string> of <string>: html	tt	tts	tt	0	html	string	string
+tt <string> of <html>: html	tt	tts	tt	0	html	html	string
+type of <json value>: string	type	types	type	0	string	json value	
+tuple items of <string>: tuple item	tuple item	tuple items	tuple items	1	tuple item	string	
+tuple string item <integer> of <string>: string	tuple string item	tuple string items	tuple string item	0	string	string	integer
+tuple string items of <string>: string	tuple string item	tuple string items	tuple string items	1	string	string	
+tuple strings of <string>: string	tuple string	tuple strings	tuple strings	1	string	string	
+time <string>: time	time	times	time	0	time		string
+time interval <string>: time interval	time interval	time intervals	time interval	0	time interval		string
+time zone <string>: time zone	time zone	time zones	time zone	0	time zone		string
+true: boolean	true	trues	true	0	boolean		
+type <string>: type	type	types	type	0	type		string
+types: type	type	types	types	1	type		
+tuesday: day of week	tuesday	tuesdays	tuesday	0	day of week		
+thursday: day of week	thursday	thursdays	thursday	0	day of week		
+two digit hour of <time of day>: string	two digit hour	two digit hours	two digit hour	0	string	time of day	
+two digit minute of <time of day>: string	two digit minute	two digit minutes	two digit minute	0	string	time of day	
+two digit second of <time of day>: string	two digit second	two digit seconds	two digit second	0	string	time of day	
+time_of_day <string>: time of day	time_of_day	times_of_day	time_of_day	0	time of day		string
+time of <time of day with time zone>: time of day	time	times	time	0	time of day	time of day with time zone	
+two digit hour of <time of day with time zone>: string	two digit hour	two digit hours	two digit hour	0	string	time of day with time zone	
+two digit minute of <time of day with time zone>: string	two digit minute	two digit minutes	two digit minute	0	string	time of day with time zone	
+two digit second of <time of day with time zone>: string	two digit second	two digit seconds	two digit second	0	string	time of day with time zone	
+time <time zone> of <time>: time of day with time zone	time	times	time	0	time of day with time zone	time	time zone
+total of <statistic range>: statistical bin	total	totals	total	0	statistical bin	statistic range	
+totals <time interval> of <statistic range>: statistical bin	total	totals	totals	1	statistical bin	statistic range	time interval
+time of <historical fixlet count>: time	time	times	time	0	time	historical fixlet count	
+time of <historical computer count>: time	time	times	time	0	time	historical computer count	
+total lower bound of <statistical bin>: floating point	total lower bound	total lower bounds	total lower bound	0	floating point	statistical bin	
+total upper bound of <statistical bin>: floating point	total upper bound	total upper bounds	total upper bound	0	floating point	statistical bin	
+top level bes action set: bes action set	top level bes action set	top level bes action sets	top level bes action set	0	bes action set		
+top level bes actions: bes action	top level bes action	top level bes actions	top level bes actions	1	bes action		
+targeted computer set of <bes action>: bes computer set	targeted computer set	targeted computer sets	targeted computer set	0	bes computer set	bes action	
+targeted computers of <bes action>: bes computer	targeted computer	targeted computers	targeted computers	1	bes computer	bes action	
+time issued of <bes action>: time	time issued	times issued	time issued	0	time	bes action	
+targeting relevance of <bes action>: string	targeting relevance	targeting relevances	targeting relevance	0	string	bes action	
+targeting method of <bes action>: string	targeting method	targeting methods	targeting method	0	string	bes action	
+targeted by id flag of <bes action>: boolean	targeted by id flag	targeted by id flags	targeted by id flag	0	boolean	bes action	
+targeted by property flag of <bes action>: boolean	targeted by property flag	targeted by property flags	targeted by property flag	0	boolean	bes action	
+targeted by list flag of <bes action>: boolean	targeted by list flag	targeted by list flags	targeted by list flag	0	boolean	bes action	
+targeted names of <bes action>: string	targeted name	targeted names	targeted names	1	string	bes action	
+targeted list of <bes action>: string	targeted list	targeted lists	targeted list	0	string	bes action	
+top level flag of <bes action>: boolean	top level flag	top level flags	top level flag	0	boolean	bes action	
+time stopped of <bes action>: time	time stopped	times stopped	time stopped	0	time	bes action	
+time range start of <bes action>: time of day	time range start	time range starts	time range start	0	time of day	bes action	
+time range end of <bes action>: time of day	time range end	time range ends	time range end	0	time of day	bes action	
+temporal distribution of <bes action>: time interval	temporal distribution	temporal distributions	temporal distribution	0	time interval	bes action	
+timestamp of <bes comment>: time	timestamp	timestamps	timestamp	0	time	bes comment	
+text of <bes comment>: string	text	texts	text	0	string	bes comment	
+task flag of <bes filter>: boolean	task flag	task flags	task flag	0	boolean	bes filter	
+task set of <bes filter>: bes fixlet set	task set	task sets	task set	0	bes fixlet set	bes filter	
+type of <bes fixlet>: string	type	types	type	0	string	bes fixlet	
+task flag of <bes fixlet>: boolean	task flag	task flags	task flag	0	boolean	bes fixlet	
+taken action set of <bes fixlet>: bes action set	taken action set	taken action sets	taken action set	0	bes action set	bes fixlet	
+taken actions of <bes fixlet>: bes action	taken action	taken actions	taken actions	1	bes action	bes fixlet	
+tenant id of <bes idp directory>: string	tenant id	tenant ids	tenant id	0	string	bes idp directory	
+tag of <bes site>: string	tag	tags	tag	0	string	bes site	
+tags of <bes fixlet>: bes tag	tag	tags	tags	1	bes tag	bes fixlet	
+tags of <bes action>: bes tag	tag	tags	tags	1	bes tag	bes action	
+tagged fixlets of <string>: bes fixlet	tagged fixlet	tagged fixlets	tagged fixlets	1	bes fixlet	string	
+tagged actions of <string>: bes action	tagged action	tagged actions	tagged actions	1	bes action	string	
+term of <bes product>: boolean	term	terms	term	0	boolean	bes product	
+type of <license>: string	type	types	type	0	string	license	
+tls cipher list of <license>: string	tls cipher list	tls cipher lists	tls cipher list	0	string	license	
+unordered lists of <string>: html	unordered list	unordered lists	unordered lists	1	html	string	
+unordered lists <string> of <string>: html	unordered list	unordered lists	unordered lists	1	html	string	string
+unordered lists of <html>: html	unordered list	unordered lists	unordered lists	1	html	html	
+unordered lists <string> of <html>: html	unordered list	unordered lists	unordered lists	1	html	html	string
+ul of <string>: html	ul	uls	ul	0	html	string	
+ul of <html>: html	ul	uls	ul	0	html	html	
+ul <string> of <string>: html	ul	uls	ul	0	html	string	string
+ul <string> of <html>: html	ul	uls	ul	0	html	html	string
+unique values of <hertz>: hertz with multiplicity	unique value	unique values	unique values	1	hertz with multiplicity	hertz	
+universal time <string>: time	universal time	universal times	universal time	0	time		string
+unique values of <time>: time with multiplicity	unique value	unique values	unique values	1	time with multiplicity	time	
+unique values of <time interval>: time interval with multiplicity	unique value	unique values	unique values	1	time interval with multiplicity	time interval	
+universal time zone: time zone	universal time zone	universal time zones	universal time zone	0	time zone		
+unique values of <time zone>: time zone with multiplicity	unique value	unique values	unique values	1	time zone with multiplicity	time zone	
+unique values of <string>: string with multiplicity	unique value	unique values	unique values	1	string with multiplicity	string	
+usual name of <property>: string	usual name	usual names	usual name	0	string	property	
+unique values of <integer>: integer with multiplicity	unique value	unique values	unique values	1	integer with multiplicity	integer	
+upper bound of <integer range>: integer	upper bound	upper bounds	upper bound	0	integer	integer range	
+unique values of <large integer>: large integer with multiplicity	unique value	unique values	unique values	1	large integer with multiplicity	large integer	
+uinteger <integer>: uinteger	uinteger	uintegers	uinteger	0	uinteger		integer
+unique values of <uinteger>: uinteger with multiplicity	unique value	unique values	unique values	1	uinteger with multiplicity	uinteger	
+uinteger <string>: uinteger	uinteger	uintegers	uinteger	0	uinteger		string
+unary operators: unary operator	unary operator	unary operators	unary operators	1	unary operator		
+unary operators <string>: unary operator	unary operator	unary operators	unary operators	1	unary operator		string
+unary operators returning <type>: unary operator	unary operator returning	unary operators returning	unary operators returning	1	unary operator		type
+unique values of <day of month>: day of month with multiplicity	unique value	unique values	unique values	1	day of month with multiplicity	day of month	
+unique values of <day of week>: day of week with multiplicity	unique value	unique values	unique values	1	day of week with multiplicity	day of week	
+unique values of <day of year>: day of year with multiplicity	unique value	unique values	unique values	1	day of year with multiplicity	day of year	
+unique values of <date>: date with multiplicity	unique value	unique values	unique values	1	date with multiplicity	date	
+unique values of <month and year>: month and year with multiplicity	unique value	unique values	unique values	1	month and year with multiplicity	month and year	
+unique values of <number of months>: number of months with multiplicity	unique value	unique values	unique values	1	number of months with multiplicity	number of months	
+unique values of <month>: month with multiplicity	unique value	unique values	unique values	1	month with multiplicity	month	
+unique values of <time of day>: time of day with multiplicity	unique value	unique values	unique values	1	time of day with multiplicity	time of day	
+unique values of <time range>: time range with multiplicity	unique value	unique values	unique values	1	time range with multiplicity	time range	
+unique values of <year>: year with multiplicity	unique value	unique values	unique values	1	year with multiplicity	year	
+unique values of <time of day with time zone>: time of day with time zone with multiplicity	unique value	unique values	unique values	1	time of day with time zone with multiplicity	time of day with time zone	
+unique values of <site version list>: site version list with multiplicity	unique value	unique values	unique values	1	site version list with multiplicity	site version list	
+unions of <integer set>: integer set	union	unions	unions	1	integer set	integer set	
+unions of <string set>: string set	union	unions	unions	1	string set	string set	
+unique values of <version>: version with multiplicity	unique value	unique values	unique values	1	version with multiplicity	version	
+unique values of <floating point>: floating point with multiplicity	unique value	unique values	unique values	1	floating point with multiplicity	floating point	
+underflow of <floating point>: boolean	underflow	underflows	underflow	0	boolean	floating point	
+unique values of <rate>: rate with multiplicity	unique value	unique values	unique values	1	rate with multiplicity	rate	
+unions of <bes action set>: bes action set	union	unions	unions	1	bes action set	bes action set	
+unique values of <bes action>: bes action with multiplicity	unique value	unique values	unique values	1	bes action with multiplicity	bes action	
+untargeted flag of <bes action>: boolean	untargeted flag	untargeted flags	untargeted flag	0	boolean	bes action	
+urgent flag of <bes action>: boolean	urgent flag	urgent flags	urgent flag	0	boolean	bes action	
+utc time flag of <bes action>: boolean	utc time flag	utc time flags	utc time flag	0	boolean	bes action	
+unknown computer set of <bes baseline component>: bes computer set	unknown computer set	unknown computer sets	unknown computer set	0	bes computer set	bes baseline component	
+unknown computer count of <bes baseline component>: integer	unknown computer count	unknown computer counts	unknown computer count	0	integer	bes baseline component	
+unions of <bes computer set>: bes computer set	union	unions	unions	1	bes computer set	bes computer set	
+unique values of <bes computer>: bes computer with multiplicity	unique value	unique values	unique values	1	bes computer with multiplicity	bes computer	
+unions of <bes computer group set>: bes computer group set	union	unions	unions	1	bes computer group set	bes computer group set	
+unique values of <bes computer group>: bes computer group with multiplicity	unique value	unique values	unique values	1	bes computer group with multiplicity	bes computer group	
+unions of <bes domain set>: bes domain set	union	unions	unions	1	bes domain set	bes domain set	
+unique values of <bes domain>: bes domain with multiplicity	unique value	unique values	unique values	1	bes domain with multiplicity	bes domain	
+unions of <bes filter set>: bes filter set	union	unions	unions	1	bes filter set	bes filter set	
+unique values of <bes filter>: bes filter with multiplicity	unique value	unique values	unique values	1	bes filter with multiplicity	bes filter	
+user flag of <bes filter>: boolean	user flag	user flags	user flag	0	boolean	bes filter	
+unmanagedasset flag of <bes filter>: boolean	unmanagedasset flag	unmanagedasset flags	unmanagedasset flag	0	boolean	bes filter	
+user set of <bes filter>: bes user set	user set	user sets	user set	0	bes user set	bes filter	
+unions of <bes fixlet set>: bes fixlet set	union	unions	unions	1	bes fixlet set	bes fixlet set	
+unique values of <bes fixlet>: bes fixlet with multiplicity	unique value	unique values	unique values	1	bes fixlet with multiplicity	bes fixlet	
+unlocked computer count of <bes fixlet>: integer	unlocked computer count	unlocked computer counts	unlocked computer count	0	integer	bes fixlet	
+unions of <bes ldap directory set>: bes ldap directory set	union	unions	unions	1	bes ldap directory set	bes ldap directory set	
+unique values of <bes ldap directory>: bes ldap directory with multiplicity	unique value	unique values	unique values	1	bes ldap directory with multiplicity	bes ldap directory	
+unions of <bes idp directory set>: bes idp directory set	union	unions	unions	1	bes idp directory set	bes idp directory set	
+unique values of <bes idp directory>: bes idp directory with multiplicity	unique value	unique values	unique values	1	bes idp directory with multiplicity	bes idp directory	
+use ssl of <bes ldap directory>: boolean	use ssl	use ssls	use ssl	0	boolean	bes ldap directory	
+use ssl of <bes idp directory>: boolean	use ssl	use ssls	use ssl	0	boolean	bes idp directory	
+uid attribute of <bes ldap directory>: string	uid attribute	uid attributes	uid attribute	0	string	bes ldap directory	
+uid attribute of <bes idp directory>: string	uid attribute	uid attributes	uid attribute	0	string	bes idp directory	
+user filter of <bes ldap directory>: string	user filter	user filters	user filter	0	string	bes ldap directory	
+user filter of <bes idp directory>: string	user filter	user filters	user filter	0	string	bes idp directory	
+unique values of <bes peer download>: bes peer download with multiplicity	unique value	unique values	unique values	1	bes peer download with multiplicity	bes peer download	
+unions of <bes property set>: bes property set	union	unions	unions	1	bes property set	bes property set	
+unique values of <bes property>: bes property with multiplicity	unique value	unique values	unique values	1	bes property with multiplicity	bes property	
+unions of <bes role set>: bes role set	union	unions	unions	1	bes role set	bes role set	
+unique values of <bes role>: bes role with multiplicity	unique value	unique values	unique values	1	bes role with multiplicity	bes role	
+unmanagedasset privilege scanpoint flag of <bes role>: boolean	unmanagedasset privilege scanpoint flag	unmanagedasset privilege scanpoint flags	unmanagedasset privilege scanpoint flag	0	boolean	bes role	
+unmanagedasset privilege showall flag of <bes role>: boolean	unmanagedasset privilege showall flag	unmanagedasset privilege showall flags	unmanagedasset privilege showall flag	0	boolean	bes role	
+unmanagedasset privilege shownone flag of <bes role>: boolean	unmanagedasset privilege shownone flag	unmanagedasset privilege shownone flags	unmanagedasset privilege shownone flag	0	boolean	bes role	
+user set of <bes role>: bes user set	user set	user sets	user set	0	bes user set	bes role	
+users of <bes role>: bes user	user	users	users	1	bes user	bes role	
+url of <bes server>: string	url	urls	url	0	string	bes server	
+unions of <bes site set>: bes site set	union	unions	unions	1	bes site set	bes site set	
+unique values of <bes site>: bes site with multiplicity	unique value	unique values	unique values	1	bes site with multiplicity	bes site	
+unified id of <bes site>: integer	unified id	unified ids	unified id	0	integer	bes site	
+url of <bes site>: string	url	urls	url	0	string	bes site	
+unions of <bes site file set>: bes site file set	union	unions	unions	1	bes site file set	bes site file set	
+unique values of <bes site file>: bes site file with multiplicity	unique value	unique values	unique values	1	bes site file with multiplicity	bes site file	
+unions of <bes unmanagedasset set>: bes unmanagedasset set	union	unions	unions	1	bes unmanagedasset set	bes unmanagedasset set	
+unique values of <bes unmanagedasset>: bes unmanagedasset with multiplicity	unique value	unique values	unique values	1	bes unmanagedasset with multiplicity	bes unmanagedasset	
+unions of <bes user set>: bes user set	union	unions	unions	1	bes user set	bes user set	
+unique values of <bes user>: bes user with multiplicity	unique value	unique values	unique values	1	bes user with multiplicity	bes user	
+unmanagedasset privilege scanpoint flag of <bes user>: boolean	unmanagedasset privilege scanpoint flag	unmanagedasset privilege scanpoint flags	unmanagedasset privilege scanpoint flag	0	boolean	bes user	
+unmanagedasset privilege showall flag of <bes user>: boolean	unmanagedasset privilege showall flag	unmanagedasset privilege showall flags	unmanagedasset privilege showall flag	0	boolean	bes user	
+unmanagedasset privilege shownone flag of <bes user>: boolean	unmanagedasset privilege shownone flag	unmanagedasset privilege shownone flags	unmanagedasset privilege shownone flag	0	boolean	bes user	
+unions of <bes wizard set>: bes wizard set	union	unions	unions	1	bes wizard set	bes wizard set	
+unique values of <bes wizard>: bes wizard with multiplicity	unique value	unique values	unique values	1	bes wizard with multiplicity	bes wizard	
+url of <bes wizard>: string	url	urls	url	0	string	bes wizard	
+unions of <bes webui app set>: bes webui app set	union	unions	unions	1	bes webui app set	bes webui app set	
+unique values of <bes webui app>: bes webui app with multiplicity	unique value	unique values	unique values	1	bes webui app with multiplicity	bes webui app	
+user count of <bes product>: integer	user count	user counts	user count	0	integer	bes product	
+unique values of <ipv4 address>: ipv4 address with multiplicity	unique value	unique values	unique values	1	ipv4 address with multiplicity	ipv4 address	
+unique values of <ipv6 address>: ipv6 address with multiplicity	unique value	unique values	unique values	1	ipv6 address with multiplicity	ipv6 address	
+unique values of <ipv4or6 address>: ipv4or6 address with multiplicity	unique value	unique values	unique values	1	ipv4or6 address with multiplicity	ipv4or6 address	
+var of <string>: html	var	vars	var	0	html	string	
+var of <html>: html	var	vars	var	0	html	html	
+var <string> of <string>: html	var	vars	var	0	html	string	string
+var <string> of <html>: html	var	vars	var	0	html	html	string
+value of <json key>: json value	value	values	value	0	json value	json key	
+version of <cryptography>: string	version	versions	version	0	string	cryptography	
+week: time interval	week	weeks	week	0	time interval		
+wednesday: day of week	wednesday	wednesdays	wednesday	0	day of week		
+year of <date>: year	year	years	year	0	year	date	
+year of <month and year>: year	year	years	year	0	year	month and year	
+year: number of months	year	years	year	0	number of months		
+year <integer>: year	year	years	year	0	year		integer
+year <string>: year	year	years	year	0	year		string
+zone of <time of day with time zone>: time zone	zone	zones	zone	0	time zone	time of day with time zone	
+zoned time_of_day <string>: time of day with time zone	zoned time_of_day	zoned times_of_day	zoned time_of_day	0	time of day with time zone		string
+version <string>: version	version	versions	version	0	version		string
+version of <x509 certificate>: integer	version	versions	version	0	integer	x509 certificate	
+value of <mime field>: string	value	values	value	0	string	mime field	
+version string <string> of <module>: string	version string	version strings	version string	0	string	module	string
+version of <module>: version	version	versions	version	0	version	module	
+variance of <statistical bin>: floating point	variance	variances	variance	0	floating point	statistical bin	
+value of <bes action parameter>: string	value	values	value	0	string	bes action parameter	
+value of <bes client setting>: string	value	values	value	0	string	bes client setting	
+value of <bes deployment option>: string	value	values	value	0	string	bes deployment option	
+wizard data of <bes fixlet>: html	wizard data	wizard datas	wizard data	0	html	bes fixlet	
+wizard name of <bes fixlet>: string	wizard name	wizard names	wizard name	0	string	bes fixlet	
+wizard link of <bes fixlet>: string	wizard link	wizard links	wizard link	0	string	bes fixlet	
+visible flag of <bes fixlet>: boolean	visible flag	visible flags	visible flag	0	boolean	bes fixlet	
+values of <bes fixlet field>: bes fixlet field value	value	values	values	1	bes fixlet field value	bes fixlet field	
+value count of <bes property result>: integer	value count	value counts	value count	0	integer	bes property result	
+values of <bes property result>: string	value	values	values	1	string	bes property result	
+writer set of <bes site>: bes user set	writer set	writer sets	writer set	0	bes user set	bes site	
+writers of <bes site>: bes user	writer	writers	writers	1	bes user	bes site	
+wizard set of <bes site>: bes wizard set	wizard set	wizard sets	wizard set	0	bes wizard set	bes site	
+wizards of <bes site>: bes wizard	wizard	wizards	wizards	1	bes wizard	bes site	
+version of <bes site>: integer	version	versions	version	0	integer	bes site	
+value of <bes tag>: string	value	values	value	0	string	bes tag	
+value of <bes unmanagedasset field>: string	value	values	value	0	string	bes unmanagedasset field	
+variables of <bes wizard>: bes wizard variable	variable	variables	variables	1	bes wizard variable	bes wizard	
+wizard of <bes wizard variable>: bes wizard	wizard	wizards	wizard	0	bes wizard	bes wizard variable	
+value of <bes wizard variable>: string	value	values	value	0	string	bes wizard variable	
+webui enabled: boolean	webui enabled	webuis enabled	webui enabled	0	boolean		
+windows display time <string>: time	windows display time	windows display times	windows display time	0	time		string
+workstation count of <bes product>: integer	workstation count	workstation counts	workstation count	0	integer	bes product	
+windows server count of <bes product>: integer	windows server count	windows server counts	windows server count	0	integer	bes product	

@@ -11,12 +11,20 @@
 ignore-words-list = thead,theads,oprating,wnidows
 
 # tests/examples/ holds real-world BigFix content copied verbatim from
-# https://github.com/jgstew/bigfix-content for fidelity (see its README) -
-# including whatever typos already exist in that third-party content. Don't
-# flag those; fixing them here would misrepresent what was actually copied.
+# https://github.com/jgstew/bigfix-content for fidelity (see its README), plus
+# the relevance_inspectors/ dumps of BigFix's own introspection output - both
+# include whatever "typos" already exist in that upstream content, including a
+# few HTML-element property names whose mechanically-formed plural (name + a
+# trailing s) reads as a misspelling of an unrelated word. Don't flag those;
+# fixing them here would misrepresent what BigFix actually reports.
+#
+# The bare "tests/examples" form only matches a path component equal to that
+# whole string, not anything nested under it - codespell needs an explicit
+# `**` to recurse, which is what actually makes this skip work rather than
+# being silently vacuous.
 #
 # _inspector_data.py is generated from tests/examples/relevance_inspectors/ by
 # tools/generate_inspector_data.py - the same verbatim BigFix inspector names
 # (e.g. `additional_information of <dmi>`), just relocated into src/ so the
 # library can read them at runtime. Same rationale, same exclusion.
-skip = tests/examples,src/bigfix_relevance_analyzer/_inspector_data.py
+skip = tests/examples/**,src/bigfix_relevance_analyzer/_inspector_data.py
