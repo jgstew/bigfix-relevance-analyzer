@@ -1,309 +1,312 @@
-access control entry
-access control list
-action
-action lock state
-active device
-active directory group
-active directory local computer
-active directory local user
-active directory server
-activity history
-administrative rights
-agent interface
-agent interface capability
-analysis
-application
-application usage summary
-application usage summary instance
-audit policy
-audit policy category
-audit policy information
-audit policy subcategory
-bes product
-binary operator
-binary position
-binary_string
-binary_substring
-bios
-bit set
-boolean
-boot task trigger
-cast
-cidr subnet
-client
-client_cryptography
-cloud provider
-com handler task action
-connection
-connection status
-cpupackage
-cryptography
-current relay
-daily task trigger
-date
-date with multiplicity
-day of month
-day of month with multiplicity
-day of week
-day of week with multiplicity
-day of year
-day of year with multiplicity
-discretionary access control list
-distinguished name
-distinguished name component
-dmi
-dmi additional_information
-dmi b32_bit_memory_error_information
-dmi b64_bit_memory_error_information
-dmi base_board_information
-dmi bios_information
-dmi bios_language_information
-dmi built_in_pointing_device
-dmi cache_information
-dmi cooling_device
-dmi electrical_current_probe
-dmi end_of_table
-dmi group_associations
-dmi hardware_security
-dmi inactive
-dmi ipmi_device_information
-dmi management_device
-dmi management_device_component
-dmi management_device_threshold_data
-dmi memory_array_mapped_address
-dmi memory_channel
-dmi memory_controller_information
-dmi memory_device
-dmi memory_device_mapped_address
-dmi memory_module_information
-dmi oem_strings
-dmi on_board_devices_information
-dmi onboard_devices_extended_information
-dmi out_of_band_remote_access
-dmi physical_memory_array
-dmi port_connector_information
-dmi portable_battery
-dmi processor_information
-dmi system_boot_information
-dmi system_configuration_option
-dmi system_enclosure_or_chassis
-dmi system_information
-dmi system_power_controls
-dmi system_power_supply
-dmi system_reset
-dmi system_slots
-dmi temperature_probe
-dmi voltage_probe
-download server
-download storage folder
-drive
-email task action
-encoding
-environment
-environment variable
-evaluation cycle
-event log
-event log event type
-event log record
-event task trigger
-exec task action
-execution
-file
-file content
-file line
-file section
-file shortcut
-file version block
-filesystem object
-firewall
-firewall action
-firewall authorized application
-firewall icmp settings
-firewall local policy modify state
-firewall open port
-firewall policy
-firewall profile
-firewall profile type
-firewall remote admin settings
-firewall rule
-firewall scope
-firewall service
-firewall service restriction
-firewall service type
-fixlet
-fixlet_header
-floating point
-floating point with multiplicity
-folder
-format
-hardware
-hertz
-hertz with multiplicity
-html
-html attribute list
-idle task trigger
-instance data
-integer
-integer range
-integer set
-integer with multiplicity
-internet connection firewall
-internet protocol
-ip version
-ipv4 address
-ipv4 address with multiplicity
-ipv4or6 address
-ipv4or6 address with multiplicity
-ipv6 address
-ipv6 address with multiplicity
-json key
-json value
-language
-large integer
-large integer with multiplicity
-license
-local group
-local group member
-local mssql database
-logged on user
-logon task trigger
-manual group
-media type
-metabase
-metabase identifier
-metabase key
-metabase type
-metabase user type
-metabase value
-module
-monitor power interval
-month
-month and year
-month and year with multiplicity
-month with multiplicity
-monthly task trigger
-monthlydow task trigger
-network
-network adapter
-network adapter interface
-network address list
-network interface
-network ip interface
-network share
-number of months
-number of months with multiplicity
-operating system
-operating system product type
-operating system suite mask
-plugin store
-plugin store key
-port mapping
-power history
-power level
-power state
-primary language
-priority class
-process
-processor
-property
-ram
-registration server
-registration task trigger
-registry
-registry key
-registry key value
-registry key value type
-regular expression
-regular expression match
-restricted site
-root server
-rope
-running task
-scheduled task
-security account
-security database
-security descriptor
-security identifier
-selected server
-server based group
-service
-session state change task trigger
-setting
-show message task action
-site
-site group
-site profile
-site profile variable
-site version list
-site version list with multiplicity
-smbios
-smbios structure
-smbios value
-socket
-sqlite column
-sqlite column type
-sqlite database
-sqlite row
-sqlite statement
-sqlite table
-string
-string position
-string set
-string with multiplicity
-substring
-system access control list
-system power interval
-task action
-task action type
-task definition
-task folder
-task idle settings
-task named value pair
-task network settings
-task principal
-task registration info
-task repetition pattern
-task settings
-task trigger
-task trigger type
-tcp state
-time
-time interval
-time interval with multiplicity
-time of day
-time of day with multiplicity
-time of day with time zone
-time of day with time zone with multiplicity
-time range
-time range with multiplicity
-time task trigger
-time with multiplicity
-time zone
-time zone with multiplicity
-tuple item
-type
-uinteger
-uinteger with multiplicity
-unary operator
-undefined
-user
-utf8 string
-uuid
-uuid with multiplicity
-version
-version with multiplicity
-weekly task trigger
-wifi
-wifi network
-winrt enumeration
-winrt package
-winrt package id
-winrt package user information
-wmi
-wmi object
-wmi select
-x509 certificate
-xml dom document
-xml dom node
-year
-year with multiplicity
+		1
+access control entry		4
+access control list		4
+action		152
+action lock state		1
+active device		36
+active directory group		344
+active directory local computer		440
+active directory local user		440
+active directory server		1
+activity history		12
+administrative rights		1
+agent interface		1
+agent interface capability		1
+analysis		8
+application	file	728
+application usage summary		136
+application usage summary instance		92
+audit policy		1
+audit policy category		16
+audit policy information		4
+audit policy subcategory		4
+bes product		4
+binary operator		4
+binary position	integer	112
+binary_string		100
+binary_substring	binary_string	100
+bios		36
+bit set		8
+boolean		1
+boot task trigger	task trigger	56
+cast		4
+cidr subnet		58
+client	application	728
+client_cryptography		28
+cloud provider		1
+com handler task action	task action	12
+connection		4
+connection status		4
+cpupackage		1
+cryptography		52
+current relay		1
+daily task trigger	task trigger	56
+date		24
+date with multiplicity	date	32
+day of month		8
+day of month with multiplicity	day of month	16
+day of week		4
+day of week with multiplicity	day of week	16
+day of year		16
+day of year with multiplicity	day of year	24
+discretionary access control list	access control list	8
+distinguished name	string	252
+distinguished name component	string	104
+dmi		4
+dmi additional_information		8
+dmi b32_bit_memory_error_information		8
+dmi b64_bit_memory_error_information		8
+dmi base_board_information		8
+dmi bios_information		8
+dmi bios_language_information		8
+dmi built_in_pointing_device		8
+dmi cache_information		8
+dmi cooling_device		8
+dmi electrical_current_probe		8
+dmi end_of_table		8
+dmi group_associations		8
+dmi hardware_security		8
+dmi inactive		8
+dmi ipmi_device_information		8
+dmi management_device		8
+dmi management_device_component		8
+dmi management_device_threshold_data		8
+dmi memory_array_mapped_address		8
+dmi memory_channel		8
+dmi memory_controller_information		8
+dmi memory_device		8
+dmi memory_device_mapped_address		8
+dmi memory_module_information		8
+dmi oem_strings		8
+dmi on_board_devices_information		8
+dmi onboard_devices_extended_information		8
+dmi out_of_band_remote_access		8
+dmi physical_memory_array		8
+dmi port_connector_information		8
+dmi portable_battery		8
+dmi processor_information		8
+dmi system_boot_information		8
+dmi system_configuration_option		8
+dmi system_enclosure_or_chassis		8
+dmi system_information		8
+dmi system_power_controls		8
+dmi system_power_supply		8
+dmi system_reset		8
+dmi system_slots		8
+dmi temperature_probe		8
+dmi voltage_probe		8
+download server		1
+download storage folder	folder	728
+drive		84
+email task action	task action	12
+encoding		56
+environment		1
+environment variable		208
+evaluation cycle		120
+event log		116
+event log event type		2
+event log record		152
+event task trigger	task trigger	56
+exec task action	task action	12
+execution		48
+file	filesystem object	728
+file content		12
+file line	string	136
+file section		216
+file shortcut		324
+file version block		12
+filesystem object		728
+firewall		8
+firewall action		4
+firewall authorized application		4
+firewall icmp settings		4
+firewall local policy modify state		4
+firewall open port		4
+firewall policy		8
+firewall profile		12
+firewall profile type		4
+firewall remote admin settings		4
+firewall rule		32
+firewall scope		4
+firewall service		4
+firewall service restriction		8
+firewall service type		4
+fixlet		40
+fixlet_header		16
+floating point		24
+floating point with multiplicity	floating point	32
+folder	filesystem object	728
+format		96
+hardware		4
+hertz		8
+hertz with multiplicity	hertz	16
+html		112
+html attribute list		8
+idle task trigger	task trigger	56
+instance data		8
+integer		8
+integer range		16
+integer set		12
+integer with multiplicity	integer	16
+internet connection firewall		4
+internet protocol		4
+ip version		4
+ipv4 address	ipv4or6 address	28
+ipv4 address with multiplicity	ipv4 address	40
+ipv4or6 address		28
+ipv4or6 address with multiplicity	ipv4or6 address	40
+ipv6 address	ipv4or6 address	28
+ipv6 address with multiplicity	ipv6 address	40
+json key		112
+json value		8
+language		2
+large integer		24
+large integer with multiplicity	large integer	32
+license		1664
+local group	security account	24
+local group member	security account	16
+local mssql database		84
+logged on user		36
+logon task trigger	task trigger	56
+manual group		160
+media type		4
+metabase		4
+metabase identifier		4
+metabase key		36
+metabase type		4
+metabase user type		4
+metabase value		24
+module		4
+monitor power interval		32
+month		4
+month and year		16
+month and year with multiplicity	month and year	24
+month with multiplicity	month	16
+monthly task trigger	task trigger	56
+monthlydow task trigger	task trigger	56
+network		28
+network adapter		56
+network adapter interface		56
+network address list		4
+network interface		4
+network ip interface	network interface	68
+network share		8
+number of months		8
+number of months with multiplicity	number of months	16
+operating system		1
+operating system product type		8
+operating system suite mask	bit set	8
+plugin store		116
+plugin store key		224
+port mapping		4
+power history		24
+power level		8
+power state		4
+primary language		2
+priority class		4
+process		16
+processor		112
+property		4
+ram		1
+registration server		1
+registration task trigger	task trigger	56
+registry		4
+registry key		96
+registry key value		100
+registry key value type		4
+regular expression		8
+regular expression match	substring	112
+restricted site		12
+root server		1
+rope		112
+running task		4
+scheduled task		112
+security account		8
+security database		1
+security descriptor		24
+security identifier		20
+selected server		4
+server based group		160
+service		284
+session state change task trigger	task trigger	56
+setting		4
+show message task action	task action	12
+site		4
+site group		16
+site profile		8
+site profile variable		12
+site version list		512
+site version list with multiplicity	site version list	520
+smbios		4
+smbios structure		12
+smbios value		192
+socket		52
+sqlite column		116
+sqlite column type		108
+sqlite database		88
+sqlite row		4
+sqlite statement		8
+sqlite table		108
+string		104
+string position	integer	112
+string set		12
+string with multiplicity	string	112
+substring	string	104
+system access control list	access control list	8
+system power interval		24
+task action		8
+task action type		4
+task definition		8
+task folder		4
+task idle settings		8
+task named value pair		4
+task network settings		8
+task principal		8
+task registration info		8
+task repetition pattern		52
+task settings		8
+task trigger		52
+task trigger type		4
+tcp state		4
+time		8
+time interval		8
+time interval with multiplicity	time interval	16
+time of day		8
+time of day with multiplicity	time of day	16
+time of day with time zone		16
+time of day with time zone with multiplicity	time of day with time zone	24
+time range		16
+time range with multiplicity	time range	24
+time task trigger	task trigger	56
+time with multiplicity	time	16
+time zone		8
+time zone with multiplicity	time zone	16
+tuple item		112
+type		4
+uinteger		8
+uinteger with multiplicity	uinteger	16
+unary operator		4
+undefined		1
+user	security account	20
+utf8 string		8
+uuid		16
+uuid with multiplicity	uuid	24
+version		20
+version with multiplicity	version	32
+weekly task trigger	task trigger	56
+wifi		24
+wifi network		112
+winrt enumeration		28
+winrt package		188
+winrt package id		188
+winrt package user information		52
+wmi		8
+wmi object		4
+wmi select		32
+x509 certificate		584
+xml dom document	xml dom node	12
+xml dom node		8
+yaml key		144
+yaml value		40
+year		8
+year with multiplicity	year	16

@@ -1,345 +1,345 @@
-<yaml value> = <yaml value>: boolean
-<yaml key> = <yaml key>: boolean
-<cidr subnet> = <string>: boolean
-<string> = <cidr subnet>: boolean
-<cidr subnet> = <cidr subnet>: boolean
-<cidr subnet> contains <cidr subnet>: boolean
-<cidr subnet> contains <ipv4or6 address>: boolean
-<cidr subnet> contains <ipv4 address>: boolean
-<cidr subnet> contains <ipv6 address>: boolean
-<power state> = <power state>: boolean
-<html> & <string>: html
-<string> & <html>: html
-<html> & <html>: html
-<string> contains <regular expression>: boolean
-<string> = <regular expression>: boolean
-<regular expression> = <string>: boolean
-<string> starts with <regular expression>: boolean
-<string> ends with <regular expression>: boolean
-<rate> = <rate>: boolean
-<rate> < <rate>: boolean
-<rate> <= <rate>: boolean
-<rate> + <rate>: rate
-<rate> - <rate>: rate
-<rate> * <floating point>: rate
-<floating point> * <rate>: rate
-<rate> / <floating point>: rate
-<rate> * <time interval>: floating point
-<time interval> * <rate>: floating point
-<floating point> / <time interval>: rate
-<stage> = <stage>: boolean
-<version> = <version>: boolean
-<version> < <version>: boolean
-<version> <= <version>: boolean
-<version> = <string>: boolean
-<version> < <string>: boolean
-<version> <= <string>: boolean
-<string> = <version>: boolean
-<string> < <version>: boolean
-<string> <= <version>: boolean
-<bit set> = <bit set>: boolean
-<bit set> contains <bit set>: boolean
-<bit set> + <bit set>: bit set
-<bit set> - <bit set>: bit set
-<bit set> * <bit set>: bit set
-<day of month> = <day of month>: boolean
-<day of month> < <day of month>: boolean
-<day of month> <= <day of month>: boolean
-<day of month> + <time interval>: day of month
-<time interval> + <day of month>: day of month
-<day of month> - <time interval>: day of month
-<day of month> - <day of month>: time interval
-<day of week> = <day of week>: boolean
-<day of week> + <time interval>: day of week
-<time interval> + <day of week>: day of week
-<day of week> - <time interval>: day of week
-<day of week> - <day of week>: time interval
-<day of year> = <day of year>: boolean
-<day of year> < <day of year>: boolean
-<day of year> <= <day of year>: boolean
-<month> & <day of month>: day of year
-<day of month> & <month>: day of year
-<day of year> + <time interval>: day of year
-<time interval> + <day of year>: day of year
-<day of year> - <time interval>: day of year
-<day of year> - <day of year>: time interval
-<day of year> + <number of months>: day of year
-<number of months> + <day of year>: day of year
-<day of year> - <number of months>: day of year
-<hertz> = <hertz>: boolean
-<hertz> < <hertz>: boolean
-<hertz> <= <hertz>: boolean
-<hertz> + <hertz>: hertz
-<hertz> - <hertz>: hertz
-<hertz> * <integer>: hertz
-<integer> * <hertz>: hertz
-<hertz> / <hertz>: integer
-<hertz> / <integer>: hertz
-<hertz> %25 <hertz>: hertz
-<date> = <date>: boolean
-<date> < <date>: boolean
-<date> <= <date>: boolean
-<day of month> & <month and year>: date
-<month and year> & <day of month>: date
-<day of year> & <year>: date
-<year> & <day of year>: date
-<day of year> & <month and year>: date
-<month and year> & <day of year>: date
-<date> + <number of months>: date
-<number of months> + <date>: date
-<date> - <number of months>: date
-<date> + <time interval>: date
-<time interval> + <date>: date
-<date> - <time interval>: date
-<date> - <date>: time interval
-<date> & <time of day with time zone>: time
-<time of day with time zone> & <date>: time
-<ip version> = <ip version>: boolean
-<ipv4 address> = <string>: boolean
-<string> = <ipv4 address>: boolean
-<ipv4or6 address> = <string>: boolean
-<string> = <ipv4or6 address>: boolean
-<ipv4 address> < <string>: boolean
-<string> < <ipv4 address>: boolean
-<ipv4or6 address> < <string>: boolean
-<string> < <ipv4or6 address>: boolean
-<ipv4 address> <= <string>: boolean
-<string> <= <ipv4 address>: boolean
-<ipv4or6 address> <= <string>: boolean
-<string> <= <ipv4or6 address>: boolean
-<ipv4 address> = <ipv4 address>: boolean
-<ipv4 address> < <ipv4 address>: boolean
-<ipv4 address> <= <ipv4 address>: boolean
-<ipv6 address> = <ipv6 address>: boolean
-<ipv6 address> < <ipv6 address>: boolean
-<ipv6 address> <= <ipv6 address>: boolean
-<ipv4or6 address> = <ipv4or6 address>: boolean
-<ipv4or6 address> < <ipv4or6 address>: boolean
-<ipv4or6 address> <= <ipv4or6 address>: boolean
-<month and year> = <month and year>: boolean
-<month and year> < <month and year>: boolean
-<month and year> <= <month and year>: boolean
-<month> & <year>: month and year
-<year> & <month>: month and year
-<month and year> + <number of months>: month and year
-<number of months> + <month and year>: month and year
-<month and year> - <number of months>: month and year
-<month and year> - <month and year>: number of months
-<number of months> = <number of months>: boolean
-<number of months> < <number of months>: boolean
-<number of months> <= <number of months>: boolean
-<number of months> + <number of months>: number of months
-<number of months> - <number of months>: number of months
-<integer> * <number of months>: number of months
-<number of months> * <integer>: number of months
-<number of months> / <number of months>: integer
-<number of months> / <integer>: number of months
-<number of months> %25 <number of months>: number of months
-<month> = <month>: boolean
-<month> < <month>: boolean
-<month> <= <month>: boolean
-<month> + <number of months>: month
-<number of months> + <month>: month
-<month> - <number of months>: month
-<month> - <month>: number of months
-<rope> & <string>: rope
-<string> & <rope>: rope
-<rope> & <rope>: rope
-<rope> contains <string>: boolean
-<time of day> = <time of day>: boolean
-<time of day> < <time of day>: boolean
-<time of day> <= <time of day>: boolean
-<time of day> + <time interval>: time of day
-<time interval> + <time of day>: time of day
-<time of day> - <time interval>: time of day
-<time of day> - <time of day>: time interval
-<time range> = <time range>: boolean
-<time> & <time>: time range
-<time> & <time interval>: time range
-<time interval> & <time>: time range
-<time range> & <time>: time range
-<time> & <time range>: time range
-<time range> & <time range>: time range
-<time range> + <time range>: time range
-<time range> * <time range>: time range
-<time range> contains <time>: boolean
-<time range> contains <time range>: boolean
-<time zone> + <time interval>: time zone
-<time interval> + <time zone>: time zone
-<time zone> - <time interval>: time zone
-<time zone> - <time zone>: time interval
-<time zone> = <time zone>: boolean
-<time range> * <integer>: timed( time range, integer )
-<integer> * <time range>: timed( time range, integer )
-<time range> * <boolean>: timed( time range, boolean )
-<boolean> * <time range>: timed( time range, boolean )
-<year> = <year>: boolean
-<year> < <year>: boolean
-<year> <= <year>: boolean
-<year> + <number of months>: year
-<number of months> + <year>: year
-<year> - <number of months>: year
-<year> - <year>: number of months
-<time of day with time zone> < <time of day with time zone>: boolean
-<time of day with time zone> <= <time of day with time zone>: boolean
-<time of day with time zone> = <time of day with time zone>: boolean
-<time of day> & <time zone>: time of day with time zone
-<time zone> & <time of day>: time of day with time zone
-<time of day with time zone> & <time zone>: time of day with time zone
-<time zone> & <time of day with time zone>: time of day with time zone
-<time of day with time zone> + <time interval>: time of day with time zone
-<time interval> + <time of day with time zone>: time of day with time zone
-<time of day with time zone> - <time interval>: time of day with time zone
-<time of day with time zone> - <time of day with time zone>: time interval
-<file signature> = <file signature>: boolean
-<file type> = <file type>: boolean
-<volume> = <volume>: boolean
-<country> = <country>: boolean
-<security identifier> = <security identifier>: boolean
-<floating point> = <floating point>: boolean
-<floating point> < <floating point>: boolean
-<floating point> <= <floating point>: boolean
-<floating point> + <floating point>: floating point
-<floating point> - <floating point>: floating point
-<floating point> * <floating point>: floating point
-<floating point> / <floating point>: floating point
-<integer> + <floating point>: floating point
-<integer> - <floating point>: floating point
-<integer> * <floating point>: floating point
-<integer> / <floating point>: floating point
-<floating point> + <integer>: floating point
-<floating point> - <integer>: floating point
-<floating point> * <integer>: floating point
-<floating point> / <integer>: floating point
-<integer> = <floating point>: boolean
-<integer> <= <floating point>: boolean
-<integer> < <floating point>: boolean
-<floating point> = <integer>: boolean
-<floating point> <= <integer>: boolean
-<floating point> < <integer>: boolean
-<time> = <time>: boolean
-<time> < <time>: boolean
-<time> <= <time>: boolean
-<time> + <time interval>: time
-<time interval> + <time>: time
-<time> - <time interval>: time
-<time> - <time>: time interval
-<time interval> = <time interval>: boolean
-<time interval> < <time interval>: boolean
-<time interval> <= <time interval>: boolean
-<time interval> + <time interval>: time interval
-<time interval> - <time interval>: time interval
-<time interval> * <integer>: time interval
-<integer> * <time interval>: time interval
-<time interval> / <time interval>: integer
-<time interval> / <integer>: time interval
-<time interval> %25 <time interval>: time interval
-<firewall action> = <firewall action>: boolean
-<site version list> = <site version list>: boolean
-<site version list> < <site version list>: boolean
-<site version list> <= <site version list>: boolean
-<site version list> contains <site version list>: boolean
-<integer set> + <integer set>: integer set
-<integer set> - <integer set>: integer set
-<integer set> * <integer set>: integer set
-<integer set> = <integer set>: boolean
-<integer set> contains <integer>: boolean
-<integer set> contains <integer set>: boolean
-<string set> + <string set>: string set
-<string set> - <string set>: string set
-<string set> * <string set>: string set
-<string set> = <string set>: boolean
-<string set> contains <string>: boolean
-<string set> contains <string set>: boolean
-<json key> = <json key>: boolean
-<json value> = <json value>: boolean
-<format> + <string>: format
-<format> + <integer>: format
-<format> + <time interval>: format
-<format> + <time>: format
-<format> + <time of day>: format
-<format> + <day of week>: format
-<format> + <date>: format
-<format> + <format>: format
-<file content> contains <string>: boolean
-<uuid> = <uuid>: boolean
-<uuid> < <uuid>: boolean
-<uuid> <= <uuid>: boolean
-<uuid> = <string>: boolean
-<uuid> <= <string>: boolean
-<uuid> < <string>: boolean
-<string> = <uuid>: boolean
-<string> <= <uuid>: boolean
-<string> < <uuid>: boolean
-<uinteger> = <uinteger>: boolean
-<uinteger> < <uinteger>: boolean
-<uinteger> <= <uinteger>: boolean
-<uinteger> = <integer>: boolean
-<uinteger> <= <integer>: boolean
-<uinteger> < <integer>: boolean
-<integer> = <uinteger>: boolean
-<integer> <= <uinteger>: boolean
-<integer> < <uinteger>: boolean
-<uinteger> + <uinteger>: uinteger
-<uinteger> - <uinteger>: uinteger
-<uinteger> * <uinteger>: uinteger
-<uinteger> / <uinteger>: uinteger
-<uinteger> %25 <uinteger>: uinteger
-<uinteger> + <integer>: uinteger
-<uinteger> - <integer>: uinteger
-<uinteger> * <integer>: uinteger
-<uinteger> / <integer>: uinteger
-<uinteger> %25 <integer>: uinteger
-<integer> + <uinteger>: uinteger
-<integer> - <uinteger>: uinteger
-<integer> * <uinteger>: uinteger
-<integer> / <uinteger>: uinteger
-<integer> %25 <uinteger>: uinteger
-<boolean> = <boolean>: boolean
-<string> = <string>: boolean
-<string> < <string>: boolean
-<string> <= <string>: boolean
-<string> starts with <string>: boolean
-<string> ends with <string>: boolean
-<string> contains <string>: boolean
-<string> & <string>: string
-<type> = <type>: boolean
-<integer> = <integer>: boolean
-<integer> < <integer>: boolean
-<integer> <= <integer>: boolean
-<integer> + <integer>: integer
-<integer> - <integer>: integer
-<integer> * <integer>: integer
-<integer> / <integer>: integer
-<integer> %25 <integer>: integer
-<large integer> = <large integer>: boolean
-<large integer> < <large integer>: boolean
-<large integer> <= <large integer>: boolean
-<large integer> = <integer>: boolean
-<large integer> <= <integer>: boolean
-<large integer> < <integer>: boolean
-<integer> = <large integer>: boolean
-<integer> <= <large integer>: boolean
-<integer> < <large integer>: boolean
-<large integer> + <large integer>: large integer
-<large integer> - <large integer>: large integer
-<large integer> * <large integer>: large integer
-<large integer> / <large integer>: large integer
-<large integer> %25 <large integer>: large integer
-<large integer> + <integer>: large integer
-<large integer> - <integer>: large integer
-<large integer> * <integer>: large integer
-<large integer> / <integer>: large integer
-<large integer> %25 <integer>: large integer
-<integer> + <large integer>: large integer
-<integer> - <large integer>: large integer
-<integer> * <large integer>: large integer
-<integer> / <large integer>: large integer
-<integer> %25 <large integer>: large integer
-<binary_string> = <binary_string>: boolean
-<binary_string> < <binary_string>: boolean
-<binary_string> <= <binary_string>: boolean
-<binary_string> starts with <binary_string>: boolean
-<binary_string> ends with <binary_string>: boolean
-<binary_string> contains <binary_string>: boolean
-<binary_string> & <binary_string>: binary_string
+<yaml value> = <yaml value>: boolean	equal	=	yaml value	yaml value	boolean
+<yaml key> = <yaml key>: boolean	equal	=	yaml key	yaml key	boolean
+<cidr subnet> = <string>: boolean	equal	=	cidr subnet	string	boolean
+<string> = <cidr subnet>: boolean	equal	=	string	cidr subnet	boolean
+<cidr subnet> = <cidr subnet>: boolean	equal	=	cidr subnet	cidr subnet	boolean
+<cidr subnet> contains <cidr subnet>: boolean	contains	contains	cidr subnet	cidr subnet	boolean
+<cidr subnet> contains <ipv4or6 address>: boolean	contains	contains	cidr subnet	ipv4or6 address	boolean
+<cidr subnet> contains <ipv4 address>: boolean	contains	contains	cidr subnet	ipv4 address	boolean
+<cidr subnet> contains <ipv6 address>: boolean	contains	contains	cidr subnet	ipv6 address	boolean
+<power state> = <power state>: boolean	equal	=	power state	power state	boolean
+<html> & <string>: html	concatenate	&	html	string	html
+<string> & <html>: html	concatenate	&	string	html	html
+<html> & <html>: html	concatenate	&	html	html	html
+<string> contains <regular expression>: boolean	contains	contains	string	regular expression	boolean
+<string> = <regular expression>: boolean	equal	=	string	regular expression	boolean
+<regular expression> = <string>: boolean	equal	=	regular expression	string	boolean
+<string> starts with <regular expression>: boolean	starts with	starts with	string	regular expression	boolean
+<string> ends with <regular expression>: boolean	ends with	ends with	string	regular expression	boolean
+<rate> = <rate>: boolean	equal	=	rate	rate	boolean
+<rate> < <rate>: boolean	less than	<	rate	rate	boolean
+<rate> <= <rate>: boolean	less than or equal	<=	rate	rate	boolean
+<rate> + <rate>: rate	plus	+	rate	rate	rate
+<rate> - <rate>: rate	minus	-	rate	rate	rate
+<rate> * <floating point>: rate	times	*	rate	floating point	rate
+<floating point> * <rate>: rate	times	*	floating point	rate	rate
+<rate> / <floating point>: rate	divide	/	rate	floating point	rate
+<rate> * <time interval>: floating point	times	*	rate	time interval	floating point
+<time interval> * <rate>: floating point	times	*	time interval	rate	floating point
+<floating point> / <time interval>: rate	divide	/	floating point	time interval	rate
+<stage> = <stage>: boolean	equal	=	stage	stage	boolean
+<version> = <version>: boolean	equal	=	version	version	boolean
+<version> < <version>: boolean	less than	<	version	version	boolean
+<version> <= <version>: boolean	less than or equal	<=	version	version	boolean
+<version> = <string>: boolean	equal	=	version	string	boolean
+<version> < <string>: boolean	less than	<	version	string	boolean
+<version> <= <string>: boolean	less than or equal	<=	version	string	boolean
+<string> = <version>: boolean	equal	=	string	version	boolean
+<string> < <version>: boolean	less than	<	string	version	boolean
+<string> <= <version>: boolean	less than or equal	<=	string	version	boolean
+<bit set> = <bit set>: boolean	equal	=	bit set	bit set	boolean
+<bit set> contains <bit set>: boolean	contains	contains	bit set	bit set	boolean
+<bit set> + <bit set>: bit set	plus	+	bit set	bit set	bit set
+<bit set> - <bit set>: bit set	minus	-	bit set	bit set	bit set
+<bit set> * <bit set>: bit set	times	*	bit set	bit set	bit set
+<day of month> = <day of month>: boolean	equal	=	day of month	day of month	boolean
+<day of month> < <day of month>: boolean	less than	<	day of month	day of month	boolean
+<day of month> <= <day of month>: boolean	less than or equal	<=	day of month	day of month	boolean
+<day of month> + <time interval>: day of month	plus	+	day of month	time interval	day of month
+<time interval> + <day of month>: day of month	plus	+	time interval	day of month	day of month
+<day of month> - <time interval>: day of month	minus	-	day of month	time interval	day of month
+<day of month> - <day of month>: time interval	minus	-	day of month	day of month	time interval
+<day of week> = <day of week>: boolean	equal	=	day of week	day of week	boolean
+<day of week> + <time interval>: day of week	plus	+	day of week	time interval	day of week
+<time interval> + <day of week>: day of week	plus	+	time interval	day of week	day of week
+<day of week> - <time interval>: day of week	minus	-	day of week	time interval	day of week
+<day of week> - <day of week>: time interval	minus	-	day of week	day of week	time interval
+<day of year> = <day of year>: boolean	equal	=	day of year	day of year	boolean
+<day of year> < <day of year>: boolean	less than	<	day of year	day of year	boolean
+<day of year> <= <day of year>: boolean	less than or equal	<=	day of year	day of year	boolean
+<month> & <day of month>: day of year	concatenate	&	month	day of month	day of year
+<day of month> & <month>: day of year	concatenate	&	day of month	month	day of year
+<day of year> + <time interval>: day of year	plus	+	day of year	time interval	day of year
+<time interval> + <day of year>: day of year	plus	+	time interval	day of year	day of year
+<day of year> - <time interval>: day of year	minus	-	day of year	time interval	day of year
+<day of year> - <day of year>: time interval	minus	-	day of year	day of year	time interval
+<day of year> + <number of months>: day of year	plus	+	day of year	number of months	day of year
+<number of months> + <day of year>: day of year	plus	+	number of months	day of year	day of year
+<day of year> - <number of months>: day of year	minus	-	day of year	number of months	day of year
+<hertz> = <hertz>: boolean	equal	=	hertz	hertz	boolean
+<hertz> < <hertz>: boolean	less than	<	hertz	hertz	boolean
+<hertz> <= <hertz>: boolean	less than or equal	<=	hertz	hertz	boolean
+<hertz> + <hertz>: hertz	plus	+	hertz	hertz	hertz
+<hertz> - <hertz>: hertz	minus	-	hertz	hertz	hertz
+<hertz> * <integer>: hertz	times	*	hertz	integer	hertz
+<integer> * <hertz>: hertz	times	*	integer	hertz	hertz
+<hertz> / <hertz>: integer	divide	/	hertz	hertz	integer
+<hertz> / <integer>: hertz	divide	/	hertz	integer	hertz
+<hertz> % <hertz>: hertz	mod	%	hertz	hertz	hertz
+<date> = <date>: boolean	equal	=	date	date	boolean
+<date> < <date>: boolean	less than	<	date	date	boolean
+<date> <= <date>: boolean	less than or equal	<=	date	date	boolean
+<day of month> & <month and year>: date	concatenate	&	day of month	month and year	date
+<month and year> & <day of month>: date	concatenate	&	month and year	day of month	date
+<day of year> & <year>: date	concatenate	&	day of year	year	date
+<year> & <day of year>: date	concatenate	&	year	day of year	date
+<day of year> & <month and year>: date	concatenate	&	day of year	month and year	date
+<month and year> & <day of year>: date	concatenate	&	month and year	day of year	date
+<date> + <number of months>: date	plus	+	date	number of months	date
+<number of months> + <date>: date	plus	+	number of months	date	date
+<date> - <number of months>: date	minus	-	date	number of months	date
+<date> + <time interval>: date	plus	+	date	time interval	date
+<time interval> + <date>: date	plus	+	time interval	date	date
+<date> - <time interval>: date	minus	-	date	time interval	date
+<date> - <date>: time interval	minus	-	date	date	time interval
+<date> & <time of day with time zone>: time	concatenate	&	date	time of day with time zone	time
+<time of day with time zone> & <date>: time	concatenate	&	time of day with time zone	date	time
+<ip version> = <ip version>: boolean	equal	=	ip version	ip version	boolean
+<ipv4 address> = <string>: boolean	equal	=	ipv4 address	string	boolean
+<string> = <ipv4 address>: boolean	equal	=	string	ipv4 address	boolean
+<ipv4or6 address> = <string>: boolean	equal	=	ipv4or6 address	string	boolean
+<string> = <ipv4or6 address>: boolean	equal	=	string	ipv4or6 address	boolean
+<ipv4 address> < <string>: boolean	less than	<	ipv4 address	string	boolean
+<string> < <ipv4 address>: boolean	less than	<	string	ipv4 address	boolean
+<ipv4or6 address> < <string>: boolean	less than	<	ipv4or6 address	string	boolean
+<string> < <ipv4or6 address>: boolean	less than	<	string	ipv4or6 address	boolean
+<ipv4 address> <= <string>: boolean	less than or equal	<=	ipv4 address	string	boolean
+<string> <= <ipv4 address>: boolean	less than or equal	<=	string	ipv4 address	boolean
+<ipv4or6 address> <= <string>: boolean	less than or equal	<=	ipv4or6 address	string	boolean
+<string> <= <ipv4or6 address>: boolean	less than or equal	<=	string	ipv4or6 address	boolean
+<ipv4 address> = <ipv4 address>: boolean	equal	=	ipv4 address	ipv4 address	boolean
+<ipv4 address> < <ipv4 address>: boolean	less than	<	ipv4 address	ipv4 address	boolean
+<ipv4 address> <= <ipv4 address>: boolean	less than or equal	<=	ipv4 address	ipv4 address	boolean
+<ipv6 address> = <ipv6 address>: boolean	equal	=	ipv6 address	ipv6 address	boolean
+<ipv6 address> < <ipv6 address>: boolean	less than	<	ipv6 address	ipv6 address	boolean
+<ipv6 address> <= <ipv6 address>: boolean	less than or equal	<=	ipv6 address	ipv6 address	boolean
+<ipv4or6 address> = <ipv4or6 address>: boolean	equal	=	ipv4or6 address	ipv4or6 address	boolean
+<ipv4or6 address> < <ipv4or6 address>: boolean	less than	<	ipv4or6 address	ipv4or6 address	boolean
+<ipv4or6 address> <= <ipv4or6 address>: boolean	less than or equal	<=	ipv4or6 address	ipv4or6 address	boolean
+<month and year> = <month and year>: boolean	equal	=	month and year	month and year	boolean
+<month and year> < <month and year>: boolean	less than	<	month and year	month and year	boolean
+<month and year> <= <month and year>: boolean	less than or equal	<=	month and year	month and year	boolean
+<month> & <year>: month and year	concatenate	&	month	year	month and year
+<year> & <month>: month and year	concatenate	&	year	month	month and year
+<month and year> + <number of months>: month and year	plus	+	month and year	number of months	month and year
+<number of months> + <month and year>: month and year	plus	+	number of months	month and year	month and year
+<month and year> - <number of months>: month and year	minus	-	month and year	number of months	month and year
+<month and year> - <month and year>: number of months	minus	-	month and year	month and year	number of months
+<number of months> = <number of months>: boolean	equal	=	number of months	number of months	boolean
+<number of months> < <number of months>: boolean	less than	<	number of months	number of months	boolean
+<number of months> <= <number of months>: boolean	less than or equal	<=	number of months	number of months	boolean
+<number of months> + <number of months>: number of months	plus	+	number of months	number of months	number of months
+<number of months> - <number of months>: number of months	minus	-	number of months	number of months	number of months
+<integer> * <number of months>: number of months	times	*	integer	number of months	number of months
+<number of months> * <integer>: number of months	times	*	number of months	integer	number of months
+<number of months> / <number of months>: integer	divide	/	number of months	number of months	integer
+<number of months> / <integer>: number of months	divide	/	number of months	integer	number of months
+<number of months> % <number of months>: number of months	mod	%	number of months	number of months	number of months
+<month> = <month>: boolean	equal	=	month	month	boolean
+<month> < <month>: boolean	less than	<	month	month	boolean
+<month> <= <month>: boolean	less than or equal	<=	month	month	boolean
+<month> + <number of months>: month	plus	+	month	number of months	month
+<number of months> + <month>: month	plus	+	number of months	month	month
+<month> - <number of months>: month	minus	-	month	number of months	month
+<month> - <month>: number of months	minus	-	month	month	number of months
+<rope> & <string>: rope	concatenate	&	rope	string	rope
+<string> & <rope>: rope	concatenate	&	string	rope	rope
+<rope> & <rope>: rope	concatenate	&	rope	rope	rope
+<rope> contains <string>: boolean	contains	contains	rope	string	boolean
+<time of day> = <time of day>: boolean	equal	=	time of day	time of day	boolean
+<time of day> < <time of day>: boolean	less than	<	time of day	time of day	boolean
+<time of day> <= <time of day>: boolean	less than or equal	<=	time of day	time of day	boolean
+<time of day> + <time interval>: time of day	plus	+	time of day	time interval	time of day
+<time interval> + <time of day>: time of day	plus	+	time interval	time of day	time of day
+<time of day> - <time interval>: time of day	minus	-	time of day	time interval	time of day
+<time of day> - <time of day>: time interval	minus	-	time of day	time of day	time interval
+<time range> = <time range>: boolean	equal	=	time range	time range	boolean
+<time> & <time>: time range	concatenate	&	time	time	time range
+<time> & <time interval>: time range	concatenate	&	time	time interval	time range
+<time interval> & <time>: time range	concatenate	&	time interval	time	time range
+<time range> & <time>: time range	concatenate	&	time range	time	time range
+<time> & <time range>: time range	concatenate	&	time	time range	time range
+<time range> & <time range>: time range	concatenate	&	time range	time range	time range
+<time range> + <time range>: time range	plus	+	time range	time range	time range
+<time range> * <time range>: time range	times	*	time range	time range	time range
+<time range> contains <time>: boolean	contains	contains	time range	time	boolean
+<time range> contains <time range>: boolean	contains	contains	time range	time range	boolean
+<time zone> + <time interval>: time zone	plus	+	time zone	time interval	time zone
+<time interval> + <time zone>: time zone	plus	+	time interval	time zone	time zone
+<time zone> - <time interval>: time zone	minus	-	time zone	time interval	time zone
+<time zone> - <time zone>: time interval	minus	-	time zone	time zone	time interval
+<time zone> = <time zone>: boolean	equal	=	time zone	time zone	boolean
+<time range> * <integer>: timed( time range, integer )	times	*	time range	integer	timed( time range, integer )
+<integer> * <time range>: timed( time range, integer )	times	*	integer	time range	timed( time range, integer )
+<time range> * <boolean>: timed( time range, boolean )	times	*	time range	boolean	timed( time range, boolean )
+<boolean> * <time range>: timed( time range, boolean )	times	*	boolean	time range	timed( time range, boolean )
+<year> = <year>: boolean	equal	=	year	year	boolean
+<year> < <year>: boolean	less than	<	year	year	boolean
+<year> <= <year>: boolean	less than or equal	<=	year	year	boolean
+<year> + <number of months>: year	plus	+	year	number of months	year
+<number of months> + <year>: year	plus	+	number of months	year	year
+<year> - <number of months>: year	minus	-	year	number of months	year
+<year> - <year>: number of months	minus	-	year	year	number of months
+<time of day with time zone> < <time of day with time zone>: boolean	less than	<	time of day with time zone	time of day with time zone	boolean
+<time of day with time zone> <= <time of day with time zone>: boolean	less than or equal	<=	time of day with time zone	time of day with time zone	boolean
+<time of day with time zone> = <time of day with time zone>: boolean	equal	=	time of day with time zone	time of day with time zone	boolean
+<time of day> & <time zone>: time of day with time zone	concatenate	&	time of day	time zone	time of day with time zone
+<time zone> & <time of day>: time of day with time zone	concatenate	&	time zone	time of day	time of day with time zone
+<time of day with time zone> & <time zone>: time of day with time zone	concatenate	&	time of day with time zone	time zone	time of day with time zone
+<time zone> & <time of day with time zone>: time of day with time zone	concatenate	&	time zone	time of day with time zone	time of day with time zone
+<time of day with time zone> + <time interval>: time of day with time zone	plus	+	time of day with time zone	time interval	time of day with time zone
+<time interval> + <time of day with time zone>: time of day with time zone	plus	+	time interval	time of day with time zone	time of day with time zone
+<time of day with time zone> - <time interval>: time of day with time zone	minus	-	time of day with time zone	time interval	time of day with time zone
+<time of day with time zone> - <time of day with time zone>: time interval	minus	-	time of day with time zone	time of day with time zone	time interval
+<file signature> = <file signature>: boolean	equal	=	file signature	file signature	boolean
+<file type> = <file type>: boolean	equal	=	file type	file type	boolean
+<volume> = <volume>: boolean	equal	=	volume	volume	boolean
+<country> = <country>: boolean	equal	=	country	country	boolean
+<security identifier> = <security identifier>: boolean	equal	=	security identifier	security identifier	boolean
+<floating point> = <floating point>: boolean	equal	=	floating point	floating point	boolean
+<floating point> < <floating point>: boolean	less than	<	floating point	floating point	boolean
+<floating point> <= <floating point>: boolean	less than or equal	<=	floating point	floating point	boolean
+<floating point> + <floating point>: floating point	plus	+	floating point	floating point	floating point
+<floating point> - <floating point>: floating point	minus	-	floating point	floating point	floating point
+<floating point> * <floating point>: floating point	times	*	floating point	floating point	floating point
+<floating point> / <floating point>: floating point	divide	/	floating point	floating point	floating point
+<integer> + <floating point>: floating point	plus	+	integer	floating point	floating point
+<integer> - <floating point>: floating point	minus	-	integer	floating point	floating point
+<integer> * <floating point>: floating point	times	*	integer	floating point	floating point
+<integer> / <floating point>: floating point	divide	/	integer	floating point	floating point
+<floating point> + <integer>: floating point	plus	+	floating point	integer	floating point
+<floating point> - <integer>: floating point	minus	-	floating point	integer	floating point
+<floating point> * <integer>: floating point	times	*	floating point	integer	floating point
+<floating point> / <integer>: floating point	divide	/	floating point	integer	floating point
+<integer> = <floating point>: boolean	equal	=	integer	floating point	boolean
+<integer> <= <floating point>: boolean	less than or equal	<=	integer	floating point	boolean
+<integer> < <floating point>: boolean	less than	<	integer	floating point	boolean
+<floating point> = <integer>: boolean	equal	=	floating point	integer	boolean
+<floating point> <= <integer>: boolean	less than or equal	<=	floating point	integer	boolean
+<floating point> < <integer>: boolean	less than	<	floating point	integer	boolean
+<time> = <time>: boolean	equal	=	time	time	boolean
+<time> < <time>: boolean	less than	<	time	time	boolean
+<time> <= <time>: boolean	less than or equal	<=	time	time	boolean
+<time> + <time interval>: time	plus	+	time	time interval	time
+<time interval> + <time>: time	plus	+	time interval	time	time
+<time> - <time interval>: time	minus	-	time	time interval	time
+<time> - <time>: time interval	minus	-	time	time	time interval
+<time interval> = <time interval>: boolean	equal	=	time interval	time interval	boolean
+<time interval> < <time interval>: boolean	less than	<	time interval	time interval	boolean
+<time interval> <= <time interval>: boolean	less than or equal	<=	time interval	time interval	boolean
+<time interval> + <time interval>: time interval	plus	+	time interval	time interval	time interval
+<time interval> - <time interval>: time interval	minus	-	time interval	time interval	time interval
+<time interval> * <integer>: time interval	times	*	time interval	integer	time interval
+<integer> * <time interval>: time interval	times	*	integer	time interval	time interval
+<time interval> / <time interval>: integer	divide	/	time interval	time interval	integer
+<time interval> / <integer>: time interval	divide	/	time interval	integer	time interval
+<time interval> % <time interval>: time interval	mod	%	time interval	time interval	time interval
+<firewall action> = <firewall action>: boolean	equal	=	firewall action	firewall action	boolean
+<site version list> = <site version list>: boolean	equal	=	site version list	site version list	boolean
+<site version list> < <site version list>: boolean	less than	<	site version list	site version list	boolean
+<site version list> <= <site version list>: boolean	less than or equal	<=	site version list	site version list	boolean
+<site version list> contains <site version list>: boolean	contains	contains	site version list	site version list	boolean
+<integer set> + <integer set>: integer set	plus	+	integer set	integer set	integer set
+<integer set> - <integer set>: integer set	minus	-	integer set	integer set	integer set
+<integer set> * <integer set>: integer set	times	*	integer set	integer set	integer set
+<integer set> = <integer set>: boolean	equal	=	integer set	integer set	boolean
+<integer set> contains <integer>: boolean	contains	contains	integer set	integer	boolean
+<integer set> contains <integer set>: boolean	contains	contains	integer set	integer set	boolean
+<string set> + <string set>: string set	plus	+	string set	string set	string set
+<string set> - <string set>: string set	minus	-	string set	string set	string set
+<string set> * <string set>: string set	times	*	string set	string set	string set
+<string set> = <string set>: boolean	equal	=	string set	string set	boolean
+<string set> contains <string>: boolean	contains	contains	string set	string	boolean
+<string set> contains <string set>: boolean	contains	contains	string set	string set	boolean
+<json key> = <json key>: boolean	equal	=	json key	json key	boolean
+<json value> = <json value>: boolean	equal	=	json value	json value	boolean
+<format> + <string>: format	plus	+	format	string	format
+<format> + <integer>: format	plus	+	format	integer	format
+<format> + <time interval>: format	plus	+	format	time interval	format
+<format> + <time>: format	plus	+	format	time	format
+<format> + <time of day>: format	plus	+	format	time of day	format
+<format> + <day of week>: format	plus	+	format	day of week	format
+<format> + <date>: format	plus	+	format	date	format
+<format> + <format>: format	plus	+	format	format	format
+<file content> contains <string>: boolean	contains	contains	file content	string	boolean
+<uuid> = <uuid>: boolean	equal	=	uuid	uuid	boolean
+<uuid> < <uuid>: boolean	less than	<	uuid	uuid	boolean
+<uuid> <= <uuid>: boolean	less than or equal	<=	uuid	uuid	boolean
+<uuid> = <string>: boolean	equal	=	uuid	string	boolean
+<uuid> <= <string>: boolean	less than or equal	<=	uuid	string	boolean
+<uuid> < <string>: boolean	less than	<	uuid	string	boolean
+<string> = <uuid>: boolean	equal	=	string	uuid	boolean
+<string> <= <uuid>: boolean	less than or equal	<=	string	uuid	boolean
+<string> < <uuid>: boolean	less than	<	string	uuid	boolean
+<uinteger> = <uinteger>: boolean	equal	=	uinteger	uinteger	boolean
+<uinteger> < <uinteger>: boolean	less than	<	uinteger	uinteger	boolean
+<uinteger> <= <uinteger>: boolean	less than or equal	<=	uinteger	uinteger	boolean
+<uinteger> = <integer>: boolean	equal	=	uinteger	integer	boolean
+<uinteger> <= <integer>: boolean	less than or equal	<=	uinteger	integer	boolean
+<uinteger> < <integer>: boolean	less than	<	uinteger	integer	boolean
+<integer> = <uinteger>: boolean	equal	=	integer	uinteger	boolean
+<integer> <= <uinteger>: boolean	less than or equal	<=	integer	uinteger	boolean
+<integer> < <uinteger>: boolean	less than	<	integer	uinteger	boolean
+<uinteger> + <uinteger>: uinteger	plus	+	uinteger	uinteger	uinteger
+<uinteger> - <uinteger>: uinteger	minus	-	uinteger	uinteger	uinteger
+<uinteger> * <uinteger>: uinteger	times	*	uinteger	uinteger	uinteger
+<uinteger> / <uinteger>: uinteger	divide	/	uinteger	uinteger	uinteger
+<uinteger> % <uinteger>: uinteger	mod	%	uinteger	uinteger	uinteger
+<uinteger> + <integer>: uinteger	plus	+	uinteger	integer	uinteger
+<uinteger> - <integer>: uinteger	minus	-	uinteger	integer	uinteger
+<uinteger> * <integer>: uinteger	times	*	uinteger	integer	uinteger
+<uinteger> / <integer>: uinteger	divide	/	uinteger	integer	uinteger
+<uinteger> % <integer>: uinteger	mod	%	uinteger	integer	uinteger
+<integer> + <uinteger>: uinteger	plus	+	integer	uinteger	uinteger
+<integer> - <uinteger>: uinteger	minus	-	integer	uinteger	uinteger
+<integer> * <uinteger>: uinteger	times	*	integer	uinteger	uinteger
+<integer> / <uinteger>: uinteger	divide	/	integer	uinteger	uinteger
+<integer> % <uinteger>: uinteger	mod	%	integer	uinteger	uinteger
+<boolean> = <boolean>: boolean	equal	=	boolean	boolean	boolean
+<string> = <string>: boolean	equal	=	string	string	boolean
+<string> < <string>: boolean	less than	<	string	string	boolean
+<string> <= <string>: boolean	less than or equal	<=	string	string	boolean
+<string> starts with <string>: boolean	starts with	starts with	string	string	boolean
+<string> ends with <string>: boolean	ends with	ends with	string	string	boolean
+<string> contains <string>: boolean	contains	contains	string	string	boolean
+<string> & <string>: string	concatenate	&	string	string	string
+<type> = <type>: boolean	equal	=	type	type	boolean
+<integer> = <integer>: boolean	equal	=	integer	integer	boolean
+<integer> < <integer>: boolean	less than	<	integer	integer	boolean
+<integer> <= <integer>: boolean	less than or equal	<=	integer	integer	boolean
+<integer> + <integer>: integer	plus	+	integer	integer	integer
+<integer> - <integer>: integer	minus	-	integer	integer	integer
+<integer> * <integer>: integer	times	*	integer	integer	integer
+<integer> / <integer>: integer	divide	/	integer	integer	integer
+<integer> % <integer>: integer	mod	%	integer	integer	integer
+<large integer> = <large integer>: boolean	equal	=	large integer	large integer	boolean
+<large integer> < <large integer>: boolean	less than	<	large integer	large integer	boolean
+<large integer> <= <large integer>: boolean	less than or equal	<=	large integer	large integer	boolean
+<large integer> = <integer>: boolean	equal	=	large integer	integer	boolean
+<large integer> <= <integer>: boolean	less than or equal	<=	large integer	integer	boolean
+<large integer> < <integer>: boolean	less than	<	large integer	integer	boolean
+<integer> = <large integer>: boolean	equal	=	integer	large integer	boolean
+<integer> <= <large integer>: boolean	less than or equal	<=	integer	large integer	boolean
+<integer> < <large integer>: boolean	less than	<	integer	large integer	boolean
+<large integer> + <large integer>: large integer	plus	+	large integer	large integer	large integer
+<large integer> - <large integer>: large integer	minus	-	large integer	large integer	large integer
+<large integer> * <large integer>: large integer	times	*	large integer	large integer	large integer
+<large integer> / <large integer>: large integer	divide	/	large integer	large integer	large integer
+<large integer> % <large integer>: large integer	mod	%	large integer	large integer	large integer
+<large integer> + <integer>: large integer	plus	+	large integer	integer	large integer
+<large integer> - <integer>: large integer	minus	-	large integer	integer	large integer
+<large integer> * <integer>: large integer	times	*	large integer	integer	large integer
+<large integer> / <integer>: large integer	divide	/	large integer	integer	large integer
+<large integer> % <integer>: large integer	mod	%	large integer	integer	large integer
+<integer> + <large integer>: large integer	plus	+	integer	large integer	large integer
+<integer> - <large integer>: large integer	minus	-	integer	large integer	large integer
+<integer> * <large integer>: large integer	times	*	integer	large integer	large integer
+<integer> / <large integer>: large integer	divide	/	integer	large integer	large integer
+<integer> % <large integer>: large integer	mod	%	integer	large integer	large integer
+<binary_string> = <binary_string>: boolean	equal	=	binary_string	binary_string	boolean
+<binary_string> < <binary_string>: boolean	less than	<	binary_string	binary_string	boolean
+<binary_string> <= <binary_string>: boolean	less than or equal	<=	binary_string	binary_string	boolean
+<binary_string> starts with <binary_string>: boolean	starts with	starts with	binary_string	binary_string	boolean
+<binary_string> ends with <binary_string>: boolean	ends with	ends with	binary_string	binary_string	boolean
+<binary_string> contains <binary_string>: boolean	contains	contains	binary_string	binary_string	boolean
+<binary_string> & <binary_string>: binary_string	concatenate	&	binary_string	binary_string	binary_string

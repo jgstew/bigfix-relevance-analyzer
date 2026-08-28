@@ -1,238 +1,238 @@
-
-SELinux Boolean
-Xinetd Service
-action
-action lock state
-administrative rights
-analysis
-application
-application usage summary
-application usage summary instance
-bes product
-binary operator
-binary position
-binary_string
-binary_substring
-bios
-bit set
-boolean
-cast
-cidr subnet
-client
-client_cryptography
-cloud provider
-cpupackage
-cryptography
-current relay
-date
-date with multiplicity
-day of month
-day of month with multiplicity
-day of week
-day of week with multiplicity
-day of year
-day of year with multiplicity
-debian base package
-debian package upstream version
-debian package upstream version with multiplicity
-debian package version
-debian package version epoch
-debian package version epoch with multiplicity
-debian package version revision
-debian package version revision with multiplicity
-debian package version with multiplicity
-debian versioned package
-debianpackagecache
-debianpkg dependency
-debianpkg reverse dependencies
-debianpkg verfile
-debianpkg version
-device file
-dmi
-dmi additional_information
-dmi b32_bit_memory_error_information
-dmi b64_bit_memory_error_information
-dmi base_board_information
-dmi bios_information
-dmi bios_language_information
-dmi built_in_pointing_device
-dmi cache_information
-dmi cooling_device
-dmi electrical_current_probe
-dmi end_of_table
-dmi group_associations
-dmi hardware_security
-dmi inactive
-dmi ipmi_device_information
-dmi management_device
-dmi management_device_component
-dmi management_device_threshold_data
-dmi memory_array_mapped_address
-dmi memory_channel
-dmi memory_controller_information
-dmi memory_device
-dmi memory_device_mapped_address
-dmi memory_module_information
-dmi oem_strings
-dmi on_board_devices_information
-dmi onboard_devices_extended_information
-dmi out_of_band_remote_access
-dmi physical_memory_array
-dmi port_connector_information
-dmi portable_battery
-dmi processor_information
-dmi system_boot_information
-dmi system_configuration_option
-dmi system_enclosure_or_chassis
-dmi system_information
-dmi system_power_controls
-dmi system_power_supply
-dmi system_reset
-dmi system_slots
-dmi temperature_probe
-dmi voltage_probe
-download server
-download storage folder
-encoding
-environment
-environment variable
-evaluation cycle
-execution
-fifo file
-file
-file content
-file line
-file section
-filesystem
-filesystem object
-fixlet
-fixlet_header
-floating point
-floating point with multiplicity
-folder
-format
-grub block list
-grub bootable image
-grub color
-grub color pair
-grub color scheme
-grub config file
-grub device
-grub file location
-grub image choice
-grub kernel
-grub module
-hardware
-hertz
-hertz with multiplicity
-html
-html attribute list
-instance data
-integer
-integer range
-integer set
-integer with multiplicity
-ip version
-ipv4 address
-ipv4 address with multiplicity
-ipv4or6 address
-ipv4or6 address with multiplicity
-ipv6 address
-ipv6 address with multiplicity
-json key
-json value
-language
-large integer
-large integer with multiplicity
-license
-logged on user
-manual group
-mode
-mode_mask
-module
-month
-month and year
-month and year with multiplicity
-month with multiplicity
-network
-network adapter
-network adapter interface
-network interface
-network ip interface
-number of months
-number of months with multiplicity
-operating system
-power level
-primary language
-process
-processor
-property
-ram
-registration server
-regular expression
-regular expression match
-restricted site
-root server
-rope
-route
-routing table
-runlevel
-selected server
-server based group
-service
-setting
-site
-site group
-site version list
-site version list with multiplicity
-smbios
-smbios structure
-smbios value
-socket
-socket file
-sqlite column
-sqlite column type
-sqlite database
-sqlite row
-sqlite statement
-sqlite table
-string
-string position
-string set
-string with multiplicity
-strverscmp version
-substring
-swap
-symlink
-tcp state
-time
-time interval
-time interval with multiplicity
-time of day
-time of day with multiplicity
-time of day with time zone
-time of day with time zone with multiplicity
-time range
-time range with multiplicity
-time with multiplicity
-time zone
-time zone with multiplicity
-tuple item
-type
-uinteger
-uinteger with multiplicity
-unary operator
-undefined
-user
-utf8 string
-uuid
-uuid with multiplicity
-version
-version with multiplicity
-x509 certificate
-xml dom document
-xml dom node
-yaml key
-yaml value
-year
-year with multiplicity
+		1
+SELinux Boolean		40
+Xinetd Service		456
+action		176
+action lock state		4
+administrative rights		1
+analysis		8
+application	file	832
+application usage summary		160
+application usage summary instance		120
+bes product		8
+binary operator		8
+binary position	integer	144
+binary_string		136
+binary_substring	binary_string	136
+bios		1
+bit set		8
+boolean		1
+cast		8
+cidr subnet		58
+client	application	832
+client_cryptography		40
+cloud provider		1
+cpupackage		1
+cryptography		72
+current relay		1
+date		24
+date with multiplicity	date	32
+day of month		8
+day of month with multiplicity	day of month	16
+day of week		4
+day of week with multiplicity	day of week	16
+day of year		16
+day of year with multiplicity	day of year	24
+debian base package		8
+debian package upstream version		32
+debian package upstream version with multiplicity	debian package upstream version	40
+debian package version		32
+debian package version epoch		32
+debian package version epoch with multiplicity	debian package version epoch	40
+debian package version revision		32
+debian package version revision with multiplicity	debian package version revision	40
+debian package version with multiplicity	debian package version	40
+debian versioned package		8
+debianpackagecache		16
+debianpkg dependency		8
+debianpkg reverse dependencies		8
+debianpkg verfile		8
+debianpkg version		8
+device file	filesystem object	832
+dmi		8
+dmi additional_information		16
+dmi b32_bit_memory_error_information		16
+dmi b64_bit_memory_error_information		16
+dmi base_board_information		16
+dmi bios_information		16
+dmi bios_language_information		16
+dmi built_in_pointing_device		16
+dmi cache_information		16
+dmi cooling_device		16
+dmi electrical_current_probe		16
+dmi end_of_table		16
+dmi group_associations		16
+dmi hardware_security		16
+dmi inactive		16
+dmi ipmi_device_information		16
+dmi management_device		16
+dmi management_device_component		16
+dmi management_device_threshold_data		16
+dmi memory_array_mapped_address		16
+dmi memory_channel		16
+dmi memory_controller_information		16
+dmi memory_device		16
+dmi memory_device_mapped_address		16
+dmi memory_module_information		16
+dmi oem_strings		16
+dmi on_board_devices_information		16
+dmi onboard_devices_extended_information		16
+dmi out_of_band_remote_access		16
+dmi physical_memory_array		16
+dmi port_connector_information		16
+dmi portable_battery		16
+dmi processor_information		16
+dmi system_boot_information		16
+dmi system_configuration_option		16
+dmi system_enclosure_or_chassis		16
+dmi system_information		16
+dmi system_power_controls		16
+dmi system_power_supply		16
+dmi system_reset		16
+dmi system_slots		16
+dmi temperature_probe		16
+dmi voltage_probe		16
+download server		1
+download storage folder	folder	832
+encoding		64
+environment		48
+environment variable		192
+evaluation cycle		120
+execution		72
+fifo file	filesystem object	832
+file	filesystem object	832
+file content		16
+file line	string	184
+file section		280
+filesystem		608
+filesystem object		832
+fixlet		64
+fixlet_header		32
+floating point		24
+floating point with multiplicity	floating point	32
+folder	filesystem object	832
+format		128
+grub block list		32
+grub bootable image		640
+grub color		32
+grub color pair		72
+grub color scheme		160
+grub config file		640
+grub device		32
+grub file location		152
+grub image choice		48
+grub kernel		176
+grub module		40
+hardware		8
+hertz		8
+hertz with multiplicity	hertz	16
+html		160
+html attribute list		16
+instance data		16
+integer		8
+integer range		16
+integer set		24
+integer with multiplicity	integer	16
+ip version		4
+ipv4 address	ipv4or6 address	28
+ipv4 address with multiplicity	ipv4 address	40
+ipv4or6 address		28
+ipv4or6 address with multiplicity	ipv4or6 address	40
+ipv6 address	ipv4or6 address	28
+ipv6 address with multiplicity	ipv6 address	40
+json key		160
+json value		16
+language		144
+large integer		24
+large integer with multiplicity	large integer	32
+license		2016
+logged on user		208
+manual group		192
+mode		4
+mode_mask		1
+module		8
+month		4
+month and year		16
+month and year with multiplicity	month and year	24
+month with multiplicity	month	16
+network		32
+network adapter		8
+network adapter interface		200
+network interface		48
+network ip interface	network interface	200
+number of months		8
+number of months with multiplicity	number of months	16
+operating system		256
+power level		8
+primary language		96
+process		152
+processor		216
+property		8
+ram		48
+registration server		1
+regular expression		16
+regular expression match	substring	160
+restricted site		56
+root server		1
+rope		160
+route		88
+routing table		24
+runlevel		16
+selected server		8
+server based group		192
+service		256
+setting		552
+site		8
+site group		16
+site version list		512
+site version list with multiplicity	site version list	520
+smbios		8
+smbios structure		24
+smbios value		248
+socket		64
+socket file	filesystem object	832
+sqlite column		168
+sqlite column type		152
+sqlite database		216
+sqlite row		8
+sqlite statement		16
+sqlite table		152
+string		144
+string position	integer	152
+string set		24
+string with multiplicity	string	152
+strverscmp version	version	56
+substring	string	144
+swap		24
+symlink		816
+tcp state		4
+time		8
+time interval		8
+time interval with multiplicity	time interval	16
+time of day		8
+time of day with multiplicity	time of day	16
+time of day with time zone		16
+time of day with time zone with multiplicity	time of day with time zone	24
+time range		16
+time range with multiplicity	time range	24
+time with multiplicity	time	16
+time zone		8
+time zone with multiplicity	time zone	16
+tuple item		152
+type		8
+uinteger		8
+uinteger with multiplicity	uinteger	16
+unary operator		8
+undefined		1
+user		200
+utf8 string		16
+uuid		16
+uuid with multiplicity	uuid	24
+version		56
+version with multiplicity	version	64
+x509 certificate		712
+xml dom document	xml dom node	40
+xml dom node		24
+yaml key		208
+yaml value		64
+year		8
+year with multiplicity	year	16

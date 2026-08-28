@@ -275,8 +275,13 @@ def test_a_single_valued_property_is_not_multivalued() -> None:
 
 
 def test_enrichment_is_absent_for_a_dump_that_never_carried_it() -> None:
-    """A client-only property has no session enrichment columns."""
-    entry = only("current user key", "current user key <logged on user> of <registry>")
+    """A property found only on a surface whose dump was never enriched has
+    no enrichment columns. Every client platform's dump is enriched now (see
+    the relevance_inspectors README's "Regenerating" section), so this needs
+    a property found only in the still-bare console/Web Reports session
+    dumps."""
+    entry = only("active directory path", "active directory path of <bes computer>")
+    assert entry.sources == frozenset({"session:console", "session:web_reports"})
     assert entry.singular_name is None
     assert entry.plural_name is None
     assert entry.usual_name is None

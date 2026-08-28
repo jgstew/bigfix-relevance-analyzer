@@ -1,224 +1,224 @@
-<html> as string: string
-<html> as decoded string: string
-<string> as html: html
-<html> as html: html
-<json key> as string: string
-<json value> as string: string
-<json value> as integer: integer
-<json value> as float: floating point
-<json value> as boolean: boolean
-<format> as string: string
-<rope> as string: string
-<string> as left trimmed string: string
-<string> as right trimmed string: string
-<string> as trimmed string: string
-<tuple item> as string: string
-<bit set> as integer: integer
-<integer> as bit set: bit set
-<integer> as bits: bit set
-<bit set> as string: string
-<integer> as hexadecimal: string
-<uinteger> as hexadecimal: string
-<large integer> as hexadecimal: string
-<string> as hexadecimal: string
-<binary_string> as hexadecimal: string
-<hertz> as string: string
-<time> as local date: date
-<time> as universal date: date
-<string> as time: time
-<string> as local time: time
-<string> as universal time: time
-<time> as string: string
-<time> as local string: string
-<time> as universal string: string
-<substring> as string: string
-<substring> as substring: substring
-<string> as time interval: time interval
-<time interval> as string: string
-<string> as time zone: time zone
-<time zone> as string: string
-<binary operator> as string: string
-<binary_string> as string: string
-<binary_string> as utf8 string: string
-<binary_string> as utf16 string: string
-<binary_string> as local string: string
-<binary_string> as fxf string: string
-<string> as boolean: boolean
-<boolean> as string: string
-<boolean> as boolean: boolean
-<cast> as string: string
-<property> as string: string
-<string> as uppercase: string
-<string> as lowercase: string
-<string> as string: string
-<string> as binary_string: binary_string
-<string> as utf8 binary_string: binary_string
-<string> as utf16 binary_string: binary_string
-<string> as local binary_string: binary_string
-<string> as fxf binary_string: binary_string
-<type> as string: string
-<string> as integer: integer
-<uinteger> as integer: integer
-<large integer> as integer: integer
-<integer> as string: string
-<integer> as integer: integer
-<string> as large integer: large integer
-<integer> as large integer: large integer
-<uinteger> as large integer: large integer
-<large integer> as string: string
-<large integer> as large integer: large integer
-<string> as uinteger: uinteger
-<integer> as uinteger: uinteger
-<large integer> as uinteger: uinteger
-<uinteger> as string: string
-<uinteger> as uinteger: uinteger
-<unary operator> as string: string
-<undefined> as string: string
-<integer> as day_of_month: day of month
-<day of month> as integer: integer
-<string> as day_of_month: day of month
-<day of month> as string: string
-<day of month> as two digits: string
-<string> as day_of_week: day of week
-<day of week> as string: string
-<day of week> as three letters: string
-<day of year> as string: string
-<string> as date: date
-<date> as string: string
-<month and year> as string: string
-<number of months> as string: string
-<integer> as month: month
-<month> as integer: integer
-<string> as month: month
-<month> as string: string
-<month> as three letters: string
-<month> as two digits: string
-<string> as time_of_day: time of day
-<time of day> as string: string
-<time range> as string: string
-<integer> as year: year
-<year> as integer: integer
-<string> as year: year
-<year> as string: string
-<string> as zoned time_of_day: time of day with time zone
-<string> as universal zoned time_of_day: time of day with time zone
-<string> as local zoned time_of_day: time of day with time zone
-<time of day with time zone> as string: string
-<site version list> as string: string
-<string> as site version list: site version list
-<version> as string: string
-<string> as version: version
-<version> as version: version
-<string> as strverscmp version: strverscmp version
-<integer> as floating point: floating point
-<floating point> as integer: integer
-<floating point> as string: string
-<floating point> as scientific notation: string
-<floating point> as standard notation: string
-<string> as floating point: floating point
-<floating point> as floating point: floating point
-<binary_substring> as string: string
-<binary_substring> as binary_substring: binary_substring
-<filesystem object> as string: string
-<ipv4 address> as string: string
-<ipv6 address> as string: string
-<ipv4or6 address> as string: string
-<ipv6 address> as string with leading zeros: string
-<ipv4or6 address> as string with leading zeros: string
-<ipv6 address> as string with ipv4: string
-<ipv4or6 address> as string with ipv4: string
-<ipv6 address> as compressed string: string
-<ipv4or6 address> as compressed string: string
-<ipv6 address> as compressed string with ipv4: string
-<ipv4or6 address> as compressed string with ipv4: string
-<ipv6 address> as string with zone index: string
-<ipv4or6 address> as string with zone index: string
-<ipv6 address> as string with leading zeros with zone index: string
-<ipv4or6 address> as string with leading zeros with zone index: string
-<ipv6 address> as string with ipv4 with zone index: string
-<ipv4or6 address> as string with ipv4 with zone index: string
-<ipv6 address> as compressed string with zone index: string
-<ipv4or6 address> as compressed string with zone index: string
-<ipv6 address> as compressed string with ipv4 with zone index: string
-<ipv4or6 address> as compressed string with ipv4 with zone index: string
-<string> as ipv6 address: ipv6 address
-<string> as ipv4or6 address: ipv4or6 address
-<ipv4 address> as ipv6 address: ipv6 address
-<ipv4 address> as ipv4or6 address: ipv4or6 address
-<ipv6 address> as ipv4or6 address: ipv4or6 address
-<ip version> as string: string
-<action> as string: string
-<action lock state> as string: string
-<bios> as string: string
-<environment variable> as string: string
-<language> as string: string
-<mode> as string: string
-<mode> as octal string: string
-<mode_mask> as integer: integer
-<mode_mask> as string: string
-<operating system> as string: string
-<primary language> as string: string
-<service> as string: string
-<setting> as string: string
-<file content> as uppercase: file content
-<file content> as lowercase: file content
-<filesystem object> as symlink: symlink
-<symlink> as file: file
-<symlink> as folder: folder
-<symlink> as device file: device file
-<symlink> as fifo file: fifo file
-<symlink> as socket file: socket file
-<symlink> as symlink: symlink
-<symlink> as string: string
-<symlink> as binary_string: binary_string
-<runlevel> as string: string
-<filesystem object> as device file: device file
-<symlink> as device file: device file
-<filesystem object> as fifo file: fifo file
-<symlink> as fifo file: fifo file
-<filesystem object> as socket file: socket file
-<symlink> as socket file: socket file
-<power level> as string: string
-<sqlite column> as string: string
-<sqlite column type> as string: string
-<sqlite database> as string: string
-<sqlite row> as string: string
-<sqlite table> as string: string
-<manual group> as string: string
-<grub device> as string: string
-<grub block list> as string: string
-<grub file location> as string: string
-<grub module> as string: string
-<grub bootable image> as string: string
-<grub image choice> as string: string
-<grub color> as string: string
-<grub color pair> as string: string
-<smbios value> as string: string
-<smbios value> as hexadecimal: string
-<package> as string: string
-<capability> as string: string
-<rpm package version> as string: string
-<rpm package version> as rpm package version: rpm package version
-<rpm package release> as string: string
-<rpm package release> as rpm package release: rpm package release
-<rpm package version record> as string: string
-<rpm package version record> as rpm package version record: rpm package version record
-<short rpm package version record> as string: string
-<short rpm package version record> as short rpm package version record: short rpm package version record
-<short rpm package version record> as rpm package version record: rpm package version record
-<rpm package version record> as short rpm package version record: short rpm package version record
-<xml dom node> as xml: string
-<xml dom node> as text: string
-<tcp state> as string: string
-<uuid> as string: string
-<uuid> as hexadecimal: string
-<uuid> as binary_string: binary_string
-<plugin store key> as string: string
-<plugin store> as string: string
-<server based group> as string: string
-<cidr subnet> as string: string
-<yaml value> as string: string
-<yaml value> as integer: integer
-<yaml value> as float: floating point
-<yaml value> as boolean: boolean
-<yaml key> as string: string
+<html> as string: string	string	html	string
+<html> as decoded string: string	decoded string	html	string
+<string> as html: html	html	string	html
+<html> as html: html	html	html	html
+<json key> as string: string	string	json key	string
+<json value> as string: string	string	json value	string
+<json value> as integer: integer	integer	json value	integer
+<json value> as float: floating point	float	json value	floating point
+<json value> as boolean: boolean	boolean	json value	boolean
+<format> as string: string	string	format	string
+<rope> as string: string	string	rope	string
+<string> as left trimmed string: string	left trimmed string	string	string
+<string> as right trimmed string: string	right trimmed string	string	string
+<string> as trimmed string: string	trimmed string	string	string
+<tuple item> as string: string	string	tuple item	string
+<bit set> as integer: integer	integer	bit set	integer
+<integer> as bit set: bit set	bit set	integer	bit set
+<integer> as bits: bit set	bits	integer	bit set
+<bit set> as string: string	string	bit set	string
+<integer> as hexadecimal: string	hexadecimal	integer	string
+<uinteger> as hexadecimal: string	hexadecimal	uinteger	string
+<large integer> as hexadecimal: string	hexadecimal	large integer	string
+<string> as hexadecimal: string	hexadecimal	string	string
+<binary_string> as hexadecimal: string	hexadecimal	binary_string	string
+<hertz> as string: string	string	hertz	string
+<time> as local date: date	local date	time	date
+<time> as universal date: date	universal date	time	date
+<string> as time: time	time	string	time
+<string> as local time: time	local time	string	time
+<string> as universal time: time	universal time	string	time
+<time> as string: string	string	time	string
+<time> as local string: string	local string	time	string
+<time> as universal string: string	universal string	time	string
+<substring> as string: string	string	substring	string
+<substring> as substring: substring	substring	substring	substring
+<string> as time interval: time interval	time interval	string	time interval
+<time interval> as string: string	string	time interval	string
+<string> as time zone: time zone	time zone	string	time zone
+<time zone> as string: string	string	time zone	string
+<binary operator> as string: string	string	binary operator	string
+<binary_string> as string: string	string	binary_string	string
+<binary_string> as utf8 string: string	utf8 string	binary_string	string
+<binary_string> as utf16 string: string	utf16 string	binary_string	string
+<binary_string> as local string: string	local string	binary_string	string
+<binary_string> as fxf string: string	fxf string	binary_string	string
+<string> as boolean: boolean	boolean	string	boolean
+<boolean> as string: string	string	boolean	string
+<boolean> as boolean: boolean	boolean	boolean	boolean
+<cast> as string: string	string	cast	string
+<property> as string: string	string	property	string
+<string> as uppercase: string	uppercase	string	string
+<string> as lowercase: string	lowercase	string	string
+<string> as string: string	string	string	string
+<string> as binary_string: binary_string	binary_string	string	binary_string
+<string> as utf8 binary_string: binary_string	utf8 binary_string	string	binary_string
+<string> as utf16 binary_string: binary_string	utf16 binary_string	string	binary_string
+<string> as local binary_string: binary_string	local binary_string	string	binary_string
+<string> as fxf binary_string: binary_string	fxf binary_string	string	binary_string
+<type> as string: string	string	type	string
+<string> as integer: integer	integer	string	integer
+<uinteger> as integer: integer	integer	uinteger	integer
+<large integer> as integer: integer	integer	large integer	integer
+<integer> as string: string	string	integer	string
+<integer> as integer: integer	integer	integer	integer
+<string> as large integer: large integer	large integer	string	large integer
+<integer> as large integer: large integer	large integer	integer	large integer
+<uinteger> as large integer: large integer	large integer	uinteger	large integer
+<large integer> as string: string	string	large integer	string
+<large integer> as large integer: large integer	large integer	large integer	large integer
+<string> as uinteger: uinteger	uinteger	string	uinteger
+<integer> as uinteger: uinteger	uinteger	integer	uinteger
+<large integer> as uinteger: uinteger	uinteger	large integer	uinteger
+<uinteger> as string: string	string	uinteger	string
+<uinteger> as uinteger: uinteger	uinteger	uinteger	uinteger
+<unary operator> as string: string	string	unary operator	string
+<undefined> as string: string	string	undefined	string
+<integer> as day_of_month: day of month	day_of_month	integer	day of month
+<day of month> as integer: integer	integer	day of month	integer
+<string> as day_of_month: day of month	day_of_month	string	day of month
+<day of month> as string: string	string	day of month	string
+<day of month> as two digits: string	two digits	day of month	string
+<string> as day_of_week: day of week	day_of_week	string	day of week
+<day of week> as string: string	string	day of week	string
+<day of week> as three letters: string	three letters	day of week	string
+<day of year> as string: string	string	day of year	string
+<string> as date: date	date	string	date
+<date> as string: string	string	date	string
+<month and year> as string: string	string	month and year	string
+<number of months> as string: string	string	number of months	string
+<integer> as month: month	month	integer	month
+<month> as integer: integer	integer	month	integer
+<string> as month: month	month	string	month
+<month> as string: string	string	month	string
+<month> as three letters: string	three letters	month	string
+<month> as two digits: string	two digits	month	string
+<string> as time_of_day: time of day	time_of_day	string	time of day
+<time of day> as string: string	string	time of day	string
+<time range> as string: string	string	time range	string
+<integer> as year: year	year	integer	year
+<year> as integer: integer	integer	year	integer
+<string> as year: year	year	string	year
+<year> as string: string	string	year	string
+<string> as zoned time_of_day: time of day with time zone	zoned time_of_day	string	time of day with time zone
+<string> as universal zoned time_of_day: time of day with time zone	universal zoned time_of_day	string	time of day with time zone
+<string> as local zoned time_of_day: time of day with time zone	local zoned time_of_day	string	time of day with time zone
+<time of day with time zone> as string: string	string	time of day with time zone	string
+<site version list> as string: string	string	site version list	string
+<string> as site version list: site version list	site version list	string	site version list
+<version> as string: string	string	version	string
+<string> as version: version	version	string	version
+<version> as version: version	version	version	version
+<string> as strverscmp version: strverscmp version	strverscmp version	string	strverscmp version
+<integer> as floating point: floating point	floating point	integer	floating point
+<floating point> as integer: integer	integer	floating point	integer
+<floating point> as string: string	string	floating point	string
+<floating point> as scientific notation: string	scientific notation	floating point	string
+<floating point> as standard notation: string	standard notation	floating point	string
+<string> as floating point: floating point	floating point	string	floating point
+<floating point> as floating point: floating point	floating point	floating point	floating point
+<binary_substring> as string: string	string	binary_substring	string
+<binary_substring> as binary_substring: binary_substring	binary_substring	binary_substring	binary_substring
+<filesystem object> as string: string	string	filesystem object	string
+<ipv4 address> as string: string	string	ipv4 address	string
+<ipv6 address> as string: string	string	ipv6 address	string
+<ipv4or6 address> as string: string	string	ipv4or6 address	string
+<ipv6 address> as string with leading zeros: string	string with leading zeros	ipv6 address	string
+<ipv4or6 address> as string with leading zeros: string	string with leading zeros	ipv4or6 address	string
+<ipv6 address> as string with ipv4: string	string with ipv4	ipv6 address	string
+<ipv4or6 address> as string with ipv4: string	string with ipv4	ipv4or6 address	string
+<ipv6 address> as compressed string: string	compressed string	ipv6 address	string
+<ipv4or6 address> as compressed string: string	compressed string	ipv4or6 address	string
+<ipv6 address> as compressed string with ipv4: string	compressed string with ipv4	ipv6 address	string
+<ipv4or6 address> as compressed string with ipv4: string	compressed string with ipv4	ipv4or6 address	string
+<ipv6 address> as string with zone index: string	string with zone index	ipv6 address	string
+<ipv4or6 address> as string with zone index: string	string with zone index	ipv4or6 address	string
+<ipv6 address> as string with leading zeros with zone index: string	string with leading zeros with zone index	ipv6 address	string
+<ipv4or6 address> as string with leading zeros with zone index: string	string with leading zeros with zone index	ipv4or6 address	string
+<ipv6 address> as string with ipv4 with zone index: string	string with ipv4 with zone index	ipv6 address	string
+<ipv4or6 address> as string with ipv4 with zone index: string	string with ipv4 with zone index	ipv4or6 address	string
+<ipv6 address> as compressed string with zone index: string	compressed string with zone index	ipv6 address	string
+<ipv4or6 address> as compressed string with zone index: string	compressed string with zone index	ipv4or6 address	string
+<ipv6 address> as compressed string with ipv4 with zone index: string	compressed string with ipv4 with zone index	ipv6 address	string
+<ipv4or6 address> as compressed string with ipv4 with zone index: string	compressed string with ipv4 with zone index	ipv4or6 address	string
+<string> as ipv6 address: ipv6 address	ipv6 address	string	ipv6 address
+<string> as ipv4or6 address: ipv4or6 address	ipv4or6 address	string	ipv4or6 address
+<ipv4 address> as ipv6 address: ipv6 address	ipv6 address	ipv4 address	ipv6 address
+<ipv4 address> as ipv4or6 address: ipv4or6 address	ipv4or6 address	ipv4 address	ipv4or6 address
+<ipv6 address> as ipv4or6 address: ipv4or6 address	ipv4or6 address	ipv6 address	ipv4or6 address
+<ip version> as string: string	string	ip version	string
+<action> as string: string	string	action	string
+<action lock state> as string: string	string	action lock state	string
+<bios> as string: string	string	bios	string
+<environment variable> as string: string	string	environment variable	string
+<language> as string: string	string	language	string
+<mode> as string: string	string	mode	string
+<mode> as octal string: string	octal string	mode	string
+<mode_mask> as integer: integer	integer	mode_mask	integer
+<mode_mask> as string: string	string	mode_mask	string
+<operating system> as string: string	string	operating system	string
+<primary language> as string: string	string	primary language	string
+<service> as string: string	string	service	string
+<setting> as string: string	string	setting	string
+<file content> as uppercase: file content	uppercase	file content	file content
+<file content> as lowercase: file content	lowercase	file content	file content
+<filesystem object> as symlink: symlink	symlink	filesystem object	symlink
+<symlink> as file: file	file	symlink	file
+<symlink> as folder: folder	folder	symlink	folder
+<symlink> as device file: device file	device file	symlink	device file
+<symlink> as fifo file: fifo file	fifo file	symlink	fifo file
+<symlink> as socket file: socket file	socket file	symlink	socket file
+<symlink> as symlink: symlink	symlink	symlink	symlink
+<symlink> as string: string	string	symlink	string
+<symlink> as binary_string: binary_string	binary_string	symlink	binary_string
+<runlevel> as string: string	string	runlevel	string
+<filesystem object> as device file: device file	device file	filesystem object	device file
+<symlink> as device file: device file	device file	symlink	device file
+<filesystem object> as fifo file: fifo file	fifo file	filesystem object	fifo file
+<symlink> as fifo file: fifo file	fifo file	symlink	fifo file
+<filesystem object> as socket file: socket file	socket file	filesystem object	socket file
+<symlink> as socket file: socket file	socket file	symlink	socket file
+<power level> as string: string	string	power level	string
+<sqlite column> as string: string	string	sqlite column	string
+<sqlite column type> as string: string	string	sqlite column type	string
+<sqlite database> as string: string	string	sqlite database	string
+<sqlite row> as string: string	string	sqlite row	string
+<sqlite table> as string: string	string	sqlite table	string
+<manual group> as string: string	string	manual group	string
+<grub device> as string: string	string	grub device	string
+<grub block list> as string: string	string	grub block list	string
+<grub file location> as string: string	string	grub file location	string
+<grub module> as string: string	string	grub module	string
+<grub bootable image> as string: string	string	grub bootable image	string
+<grub image choice> as string: string	string	grub image choice	string
+<grub color> as string: string	string	grub color	string
+<grub color pair> as string: string	string	grub color pair	string
+<smbios value> as string: string	string	smbios value	string
+<smbios value> as hexadecimal: string	hexadecimal	smbios value	string
+<package> as string: string	string	package	string
+<capability> as string: string	string	capability	string
+<rpm package version> as string: string	string	rpm package version	string
+<rpm package version> as rpm package version: rpm package version	rpm package version	rpm package version	rpm package version
+<rpm package release> as string: string	string	rpm package release	string
+<rpm package release> as rpm package release: rpm package release	rpm package release	rpm package release	rpm package release
+<rpm package version record> as string: string	string	rpm package version record	string
+<rpm package version record> as rpm package version record: rpm package version record	rpm package version record	rpm package version record	rpm package version record
+<short rpm package version record> as string: string	string	short rpm package version record	string
+<short rpm package version record> as short rpm package version record: short rpm package version record	short rpm package version record	short rpm package version record	short rpm package version record
+<short rpm package version record> as rpm package version record: rpm package version record	rpm package version record	short rpm package version record	rpm package version record
+<rpm package version record> as short rpm package version record: short rpm package version record	short rpm package version record	rpm package version record	short rpm package version record
+<xml dom node> as xml: string	xml	xml dom node	string
+<xml dom node> as text: string	text	xml dom node	string
+<tcp state> as string: string	string	tcp state	string
+<uuid> as string: string	string	uuid	string
+<uuid> as hexadecimal: string	hexadecimal	uuid	string
+<uuid> as binary_string: binary_string	binary_string	uuid	binary_string
+<plugin store key> as string: string	string	plugin store key	string
+<plugin store> as string: string	string	plugin store	string
+<server based group> as string: string	string	server based group	string
+<cidr subnet> as string: string	string	cidr subnet	string
+<yaml value> as string: string	string	yaml value	string
+<yaml value> as integer: integer	integer	yaml value	integer
+<yaml value> as float: floating point	float	yaml value	floating point
+<yaml value> as boolean: boolean	boolean	yaml value	boolean
+<yaml key> as string: string	string	yaml key	string
