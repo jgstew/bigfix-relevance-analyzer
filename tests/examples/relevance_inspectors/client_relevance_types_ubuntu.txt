@@ -1,0 +1,238 @@
+
+SELinux Boolean
+Xinetd Service
+action
+action lock state
+administrative rights
+analysis
+application
+application usage summary
+application usage summary instance
+bes product
+binary operator
+binary position
+binary_string
+binary_substring
+bios
+bit set
+boolean
+cast
+cidr subnet
+client
+client_cryptography
+cloud provider
+cpupackage
+cryptography
+current relay
+date
+date with multiplicity
+day of month
+day of month with multiplicity
+day of week
+day of week with multiplicity
+day of year
+day of year with multiplicity
+debian base package
+debian package upstream version
+debian package upstream version with multiplicity
+debian package version
+debian package version epoch
+debian package version epoch with multiplicity
+debian package version revision
+debian package version revision with multiplicity
+debian package version with multiplicity
+debian versioned package
+debianpackagecache
+debianpkg dependency
+debianpkg reverse dependencies
+debianpkg verfile
+debianpkg version
+device file
+dmi
+dmi additional_information
+dmi b32_bit_memory_error_information
+dmi b64_bit_memory_error_information
+dmi base_board_information
+dmi bios_information
+dmi bios_language_information
+dmi built_in_pointing_device
+dmi cache_information
+dmi cooling_device
+dmi electrical_current_probe
+dmi end_of_table
+dmi group_associations
+dmi hardware_security
+dmi inactive
+dmi ipmi_device_information
+dmi management_device
+dmi management_device_component
+dmi management_device_threshold_data
+dmi memory_array_mapped_address
+dmi memory_channel
+dmi memory_controller_information
+dmi memory_device
+dmi memory_device_mapped_address
+dmi memory_module_information
+dmi oem_strings
+dmi on_board_devices_information
+dmi onboard_devices_extended_information
+dmi out_of_band_remote_access
+dmi physical_memory_array
+dmi port_connector_information
+dmi portable_battery
+dmi processor_information
+dmi system_boot_information
+dmi system_configuration_option
+dmi system_enclosure_or_chassis
+dmi system_information
+dmi system_power_controls
+dmi system_power_supply
+dmi system_reset
+dmi system_slots
+dmi temperature_probe
+dmi voltage_probe
+download server
+download storage folder
+encoding
+environment
+environment variable
+evaluation cycle
+execution
+fifo file
+file
+file content
+file line
+file section
+filesystem
+filesystem object
+fixlet
+fixlet_header
+floating point
+floating point with multiplicity
+folder
+format
+grub block list
+grub bootable image
+grub color
+grub color pair
+grub color scheme
+grub config file
+grub device
+grub file location
+grub image choice
+grub kernel
+grub module
+hardware
+hertz
+hertz with multiplicity
+html
+html attribute list
+instance data
+integer
+integer range
+integer set
+integer with multiplicity
+ip version
+ipv4 address
+ipv4 address with multiplicity
+ipv4or6 address
+ipv4or6 address with multiplicity
+ipv6 address
+ipv6 address with multiplicity
+json key
+json value
+language
+large integer
+large integer with multiplicity
+license
+logged on user
+manual group
+mode
+mode_mask
+module
+month
+month and year
+month and year with multiplicity
+month with multiplicity
+network
+network adapter
+network adapter interface
+network interface
+network ip interface
+number of months
+number of months with multiplicity
+operating system
+power level
+primary language
+process
+processor
+property
+ram
+registration server
+regular expression
+regular expression match
+restricted site
+root server
+rope
+route
+routing table
+runlevel
+selected server
+server based group
+service
+setting
+site
+site group
+site version list
+site version list with multiplicity
+smbios
+smbios structure
+smbios value
+socket
+socket file
+sqlite column
+sqlite column type
+sqlite database
+sqlite row
+sqlite statement
+sqlite table
+string
+string position
+string set
+string with multiplicity
+strverscmp version
+substring
+swap
+symlink
+tcp state
+time
+time interval
+time interval with multiplicity
+time of day
+time of day with multiplicity
+time of day with time zone
+time of day with time zone with multiplicity
+time range
+time range with multiplicity
+time with multiplicity
+time zone
+time zone with multiplicity
+tuple item
+type
+uinteger
+uinteger with multiplicity
+unary operator
+undefined
+user
+utf8 string
+uuid
+uuid with multiplicity
+version
+version with multiplicity
+x509 certificate
+xml dom document
+xml dom node
+yaml key
+yaml value
+year
+year with multiplicity

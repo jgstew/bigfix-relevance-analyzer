@@ -23,7 +23,7 @@ SOURCES: tuple[str, ...] = (
     "session:web_reports",
 )
 
-# 526 rows
+# 599 rows
 BINARY_OPERATORS: str = """\
 40	<bes action set> * <bes action set>: bes action set	times	*	bes action set	bes action set	bes action set
 40	<bes action set> + <bes action set>: bes action set	plus	+	bes action set	bes action set	bes action set
@@ -140,61 +140,86 @@ BINARY_OPERATORS: str = """\
 40	<bes wizard set> contains <bes wizard set>: boolean	contains	contains	bes wizard set	bes wizard set	boolean
 40	<bes wizard set> contains <bes wizard>: boolean	contains	contains	bes wizard set	bes wizard	boolean
 40	<bes wizard> = <bes wizard>: boolean	equal	=	bes wizard	bes wizard	boolean
-52	<binary_string> & <binary_string>: binary_string	concatenate	&	binary_string	binary_string	binary_string
-52	<binary_string> < <binary_string>: boolean	less than	<	binary_string	binary_string	boolean
-52	<binary_string> <= <binary_string>: boolean	less than or equal	<=	binary_string	binary_string	boolean
-52	<binary_string> = <binary_string>: boolean	equal	=	binary_string	binary_string	boolean
-52	<binary_string> contains <binary_string>: boolean	contains	contains	binary_string	binary_string	boolean
-52	<binary_string> ends with <binary_string>: boolean	ends with	ends with	binary_string	binary_string	boolean
-52	<binary_string> starts with <binary_string>: boolean	starts with	starts with	binary_string	binary_string	boolean
-52	<bit set> * <bit set>: bit set	times	*	bit set	bit set	bit set
-52	<bit set> + <bit set>: bit set	plus	+	bit set	bit set	bit set
-52	<bit set> - <bit set>: bit set	minus	-	bit set	bit set	bit set
-52	<bit set> = <bit set>: boolean	equal	=	bit set	bit set	boolean
-52	<bit set> contains <bit set>: boolean	contains	contains	bit set	bit set	boolean
-52	<boolean> * <time range>: timed( time range, boolean )	times	*	boolean	time range	timed( time range, boolean )
-52	<boolean> = <boolean>: boolean	equal	=	boolean	boolean	boolean
-12	<cidr subnet> = <cidr subnet>: boolean
-12	<cidr subnet> = <string>: boolean
-12	<cidr subnet> contains <cidr subnet>: boolean
-12	<cidr subnet> contains <ipv4 address>: boolean
-12	<cidr subnet> contains <ipv4or6 address>: boolean
-12	<cidr subnet> contains <ipv6 address>: boolean
+5f	<binary_string> & <binary_string>: binary_string	concatenate	&	binary_string	binary_string	binary_string
+5f	<binary_string> < <binary_string>: boolean	less than	<	binary_string	binary_string	boolean
+5f	<binary_string> <= <binary_string>: boolean	less than or equal	<=	binary_string	binary_string	boolean
+5f	<binary_string> = <binary_string>: boolean	equal	=	binary_string	binary_string	boolean
+5f	<binary_string> contains <binary_string>: boolean	contains	contains	binary_string	binary_string	boolean
+5f	<binary_string> ends with <binary_string>: boolean	ends with	ends with	binary_string	binary_string	boolean
+5f	<binary_string> starts with <binary_string>: boolean	starts with	starts with	binary_string	binary_string	boolean
+5f	<bit set> * <bit set>: bit set	times	*	bit set	bit set	bit set
+5f	<bit set> + <bit set>: bit set	plus	+	bit set	bit set	bit set
+5f	<bit set> - <bit set>: bit set	minus	-	bit set	bit set	bit set
+5f	<bit set> = <bit set>: boolean	equal	=	bit set	bit set	boolean
+5f	<bit set> contains <bit set>: boolean	contains	contains	bit set	bit set	boolean
+5f	<boolean> * <time range>: timed( time range, boolean )	times	*	boolean	time range	timed( time range, boolean )
+5f	<boolean> = <boolean>: boolean	equal	=	boolean	boolean	boolean
+4	<capability> contains <capability>: boolean
+1f	<cidr subnet> = <cidr subnet>: boolean
+1f	<cidr subnet> = <string>: boolean
+1f	<cidr subnet> contains <cidr subnet>: boolean
+1f	<cidr subnet> contains <ipv4 address>: boolean
+1f	<cidr subnet> contains <ipv4or6 address>: boolean
+1f	<cidr subnet> contains <ipv6 address>: boolean
 10	<connection status> = <connection status>: boolean
 2	<country> = <country>: boolean
-52	<date> & <time of day with time zone>: time	concatenate	&	date	time of day with time zone	time
-52	<date> + <number of months>: date	plus	+	date	number of months	date
-52	<date> + <time interval>: date	plus	+	date	time interval	date
-52	<date> - <date>: time interval	minus	-	date	date	time interval
-52	<date> - <number of months>: date	minus	-	date	number of months	date
-52	<date> - <time interval>: date	minus	-	date	time interval	date
-52	<date> < <date>: boolean	less than	<	date	date	boolean
-52	<date> <= <date>: boolean	less than or equal	<=	date	date	boolean
-52	<date> = <date>: boolean	equal	=	date	date	boolean
-52	<day of month> & <month and year>: date	concatenate	&	day of month	month and year	date
-52	<day of month> & <month>: day of year	concatenate	&	day of month	month	day of year
-52	<day of month> + <time interval>: day of month	plus	+	day of month	time interval	day of month
-52	<day of month> - <day of month>: time interval	minus	-	day of month	day of month	time interval
-52	<day of month> - <time interval>: day of month	minus	-	day of month	time interval	day of month
-52	<day of month> < <day of month>: boolean	less than	<	day of month	day of month	boolean
-52	<day of month> <= <day of month>: boolean	less than or equal	<=	day of month	day of month	boolean
-52	<day of month> = <day of month>: boolean	equal	=	day of month	day of month	boolean
-52	<day of week> + <time interval>: day of week	plus	+	day of week	time interval	day of week
-52	<day of week> - <day of week>: time interval	minus	-	day of week	day of week	time interval
-52	<day of week> - <time interval>: day of week	minus	-	day of week	time interval	day of week
-52	<day of week> = <day of week>: boolean	equal	=	day of week	day of week	boolean
-52	<day of year> & <month and year>: date	concatenate	&	day of year	month and year	date
-52	<day of year> & <year>: date	concatenate	&	day of year	year	date
-52	<day of year> + <number of months>: day of year	plus	+	day of year	number of months	day of year
-52	<day of year> + <time interval>: day of year	plus	+	day of year	time interval	day of year
-52	<day of year> - <day of year>: time interval	minus	-	day of year	day of year	time interval
-52	<day of year> - <number of months>: day of year	minus	-	day of year	number of months	day of year
-52	<day of year> - <time interval>: day of year	minus	-	day of year	time interval	day of year
-52	<day of year> < <day of year>: boolean	less than	<	day of year	day of year	boolean
-52	<day of year> <= <day of year>: boolean	less than or equal	<=	day of year	day of year	boolean
-52	<day of year> = <day of year>: boolean	equal	=	day of year	day of year	boolean
+5f	<date> & <time of day with time zone>: time	concatenate	&	date	time of day with time zone	time
+5f	<date> + <number of months>: date	plus	+	date	number of months	date
+5f	<date> + <time interval>: date	plus	+	date	time interval	date
+5f	<date> - <date>: time interval	minus	-	date	date	time interval
+5f	<date> - <number of months>: date	minus	-	date	number of months	date
+5f	<date> - <time interval>: date	minus	-	date	time interval	date
+5f	<date> < <date>: boolean	less than	<	date	date	boolean
+5f	<date> <= <date>: boolean	less than or equal	<=	date	date	boolean
+5f	<date> = <date>: boolean	equal	=	date	date	boolean
+5f	<day of month> & <month and year>: date	concatenate	&	day of month	month and year	date
+5f	<day of month> & <month>: day of year	concatenate	&	day of month	month	day of year
+5f	<day of month> + <time interval>: day of month	plus	+	day of month	time interval	day of month
+5f	<day of month> - <day of month>: time interval	minus	-	day of month	day of month	time interval
+5f	<day of month> - <time interval>: day of month	minus	-	day of month	time interval	day of month
+5f	<day of month> < <day of month>: boolean	less than	<	day of month	day of month	boolean
+5f	<day of month> <= <day of month>: boolean	less than or equal	<=	day of month	day of month	boolean
+5f	<day of month> = <day of month>: boolean	equal	=	day of month	day of month	boolean
+5f	<day of week> + <time interval>: day of week	plus	+	day of week	time interval	day of week
+5f	<day of week> - <day of week>: time interval	minus	-	day of week	day of week	time interval
+5f	<day of week> - <time interval>: day of week	minus	-	day of week	time interval	day of week
+5f	<day of week> = <day of week>: boolean	equal	=	day of week	day of week	boolean
+5f	<day of year> & <month and year>: date	concatenate	&	day of year	month and year	date
+5f	<day of year> & <year>: date	concatenate	&	day of year	year	date
+5f	<day of year> + <number of months>: day of year	plus	+	day of year	number of months	day of year
+5f	<day of year> + <time interval>: day of year	plus	+	day of year	time interval	day of year
+5f	<day of year> - <day of year>: time interval	minus	-	day of year	day of year	time interval
+5f	<day of year> - <number of months>: day of year	minus	-	day of year	number of months	day of year
+5f	<day of year> - <time interval>: day of year	minus	-	day of year	time interval	day of year
+5f	<day of year> < <day of year>: boolean	less than	<	day of year	day of year	boolean
+5f	<day of year> <= <day of year>: boolean	less than or equal	<=	day of year	day of year	boolean
+5f	<day of year> = <day of year>: boolean	equal	=	day of year	day of year	boolean
+9	<debian package upstream version> < <debian package upstream version>: boolean
+9	<debian package upstream version> < <string>: boolean
+9	<debian package upstream version> <= <debian package upstream version>: boolean
+9	<debian package upstream version> <= <string>: boolean
+9	<debian package upstream version> = <debian package upstream version>: boolean
+9	<debian package upstream version> = <string>: boolean
+9	<debian package version epoch> < <debian package version epoch>: boolean
+9	<debian package version epoch> < <string>: boolean
+9	<debian package version epoch> <= <debian package version epoch>: boolean
+9	<debian package version epoch> <= <string>: boolean
+9	<debian package version epoch> = <debian package version epoch>: boolean
+9	<debian package version epoch> = <string>: boolean
+9	<debian package version revision> < <debian package version revision>: boolean
+9	<debian package version revision> < <string>: boolean
+9	<debian package version revision> <= <debian package version revision>: boolean
+9	<debian package version revision> <= <string>: boolean
+9	<debian package version revision> = <debian package version revision>: boolean
+9	<debian package version revision> = <string>: boolean
+9	<debian package version> < <debian package version>: boolean
+9	<debian package version> < <string>: boolean
+9	<debian package version> <= <debian package version>: boolean
+9	<debian package version> <= <string>: boolean
+9	<debian package version> = <debian package version>: boolean
+9	<debian package version> = <string>: boolean
 10	<event log event type> = <event log event type>: boolean
-12	<file content> contains <string>: boolean
+1f	<file content> contains <string>: boolean
 2	<file signature> = <file signature>: boolean
 2	<file type> = <file type>: boolean
 12	<firewall action> = <firewall action>: boolean
@@ -202,167 +227,167 @@ BINARY_OPERATORS: str = """\
 10	<firewall profile type> = <firewall profile type>: boolean
 10	<firewall scope> = <firewall scope>: boolean
 10	<firewall service type> = <firewall service type>: boolean
-52	<floating point> * <floating point>: floating point	times	*	floating point	floating point	floating point
-52	<floating point> * <integer>: floating point	times	*	floating point	integer	floating point
+5f	<floating point> * <floating point>: floating point	times	*	floating point	floating point	floating point
+5f	<floating point> * <integer>: floating point	times	*	floating point	integer	floating point
 42	<floating point> * <rate>: rate	times	*	floating point	rate	rate
-52	<floating point> + <floating point>: floating point	plus	+	floating point	floating point	floating point
-52	<floating point> + <integer>: floating point	plus	+	floating point	integer	floating point
-52	<floating point> - <floating point>: floating point	minus	-	floating point	floating point	floating point
-52	<floating point> - <integer>: floating point	minus	-	floating point	integer	floating point
-52	<floating point> / <floating point>: floating point	divide	/	floating point	floating point	floating point
-52	<floating point> / <integer>: floating point	divide	/	floating point	integer	floating point
+5f	<floating point> + <floating point>: floating point	plus	+	floating point	floating point	floating point
+5f	<floating point> + <integer>: floating point	plus	+	floating point	integer	floating point
+5f	<floating point> - <floating point>: floating point	minus	-	floating point	floating point	floating point
+5f	<floating point> - <integer>: floating point	minus	-	floating point	integer	floating point
+5f	<floating point> / <floating point>: floating point	divide	/	floating point	floating point	floating point
+5f	<floating point> / <integer>: floating point	divide	/	floating point	integer	floating point
 42	<floating point> / <time interval>: rate	divide	/	floating point	time interval	rate
-52	<floating point> < <floating point>: boolean	less than	<	floating point	floating point	boolean
-52	<floating point> < <integer>: boolean	less than	<	floating point	integer	boolean
-52	<floating point> <= <floating point>: boolean	less than or equal	<=	floating point	floating point	boolean
-52	<floating point> <= <integer>: boolean	less than or equal	<=	floating point	integer	boolean
-52	<floating point> = <floating point>: boolean	equal	=	floating point	floating point	boolean
-52	<floating point> = <integer>: boolean	equal	=	floating point	integer	boolean
-52	<format> + <date>: format	plus	+	format	date	format
-52	<format> + <day of week>: format	plus	+	format	day of week	format
-52	<format> + <format>: format	plus	+	format	format	format
-52	<format> + <integer>: format	plus	+	format	integer	format
-52	<format> + <string>: format	plus	+	format	string	format
-52	<format> + <time interval>: format	plus	+	format	time interval	format
-52	<format> + <time of day>: format	plus	+	format	time of day	format
-52	<format> + <time>: format	plus	+	format	time	format
+5f	<floating point> < <floating point>: boolean	less than	<	floating point	floating point	boolean
+5f	<floating point> < <integer>: boolean	less than	<	floating point	integer	boolean
+5f	<floating point> <= <floating point>: boolean	less than or equal	<=	floating point	floating point	boolean
+5f	<floating point> <= <integer>: boolean	less than or equal	<=	floating point	integer	boolean
+5f	<floating point> = <floating point>: boolean	equal	=	floating point	floating point	boolean
+5f	<floating point> = <integer>: boolean	equal	=	floating point	integer	boolean
+5f	<format> + <date>: format	plus	+	format	date	format
+5f	<format> + <day of week>: format	plus	+	format	day of week	format
+5f	<format> + <format>: format	plus	+	format	format	format
+5f	<format> + <integer>: format	plus	+	format	integer	format
+5f	<format> + <string>: format	plus	+	format	string	format
+5f	<format> + <time interval>: format	plus	+	format	time interval	format
+5f	<format> + <time of day>: format	plus	+	format	time of day	format
+5f	<format> + <time>: format	plus	+	format	time	format
 50	<hertz> % <hertz>: hertz	mod	%	hertz	hertz	hertz
-2	<hertz> %25 <hertz>: hertz
-52	<hertz> * <integer>: hertz	times	*	hertz	integer	hertz
-52	<hertz> + <hertz>: hertz	plus	+	hertz	hertz	hertz
-52	<hertz> - <hertz>: hertz	minus	-	hertz	hertz	hertz
-52	<hertz> / <hertz>: integer	divide	/	hertz	hertz	integer
-52	<hertz> / <integer>: hertz	divide	/	hertz	integer	hertz
-52	<hertz> < <hertz>: boolean	less than	<	hertz	hertz	boolean
-52	<hertz> <= <hertz>: boolean	less than or equal	<=	hertz	hertz	boolean
-52	<hertz> = <hertz>: boolean	equal	=	hertz	hertz	boolean
-52	<html> & <html>: html	concatenate	&	html	html	html
-52	<html> & <string>: html	concatenate	&	html	string	html
-52	<integer set> * <integer set>: integer set	times	*	integer set	integer set	integer set
-52	<integer set> + <integer set>: integer set	plus	+	integer set	integer set	integer set
-52	<integer set> - <integer set>: integer set	minus	-	integer set	integer set	integer set
-52	<integer set> = <integer set>: boolean	equal	=	integer set	integer set	boolean
-52	<integer set> contains <integer set>: boolean	contains	contains	integer set	integer set	boolean
-52	<integer set> contains <integer>: boolean	contains	contains	integer set	integer	boolean
+f	<hertz> %25 <hertz>: hertz
+5f	<hertz> * <integer>: hertz	times	*	hertz	integer	hertz
+5f	<hertz> + <hertz>: hertz	plus	+	hertz	hertz	hertz
+5f	<hertz> - <hertz>: hertz	minus	-	hertz	hertz	hertz
+5f	<hertz> / <hertz>: integer	divide	/	hertz	hertz	integer
+5f	<hertz> / <integer>: hertz	divide	/	hertz	integer	hertz
+5f	<hertz> < <hertz>: boolean	less than	<	hertz	hertz	boolean
+5f	<hertz> <= <hertz>: boolean	less than or equal	<=	hertz	hertz	boolean
+5f	<hertz> = <hertz>: boolean	equal	=	hertz	hertz	boolean
+5f	<html> & <html>: html	concatenate	&	html	html	html
+5f	<html> & <string>: html	concatenate	&	html	string	html
+5f	<integer set> * <integer set>: integer set	times	*	integer set	integer set	integer set
+5f	<integer set> + <integer set>: integer set	plus	+	integer set	integer set	integer set
+5f	<integer set> - <integer set>: integer set	minus	-	integer set	integer set	integer set
+5f	<integer set> = <integer set>: boolean	equal	=	integer set	integer set	boolean
+5f	<integer set> contains <integer set>: boolean	contains	contains	integer set	integer set	boolean
+5f	<integer set> contains <integer>: boolean	contains	contains	integer set	integer	boolean
 50	<integer> % <integer>: integer	mod	%	integer	integer	integer
 50	<integer> % <large integer>: large integer	mod	%	integer	large integer	large integer
 50	<integer> % <uinteger>: uinteger	mod	%	integer	uinteger	uinteger
-2	<integer> %25 <integer>: integer
-2	<integer> %25 <large integer>: large integer
-2	<integer> %25 <uinteger>: uinteger
-52	<integer> * <floating point>: floating point	times	*	integer	floating point	floating point
-52	<integer> * <hertz>: hertz	times	*	integer	hertz	hertz
-52	<integer> * <integer>: integer	times	*	integer	integer	integer
-52	<integer> * <large integer>: large integer	times	*	integer	large integer	large integer
-52	<integer> * <number of months>: number of months	times	*	integer	number of months	number of months
-52	<integer> * <time interval>: time interval	times	*	integer	time interval	time interval
-52	<integer> * <time range>: timed( time range, integer )	times	*	integer	time range	timed( time range, integer )
-52	<integer> * <uinteger>: uinteger	times	*	integer	uinteger	uinteger
-52	<integer> + <floating point>: floating point	plus	+	integer	floating point	floating point
-52	<integer> + <integer>: integer	plus	+	integer	integer	integer
-52	<integer> + <large integer>: large integer	plus	+	integer	large integer	large integer
-52	<integer> + <uinteger>: uinteger	plus	+	integer	uinteger	uinteger
-52	<integer> - <floating point>: floating point	minus	-	integer	floating point	floating point
-52	<integer> - <integer>: integer	minus	-	integer	integer	integer
-52	<integer> - <large integer>: large integer	minus	-	integer	large integer	large integer
-52	<integer> - <uinteger>: uinteger	minus	-	integer	uinteger	uinteger
-52	<integer> / <floating point>: floating point	divide	/	integer	floating point	floating point
-52	<integer> / <integer>: integer	divide	/	integer	integer	integer
-52	<integer> / <large integer>: large integer	divide	/	integer	large integer	large integer
-52	<integer> / <uinteger>: uinteger	divide	/	integer	uinteger	uinteger
-52	<integer> < <floating point>: boolean	less than	<	integer	floating point	boolean
-52	<integer> < <integer>: boolean	less than	<	integer	integer	boolean
-52	<integer> < <large integer>: boolean	less than	<	integer	large integer	boolean
+f	<integer> %25 <integer>: integer
+f	<integer> %25 <large integer>: large integer
+f	<integer> %25 <uinteger>: uinteger
+5f	<integer> * <floating point>: floating point	times	*	integer	floating point	floating point
+5f	<integer> * <hertz>: hertz	times	*	integer	hertz	hertz
+5f	<integer> * <integer>: integer	times	*	integer	integer	integer
+5f	<integer> * <large integer>: large integer	times	*	integer	large integer	large integer
+5f	<integer> * <number of months>: number of months	times	*	integer	number of months	number of months
+5f	<integer> * <time interval>: time interval	times	*	integer	time interval	time interval
+5f	<integer> * <time range>: timed( time range, integer )	times	*	integer	time range	timed( time range, integer )
+5f	<integer> * <uinteger>: uinteger	times	*	integer	uinteger	uinteger
+5f	<integer> + <floating point>: floating point	plus	+	integer	floating point	floating point
+5f	<integer> + <integer>: integer	plus	+	integer	integer	integer
+5f	<integer> + <large integer>: large integer	plus	+	integer	large integer	large integer
+5f	<integer> + <uinteger>: uinteger	plus	+	integer	uinteger	uinteger
+5f	<integer> - <floating point>: floating point	minus	-	integer	floating point	floating point
+5f	<integer> - <integer>: integer	minus	-	integer	integer	integer
+5f	<integer> - <large integer>: large integer	minus	-	integer	large integer	large integer
+5f	<integer> - <uinteger>: uinteger	minus	-	integer	uinteger	uinteger
+5f	<integer> / <floating point>: floating point	divide	/	integer	floating point	floating point
+5f	<integer> / <integer>: integer	divide	/	integer	integer	integer
+5f	<integer> / <large integer>: large integer	divide	/	integer	large integer	large integer
+5f	<integer> / <uinteger>: uinteger	divide	/	integer	uinteger	uinteger
+5f	<integer> < <floating point>: boolean	less than	<	integer	floating point	boolean
+5f	<integer> < <integer>: boolean	less than	<	integer	integer	boolean
+5f	<integer> < <large integer>: boolean	less than	<	integer	large integer	boolean
 10	<integer> < <registry key value type>: boolean
 10	<integer> < <registry key value>: boolean
-52	<integer> < <uinteger>: boolean	less than	<	integer	uinteger	boolean
-52	<integer> <= <floating point>: boolean	less than or equal	<=	integer	floating point	boolean
-52	<integer> <= <integer>: boolean	less than or equal	<=	integer	integer	boolean
-52	<integer> <= <large integer>: boolean	less than or equal	<=	integer	large integer	boolean
+5f	<integer> < <uinteger>: boolean	less than	<	integer	uinteger	boolean
+5f	<integer> <= <floating point>: boolean	less than or equal	<=	integer	floating point	boolean
+5f	<integer> <= <integer>: boolean	less than or equal	<=	integer	integer	boolean
+5f	<integer> <= <large integer>: boolean	less than or equal	<=	integer	large integer	boolean
 10	<integer> <= <registry key value type>: boolean
 10	<integer> <= <registry key value>: boolean
-52	<integer> <= <uinteger>: boolean	less than or equal	<=	integer	uinteger	boolean
-52	<integer> = <floating point>: boolean	equal	=	integer	floating point	boolean
-52	<integer> = <integer>: boolean	equal	=	integer	integer	boolean
-52	<integer> = <large integer>: boolean	equal	=	integer	large integer	boolean
+5f	<integer> <= <uinteger>: boolean	less than or equal	<=	integer	uinteger	boolean
+5f	<integer> = <floating point>: boolean	equal	=	integer	floating point	boolean
+5f	<integer> = <integer>: boolean	equal	=	integer	integer	boolean
+5f	<integer> = <large integer>: boolean	equal	=	integer	large integer	boolean
 10	<integer> = <registry key value type>: boolean
 10	<integer> = <registry key value>: boolean
-52	<integer> = <uinteger>: boolean	equal	=	integer	uinteger	boolean
+5f	<integer> = <uinteger>: boolean	equal	=	integer	uinteger	boolean
 10	<internet protocol> = <internet protocol>: boolean
-52	<ip version> = <ip version>: boolean	equal	=	ip version	ip version	boolean
-52	<ipv4 address> < <ipv4 address>: boolean	less than	<	ipv4 address	ipv4 address	boolean
-52	<ipv4 address> < <string>: boolean	less than	<	ipv4 address	string	boolean
-52	<ipv4 address> <= <ipv4 address>: boolean	less than or equal	<=	ipv4 address	ipv4 address	boolean
-52	<ipv4 address> <= <string>: boolean	less than or equal	<=	ipv4 address	string	boolean
-52	<ipv4 address> = <ipv4 address>: boolean	equal	=	ipv4 address	ipv4 address	boolean
-52	<ipv4 address> = <string>: boolean	equal	=	ipv4 address	string	boolean
-52	<ipv4or6 address> < <ipv4or6 address>: boolean	less than	<	ipv4or6 address	ipv4or6 address	boolean
-52	<ipv4or6 address> < <string>: boolean	less than	<	ipv4or6 address	string	boolean
-52	<ipv4or6 address> <= <ipv4or6 address>: boolean	less than or equal	<=	ipv4or6 address	ipv4or6 address	boolean
-52	<ipv4or6 address> <= <string>: boolean	less than or equal	<=	ipv4or6 address	string	boolean
-52	<ipv4or6 address> = <ipv4or6 address>: boolean	equal	=	ipv4or6 address	ipv4or6 address	boolean
-52	<ipv4or6 address> = <string>: boolean	equal	=	ipv4or6 address	string	boolean
-52	<ipv6 address> < <ipv6 address>: boolean	less than	<	ipv6 address	ipv6 address	boolean
-52	<ipv6 address> <= <ipv6 address>: boolean	less than or equal	<=	ipv6 address	ipv6 address	boolean
-52	<ipv6 address> = <ipv6 address>: boolean	equal	=	ipv6 address	ipv6 address	boolean
-52	<json key> = <json key>: boolean	equal	=	json key	json key	boolean
-52	<json value> = <json value>: boolean	equal	=	json value	json value	boolean
+5f	<ip version> = <ip version>: boolean	equal	=	ip version	ip version	boolean
+5f	<ipv4 address> < <ipv4 address>: boolean	less than	<	ipv4 address	ipv4 address	boolean
+5f	<ipv4 address> < <string>: boolean	less than	<	ipv4 address	string	boolean
+5f	<ipv4 address> <= <ipv4 address>: boolean	less than or equal	<=	ipv4 address	ipv4 address	boolean
+5f	<ipv4 address> <= <string>: boolean	less than or equal	<=	ipv4 address	string	boolean
+5f	<ipv4 address> = <ipv4 address>: boolean	equal	=	ipv4 address	ipv4 address	boolean
+5f	<ipv4 address> = <string>: boolean	equal	=	ipv4 address	string	boolean
+5f	<ipv4or6 address> < <ipv4or6 address>: boolean	less than	<	ipv4or6 address	ipv4or6 address	boolean
+5f	<ipv4or6 address> < <string>: boolean	less than	<	ipv4or6 address	string	boolean
+5f	<ipv4or6 address> <= <ipv4or6 address>: boolean	less than or equal	<=	ipv4or6 address	ipv4or6 address	boolean
+5f	<ipv4or6 address> <= <string>: boolean	less than or equal	<=	ipv4or6 address	string	boolean
+5f	<ipv4or6 address> = <ipv4or6 address>: boolean	equal	=	ipv4or6 address	ipv4or6 address	boolean
+5f	<ipv4or6 address> = <string>: boolean	equal	=	ipv4or6 address	string	boolean
+5f	<ipv6 address> < <ipv6 address>: boolean	less than	<	ipv6 address	ipv6 address	boolean
+5f	<ipv6 address> <= <ipv6 address>: boolean	less than or equal	<=	ipv6 address	ipv6 address	boolean
+5f	<ipv6 address> = <ipv6 address>: boolean	equal	=	ipv6 address	ipv6 address	boolean
+5f	<json key> = <json key>: boolean	equal	=	json key	json key	boolean
+5f	<json value> = <json value>: boolean	equal	=	json value	json value	boolean
 50	<large integer> % <integer>: large integer	mod	%	large integer	integer	large integer
 50	<large integer> % <large integer>: large integer	mod	%	large integer	large integer	large integer
-2	<large integer> %25 <integer>: large integer
-2	<large integer> %25 <large integer>: large integer
-52	<large integer> * <integer>: large integer	times	*	large integer	integer	large integer
-52	<large integer> * <large integer>: large integer	times	*	large integer	large integer	large integer
-52	<large integer> + <integer>: large integer	plus	+	large integer	integer	large integer
-52	<large integer> + <large integer>: large integer	plus	+	large integer	large integer	large integer
-52	<large integer> - <integer>: large integer	minus	-	large integer	integer	large integer
-52	<large integer> - <large integer>: large integer	minus	-	large integer	large integer	large integer
-52	<large integer> / <integer>: large integer	divide	/	large integer	integer	large integer
-52	<large integer> / <large integer>: large integer	divide	/	large integer	large integer	large integer
-52	<large integer> < <integer>: boolean	less than	<	large integer	integer	boolean
-52	<large integer> < <large integer>: boolean	less than	<	large integer	large integer	boolean
-52	<large integer> <= <integer>: boolean	less than or equal	<=	large integer	integer	boolean
-52	<large integer> <= <large integer>: boolean	less than or equal	<=	large integer	large integer	boolean
-52	<large integer> = <integer>: boolean	equal	=	large integer	integer	boolean
-52	<large integer> = <large integer>: boolean	equal	=	large integer	large integer	boolean
+f	<large integer> %25 <integer>: large integer
+f	<large integer> %25 <large integer>: large integer
+5f	<large integer> * <integer>: large integer	times	*	large integer	integer	large integer
+5f	<large integer> * <large integer>: large integer	times	*	large integer	large integer	large integer
+5f	<large integer> + <integer>: large integer	plus	+	large integer	integer	large integer
+5f	<large integer> + <large integer>: large integer	plus	+	large integer	large integer	large integer
+5f	<large integer> - <integer>: large integer	minus	-	large integer	integer	large integer
+5f	<large integer> - <large integer>: large integer	minus	-	large integer	large integer	large integer
+5f	<large integer> / <integer>: large integer	divide	/	large integer	integer	large integer
+5f	<large integer> / <large integer>: large integer	divide	/	large integer	large integer	large integer
+5f	<large integer> < <integer>: boolean	less than	<	large integer	integer	boolean
+5f	<large integer> < <large integer>: boolean	less than	<	large integer	large integer	boolean
+5f	<large integer> <= <integer>: boolean	less than or equal	<=	large integer	integer	boolean
+5f	<large integer> <= <large integer>: boolean	less than or equal	<=	large integer	large integer	boolean
+5f	<large integer> = <integer>: boolean	equal	=	large integer	integer	boolean
+5f	<large integer> = <large integer>: boolean	equal	=	large integer	large integer	boolean
 10	<media type> = <media type>: boolean
 10	<metabase identifier> = <metabase identifier>: boolean
 10	<metabase type> = <metabase type>: boolean
 10	<metabase user type> = <metabase user type>: boolean
-52	<month and year> & <day of month>: date	concatenate	&	month and year	day of month	date
-52	<month and year> & <day of year>: date	concatenate	&	month and year	day of year	date
-52	<month and year> + <number of months>: month and year	plus	+	month and year	number of months	month and year
-52	<month and year> - <month and year>: number of months	minus	-	month and year	month and year	number of months
-52	<month and year> - <number of months>: month and year	minus	-	month and year	number of months	month and year
-52	<month and year> < <month and year>: boolean	less than	<	month and year	month and year	boolean
-52	<month and year> <= <month and year>: boolean	less than or equal	<=	month and year	month and year	boolean
-52	<month and year> = <month and year>: boolean	equal	=	month and year	month and year	boolean
-52	<month> & <day of month>: day of year	concatenate	&	month	day of month	day of year
-52	<month> & <year>: month and year	concatenate	&	month	year	month and year
-52	<month> + <number of months>: month	plus	+	month	number of months	month
-52	<month> - <month>: number of months	minus	-	month	month	number of months
-52	<month> - <number of months>: month	minus	-	month	number of months	month
-52	<month> < <month>: boolean	less than	<	month	month	boolean
-52	<month> <= <month>: boolean	less than or equal	<=	month	month	boolean
-52	<month> = <month>: boolean	equal	=	month	month	boolean
+5f	<month and year> & <day of month>: date	concatenate	&	month and year	day of month	date
+5f	<month and year> & <day of year>: date	concatenate	&	month and year	day of year	date
+5f	<month and year> + <number of months>: month and year	plus	+	month and year	number of months	month and year
+5f	<month and year> - <month and year>: number of months	minus	-	month and year	month and year	number of months
+5f	<month and year> - <number of months>: month and year	minus	-	month and year	number of months	month and year
+5f	<month and year> < <month and year>: boolean	less than	<	month and year	month and year	boolean
+5f	<month and year> <= <month and year>: boolean	less than or equal	<=	month and year	month and year	boolean
+5f	<month and year> = <month and year>: boolean	equal	=	month and year	month and year	boolean
+5f	<month> & <day of month>: day of year	concatenate	&	month	day of month	day of year
+5f	<month> & <year>: month and year	concatenate	&	month	year	month and year
+5f	<month> + <number of months>: month	plus	+	month	number of months	month
+5f	<month> - <month>: number of months	minus	-	month	month	number of months
+5f	<month> - <number of months>: month	minus	-	month	number of months	month
+5f	<month> < <month>: boolean	less than	<	month	month	boolean
+5f	<month> <= <month>: boolean	less than or equal	<=	month	month	boolean
+5f	<month> = <month>: boolean	equal	=	month	month	boolean
 50	<number of months> % <number of months>: number of months	mod	%	number of months	number of months	number of months
-2	<number of months> %25 <number of months>: number of months
-52	<number of months> * <integer>: number of months	times	*	number of months	integer	number of months
-52	<number of months> + <date>: date	plus	+	number of months	date	date
-52	<number of months> + <day of year>: day of year	plus	+	number of months	day of year	day of year
-52	<number of months> + <month and year>: month and year	plus	+	number of months	month and year	month and year
-52	<number of months> + <month>: month	plus	+	number of months	month	month
-52	<number of months> + <number of months>: number of months	plus	+	number of months	number of months	number of months
-52	<number of months> + <year>: year	plus	+	number of months	year	year
-52	<number of months> - <number of months>: number of months	minus	-	number of months	number of months	number of months
-52	<number of months> / <integer>: number of months	divide	/	number of months	integer	number of months
-52	<number of months> / <number of months>: integer	divide	/	number of months	number of months	integer
-52	<number of months> < <number of months>: boolean	less than	<	number of months	number of months	boolean
-52	<number of months> <= <number of months>: boolean	less than or equal	<=	number of months	number of months	boolean
-52	<number of months> = <number of months>: boolean	equal	=	number of months	number of months	boolean
+f	<number of months> %25 <number of months>: number of months
+5f	<number of months> * <integer>: number of months	times	*	number of months	integer	number of months
+5f	<number of months> + <date>: date	plus	+	number of months	date	date
+5f	<number of months> + <day of year>: day of year	plus	+	number of months	day of year	day of year
+5f	<number of months> + <month and year>: month and year	plus	+	number of months	month and year	month and year
+5f	<number of months> + <month>: month	plus	+	number of months	month	month
+5f	<number of months> + <number of months>: number of months	plus	+	number of months	number of months	number of months
+5f	<number of months> + <year>: year	plus	+	number of months	year	year
+5f	<number of months> - <number of months>: number of months	minus	-	number of months	number of months	number of months
+5f	<number of months> / <integer>: number of months	divide	/	number of months	integer	number of months
+5f	<number of months> / <number of months>: integer	divide	/	number of months	number of months	integer
+5f	<number of months> < <number of months>: boolean	less than	<	number of months	number of months	boolean
+5f	<number of months> <= <number of months>: boolean	less than or equal	<=	number of months	number of months	boolean
+5f	<number of months> = <number of months>: boolean	equal	=	number of months	number of months	boolean
 10	<operating system product type> = <operating system product type>: boolean
-10	<plugin store key> = <plugin store key>: boolean
-10	<plugin store> = <plugin store>: boolean
+14	<plugin store key> = <plugin store key>: boolean
+14	<plugin store> = <plugin store>: boolean
 12	<power state> = <power state>: boolean
 10	<priority class> = <priority class>: boolean
 42	<rate> * <floating point>: rate	times	*	rate	floating point	rate
@@ -391,172 +416,220 @@ BINARY_OPERATORS: str = """\
 10	<registry key value> = <integer>: boolean
 10	<registry key value> = <registry key value>: boolean
 10	<registry key value> = <string>: boolean
-52	<regular expression> = <string>: boolean	equal	=	regular expression	string	boolean
-52	<rope> & <rope>: rope	concatenate	&	rope	rope	rope
-52	<rope> & <string>: rope	concatenate	&	rope	string	rope
-52	<rope> contains <string>: boolean	contains	contains	rope	string	boolean
+5f	<regular expression> = <string>: boolean	equal	=	regular expression	string	boolean
+5f	<rope> & <rope>: rope	concatenate	&	rope	rope	rope
+5f	<rope> & <string>: rope	concatenate	&	rope	string	rope
+5f	<rope> contains <string>: boolean	contains	contains	rope	string	boolean
+4	<rpm package release> < <rpm package release>: boolean
+4	<rpm package release> < <string>: boolean
+4	<rpm package release> <= <rpm package release>: boolean
+4	<rpm package release> <= <string>: boolean
+4	<rpm package release> = <rpm package release>: boolean
+4	<rpm package release> = <string>: boolean
+4	<rpm package version record> < <rpm package version record>: boolean
+4	<rpm package version record> < <short rpm package version record>: boolean
+4	<rpm package version record> < <string>: boolean
+4	<rpm package version record> <= <rpm package version record>: boolean
+4	<rpm package version record> <= <short rpm package version record>: boolean
+4	<rpm package version record> <= <string>: boolean
+4	<rpm package version record> = <rpm package version record>: boolean
+4	<rpm package version record> = <short rpm package version record>: boolean
+4	<rpm package version record> = <string>: boolean
+4	<rpm package version> < <rpm package version>: boolean
+4	<rpm package version> < <string>: boolean
+4	<rpm package version> <= <rpm package version>: boolean
+4	<rpm package version> <= <string>: boolean
+4	<rpm package version> = <rpm package version>: boolean
+4	<rpm package version> = <string>: boolean
 12	<security identifier> = <security identifier>: boolean
-52	<site version list> < <site version list>: boolean	less than	<	site version list	site version list	boolean
-52	<site version list> <= <site version list>: boolean	less than or equal	<=	site version list	site version list	boolean
-52	<site version list> = <site version list>: boolean	equal	=	site version list	site version list	boolean
-52	<site version list> contains <site version list>: boolean	contains	contains	site version list	site version list	boolean
+4	<short rpm package version record> < <rpm package version record>: boolean
+4	<short rpm package version record> < <short rpm package version record>: boolean
+4	<short rpm package version record> <= <rpm package version record>: boolean
+4	<short rpm package version record> <= <short rpm package version record>: boolean
+4	<short rpm package version record> = <rpm package version record>: boolean
+4	<short rpm package version record> = <short rpm package version record>: boolean
+5f	<site version list> < <site version list>: boolean	less than	<	site version list	site version list	boolean
+5f	<site version list> <= <site version list>: boolean	less than or equal	<=	site version list	site version list	boolean
+5f	<site version list> = <site version list>: boolean	equal	=	site version list	site version list	boolean
+5f	<site version list> contains <site version list>: boolean	contains	contains	site version list	site version list	boolean
 2	<stage> = <stage>: boolean
-52	<string set> * <string set>: string set	times	*	string set	string set	string set
-52	<string set> + <string set>: string set	plus	+	string set	string set	string set
-52	<string set> - <string set>: string set	minus	-	string set	string set	string set
-52	<string set> = <string set>: boolean	equal	=	string set	string set	boolean
-52	<string set> contains <string set>: boolean	contains	contains	string set	string set	boolean
-52	<string set> contains <string>: boolean	contains	contains	string set	string	boolean
-52	<string> & <html>: html	concatenate	&	string	html	html
-52	<string> & <rope>: rope	concatenate	&	string	rope	rope
-52	<string> & <string>: string	concatenate	&	string	string	string
-52	<string> < <ipv4 address>: boolean	less than	<	string	ipv4 address	boolean
-52	<string> < <ipv4or6 address>: boolean	less than	<	string	ipv4or6 address	boolean
+5f	<string set> * <string set>: string set	times	*	string set	string set	string set
+5f	<string set> + <string set>: string set	plus	+	string set	string set	string set
+5f	<string set> - <string set>: string set	minus	-	string set	string set	string set
+5f	<string set> = <string set>: boolean	equal	=	string set	string set	boolean
+5f	<string set> contains <string set>: boolean	contains	contains	string set	string set	boolean
+5f	<string set> contains <string>: boolean	contains	contains	string set	string	boolean
+5f	<string> & <html>: html	concatenate	&	string	html	html
+5f	<string> & <rope>: rope	concatenate	&	string	rope	rope
+5f	<string> & <string>: string	concatenate	&	string	string	string
+9	<string> < <debian package upstream version>: boolean
+9	<string> < <debian package version epoch>: boolean
+9	<string> < <debian package version revision>: boolean
+9	<string> < <debian package version>: boolean
+5f	<string> < <ipv4 address>: boolean	less than	<	string	ipv4 address	boolean
+5f	<string> < <ipv4or6 address>: boolean	less than	<	string	ipv4or6 address	boolean
 10	<string> < <registry key value type>: boolean
 10	<string> < <registry key value>: boolean
-52	<string> < <string>: boolean	less than	<	string	string	boolean
-40	<string> < <strverscmp version>: boolean	less than	<	string	strverscmp version	boolean
-12	<string> < <uuid>: boolean
-52	<string> < <version>: boolean	less than	<	string	version	boolean
-52	<string> <= <ipv4 address>: boolean	less than or equal	<=	string	ipv4 address	boolean
-52	<string> <= <ipv4or6 address>: boolean	less than or equal	<=	string	ipv4or6 address	boolean
+4	<string> < <rpm package release>: boolean
+4	<string> < <rpm package version record>: boolean
+4	<string> < <rpm package version>: boolean
+5f	<string> < <string>: boolean	less than	<	string	string	boolean
+4d	<string> < <strverscmp version>: boolean	less than	<	string	strverscmp version	boolean
+1f	<string> < <uuid>: boolean
+5f	<string> < <version>: boolean	less than	<	string	version	boolean
+9	<string> <= <debian package upstream version>: boolean
+9	<string> <= <debian package version epoch>: boolean
+9	<string> <= <debian package version revision>: boolean
+9	<string> <= <debian package version>: boolean
+5f	<string> <= <ipv4 address>: boolean	less than or equal	<=	string	ipv4 address	boolean
+5f	<string> <= <ipv4or6 address>: boolean	less than or equal	<=	string	ipv4or6 address	boolean
 10	<string> <= <registry key value type>: boolean
 10	<string> <= <registry key value>: boolean
-52	<string> <= <string>: boolean	less than or equal	<=	string	string	boolean
-40	<string> <= <strverscmp version>: boolean	less than or equal	<=	string	strverscmp version	boolean
-12	<string> <= <uuid>: boolean
-52	<string> <= <version>: boolean	less than or equal	<=	string	version	boolean
-12	<string> = <cidr subnet>: boolean
-52	<string> = <ipv4 address>: boolean	equal	=	string	ipv4 address	boolean
-52	<string> = <ipv4or6 address>: boolean	equal	=	string	ipv4or6 address	boolean
+4	<string> <= <rpm package release>: boolean
+4	<string> <= <rpm package version record>: boolean
+4	<string> <= <rpm package version>: boolean
+5f	<string> <= <string>: boolean	less than or equal	<=	string	string	boolean
+4d	<string> <= <strverscmp version>: boolean	less than or equal	<=	string	strverscmp version	boolean
+1f	<string> <= <uuid>: boolean
+5f	<string> <= <version>: boolean	less than or equal	<=	string	version	boolean
+1f	<string> = <cidr subnet>: boolean
+9	<string> = <debian package upstream version>: boolean
+9	<string> = <debian package version epoch>: boolean
+9	<string> = <debian package version revision>: boolean
+9	<string> = <debian package version>: boolean
+5f	<string> = <ipv4 address>: boolean	equal	=	string	ipv4 address	boolean
+5f	<string> = <ipv4or6 address>: boolean	equal	=	string	ipv4or6 address	boolean
 10	<string> = <registry key value type>: boolean
 10	<string> = <registry key value>: boolean
-52	<string> = <regular expression>: boolean	equal	=	string	regular expression	boolean
-52	<string> = <string>: boolean	equal	=	string	string	boolean
-40	<string> = <strverscmp version>: boolean	equal	=	string	strverscmp version	boolean
-12	<string> = <uuid>: boolean
-52	<string> = <version>: boolean	equal	=	string	version	boolean
-52	<string> contains <regular expression>: boolean	contains	contains	string	regular expression	boolean
-52	<string> contains <string>: boolean	contains	contains	string	string	boolean
-52	<string> ends with <regular expression>: boolean	ends with	ends with	string	regular expression	boolean
-52	<string> ends with <string>: boolean	ends with	ends with	string	string	boolean
-52	<string> starts with <regular expression>: boolean	starts with	starts with	string	regular expression	boolean
-52	<string> starts with <string>: boolean	starts with	starts with	string	string	boolean
-40	<strverscmp version> < <string>: boolean	less than	<	strverscmp version	string	boolean
-40	<strverscmp version> < <strverscmp version>: boolean	less than	<	strverscmp version	strverscmp version	boolean
-40	<strverscmp version> <= <string>: boolean	less than or equal	<=	strverscmp version	string	boolean
-40	<strverscmp version> <= <strverscmp version>: boolean	less than or equal	<=	strverscmp version	strverscmp version	boolean
-40	<strverscmp version> = <string>: boolean	equal	=	strverscmp version	string	boolean
-40	<strverscmp version> = <strverscmp version>: boolean	equal	=	strverscmp version	strverscmp version	boolean
+5f	<string> = <regular expression>: boolean	equal	=	string	regular expression	boolean
+4	<string> = <rpm package release>: boolean
+4	<string> = <rpm package version record>: boolean
+4	<string> = <rpm package version>: boolean
+5f	<string> = <string>: boolean	equal	=	string	string	boolean
+4d	<string> = <strverscmp version>: boolean	equal	=	string	strverscmp version	boolean
+1f	<string> = <uuid>: boolean
+5f	<string> = <version>: boolean	equal	=	string	version	boolean
+5f	<string> contains <regular expression>: boolean	contains	contains	string	regular expression	boolean
+5f	<string> contains <string>: boolean	contains	contains	string	string	boolean
+5f	<string> ends with <regular expression>: boolean	ends with	ends with	string	regular expression	boolean
+5f	<string> ends with <string>: boolean	ends with	ends with	string	string	boolean
+5f	<string> starts with <regular expression>: boolean	starts with	starts with	string	regular expression	boolean
+5f	<string> starts with <string>: boolean	starts with	starts with	string	string	boolean
+4d	<strverscmp version> < <string>: boolean	less than	<	strverscmp version	string	boolean
+4d	<strverscmp version> < <strverscmp version>: boolean	less than	<	strverscmp version	strverscmp version	boolean
+4d	<strverscmp version> <= <string>: boolean	less than or equal	<=	strverscmp version	string	boolean
+4d	<strverscmp version> <= <strverscmp version>: boolean	less than or equal	<=	strverscmp version	strverscmp version	boolean
+4d	<strverscmp version> = <string>: boolean	equal	=	strverscmp version	string	boolean
+4d	<strverscmp version> = <strverscmp version>: boolean	equal	=	strverscmp version	strverscmp version	boolean
 10	<task action type> = <task action type>: boolean
 10	<task trigger type> = <task trigger type>: boolean
 50	<time interval> % <time interval>: time interval	mod	%	time interval	time interval	time interval
-2	<time interval> %25 <time interval>: time interval
-52	<time interval> & <time>: time range	concatenate	&	time interval	time	time range
-52	<time interval> * <integer>: time interval	times	*	time interval	integer	time interval
+f	<time interval> %25 <time interval>: time interval
+5f	<time interval> & <time>: time range	concatenate	&	time interval	time	time range
+5f	<time interval> * <integer>: time interval	times	*	time interval	integer	time interval
 42	<time interval> * <rate>: floating point	times	*	time interval	rate	floating point
-52	<time interval> + <date>: date	plus	+	time interval	date	date
-52	<time interval> + <day of month>: day of month	plus	+	time interval	day of month	day of month
-52	<time interval> + <day of week>: day of week	plus	+	time interval	day of week	day of week
-52	<time interval> + <day of year>: day of year	plus	+	time interval	day of year	day of year
-52	<time interval> + <time interval>: time interval	plus	+	time interval	time interval	time interval
-52	<time interval> + <time of day with time zone>: time of day with time zone	plus	+	time interval	time of day with time zone	time of day with time zone
-52	<time interval> + <time of day>: time of day	plus	+	time interval	time of day	time of day
-52	<time interval> + <time zone>: time zone	plus	+	time interval	time zone	time zone
-52	<time interval> + <time>: time	plus	+	time interval	time	time
-52	<time interval> - <time interval>: time interval	minus	-	time interval	time interval	time interval
-52	<time interval> / <integer>: time interval	divide	/	time interval	integer	time interval
-52	<time interval> / <time interval>: integer	divide	/	time interval	time interval	integer
-52	<time interval> < <time interval>: boolean	less than	<	time interval	time interval	boolean
-52	<time interval> <= <time interval>: boolean	less than or equal	<=	time interval	time interval	boolean
-52	<time interval> = <time interval>: boolean	equal	=	time interval	time interval	boolean
-52	<time of day with time zone> & <date>: time	concatenate	&	time of day with time zone	date	time
-52	<time of day with time zone> & <time zone>: time of day with time zone	concatenate	&	time of day with time zone	time zone	time of day with time zone
-52	<time of day with time zone> + <time interval>: time of day with time zone	plus	+	time of day with time zone	time interval	time of day with time zone
-52	<time of day with time zone> - <time interval>: time of day with time zone	minus	-	time of day with time zone	time interval	time of day with time zone
-52	<time of day with time zone> - <time of day with time zone>: time interval	minus	-	time of day with time zone	time of day with time zone	time interval
-52	<time of day with time zone> < <time of day with time zone>: boolean	less than	<	time of day with time zone	time of day with time zone	boolean
-52	<time of day with time zone> <= <time of day with time zone>: boolean	less than or equal	<=	time of day with time zone	time of day with time zone	boolean
-52	<time of day with time zone> = <time of day with time zone>: boolean	equal	=	time of day with time zone	time of day with time zone	boolean
-52	<time of day> & <time zone>: time of day with time zone	concatenate	&	time of day	time zone	time of day with time zone
-52	<time of day> + <time interval>: time of day	plus	+	time of day	time interval	time of day
-52	<time of day> - <time interval>: time of day	minus	-	time of day	time interval	time of day
-52	<time of day> - <time of day>: time interval	minus	-	time of day	time of day	time interval
-52	<time of day> < <time of day>: boolean	less than	<	time of day	time of day	boolean
-52	<time of day> <= <time of day>: boolean	less than or equal	<=	time of day	time of day	boolean
-52	<time of day> = <time of day>: boolean	equal	=	time of day	time of day	boolean
-52	<time range> & <time range>: time range	concatenate	&	time range	time range	time range
-52	<time range> & <time>: time range	concatenate	&	time range	time	time range
-52	<time range> * <boolean>: timed( time range, boolean )	times	*	time range	boolean	timed( time range, boolean )
-52	<time range> * <integer>: timed( time range, integer )	times	*	time range	integer	timed( time range, integer )
-52	<time range> * <time range>: time range	times	*	time range	time range	time range
-52	<time range> + <time range>: time range	plus	+	time range	time range	time range
-52	<time range> = <time range>: boolean	equal	=	time range	time range	boolean
-52	<time range> contains <time range>: boolean	contains	contains	time range	time range	boolean
-52	<time range> contains <time>: boolean	contains	contains	time range	time	boolean
-52	<time zone> & <time of day with time zone>: time of day with time zone	concatenate	&	time zone	time of day with time zone	time of day with time zone
-52	<time zone> & <time of day>: time of day with time zone	concatenate	&	time zone	time of day	time of day with time zone
-52	<time zone> + <time interval>: time zone	plus	+	time zone	time interval	time zone
-52	<time zone> - <time interval>: time zone	minus	-	time zone	time interval	time zone
-52	<time zone> - <time zone>: time interval	minus	-	time zone	time zone	time interval
-52	<time zone> = <time zone>: boolean	equal	=	time zone	time zone	boolean
-52	<time> & <time interval>: time range	concatenate	&	time	time interval	time range
-52	<time> & <time range>: time range	concatenate	&	time	time range	time range
-52	<time> & <time>: time range	concatenate	&	time	time	time range
-52	<time> + <time interval>: time	plus	+	time	time interval	time
-52	<time> - <time interval>: time	minus	-	time	time interval	time
-52	<time> - <time>: time interval	minus	-	time	time	time interval
-52	<time> < <time>: boolean	less than	<	time	time	boolean
-52	<time> <= <time>: boolean	less than or equal	<=	time	time	boolean
-52	<time> = <time>: boolean	equal	=	time	time	boolean
-52	<type> = <type>: boolean	equal	=	type	type	boolean
+5f	<time interval> + <date>: date	plus	+	time interval	date	date
+5f	<time interval> + <day of month>: day of month	plus	+	time interval	day of month	day of month
+5f	<time interval> + <day of week>: day of week	plus	+	time interval	day of week	day of week
+5f	<time interval> + <day of year>: day of year	plus	+	time interval	day of year	day of year
+5f	<time interval> + <time interval>: time interval	plus	+	time interval	time interval	time interval
+5f	<time interval> + <time of day with time zone>: time of day with time zone	plus	+	time interval	time of day with time zone	time of day with time zone
+5f	<time interval> + <time of day>: time of day	plus	+	time interval	time of day	time of day
+5f	<time interval> + <time zone>: time zone	plus	+	time interval	time zone	time zone
+5f	<time interval> + <time>: time	plus	+	time interval	time	time
+5f	<time interval> - <time interval>: time interval	minus	-	time interval	time interval	time interval
+5f	<time interval> / <integer>: time interval	divide	/	time interval	integer	time interval
+5f	<time interval> / <time interval>: integer	divide	/	time interval	time interval	integer
+5f	<time interval> < <time interval>: boolean	less than	<	time interval	time interval	boolean
+5f	<time interval> <= <time interval>: boolean	less than or equal	<=	time interval	time interval	boolean
+5f	<time interval> = <time interval>: boolean	equal	=	time interval	time interval	boolean
+5f	<time of day with time zone> & <date>: time	concatenate	&	time of day with time zone	date	time
+5f	<time of day with time zone> & <time zone>: time of day with time zone	concatenate	&	time of day with time zone	time zone	time of day with time zone
+5f	<time of day with time zone> + <time interval>: time of day with time zone	plus	+	time of day with time zone	time interval	time of day with time zone
+5f	<time of day with time zone> - <time interval>: time of day with time zone	minus	-	time of day with time zone	time interval	time of day with time zone
+5f	<time of day with time zone> - <time of day with time zone>: time interval	minus	-	time of day with time zone	time of day with time zone	time interval
+5f	<time of day with time zone> < <time of day with time zone>: boolean	less than	<	time of day with time zone	time of day with time zone	boolean
+5f	<time of day with time zone> <= <time of day with time zone>: boolean	less than or equal	<=	time of day with time zone	time of day with time zone	boolean
+5f	<time of day with time zone> = <time of day with time zone>: boolean	equal	=	time of day with time zone	time of day with time zone	boolean
+5f	<time of day> & <time zone>: time of day with time zone	concatenate	&	time of day	time zone	time of day with time zone
+5f	<time of day> + <time interval>: time of day	plus	+	time of day	time interval	time of day
+5f	<time of day> - <time interval>: time of day	minus	-	time of day	time interval	time of day
+5f	<time of day> - <time of day>: time interval	minus	-	time of day	time of day	time interval
+5f	<time of day> < <time of day>: boolean	less than	<	time of day	time of day	boolean
+5f	<time of day> <= <time of day>: boolean	less than or equal	<=	time of day	time of day	boolean
+5f	<time of day> = <time of day>: boolean	equal	=	time of day	time of day	boolean
+5f	<time range> & <time range>: time range	concatenate	&	time range	time range	time range
+5f	<time range> & <time>: time range	concatenate	&	time range	time	time range
+5f	<time range> * <boolean>: timed( time range, boolean )	times	*	time range	boolean	timed( time range, boolean )
+5f	<time range> * <integer>: timed( time range, integer )	times	*	time range	integer	timed( time range, integer )
+5f	<time range> * <time range>: time range	times	*	time range	time range	time range
+5f	<time range> + <time range>: time range	plus	+	time range	time range	time range
+5f	<time range> = <time range>: boolean	equal	=	time range	time range	boolean
+5f	<time range> contains <time range>: boolean	contains	contains	time range	time range	boolean
+5f	<time range> contains <time>: boolean	contains	contains	time range	time	boolean
+5f	<time zone> & <time of day with time zone>: time of day with time zone	concatenate	&	time zone	time of day with time zone	time of day with time zone
+5f	<time zone> & <time of day>: time of day with time zone	concatenate	&	time zone	time of day	time of day with time zone
+5f	<time zone> + <time interval>: time zone	plus	+	time zone	time interval	time zone
+5f	<time zone> - <time interval>: time zone	minus	-	time zone	time interval	time zone
+5f	<time zone> - <time zone>: time interval	minus	-	time zone	time zone	time interval
+5f	<time zone> = <time zone>: boolean	equal	=	time zone	time zone	boolean
+5f	<time> & <time interval>: time range	concatenate	&	time	time interval	time range
+5f	<time> & <time range>: time range	concatenate	&	time	time range	time range
+5f	<time> & <time>: time range	concatenate	&	time	time	time range
+5f	<time> + <time interval>: time	plus	+	time	time interval	time
+5f	<time> - <time interval>: time	minus	-	time	time interval	time
+5f	<time> - <time>: time interval	minus	-	time	time	time interval
+5f	<time> < <time>: boolean	less than	<	time	time	boolean
+5f	<time> <= <time>: boolean	less than or equal	<=	time	time	boolean
+5f	<time> = <time>: boolean	equal	=	time	time	boolean
+5f	<type> = <type>: boolean	equal	=	type	type	boolean
 50	<uinteger> % <integer>: uinteger	mod	%	uinteger	integer	uinteger
 50	<uinteger> % <uinteger>: uinteger	mod	%	uinteger	uinteger	uinteger
-2	<uinteger> %25 <integer>: uinteger
-2	<uinteger> %25 <uinteger>: uinteger
-52	<uinteger> * <integer>: uinteger	times	*	uinteger	integer	uinteger
-52	<uinteger> * <uinteger>: uinteger	times	*	uinteger	uinteger	uinteger
-52	<uinteger> + <integer>: uinteger	plus	+	uinteger	integer	uinteger
-52	<uinteger> + <uinteger>: uinteger	plus	+	uinteger	uinteger	uinteger
-52	<uinteger> - <integer>: uinteger	minus	-	uinteger	integer	uinteger
-52	<uinteger> - <uinteger>: uinteger	minus	-	uinteger	uinteger	uinteger
-52	<uinteger> / <integer>: uinteger	divide	/	uinteger	integer	uinteger
-52	<uinteger> / <uinteger>: uinteger	divide	/	uinteger	uinteger	uinteger
-52	<uinteger> < <integer>: boolean	less than	<	uinteger	integer	boolean
-52	<uinteger> < <uinteger>: boolean	less than	<	uinteger	uinteger	boolean
-52	<uinteger> <= <integer>: boolean	less than or equal	<=	uinteger	integer	boolean
-52	<uinteger> <= <uinteger>: boolean	less than or equal	<=	uinteger	uinteger	boolean
-52	<uinteger> = <integer>: boolean	equal	=	uinteger	integer	boolean
-52	<uinteger> = <uinteger>: boolean	equal	=	uinteger	uinteger	boolean
-12	<uuid> < <string>: boolean
-12	<uuid> < <uuid>: boolean
-12	<uuid> <= <string>: boolean
-12	<uuid> <= <uuid>: boolean
-12	<uuid> = <string>: boolean
-12	<uuid> = <uuid>: boolean
-52	<version> < <string>: boolean	less than	<	version	string	boolean
-52	<version> < <version>: boolean	less than	<	version	version	boolean
-52	<version> <= <string>: boolean	less than or equal	<=	version	string	boolean
-52	<version> <= <version>: boolean	less than or equal	<=	version	version	boolean
-52	<version> = <string>: boolean	equal	=	version	string	boolean
-52	<version> = <version>: boolean	equal	=	version	version	boolean
+f	<uinteger> %25 <integer>: uinteger
+f	<uinteger> %25 <uinteger>: uinteger
+5f	<uinteger> * <integer>: uinteger	times	*	uinteger	integer	uinteger
+5f	<uinteger> * <uinteger>: uinteger	times	*	uinteger	uinteger	uinteger
+5f	<uinteger> + <integer>: uinteger	plus	+	uinteger	integer	uinteger
+5f	<uinteger> + <uinteger>: uinteger	plus	+	uinteger	uinteger	uinteger
+5f	<uinteger> - <integer>: uinteger	minus	-	uinteger	integer	uinteger
+5f	<uinteger> - <uinteger>: uinteger	minus	-	uinteger	uinteger	uinteger
+5f	<uinteger> / <integer>: uinteger	divide	/	uinteger	integer	uinteger
+5f	<uinteger> / <uinteger>: uinteger	divide	/	uinteger	uinteger	uinteger
+5f	<uinteger> < <integer>: boolean	less than	<	uinteger	integer	boolean
+5f	<uinteger> < <uinteger>: boolean	less than	<	uinteger	uinteger	boolean
+5f	<uinteger> <= <integer>: boolean	less than or equal	<=	uinteger	integer	boolean
+5f	<uinteger> <= <uinteger>: boolean	less than or equal	<=	uinteger	uinteger	boolean
+5f	<uinteger> = <integer>: boolean	equal	=	uinteger	integer	boolean
+5f	<uinteger> = <uinteger>: boolean	equal	=	uinteger	uinteger	boolean
+1f	<uuid> < <string>: boolean
+1f	<uuid> < <uuid>: boolean
+1f	<uuid> <= <string>: boolean
+1f	<uuid> <= <uuid>: boolean
+1f	<uuid> = <string>: boolean
+1f	<uuid> = <uuid>: boolean
+5f	<version> < <string>: boolean	less than	<	version	string	boolean
+5f	<version> < <version>: boolean	less than	<	version	version	boolean
+5f	<version> <= <string>: boolean	less than or equal	<=	version	string	boolean
+5f	<version> <= <version>: boolean	less than or equal	<=	version	version	boolean
+5f	<version> = <string>: boolean	equal	=	version	string	boolean
+5f	<version> = <version>: boolean	equal	=	version	version	boolean
 2	<volume> = <volume>: boolean
-2	<yaml key> = <yaml key>: boolean
-2	<yaml value> = <yaml value>: boolean
-52	<year> & <day of year>: date	concatenate	&	year	day of year	date
-52	<year> & <month>: month and year	concatenate	&	year	month	month and year
-52	<year> + <number of months>: year	plus	+	year	number of months	year
-52	<year> - <number of months>: year	minus	-	year	number of months	year
-52	<year> - <year>: number of months	minus	-	year	year	number of months
-52	<year> < <year>: boolean	less than	<	year	year	boolean
-52	<year> <= <year>: boolean	less than or equal	<=	year	year	boolean
-52	<year> = <year>: boolean	equal	=	year	year	boolean
+f	<yaml key> = <yaml key>: boolean
+f	<yaml value> = <yaml value>: boolean
+5f	<year> & <day of year>: date	concatenate	&	year	day of year	date
+5f	<year> & <month>: month and year	concatenate	&	year	month	month and year
+5f	<year> + <number of months>: year	plus	+	year	number of months	year
+5f	<year> - <number of months>: year	minus	-	year	number of months	year
+5f	<year> - <year>: number of months	minus	-	year	year	number of months
+5f	<year> < <year>: boolean	less than	<	year	year	boolean
+5f	<year> <= <year>: boolean	less than or equal	<=	year	year	boolean
+5f	<year> = <year>: boolean	equal	=	year	year	boolean
 """
 
-# 265 rows
+# 317 rows
 CASTS: str = """\
-12	<action lock state> as string: string
-12	<action> as string: string
+1f	<action lock state> as string: string
+1f	<action> as string: string
 12	<agent interface capability> as string: string
 2	<application> as string: string
 40	<bes action set> as xml string: string	xml string	bes action set	string
@@ -580,99 +653,127 @@ CASTS: str = """\
 40	<bes property set> as xml: utf8 string	xml	bes property set	utf8 string
 40	<bes property> as xml string: string	xml string	bes property	string
 40	<bes property> as xml: utf8 string	xml	bes property	utf8 string
-52	<binary operator> as string: string	string	binary operator	string
-52	<binary_string> as fxf string: string	fxf string	binary_string	string
-52	<binary_string> as hexadecimal: string	hexadecimal	binary_string	string
-52	<binary_string> as local string: string	local string	binary_string	string
-52	<binary_string> as string: string	string	binary_string	string
-52	<binary_string> as utf16 string: string	utf16 string	binary_string	string
-52	<binary_string> as utf8 string: string	utf8 string	binary_string	string
-52	<binary_substring> as binary_substring: binary_substring	binary_substring	binary_substring	binary_substring
-52	<binary_substring> as string: string	string	binary_substring	string
-12	<bios> as string: string
-52	<bit set> as integer: integer	integer	bit set	integer
-52	<bit set> as string: string	string	bit set	string
-52	<boolean> as boolean: boolean	boolean	boolean	boolean
-52	<boolean> as string: string	string	boolean	string
-52	<cast> as string: string	string	cast	string
-12	<cidr subnet> as string: string
+5f	<binary operator> as string: string	string	binary operator	string
+5f	<binary_string> as fxf string: string	fxf string	binary_string	string
+5f	<binary_string> as hexadecimal: string	hexadecimal	binary_string	string
+5f	<binary_string> as local string: string	local string	binary_string	string
+5f	<binary_string> as string: string	string	binary_string	string
+5f	<binary_string> as utf16 string: string	utf16 string	binary_string	string
+5f	<binary_string> as utf8 string: string	utf8 string	binary_string	string
+5f	<binary_substring> as binary_substring: binary_substring	binary_substring	binary_substring	binary_substring
+5f	<binary_substring> as string: string	string	binary_substring	string
+1f	<bios> as string: string
+5f	<bit set> as integer: integer	integer	bit set	integer
+5f	<bit set> as string: string	string	bit set	string
+5f	<boolean> as boolean: boolean	boolean	boolean	boolean
+5f	<boolean> as string: string	string	boolean	string
+4	<capability> as string: string
+5f	<cast> as string: string	string	cast	string
+1f	<cidr subnet> as string: string
 2	<client process owner> as string: string
-52	<date> as string: string	string	date	string
-52	<day of month> as integer: integer	integer	day of month	integer
-52	<day of month> as string: string	string	day of month	string
-52	<day of month> as two digits: string	two digits	day of month	string
-52	<day of week> as string: string	string	day of week	string
-52	<day of week> as three letters: string	three letters	day of week	string
-52	<day of year> as string: string	string	day of year	string
+5f	<date> as string: string	string	date	string
+5f	<day of month> as integer: integer	integer	day of month	integer
+5f	<day of month> as string: string	string	day of month	string
+5f	<day of month> as two digits: string	two digits	day of month	string
+5f	<day of week> as string: string	string	day of week	string
+5f	<day of week> as three letters: string	three letters	day of week	string
+5f	<day of year> as string: string	string	day of year	string
+9	<debian base package> as string: string
+9	<debian package upstream version> as debian package version upstream: debian package upstream version
+9	<debian package upstream version> as string: string
+9	<debian package version epoch> as debian package version epoch: debian package version epoch
+9	<debian package version epoch> as string: string
+9	<debian package version revision> as debian package version revision: debian package version revision
+9	<debian package version revision> as string: string
+9	<debian package version> as debian package version: debian package version
+9	<debian package version> as string: string
+9	<debian versioned package> as string: string
+9	<debianpkg dependency> as string: string
+9	<debianpkg reverse dependencies> as string: string
+9	<debianpkg verfile> as string: string
+9	<debianpkg version> as debian package version: debian package version
+9	<debianpkg version> as string: string
 10	<discretionary access control list> as string: string
 2	<dummy type> as string: string
-12	<environment variable> as string: string
-12	<file content> as lowercase: file content
-12	<file content> as uppercase: file content
+1f	<environment variable> as string: string
+1f	<file content> as lowercase: file content
+1f	<file content> as uppercase: file content
 12	<file> as string: string
+d	<filesystem object> as device file: device file
+d	<filesystem object> as fifo file: fifo file
 2	<filesystem object> as file: file
 2	<filesystem object> as folder: folder
-12	<filesystem object> as string: string
+d	<filesystem object> as socket file: socket file
+1f	<filesystem object> as string: string
+d	<filesystem object> as symlink: symlink
 10	<firewall profile type> as string: string
-52	<floating point> as floating point: floating point	floating point	floating point	floating point
-52	<floating point> as integer: integer	integer	floating point	integer
-52	<floating point> as scientific notation: string	scientific notation	floating point	string
-52	<floating point> as standard notation: string	standard notation	floating point	string
-52	<floating point> as string: string	string	floating point	string
-52	<format> as string: string	string	format	string
-52	<hertz> as string: string	string	hertz	string
-52	<html> as decoded string: string	decoded string	html	string
-52	<html> as html: html	html	html	html
-52	<html> as string: string	string	html	string
-52	<integer> as bit set: bit set	bit set	integer	bit set
-52	<integer> as bits: bit set	bits	integer	bit set
-52	<integer> as day_of_month: day of month	day_of_month	integer	day of month
-52	<integer> as floating point: floating point	floating point	integer	floating point
-52	<integer> as hexadecimal: string	hexadecimal	integer	string
-52	<integer> as integer: integer	integer	integer	integer
-52	<integer> as large integer: large integer	large integer	integer	large integer
-52	<integer> as month: month	month	integer	month
-52	<integer> as string: string	string	integer	string
-52	<integer> as uinteger: uinteger	uinteger	integer	uinteger
-52	<integer> as year: year	year	integer	year
-52	<ip version> as string: string	string	ip version	string
-52	<ipv4 address> as ipv4or6 address: ipv4or6 address	ipv4or6 address	ipv4 address	ipv4or6 address
-52	<ipv4 address> as ipv6 address: ipv6 address	ipv6 address	ipv4 address	ipv6 address
-52	<ipv4 address> as string: string	string	ipv4 address	string
-52	<ipv4or6 address> as compressed string with ipv4 with zone index: string	compressed string with ipv4 with zone index	ipv4or6 address	string
-52	<ipv4or6 address> as compressed string with ipv4: string	compressed string with ipv4	ipv4or6 address	string
-52	<ipv4or6 address> as compressed string with zone index: string	compressed string with zone index	ipv4or6 address	string
-52	<ipv4or6 address> as compressed string: string	compressed string	ipv4or6 address	string
-52	<ipv4or6 address> as string with ipv4 with zone index: string	string with ipv4 with zone index	ipv4or6 address	string
-52	<ipv4or6 address> as string with ipv4: string	string with ipv4	ipv4or6 address	string
-52	<ipv4or6 address> as string with leading zeros with zone index: string	string with leading zeros with zone index	ipv4or6 address	string
-52	<ipv4or6 address> as string with leading zeros: string	string with leading zeros	ipv4or6 address	string
-52	<ipv4or6 address> as string with zone index: string	string with zone index	ipv4or6 address	string
-52	<ipv4or6 address> as string: string	string	ipv4or6 address	string
-52	<ipv6 address> as compressed string with ipv4 with zone index: string	compressed string with ipv4 with zone index	ipv6 address	string
-52	<ipv6 address> as compressed string with ipv4: string	compressed string with ipv4	ipv6 address	string
-52	<ipv6 address> as compressed string with zone index: string	compressed string with zone index	ipv6 address	string
-52	<ipv6 address> as compressed string: string	compressed string	ipv6 address	string
-52	<ipv6 address> as ipv4or6 address: ipv4or6 address	ipv4or6 address	ipv6 address	ipv4or6 address
-52	<ipv6 address> as string with ipv4 with zone index: string	string with ipv4 with zone index	ipv6 address	string
-52	<ipv6 address> as string with ipv4: string	string with ipv4	ipv6 address	string
-52	<ipv6 address> as string with leading zeros with zone index: string	string with leading zeros with zone index	ipv6 address	string
-52	<ipv6 address> as string with leading zeros: string	string with leading zeros	ipv6 address	string
-52	<ipv6 address> as string with zone index: string	string with zone index	ipv6 address	string
-52	<ipv6 address> as string: string	string	ipv6 address	string
-52	<json key> as string: string	string	json key	string
-52	<json value> as boolean: boolean	boolean	json value	boolean
-52	<json value> as float: floating point	float	json value	floating point
-52	<json value> as integer: integer	integer	json value	integer
-52	<json value> as string: string	string	json value	string
-10	<language> as string: string
-52	<large integer> as hexadecimal: string	hexadecimal	large integer	string
-52	<large integer> as integer: integer	integer	large integer	integer
-52	<large integer> as large integer: large integer	large integer	large integer	large integer
-52	<large integer> as string: string	string	large integer	string
-52	<large integer> as uinteger: uinteger	uinteger	large integer	uinteger
+5f	<floating point> as floating point: floating point	floating point	floating point	floating point
+5f	<floating point> as integer: integer	integer	floating point	integer
+5f	<floating point> as scientific notation: string	scientific notation	floating point	string
+5f	<floating point> as standard notation: string	standard notation	floating point	string
+5f	<floating point> as string: string	string	floating point	string
+5f	<format> as string: string	string	format	string
+d	<grub block list> as string: string
+d	<grub bootable image> as string: string
+d	<grub color pair> as string: string
+d	<grub color> as string: string
+d	<grub device> as string: string
+d	<grub file location> as string: string
+d	<grub image choice> as string: string
+d	<grub module> as string: string
+5f	<hertz> as string: string	string	hertz	string
+5f	<html> as decoded string: string	decoded string	html	string
+5f	<html> as html: html	html	html	html
+5f	<html> as string: string	string	html	string
+5f	<integer> as bit set: bit set	bit set	integer	bit set
+5f	<integer> as bits: bit set	bits	integer	bit set
+5f	<integer> as day_of_month: day of month	day_of_month	integer	day of month
+5f	<integer> as floating point: floating point	floating point	integer	floating point
+5f	<integer> as hexadecimal: string	hexadecimal	integer	string
+5f	<integer> as integer: integer	integer	integer	integer
+5f	<integer> as large integer: large integer	large integer	integer	large integer
+5f	<integer> as month: month	month	integer	month
+5f	<integer> as string: string	string	integer	string
+5f	<integer> as uinteger: uinteger	uinteger	integer	uinteger
+5f	<integer> as year: year	year	integer	year
+5f	<ip version> as string: string	string	ip version	string
+5f	<ipv4 address> as ipv4or6 address: ipv4or6 address	ipv4or6 address	ipv4 address	ipv4or6 address
+5f	<ipv4 address> as ipv6 address: ipv6 address	ipv6 address	ipv4 address	ipv6 address
+5f	<ipv4 address> as string: string	string	ipv4 address	string
+5f	<ipv4or6 address> as compressed string with ipv4 with zone index: string	compressed string with ipv4 with zone index	ipv4or6 address	string
+5f	<ipv4or6 address> as compressed string with ipv4: string	compressed string with ipv4	ipv4or6 address	string
+5f	<ipv4or6 address> as compressed string with zone index: string	compressed string with zone index	ipv4or6 address	string
+5f	<ipv4or6 address> as compressed string: string	compressed string	ipv4or6 address	string
+5f	<ipv4or6 address> as string with ipv4 with zone index: string	string with ipv4 with zone index	ipv4or6 address	string
+5f	<ipv4or6 address> as string with ipv4: string	string with ipv4	ipv4or6 address	string
+5f	<ipv4or6 address> as string with leading zeros with zone index: string	string with leading zeros with zone index	ipv4or6 address	string
+5f	<ipv4or6 address> as string with leading zeros: string	string with leading zeros	ipv4or6 address	string
+5f	<ipv4or6 address> as string with zone index: string	string with zone index	ipv4or6 address	string
+5f	<ipv4or6 address> as string: string	string	ipv4or6 address	string
+5f	<ipv6 address> as compressed string with ipv4 with zone index: string	compressed string with ipv4 with zone index	ipv6 address	string
+5f	<ipv6 address> as compressed string with ipv4: string	compressed string with ipv4	ipv6 address	string
+5f	<ipv6 address> as compressed string with zone index: string	compressed string with zone index	ipv6 address	string
+5f	<ipv6 address> as compressed string: string	compressed string	ipv6 address	string
+5f	<ipv6 address> as ipv4or6 address: ipv4or6 address	ipv4or6 address	ipv6 address	ipv4or6 address
+5f	<ipv6 address> as string with ipv4 with zone index: string	string with ipv4 with zone index	ipv6 address	string
+5f	<ipv6 address> as string with ipv4: string	string with ipv4	ipv6 address	string
+5f	<ipv6 address> as string with leading zeros with zone index: string	string with leading zeros with zone index	ipv6 address	string
+5f	<ipv6 address> as string with leading zeros: string	string with leading zeros	ipv6 address	string
+5f	<ipv6 address> as string with zone index: string	string with zone index	ipv6 address	string
+5f	<ipv6 address> as string: string	string	ipv6 address	string
+5f	<json key> as string: string	string	json key	string
+5f	<json value> as boolean: boolean	boolean	json value	boolean
+5f	<json value> as float: floating point	float	json value	floating point
+5f	<json value> as integer: integer	integer	json value	integer
+5f	<json value> as string: string	string	json value	string
+1d	<language> as string: string
+5f	<large integer> as hexadecimal: string	hexadecimal	large integer	string
+5f	<large integer> as integer: integer	integer	large integer	integer
+5f	<large integer> as large integer: large integer	large integer	large integer	large integer
+5f	<large integer> as string: string	string	large integer	string
+5f	<large integer> as uinteger: uinteger	uinteger	large integer	uinteger
 10	<local group member> as string: string
-12	<manual group> as string: string
+1f	<manual group> as string: string
 10	<metabase identifier> as integer: integer
 10	<metabase identifier> as string: string
 10	<metabase type> as integer: integer
@@ -681,19 +782,24 @@ CASTS: str = """\
 10	<metabase user type> as string: string
 10	<metabase value> as integer: integer
 10	<metabase value> as string: string
-52	<month and year> as string: string	string	month and year	string
-52	<month> as integer: integer	integer	month	integer
-52	<month> as string: string	string	month	string
-52	<month> as three letters: string	three letters	month	string
-52	<month> as two digits: string	two digits	month	string
-52	<number of months> as string: string	string	number of months	string
-12	<operating system> as string: string
-10	<plugin store key> as string: string
-10	<plugin store> as string: string
-12	<power level> as string: string
+d	<mode> as octal string: string
+d	<mode> as string: string
+d	<mode_mask> as integer: integer
+d	<mode_mask> as string: string
+5f	<month and year> as string: string	string	month and year	string
+5f	<month> as integer: integer	integer	month	integer
+5f	<month> as string: string	string	month	string
+5f	<month> as three letters: string	three letters	month	string
+5f	<month> as two digits: string	two digits	month	string
+5f	<number of months> as string: string	string	number of months	string
+1f	<operating system> as string: string
+4	<package> as string: string
+14	<plugin store key> as string: string
+14	<plugin store> as string: string
+1f	<power level> as string: string
 12	<power state> as string: string
-10	<primary language> as string: string
-52	<property> as string: string	string	property	string
+1d	<primary language> as string: string
+5f	<property> as string: string	string	property	string
 42	<rate> as string: string	string	rate	string
 10	<registry key value type> as string: string
 10	<registry key value> as application: application
@@ -708,62 +814,81 @@ CASTS: str = """\
 10	<registry key value> as time: time
 10	<registry key value> as uinteger: uinteger
 10	<registry key> as string: string
-52	<rope> as string: string	string	rope	string
+5f	<rope> as string: string	string	rope	string
+4	<rpm package release> as rpm package release: rpm package release
+4	<rpm package release> as string: string
+4	<rpm package version record> as rpm package version record: rpm package version record
+4	<rpm package version record> as short rpm package version record: short rpm package version record
+4	<rpm package version record> as string: string
+4	<rpm package version> as rpm package version: rpm package version
+4	<rpm package version> as string: string
+d	<runlevel> as string: string
 10	<security descriptor> as string: string
 12	<security identifier> as string: string
-12	<server based group> as string: string
-10	<service> as string: string
-12	<setting> as string: string
+1f	<server based group> as string: string
+1d	<service> as string: string
+1f	<setting> as string: string
+4	<short rpm package version record> as rpm package version record: rpm package version record
+4	<short rpm package version record> as short rpm package version record: short rpm package version record
+4	<short rpm package version record> as string: string
 10	<site profile variable> as string: string
-52	<site version list> as string: string	string	site version list	string
-12	<smbios value> as hexadecimal: string
-12	<smbios value> as string: string
-12	<sqlite column type> as string: string
-12	<sqlite column> as string: string
-12	<sqlite database> as string: string
-12	<sqlite row> as string: string
-12	<sqlite table> as string: string
+5f	<site version list> as string: string	string	site version list	string
+1f	<smbios value> as hexadecimal: string
+1f	<smbios value> as string: string
+1f	<sqlite column type> as string: string
+1f	<sqlite column> as string: string
+1f	<sqlite database> as string: string
+1f	<sqlite row> as string: string
+1f	<sqlite table> as string: string
 2	<stage> as string: string
-52	<string> as binary_string: binary_string	binary_string	string	binary_string
-52	<string> as boolean: boolean	boolean	string	boolean
-52	<string> as date: date	date	string	date
-52	<string> as day_of_month: day of month	day_of_month	string	day of month
-52	<string> as day_of_week: day of week	day_of_week	string	day of week
-52	<string> as floating point: floating point	floating point	string	floating point
-52	<string> as fxf binary_string: binary_string	fxf binary_string	string	binary_string
-52	<string> as hexadecimal: string	hexadecimal	string	string
-52	<string> as html: html	html	string	html
-52	<string> as integer: integer	integer	string	integer
-52	<string> as ipv4or6 address: ipv4or6 address	ipv4or6 address	string	ipv4or6 address
-52	<string> as ipv6 address: ipv6 address	ipv6 address	string	ipv6 address
-52	<string> as large integer: large integer	large integer	string	large integer
-52	<string> as left trimmed string: string	left trimmed string	string	string
-52	<string> as local binary_string: binary_string	local binary_string	string	binary_string
-52	<string> as local time: time	local time	string	time
-52	<string> as local zoned time_of_day: time of day with time zone	local zoned time_of_day	string	time of day with time zone
-52	<string> as lowercase: string	lowercase	string	string
-52	<string> as month: month	month	string	month
-52	<string> as right trimmed string: string	right trimmed string	string	string
-52	<string> as site version list: site version list	site version list	string	site version list
-52	<string> as string: string	string	string	string
-40	<string> as strverscmp version: strverscmp version	strverscmp version	string	strverscmp version
-52	<string> as time interval: time interval	time interval	string	time interval
-52	<string> as time zone: time zone	time zone	string	time zone
-52	<string> as time: time	time	string	time
-52	<string> as time_of_day: time of day	time_of_day	string	time of day
-52	<string> as trimmed string: string	trimmed string	string	string
-52	<string> as uinteger: uinteger	uinteger	string	uinteger
-52	<string> as universal time: time	universal time	string	time
-52	<string> as universal zoned time_of_day: time of day with time zone	universal zoned time_of_day	string	time of day with time zone
-52	<string> as uppercase: string	uppercase	string	string
-52	<string> as utf16 binary_string: binary_string	utf16 binary_string	string	binary_string
-52	<string> as utf8 binary_string: binary_string	utf8 binary_string	string	binary_string
-52	<string> as version: version	version	string	version
+5f	<string> as binary_string: binary_string	binary_string	string	binary_string
+5f	<string> as boolean: boolean	boolean	string	boolean
+5f	<string> as date: date	date	string	date
+5f	<string> as day_of_month: day of month	day_of_month	string	day of month
+5f	<string> as day_of_week: day of week	day_of_week	string	day of week
+5f	<string> as floating point: floating point	floating point	string	floating point
+5f	<string> as fxf binary_string: binary_string	fxf binary_string	string	binary_string
+5f	<string> as hexadecimal: string	hexadecimal	string	string
+5f	<string> as html: html	html	string	html
+5f	<string> as integer: integer	integer	string	integer
+5f	<string> as ipv4or6 address: ipv4or6 address	ipv4or6 address	string	ipv4or6 address
+5f	<string> as ipv6 address: ipv6 address	ipv6 address	string	ipv6 address
+5f	<string> as large integer: large integer	large integer	string	large integer
+5f	<string> as left trimmed string: string	left trimmed string	string	string
+5f	<string> as local binary_string: binary_string	local binary_string	string	binary_string
+5f	<string> as local time: time	local time	string	time
+5f	<string> as local zoned time_of_day: time of day with time zone	local zoned time_of_day	string	time of day with time zone
+5f	<string> as lowercase: string	lowercase	string	string
+5f	<string> as month: month	month	string	month
+5f	<string> as right trimmed string: string	right trimmed string	string	string
+5f	<string> as site version list: site version list	site version list	string	site version list
+5f	<string> as string: string	string	string	string
+4d	<string> as strverscmp version: strverscmp version	strverscmp version	string	strverscmp version
+5f	<string> as time interval: time interval	time interval	string	time interval
+5f	<string> as time zone: time zone	time zone	string	time zone
+5f	<string> as time: time	time	string	time
+5f	<string> as time_of_day: time of day	time_of_day	string	time of day
+5f	<string> as trimmed string: string	trimmed string	string	string
+5f	<string> as uinteger: uinteger	uinteger	string	uinteger
+5f	<string> as universal time: time	universal time	string	time
+5f	<string> as universal zoned time_of_day: time of day with time zone	universal zoned time_of_day	string	time of day with time zone
+5f	<string> as uppercase: string	uppercase	string	string
+5f	<string> as utf16 binary_string: binary_string	utf16 binary_string	string	binary_string
+5f	<string> as utf8 binary_string: binary_string	utf8 binary_string	string	binary_string
+5f	<string> as version: version	version	string	version
 50	<string> as windows display time: time	windows display time	string	time
-52	<string> as year: year	year	string	year
-52	<string> as zoned time_of_day: time of day with time zone	zoned time_of_day	string	time of day with time zone
-52	<substring> as string: string	string	substring	string
-52	<substring> as substring: substring	substring	substring	substring
+5f	<string> as year: year	year	string	year
+5f	<string> as zoned time_of_day: time of day with time zone	zoned time_of_day	string	time of day with time zone
+5f	<substring> as string: string	string	substring	string
+5f	<substring> as substring: substring	substring	substring	substring
+d	<symlink> as binary_string: binary_string
+d	<symlink> as device file: device file
+d	<symlink> as fifo file: fifo file
+d	<symlink> as file: file
+d	<symlink> as folder: folder
+d	<symlink> as socket file: socket file
+d	<symlink> as string: string
+d	<symlink> as symlink: symlink
 10	<system access control list> as string: string
 10	<task action> as com handler task action: com handler task action
 10	<task action> as email task action: email task action
@@ -780,46 +905,46 @@ CASTS: str = """\
 10	<task trigger> as session state change task trigger: session state change task trigger
 10	<task trigger> as time task trigger: time task trigger
 10	<task trigger> as weekly task trigger: weekly task trigger
-12	<tcp state> as string: string
-52	<time interval> as string: string	string	time interval	string
-52	<time of day with time zone> as string: string	string	time of day with time zone	string
-52	<time of day> as string: string	string	time of day	string
-52	<time range> as string: string	string	time range	string
-52	<time zone> as string: string	string	time zone	string
-52	<time> as local date: date	local date	time	date
-52	<time> as local string: string	local string	time	string
-52	<time> as string: string	string	time	string
-52	<time> as universal date: date	universal date	time	date
-52	<time> as universal string: string	universal string	time	string
-52	<tuple item> as string: string	string	tuple item	string
-52	<type> as string: string	string	type	string
-52	<uinteger> as hexadecimal: string	hexadecimal	uinteger	string
-52	<uinteger> as integer: integer	integer	uinteger	integer
-52	<uinteger> as large integer: large integer	large integer	uinteger	large integer
-52	<uinteger> as string: string	string	uinteger	string
-52	<uinteger> as uinteger: uinteger	uinteger	uinteger	uinteger
-52	<unary operator> as string: string	string	unary operator	string
-52	<undefined> as string: string	string	undefined	string
+1f	<tcp state> as string: string
+5f	<time interval> as string: string	string	time interval	string
+5f	<time of day with time zone> as string: string	string	time of day with time zone	string
+5f	<time of day> as string: string	string	time of day	string
+5f	<time range> as string: string	string	time range	string
+5f	<time zone> as string: string	string	time zone	string
+5f	<time> as local date: date	local date	time	date
+5f	<time> as local string: string	local string	time	string
+5f	<time> as string: string	string	time	string
+5f	<time> as universal date: date	universal date	time	date
+5f	<time> as universal string: string	universal string	time	string
+5f	<tuple item> as string: string	string	tuple item	string
+5f	<type> as string: string	string	type	string
+5f	<uinteger> as hexadecimal: string	hexadecimal	uinteger	string
+5f	<uinteger> as integer: integer	integer	uinteger	integer
+5f	<uinteger> as large integer: large integer	large integer	uinteger	large integer
+5f	<uinteger> as string: string	string	uinteger	string
+5f	<uinteger> as uinteger: uinteger	uinteger	uinteger	uinteger
+5f	<unary operator> as string: string	string	unary operator	string
+5f	<undefined> as string: string	string	undefined	string
 2	<user attribute> as string: string
-12	<uuid> as binary_string: binary_string
-12	<uuid> as hexadecimal: string
-12	<uuid> as string: string
-52	<version> as string: string	string	version	string
-52	<version> as version: version	version	version	version
+1f	<uuid> as binary_string: binary_string
+1f	<uuid> as hexadecimal: string
+1f	<uuid> as string: string
+5f	<version> as string: string	string	version	string
+5f	<version> as version: version	version	version	version
 10	<winrt enumeration> as string: string
 10	<winrt package user information> as string: string
 10	<winrt package> as string: string
 10	<wmi object> as string: string
 10	<wmi select> as string: string
-10	<xml dom node> as text: string
-10	<xml dom node> as xml: string
-2	<yaml key> as string: string
-2	<yaml value> as boolean: boolean
-2	<yaml value> as float: floating point
-2	<yaml value> as integer: integer
-2	<yaml value> as string: string
-52	<year> as integer: integer	integer	year	integer
-52	<year> as string: string	string	year	string
+1d	<xml dom node> as text: string
+1d	<xml dom node> as xml: string
+f	<yaml key> as string: string
+f	<yaml value> as boolean: boolean
+f	<yaml value> as float: floating point
+f	<yaml value> as integer: integer
+f	<yaml value> as string: string
+5f	<year> as integer: integer	integer	year	integer
+5f	<year> as string: string	string	year	string
 """
 
 # 4626 rows
@@ -5452,26 +5577,28 @@ ff	zone of <time of day with time zone>: time zone	zone	zones	zone	0	time zone	t
 ff	zoned time_of_day <string>: time of day with time zone	zoned time_of_day	zoned times_of_day	zoned time_of_day	0	time of day with time zone		string
 """
 
-# 428 rows
+# 475 rows
 TYPES: str = """\
 40			1
+d	SELinux Boolean
+d	Xinetd Service
 10	access control entry
 10	access control list
-12	action
-12	action lock state
+1f	action
+1f	action lock state
 10	active device
 12	active directory group
 12	active directory local computer
 12	active directory local user
 12	active directory server
 10	activity history
-12	administrative rights
+1f	administrative rights
 12	agent interface
 12	agent interface capability
-12	analysis
-12	application
-12	application usage summary
-12	application usage summary instance
+1f	analysis
+1f	application
+1f	application usage summary
+1f	application usage summary instance
 2	array
 10	audit policy
 10	audit policy category
@@ -5518,7 +5645,7 @@ TYPES: str = """\
 40	bes ldap directory with multiplicity	bes ldap directory	24
 40	bes peer download		448
 40	bes peer download with multiplicity	bes peer download	456
-52	bes product		8
+5f	bes product		8
 40	bes property		24
 40	bes property result		40
 40	bes property set		24
@@ -5550,116 +5677,135 @@ TYPES: str = """\
 40	bes wizard set		24
 40	bes wizard variable		240
 40	bes wizard with multiplicity	bes wizard	240
-52	binary operator		8
-52	binary position	integer	144
-52	binary_string		136
-52	binary_substring	binary_string	136
-12	bios
-52	bit set		8
-52	boolean		1
+5f	binary operator		8
+5f	binary position	integer	144
+5f	binary_string		136
+5f	binary_substring	binary_string	136
+1f	bios
+5f	bit set		8
+5f	boolean		1
 10	boot task trigger
 2	bundle
-52	cast		8
-12	cidr subnet
-12	client
+4	capability
+5f	cast		8
+1f	cidr subnet
+1f	client
 2	client process owner
-12	client_cryptography
-12	cloud provider
+1f	client_cryptography
+1f	cloud provider
 10	com handler task action
 2	component
 2	computer
 10	connection
 10	connection status
 2	country
-12	cpupackage
-52	cryptography		24
-12	current relay
+1f	cpupackage
+5f	cryptography		24
+1f	current relay
 10	daily task trigger
 2	datafork
-52	date		24
-52	date with multiplicity	date	32
-52	day of month		8
-52	day of month with multiplicity	day of month	16
-52	day of week		4
-52	day of week with multiplicity	day of week	16
-52	day of year		16
-52	day of year with multiplicity	day of year	24
+5f	date		24
+5f	date with multiplicity	date	32
+5f	day of month		8
+5f	day of month with multiplicity	day of month	16
+5f	day of week		4
+5f	day of week with multiplicity	day of week	16
+5f	day of year		16
+5f	day of year with multiplicity	day of year	24
+9	debian base package
+9	debian package upstream version
+9	debian package upstream version with multiplicity
+9	debian package version
+9	debian package version epoch
+9	debian package version epoch with multiplicity
+9	debian package version revision
+9	debian package version revision with multiplicity
+9	debian package version with multiplicity
+9	debian versioned package
+9	debianpackagecache
+9	debianpkg dependency
+9	debianpkg reverse dependencies
+9	debianpkg verfile
+9	debianpkg version
+d	device file
 2	dictionary
 2	dictionaryentry
 10	discretionary access control list
 10	distinguished name
 10	distinguished name component
-10	dmi
-12	dmi additional_information
-12	dmi b32_bit_memory_error_information
-12	dmi b64_bit_memory_error_information
-12	dmi base_board_information
-12	dmi bios_information
-12	dmi bios_language_information
-12	dmi built_in_pointing_device
-12	dmi cache_information
-12	dmi cooling_device
-12	dmi electrical_current_probe
-12	dmi end_of_table
-12	dmi group_associations
-12	dmi hardware_security
-12	dmi inactive
-12	dmi ipmi_device_information
-12	dmi management_device
-12	dmi management_device_component
-12	dmi management_device_threshold_data
-12	dmi memory_array_mapped_address
-12	dmi memory_channel
-12	dmi memory_controller_information
-12	dmi memory_device
-12	dmi memory_device_mapped_address
-12	dmi memory_module_information
-12	dmi oem_strings
-12	dmi on_board_devices_information
-12	dmi onboard_devices_extended_information
-12	dmi out_of_band_remote_access
-12	dmi physical_memory_array
-12	dmi port_connector_information
-12	dmi portable_battery
-12	dmi processor_information
-12	dmi system_boot_information
-12	dmi system_configuration_option
-12	dmi system_enclosure_or_chassis
-12	dmi system_information
-12	dmi system_power_controls
-12	dmi system_power_supply
-12	dmi system_reset
-12	dmi system_slots
-12	dmi temperature_probe
-12	dmi voltage_probe
+1d	dmi
+1f	dmi additional_information
+1f	dmi b32_bit_memory_error_information
+1f	dmi b64_bit_memory_error_information
+1f	dmi base_board_information
+1f	dmi bios_information
+1f	dmi bios_language_information
+1f	dmi built_in_pointing_device
+1f	dmi cache_information
+1f	dmi cooling_device
+1f	dmi electrical_current_probe
+1f	dmi end_of_table
+1f	dmi group_associations
+1f	dmi hardware_security
+1f	dmi inactive
+1f	dmi ipmi_device_information
+1f	dmi management_device
+1f	dmi management_device_component
+1f	dmi management_device_threshold_data
+1f	dmi memory_array_mapped_address
+1f	dmi memory_channel
+1f	dmi memory_controller_information
+1f	dmi memory_device
+1f	dmi memory_device_mapped_address
+1f	dmi memory_module_information
+1f	dmi oem_strings
+1f	dmi on_board_devices_information
+1f	dmi onboard_devices_extended_information
+1f	dmi out_of_band_remote_access
+1f	dmi physical_memory_array
+1f	dmi port_connector_information
+1f	dmi portable_battery
+1f	dmi processor_information
+1f	dmi system_boot_information
+1f	dmi system_configuration_option
+1f	dmi system_enclosure_or_chassis
+1f	dmi system_information
+1f	dmi system_power_controls
+1f	dmi system_power_supply
+1f	dmi system_reset
+1f	dmi system_slots
+1f	dmi temperature_probe
+1f	dmi voltage_probe
 2	domain
-12	download server
-12	download storage folder
+1f	download server
+1f	download storage folder
 10	drive
 2	dummy
 2	dummy type
 10	email task action
 2	enableable_file
-12	encoding
-12	environment
-12	environment variable
-12	evaluation cycle
+1f	encoding
+1f	environment
+1f	environment variable
+1f	evaluation cycle
 10	event log
 10	event log event type
 10	event log record
 10	event task trigger
 10	exec task action
-12	execution
+1f	execution
 42	exponential projection		32
-12	file
-12	file content
-12	file line
-12	file section
+d	fifo file
+1f	file
+1f	file content
+1f	file line
+1f	file section
 10	file shortcut
 2	file signature
 2	file type
 10	file version block
-12	filesystem object
+d	filesystem
+1f	filesystem object
 12	firewall
 12	firewall action
 10	firewall authorized application
@@ -5675,48 +5821,59 @@ TYPES: str = """\
 10	firewall service
 10	firewall service restriction
 10	firewall service type
-12	fixlet
+1f	fixlet
 40	fixlet count pair		104
-12	fixlet_header
-52	floating point		24
-52	floating point with multiplicity	floating point	32
-12	folder
-52	format		128
-12	hardware
-52	hertz		8
-52	hertz with multiplicity	hertz	16
+1f	fixlet_header
+5f	floating point		24
+5f	floating point with multiplicity	floating point	32
+1f	folder
+5f	format		128
+d	grub block list
+d	grub bootable image
+d	grub color
+d	grub color pair
+d	grub color scheme
+d	grub config file
+d	grub device
+d	grub file location
+d	grub image choice
+d	grub kernel
+d	grub module
+1f	hardware
+5f	hertz		8
+5f	hertz with multiplicity	hertz	16
 40	historical computer count		24
 40	historical fixlet count		64
-52	html		160
-52	html attribute list		16
+5f	html		160
+5f	html attribute list		16
 10	idle task trigger
-12	instance data
-52	integer		8
-52	integer range		16
-52	integer set		24
-52	integer with multiplicity	integer	16
+1f	instance data
+5f	integer		8
+5f	integer range		16
+5f	integer set		24
+5f	integer with multiplicity	integer	16
 10	internet connection firewall
 10	internet protocol
-52	ip version		4
-52	ipv4 address	ipv4or6 address	28
-52	ipv4 address with multiplicity	ipv4 address	40
-52	ipv4or6 address		28
-52	ipv4or6 address with multiplicity	ipv4or6 address	40
-52	ipv6 address	ipv4or6 address	28
-52	ipv6 address with multiplicity	ipv6 address	40
-52	json key		160
-52	json value		16
-10	language
-52	large integer		24
-52	large integer with multiplicity	large integer	32
-52	license		2016
+5f	ip version		4
+5f	ipv4 address	ipv4or6 address	28
+5f	ipv4 address with multiplicity	ipv4 address	40
+5f	ipv4or6 address		28
+5f	ipv4or6 address with multiplicity	ipv4or6 address	40
+5f	ipv6 address	ipv4or6 address	28
+5f	ipv6 address with multiplicity	ipv6 address	40
+5f	json key		160
+5f	json value		16
+1d	language
+5f	large integer		24
+5f	large integer with multiplicity	large integer	32
+5f	license		2016
 42	linear projection		32
 10	local group
 10	local group member
 10	local mssql database
-12	logged on user
+1f	logged on user
 10	logon task trigger
-12	manual group
+1f	manual group
 10	media type
 10	metabase
 10	metabase identifier
@@ -5725,47 +5882,50 @@ TYPES: str = """\
 10	metabase user type
 10	metabase value
 40	mime field		8
-52	module		8
+d	mode
+d	mode_mask
+5f	module		8
 12	monitor power interval
-52	month		4
-52	month and year		16
-52	month and year with multiplicity	month and year	24
-52	month with multiplicity	month	16
+5f	month		4
+5f	month and year		16
+5f	month and year with multiplicity	month and year	24
+5f	month with multiplicity	month	16
 10	monthly task trigger
 10	monthlydow task trigger
-12	network
-12	network adapter
-12	network adapter interface
+1f	network
+1f	network adapter
+1f	network adapter interface
 10	network address list
-12	network interface
-12	network ip interface
+1f	network interface
+1f	network ip interface
 2	network link interface
 10	network share
 2	nothing
-52	number of months		8
-52	number of months with multiplicity	number of months	16
-12	operating system
+5f	number of months		8
+5f	number of months with multiplicity	number of months	16
+1f	operating system
 10	operating system product type
 10	operating system suite mask
 2	os log entry log
 2	os log store
 2	osxvalue
-10	plugin store
-10	plugin store key
+4	package
+14	plugin store
+14	plugin store key
 10	port mapping
 12	power history
-12	power level
+1f	power level
 12	power state
 2	preference
-10	primary language
+1d	primary language
 10	priority class
-12	process
-12	processor
-52	property		8
-12	ram
+1f	process
+1f	processor
+5f	property		8
+1f	ram
 42	rate		24
 42	rate with multiplicity	rate	32
-12	registration server
+1f	registration server
 10	registration task trigger
 10	registry
 10	registry key
@@ -5773,14 +5933,22 @@ TYPES: str = """\
 10	registry key value type
 2	registrynode
 2	registryroot
-52	regular expression		8
-52	regular expression match	substring	152
+5f	regular expression		8
+5f	regular expression match	substring	152
 2	resfork
-12	restricted site
-12	root server
-52	rope		160
-2	route
-2	routing table
+1f	restricted site
+1f	root server
+5f	rope		160
+f	route
+f	routing table
+4	rpm package release
+4	rpm package release with multiplicity
+4	rpm package version
+4	rpm package version record
+4	rpm package version record with multiplicity
+4	rpm package version with multiplicity
+4	rpmdatabase
+d	runlevel
 10	running task
 10	scheduled task
 2	scsibus
@@ -5789,38 +5957,42 @@ TYPES: str = """\
 10	security database
 10	security descriptor
 12	security identifier
-12	selected server
-12	server based group
-10	service
+1f	selected server
+1f	server based group
+1d	service
 10	session state change task trigger
-12	setting
+1f	setting
+4	short rpm package version record
+4	short rpm package version record with multiplicity
 10	show message task action
-12	site
-12	site group
+1f	site
+1f	site group
 10	site profile
 10	site profile variable
-52	site version list		512
-52	site version list with multiplicity	site version list	520
-12	smbios
-12	smbios structure
-12	smbios value
-12	socket
-12	sqlite column
-12	sqlite column type
-12	sqlite database
-12	sqlite row
-12	sqlite statement
-12	sqlite table
+5f	site version list		512
+5f	site version list with multiplicity	site version list	520
+1f	smbios
+1f	smbios structure
+1f	smbios value
+1f	socket
+d	socket file
+1f	sqlite column
+1f	sqlite column type
+1f	sqlite database
+1f	sqlite row
+1f	sqlite statement
+1f	sqlite table
 2	stage
 40	statistic range		16
 40	statistical bin		240
-52	string		144
-52	string position	integer	152
-52	string set		24
-52	string with multiplicity	string	152
-40	strverscmp version	version	32
-52	substring	string	144
-2	swap
+5f	string		144
+5f	string position	integer	152
+5f	string set		24
+5f	string with multiplicity	string	152
+4d	strverscmp version	version	32
+5f	substring	string	144
+f	swap
+d	symlink
 10	system access control list
 12	system power interval
 10	task action
@@ -5836,34 +6008,34 @@ TYPES: str = """\
 10	task settings
 10	task trigger
 10	task trigger type
-12	tcp state
-52	time		8
-52	time interval		8
-52	time interval with multiplicity	time interval	16
-52	time of day		8
-52	time of day with multiplicity	time of day	16
-52	time of day with time zone		16
-52	time of day with time zone with multiplicity	time of day with time zone	24
-52	time range		16
-52	time range with multiplicity	time range	24
+1f	tcp state
+5f	time		8
+5f	time interval		8
+5f	time interval with multiplicity	time interval	16
+5f	time of day		8
+5f	time of day with multiplicity	time of day	16
+5f	time of day with time zone		16
+5f	time of day with time zone with multiplicity	time of day with time zone	24
+5f	time range		16
+5f	time range with multiplicity	time range	24
 10	time task trigger
-52	time with multiplicity	time	16
-52	time zone		8
-52	time zone with multiplicity	time zone	16
-52	tuple item		152
-52	type		8
-52	uinteger		8
-52	uinteger with multiplicity	uinteger	16
-52	unary operator		8
-52	undefined		1
+5f	time with multiplicity	time	16
+5f	time zone		8
+5f	time zone with multiplicity	time zone	16
+5f	tuple item		152
+5f	type		8
+5f	uinteger		8
+5f	uinteger with multiplicity	uinteger	16
+5f	unary operator		8
+5f	undefined		1
 2	usb
-12	user
+1f	user
 2	user attribute
-52	utf8 string		16
-12	uuid
-12	uuid with multiplicity
-52	version		32
-52	version with multiplicity	version	40
+5f	utf8 string		16
+1f	uuid
+1f	uuid with multiplicity
+5f	version		32
+5f	version with multiplicity	version	40
 2	volume
 10	weekly task trigger
 12	wifi
@@ -5875,22 +6047,22 @@ TYPES: str = """\
 10	wmi
 10	wmi object
 10	wmi select
-52	x509 certificate		712
-10	xml dom document
-10	xml dom node
-2	yaml key
-2	yaml value
-52	year		8
-52	year with multiplicity	year	16
+5f	x509 certificate		712
+1d	xml dom document
+1d	xml dom node
+f	yaml key
+f	yaml value
+5f	year		8
+5f	year with multiplicity	year	16
 """
 
 # 7 rows
 UNARY_OPERATORS: str = """\
-52	- <floating point>: floating point	minus	-	floating point	floating point
-52	- <hertz>: hertz	minus	-	hertz	hertz
-52	- <integer>: integer	minus	-	integer	integer
-52	- <large integer>: large integer	minus	-	large integer	large integer
-52	- <number of months>: number of months	minus	-	number of months	number of months
+5f	- <floating point>: floating point	minus	-	floating point	floating point
+5f	- <hertz>: hertz	minus	-	hertz	hertz
+5f	- <integer>: integer	minus	-	integer	integer
+5f	- <large integer>: large integer	minus	-	large integer	large integer
+5f	- <number of months>: number of months	minus	-	number of months	number of months
 42	- <rate>: rate	minus	-	rate	rate
-52	- <time interval>: time interval	minus	-	time interval	time interval
+5f	- <time interval>: time interval	minus	-	time interval	time interval
 """

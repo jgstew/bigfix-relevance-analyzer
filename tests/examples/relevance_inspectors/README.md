@@ -62,7 +62,7 @@ Provenance below):
 | `session_relevance_unary_operators_rest_api.txt` | 7 | `(it as string) of unary operators` |
 | `session_relevance_types_rest_api.txt` | 166 | `(it as string) of types` |
 
-Client-side, captured on Windows and now macOS:
+Client-side, captured on Windows and macOS:
 
 | File | Signatures | Query |
 | --- | --- | --- |
@@ -74,6 +74,31 @@ Client-side, captured on Windows and now macOS:
 | `client_relevance_binary_operators_macos.txt` | 345 | `(it as string) of binary operators` |
 | `client_relevance_unary_operators_macos.txt` | 7 | `(it as string) of unary operators` |
 | `client_relevance_types_macos.txt` | 244 | `(it as string) of types` |
+
+And now on Ubuntu, Debian, and the RHEL family, via
+`bigfix_remote_client_relevance` against Docker containers (see Provenance
+below) - closing the platform-breadth gap the previous paragraph used to
+describe:
+
+| File | Signatures | Query | Covers |
+| --- | --- | --- | --- |
+| `client_relevance_casts_ubuntu.txt` | 225 | `(it as string) of casts` | Ubuntu 24.04, 22.04, 20.04 |
+| `client_relevance_binary_operators_ubuntu.txt` | 371 | `(it as string) of binary operators` | Ubuntu 24.04, 22.04, 20.04 |
+| `client_relevance_unary_operators_ubuntu.txt` | 6 | `(it as string) of unary operators` | Ubuntu 24.04, 22.04, 20.04 |
+| `client_relevance_types_ubuntu.txt` | 238 | `(it as string) of types` | Ubuntu 24.04, 22.04, 20.04 |
+| `client_relevance_casts_debian.txt` | 225 | `(it as string) of casts` | Debian latest, Debian 11 |
+| `client_relevance_binary_operators_debian.txt` | 371 | `(it as string) of binary operators` | Debian latest, Debian 11 |
+| `client_relevance_unary_operators_debian.txt` | 6 | `(it as string) of unary operators` | Debian latest, Debian 11 |
+| `client_relevance_types_debian.txt` | 238 | `(it as string) of types` | Debian latest, Debian 11 |
+| `client_relevance_casts_rhel.txt` | 224 | `(it as string) of casts` | AlmaLinux 9, Rocky Linux 9, Oracle Linux 9, Amazon Linux 2023 |
+| `client_relevance_binary_operators_rhel.txt` | 374 | `(it as string) of binary operators` | AlmaLinux 9, Rocky Linux 9, Oracle Linux 9, Amazon Linux 2023 |
+| `client_relevance_unary_operators_rhel.txt` | 6 | `(it as string) of unary operators` | AlmaLinux 9, Rocky Linux 9, Oracle Linux 9, Amazon Linux 2023 |
+| `client_relevance_types_rhel.txt` | 236 | `(it as string) of types` | AlmaLinux 9, Rocky Linux 9, Oracle Linux 9, Amazon Linux 2023 |
+
+Ubuntu and Debian are byte-identical to each other across all four of these
+categories (unlike `properties`, where they differ - see the platform-specific
+surface table below); every distro within the RHEL family agrees with the
+other three, same as it does for `properties`.
 
 Casts and operators are in the same `signature: type` format as the property
 dumps. `types` is not: a type's `as string` form is just its own name, so that
@@ -88,15 +113,13 @@ Agent -- not just a REST API/Windows quirk.
 these five categories -- `properties`, `casts`, `binary operators`, `unary
 operators`, `types` -- has at least one client dump and one session dump, and
 `bigfix_relevance_analyzer.inspectors` resolves every one of them to
-`dialects={client, session}`: the Windows and macOS clients genuinely define
-the same introspection meta-layer the session engine does. The remaining gap
-is platform breadth, not dialect: **Ubuntu, Debian and RHEL have no
-casts/operators/types dumps yet** -- only `properties` was captured on all
-five platforms. Someone with Fixlet Debugger, `sudo QnA` (macOS/Linux), or
-console client-relevance access to those platforms can capture them the same
-way the original `client_relevance_properties_*.txt` files were made -- run
-the four queries above per platform. `tools/generate_inspector_data.py` (see
-"Filenames are the provenance" below) picks up a new dump with no code
+`dialects={client, session}`: every client platform sampled here genuinely
+defines the same introspection meta-layer the session engine does. All five
+platforms now have all five categories captured, so the earlier "platform
+breadth, not dialect" gap for Ubuntu/Debian/RHEL is closed; the remaining gaps
+are the ones in "Still not exhaustive" below (AIX/Solaris/HP-UX, other session
+contexts, one client version per platform). `tools/generate_inspector_data.py`
+(see "Filenames are the provenance" below) picks up a new dump with no code
 change.
 
 ## Filenames are the provenance
@@ -292,8 +315,54 @@ echo '(it as string) of casts' | sudo /Library/BESAgent/BESAgent.app/Contents/Ma
 
 with the same substitution as the REST API queries above for `binary
 operators`, `unary operators` and `types`. `sudo` is required because `QnA`
-needs root to read the client's local action site. See "Introspection
-meta-layer" above for the remaining platform gap (Ubuntu, Debian, RHEL).
+needs root to read the client's local action site.
+
+The Ubuntu, Debian and RHEL-family `casts`/`binary_operators`/
+`unary_operators`/`types` files, plus a fresh `properties` capture per
+platform used only to cross-check the committed dumps (see the note below),
+were captured with
+[`jgstew/bigfix_remote_client_relevance`](https://github.com/jgstew/bigfix_remote_client_relevance)
+against qna 11.0.6.137, provisioned on-the-fly into Docker containers - no
+BigFix install, SSH, or hand-run `QnA` needed:
+
+```bash
+bigfix-remote-client-relevance --container ubuntu:22.04 --qna-version 11.0 "(it as string) of casts"
+bigfix-remote-client-relevance --container debian:11 --qna-version 11.0 "(it as string) of casts"
+```
+
+repeated for `binary operators`, `unary operators` and `types`. The RHEL
+family needed the target's platform forced explicitly - the tool's
+`uname`/`os-release` probe otherwise guesses `ubuntu` (the deb family is the
+more common default) rather than detecting the rpm family from the container's
+`ID`/`ID_LIKE` - via an inventory file:
+
+```toml
+[defaults]
+transport = "container"
+platform = "rhel"
+qna_version = "11.0"
+
+[hosts.almalinux9]
+image = "almalinux:9"
+```
+
+```bash
+bigfix-remote-client-relevance --inventory hosts.toml "(it as string) of casts"
+```
+
+Rocky Linux 9 and Amazon Linux 2023's base images additionally needed `cpio`
+(to unpack the rpm) and `dbus-libs` (a `qna` runtime dependency the minimal
+images don't ship) installed before qna would run; AlmaLinux 9 and Oracle
+Linux 9 worked from their unmodified base images. All four RHEL-family images
+produced byte-identical output once qna could run, matching the precedent
+`client_relevance_properties_rhel.txt` already set.
+
+Re-running `properties` the same way against qna 11.0.6.137 (newer than the
+version that produced the committed `client_relevance_properties_*.txt`
+files) reproduced each committed dump as a strict subset - a handful of new
+`yaml`-inspector lines on top, nothing removed or changed - so those files
+were left as-is rather than churned for a version bump alone; see "One client
+version per platform" under "Still not exhaustive".
 
 ## Regenerating
 
