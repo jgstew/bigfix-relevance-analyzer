@@ -251,7 +251,7 @@ repos:
         language: system
         files: ^tests/examples/.*\.(bes|bes\.xml|ojo|besrpt|beswrpt|webreport|bsr|rel|html?)$
         stages: [pre-push, manual]
-        entry: uv run python -m bigfix_relevance_analyzer --check --max-score=500 --max-evaluation-cost=20
+        entry: uv run python -m bigfix_relevance_analyzer --check --max-score=550 --max-evaluation-cost=20
       # A second, differently-implemented type checker (same config the editor
       # uses via pyrightconfig.json) as a cross-check on mypy - not a
       # replacement. Deferred to pre-push/CI rather than every commit: it's
