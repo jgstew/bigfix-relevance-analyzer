@@ -91,6 +91,15 @@ jobs:
     name: Tag and Release
     needs: [version, test]
     runs-on: ubuntu-latest
+    # Deliberately gates the whole release - tag, GitHub release, and PyPI
+    # upload - not just the publish step, so an environment protection rule
+    # (required reviewer, wait timer, branch restriction) stops a release
+    # before the tag is cut rather than after. The name must match the
+    # `Environment name` field of the PyPI trusted publisher exactly: PyPI
+    # checks the `environment` claim in the OIDC token, and a mismatch fails
+    # the publish. Create it under Settings > Environments; an environment
+    # with no protection rules is valid and simply records the deployment.
+    environment: pypi
     permissions:
       # contents: write - create the tag and the release, and upload assets.
       # id-token: write - OIDC for the PyPI trusted-publishing step at the end
@@ -195,12 +204,14 @@ jobs:
             --notes-file "${NOTES_FILE}" \
             dist/*.whl dist/*.tar.gz dist/SHA256SUMS.txt
 
-      # Inert until two separate things are both true, so nothing can publish
-      # by accident:
+      # Inert until all of these are true, so nothing can publish by accident:
       #   1. a PyPI trusted publisher exists for this repo with workflow name
-      #      `tag_and_release.yaml` (https://docs.pypi.org/trusted-publishers/)
+      #      `tag_and_release.yaml` and environment name `pypi`, matching the
+      #      `environment:` above (https://docs.pypi.org/trusted-publishers/)
       #   2. the repository variable PYPI_PUBLISH is set to `true`
       #      (Settings > Secrets and variables > Actions > Variables)
+      #   3. whatever protection rules the `pypi` environment carries have been
+      #      satisfied - those gate this entire job, tagging included
       # `uv publish` speaks OIDC natively given the id-token: write permission
       # above, so there is no long-lived API token to store and no
       # pypa/gh-action-pypi-publish pin to maintain. The release is already
