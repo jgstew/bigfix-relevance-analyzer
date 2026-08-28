@@ -217,6 +217,122 @@ inspector table below and type-directed disambiguation, both of which are parser
 work. Keeping this layer table-free makes it total: any input lexes, and the
 same input always lexes the same way, regardless of which dumps happen to exist.
 
+## What `it` refers to
+
+This section and the two after it come out of
+[jgstew/bigfix-relevance-analyzer#8](https://github.com/jgstew/bigfix-relevance-analyzer/issues/8),
+which reverse-engineers how the Fixlet Debugger implements `it` highlighting,
+its graphical breakdown mode, and its static type checker. The striking result
+is that the first two are **pure AST transforms** - neither needs an evaluator
+embedded here, and both are among the cheapest things on that list rather than
+the most expensive. That issue is the reference for the behavior described
+below, including which claims were executed against a real engine and which
+were not.
+
+`resolve_it_bindings` takes a parsed tree and reports, for every `it` in it,
+which construct supplies its context - the "click `it`, see its referent"
+feature, as a pure AST pass with no evaluator involved.
+
+```python
+from bigfix_relevance_analyzer import parse_relevance, resolve_it_bindings
+
+src = "files whose (size of it > 1000)"
+for binding in resolve_it_bindings(parse_relevance(src)):
+    print(src[binding.it.span.start : binding.it.span.end], "->", binding.binder)
+# it -> Binder.WHOSE
+```
+
+**BigFix's own error message for this is wrong**, and it is worth stating
+plainly because following it produces a resolver that disagrees with the
+evaluator. The engine prints `"It" used outside of "whose" clause.`, but `of`
+introduces a context too: `(it, it) of 5` evaluates to `5, 5`, and
+`name of it of file "..."` gives the file's name. So the rule is that `it` binds
+to the nearest enclosing *context-introducing* construct, of which there are
+two - `whose (...)`, binding the element being filtered, and `of`, binding the
+right-hand operand. `if/then/else` introduces nothing and passes its enclosing
+context through, so `if true then it else it` is an error at the top level. The
+engine's own internal template says `'$token' used without context`, which is
+the accurate wording and the one this package uses.
+
+Order matters in one place worth knowing about: in `A of B`, the object `B` is
+*not* evaluated in its own context. Only `A` sees `B`. Getting that backwards
+looks right on flat expressions and binds the wrong node on every nested one.
+
+An unbound `it` is reported, not raised - the entry's `context` is `None`. A
+resolver that stops at the first bad `it` is no use to an editor colorizing as
+you type, which is the same reason `try_parse_relevance` exists.
+
+## Per-level object counts
+
+`breakdown_probes` reproduces the mechanism behind the Fixlet Debugger's
+graphical breakdown mode: how many objects each level of an expression produced.
+The debugger does not instrument its evaluator - it synthesizes an ordinary
+relevance query per level and runs it through the normal engine. That is
+something this package can do too, since it is string generation over a tree.
+
+So this is **generation only**: the library emits probe text and the caller
+evaluates it, against `qna.exe`, session relevance, the REST `clientquery` API,
+or anything else it has. Nothing is added to the dependency list, and the
+capability stops being Windows-GUI-only.
+
+```python
+from bigfix_relevance_analyzer import breakdown_probes, parse_relevance
+
+src = r'names of files whose (size of it > 1000) of folder "C:\Windows"'
+for level in breakdown_probes(src, parse_relevance(src)):
+    print(level.label, "->", level.probe.relevance)
+```
+
+Hand the rows back to `interpret_count_results`. A probe answers **once per
+context object**, not once per level, so the result is reconciled positionally
+against the context objects; a length mismatch is an internal error, and is the
+condition behind the debugger's own `Result counts do not match result number`.
+Three outcomes, and two of them are lossy in ways worth surfacing rather than
+hiding:
+
+| Result | `Outcome` | Meaning |
+| --- | --- | --- |
+| `N > 0` | `COUNT` | the level produced N objects |
+| `0` | `EMPTY_OR_ERROR` | evaluated fine and produced nothing - *or* errored in a plural context, which relevance flattens to empty |
+| `-1` | `NOT_EVALUABLE` | the level could not be evaluated, e.g. a singular reference to a nonexistent object |
+
+`-1` is also indistinguishable from a legitimately computed `-1`. Both
+ambiguities are properties of the probe design rather than something a caller
+can resolve, so they are named in the API instead of being reported as a
+confident zero.
+
+A `whose` level counts what survived its filter, so the number alone says
+nothing about how selective the filter was. Those levels come back paired: a
+`Level.unfiltered` probe measures the same collection without its filter, and
+comparing the two is what makes selectivity visible. In the example above the
+pair answers 21 and 25.
+
+There is one detail that is easy to get wrong and fails loudly when you do: the
+measured expression is rewritten against `it` rather than copied from the
+source. For the level `files of folder "C:\Windows"` the measured text is
+`files of it`, because a property without its direct object is not a valid
+expression - splicing the raw text gets you
+`The operator "files" is not defined.`
+
+## Diagnostic vocabulary
+
+`bigfix_relevance_analyzer.diagnostics` is a catalog of the messages BigFix
+itself produces, as `str.format` templates. Nothing emits them yet; it exists so
+that when a checker lands, its output is wording BigFix authors already
+recognize rather than a second vocabulary to learn. Imported explicitly, like
+`inspectors`.
+
+Two vocabularies are kept, because the same broken expression produces different
+messages depending on which part of BigFix sees it. The runtime collapses
+everything into "operator not defined"; the debugger's static type checker knows
+whether it was a property, a cast or an operator, and names the types. Prefer
+the type-checker forms - each entry records which it is.
+
+The `it` message above is catalogued as what the runtime says, wrong rule and
+all, next to the accurate `used-without-context`. Where the recovered templates
+are inconsistent with each other they are reproduced as recovered, with the
+inconsistency noted, rather than tidied up.
+
 ## The inspector table
 
 `bigfix_relevance_analyzer.inspectors` is the structured table of what relevance

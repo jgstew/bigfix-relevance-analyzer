@@ -29,6 +29,13 @@ DUMPS_README = DUMPS / "README.md"
 
 _DUMP_FILENAME_RE = re.compile(r"`((?:client|session)_relevance_[a-z_]+\.txt)`")
 
+# QnA percent-encodes its output: `%` arrives as `%25` and tab as `%09` (see the
+# dump README). The capture recipe decodes both with `sed`, but nothing in code
+# enforced that -- and the `%25` that reached three Linux operator dumps survived
+# a full re-capture, because two identically-wrong strings compared equal. Match
+# the whole class of defect rather than the one instance that got through.
+_PERCENT_ENCODED_RE = re.compile(r"%[0-9A-Fa-f]{2}")
+
 
 def _load_generator() -> ModuleType:
     """Import the generator script, which lives outside any package."""
@@ -159,6 +166,47 @@ def test_every_dump_matches_the_format_its_category_implies() -> None:
             else:
                 assert ": " in line, f"{where}: expected `signature: type`, got {line!r}"
                 assert line.count(": ") == 1, f"{where}: ambiguous split in {line!r}"
+
+
+def test_no_dump_contains_percent_encoded_output() -> None:
+    """A dump holds decoded text: `mod` is `%`, never `%25`.
+
+    A legitimate signature does carry a bare `%` (`<hertz> % <hertz>`), and
+    `percent decode <string>` is a real inspector name; neither matches, because
+    the pattern requires two hex digits after the sign.
+    """
+    offenders = [
+        f"{path.name}:{number}: {match.group(0)!r} in {line!r}"
+        for path in sorted(DUMPS.glob("*.txt"))
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        for match in _PERCENT_ENCODED_RE.finditer(line)
+    ]
+    assert not offenders, "percent-encoded output reached a dump:\n" + "\n".join(offenders)
+
+
+def test_the_generated_module_contains_no_percent_encoded_output() -> None:
+    """The same invariant on the generated side.
+
+    The generator copies dump lines verbatim, so a bad dump lands here too --
+    but this also catches a hand-edited generated module, which the dump check
+    cannot see.
+    """
+    tables = {
+        "BINARY_OPERATORS": _inspector_data.BINARY_OPERATORS,
+        "CASTS": _inspector_data.CASTS,
+        "PROPERTIES": _inspector_data.PROPERTIES,
+        "TYPES": _inspector_data.TYPES,
+        "UNARY_OPERATORS": _inspector_data.UNARY_OPERATORS,
+    }
+    offenders = [
+        f"{name}: {match.group(0)!r} in {line!r}"
+        for name, table in tables.items()
+        for line in table.splitlines()
+        for match in _PERCENT_ENCODED_RE.finditer(line)
+    ]
+    assert not offenders, "percent-encoded output reached the generated table:\n" + "\n".join(
+        offenders
+    )
 
 
 def test_source_labels_are_all_dialect_qualified() -> None:
