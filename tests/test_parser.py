@@ -23,6 +23,7 @@ from bigfix_relevance_analyzer.nodes import (
     Of,
     StringLiteral,
     Unary,
+    to_mermaid,
     to_sexpr,
 )
 from bigfix_relevance_analyzer.parser import (
@@ -186,6 +187,155 @@ def test_to_sexpr_escapes_quotes_and_backslashes_in_strings() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Mermaid serialization
+# ---------------------------------------------------------------------------
+
+
+def test_to_mermaid_is_a_flowchart_with_one_line_per_node_and_edge() -> None:
+    rendered = to_mermaid(parse("size of it"))
+
+    # `Of` is right-associative and so collapses to an edge, not a box: two
+    # boxes (the name, the closure variable), one `of`-labelled edge.
+    assert rendered.startswith("flowchart TD\n")
+    assert '["size"]' in rendered
+    assert '("it")' in rendered
+    assert '-- "of" -->' in rendered
+    assert rendered.count("\n") == 3  # header + 2 boxes + 1 edge
+
+
+def test_to_mermaid_folds_a_literal_index_into_its_references_own_box() -> None:
+    rendered = to_mermaid(parse("key 0 of it"))
+
+    assert '["key 0"]' in rendered
+    assert "index" not in rendered  # nothing left to label an edge with
+
+
+def test_to_mermaid_keeps_a_non_literal_index_as_its_own_box() -> None:
+    rendered = to_mermaid(parse("file (pathname of it)"))
+
+    assert '["file"]' in rendered
+    assert '["pathname"]' in rendered
+    assert '-- "index" -->' in rendered
+
+
+def _mermaid_edges(rendered: str) -> set[tuple[str, str, str]]:
+    """The rendered graph's edges as ``(from label, edge label, to label)``.
+
+    Resolves the ``nN`` ids back to their box labels, so an assertion reads
+    as the relationship it is pinning rather than as opaque node numbers.
+    """
+    labels: dict[str, str] = {}
+    edges: set[tuple[str, str, str]] = set()
+    for line in rendered.splitlines():
+        line = line.strip()
+        if "-->" in line:
+            source, _, rest = line.partition(" ")
+            arrow, _, target = rest.rpartition(" ")
+            edges.add((source, arrow.strip(' -"><'), target))
+        elif line.startswith("n"):
+            node_id = line[: min(i for i in (line.find(c) for c in "[({") if i > 0)]
+            labels[node_id] = line[len(node_id) :].strip("[](){}\"'")
+    return {(labels[s], label, labels[t]) for s, label, t in edges}
+
+
+def test_to_mermaid_routes_an_object_past_a_whose_to_what_it_filters() -> None:
+    """`files whose (P) of folders` nests as `Of(Whose(files, P), folders)`,
+    but nothing about the folders flows into the filter: the folders yield
+    their files, and only then does `P` reduce them. So the object edge has
+    to reach `files`, not the `whose` that wraps it, while the value flowing
+    onward is the reduced set at the `whose`."""
+    edges = _mermaid_edges(
+        to_mermaid(parse('pathnames of files whose (size of it > 1) of folder "C:\\"'))
+    )
+
+    assert ("folder #34;C:\\#34;", "of", "files") in edges  # object reaches the collection...
+    assert ("files", "collection", "whose") in edges  # ...which then feeds the filter
+    assert ("whose", "of", "pathnames") in edges  # the *reduced* set flows onward
+    # Nothing flows from the folders straight into the filter.
+    assert not any(label == "of" and to == "whose" for _, label, to in edges)
+
+
+def test_to_mermaid_keeps_an_explicit_of_of_as_its_own_box() -> None:
+    """`(a of b) of c` is not the same tree as `a of (b of c)` and must not
+    collapse as if it were -- collapsing would hang two `of` edges off `a`."""
+    rendered = to_mermaid(parse("(a of b) of c"))
+
+    assert rendered.count('{{"of"}}') == 1
+    assert '-- "prop" -->' in rendered
+    assert '-- "obj" -->' in rendered
+    # `a` only has one outgoing `of` edge -- to `b` -- not two.
+    assert rendered.count('-- "of" -->') == 1
+
+
+def test_to_mermaid_folds_an_all_literal_collection_into_one_box() -> None:
+    rendered = to_mermaid(parse('set of ("ojo";"besrpt")'))
+
+    assert '[["#34;ojo#34;; #34;besrpt#34;"]]' in rendered
+    # One box for the whole list plus one for `set`, joined by a single edge
+    # -- not one box per item.
+    assert rendered.count("-->") == 1
+
+
+def test_to_mermaid_does_not_fold_a_collection_with_a_non_literal_member() -> None:
+    rendered = to_mermaid(parse('("a"; size of it)'))
+
+    assert 'n0[[";"]]' in rendered  # the collection keeps its own box
+    # One edge from each item into the collection, not one folded box. Arrows
+    # point item -> collection (evaluation flow), not collection -> item.
+    assert rendered.count("--> n0") == 2
+
+
+def test_to_mermaid_labels_edges_that_are_not_obvious_from_shape() -> None:
+    rendered = to_mermaid(parse('if (exists it) then (file (pathname of it)) else "n"'))
+
+    assert '-- "condition" -->' in rendered
+    assert '-- "then" -->' in rendered
+    assert '-- "else" -->' in rendered
+    assert '-- "index" -->' in rendered
+
+
+def test_to_mermaid_uses_shape_to_carry_what_a_label_prefix_used_to() -> None:
+    rendered = to_mermaid(parse('exists file "a" whose (size of it > 1)'))
+
+    assert '{{"exists"}}' in rendered  # operator/transform: hexagon
+    assert '{"whose"}' in rendered  # branch point: rhombus
+    assert '["file' in rendered  # a name: rectangle
+    assert '(["1"])' in rendered  # a literal value: stadium
+    assert '("it")' in rendered  # the closure variable: rounded
+
+
+def test_to_mermaid_escapes_special_characters_in_labels() -> None:
+    rendered = to_mermaid(parse('file "<script>&stuff"'))
+
+    assert "<script>" not in rendered
+    # Mermaid's own `#<decimal>;` numeric escapes, not HTML's `&name;` ones --
+    # see `_mermaid_escape`'s docstring for why that distinction is load-bearing.
+    assert "#60;script#62;#38;stuff" in rendered
+    assert "&lt;" not in rendered
+    assert "&amp;" not in rendered
+
+
+def test_to_mermaid_escaping_survives_html_pre_embedding() -> None:
+    """The CLI's Markdown fence and an Artifact's ``<pre class="mermaid">``
+    both carry this same escaped text, but a browser HTML-decodes a real
+    ``<pre>`` element's content before Mermaid ever reads it. HTML-style
+    escaping (``&quot;``) would decode back to a literal ``"`` there and
+    corrupt Mermaid's own label-quoting syntax; Mermaid's ``#34;`` numeric
+    form contains no ``&`` and so passes through an HTML parser unchanged --
+    confirmed here, not just against a real Mermaid render in the browser.
+    """
+    import html
+
+    rendered = to_mermaid(parse('file "<script>&stuff"'))
+    assert html.unescape(rendered) == rendered
+
+
+def test_to_mermaid_is_deterministic_across_separate_calls() -> None:
+    source = 'exists file "C:\\foo.txt" whose (size of it > 100)'
+    assert to_mermaid(parse(source)) == to_mermaid(parse(source))
+
+
+# ---------------------------------------------------------------------------
 # Nesting depth
 # ---------------------------------------------------------------------------
 
@@ -254,6 +404,17 @@ def test_a_wide_expression_is_not_a_deep_one() -> None:
 def test_the_deepest_accepted_tree_survives_its_recursive_consumers() -> None:
     """`to_sexpr` recurses too, so the parser's limit has to leave it room."""
     assert to_sexpr(parse(NESTING["of"](MAX_PARSE_DEPTH - 1))).count("(of ") == MAX_PARSE_DEPTH - 1
+
+
+def test_to_mermaid_also_survives_the_deepest_accepted_tree() -> None:
+    """`to_mermaid` recurses too, same as `to_sexpr` above.
+
+    ``NESTING["of"]`` builds a flat `of` chain, which now collapses to edges
+    rather than boxes -- so the count to check is the `of`-labelled edges,
+    not a per-`of` box that no longer exists.
+    """
+    rendered = to_mermaid(parse(NESTING["of"](MAX_PARSE_DEPTH - 1)))
+    assert rendered.count('-- "of" -->') == MAX_PARSE_DEPTH - 1
 
 
 # ---------------------------------------------------------------------------

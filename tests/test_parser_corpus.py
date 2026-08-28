@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from bigfix_relevance_analyzer.nodes import to_sexpr
+from bigfix_relevance_analyzer.nodes import to_mermaid, to_sexpr
 from bigfix_relevance_analyzer.parser import ParseError, parse, try_parse
 from bigfix_relevance_analyzer.tokenizer import code_tokens
 
@@ -175,6 +175,16 @@ def test_corpus_serialization_is_deterministic_and_reparseable() -> None:
         second = to_sexpr(parse(case.source))
         assert first == second, case.id
         assert read_sexpr(first) is not None
+
+
+def test_corpus_mermaid_rendering_is_deterministic() -> None:
+    for case in corpus_cases():
+        if case.expected.startswith("ERROR"):
+            continue
+        first = to_mermaid(parse(case.source))
+        second = to_mermaid(parse(case.source))
+        assert first == second, case.id
+        assert first.startswith("flowchart TD\n"), case.id
 
 
 def test_try_parse_never_raises_on_corpus_inputs_or_their_truncations() -> None:

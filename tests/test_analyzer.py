@@ -6,12 +6,13 @@ parts that depend on it, and that broken input degrades instead of raising.
 """
 
 import json
+import re
 from pathlib import Path
 
 import pytest
 
 from bigfix_relevance_analyzer import RelevanceAnalysis, __version__, analyze_relevance
-from bigfix_relevance_analyzer.__main__ import main
+from bigfix_relevance_analyzer.__main__ import _cell, main
 from bigfix_relevance_analyzer.analyzer import analyze
 from bigfix_relevance_analyzer.binding import Binder
 from bigfix_relevance_analyzer.dialect import Dialect
@@ -40,6 +41,7 @@ def test_client_statement_reaches_every_analysis() -> None:
     assert report.valid
     assert report.parse_error is None
     assert report.sexpr is not None and report.sexpr.startswith("(exists ")
+    assert report.mermaid is not None and report.mermaid.startswith("flowchart TD\n")
     assert report.tree_depth > 1
     assert report.node_kinds["Whose"] == 1
 
@@ -157,6 +159,8 @@ def test_broken_input_degrades_instead_of_raising() -> None:
     assert (report.parse_error.line, report.parse_error.column) == (1, 13)
     assert report.node is None
     assert report.check is None
+    assert report.sexpr is None
+    assert report.mermaid is None
     assert report.references == ()
     assert report.levels == ()
     assert report.it_bindings == ()
@@ -177,13 +181,62 @@ def test_to_dict_is_json_serializable(text: str) -> None:
     assert ("types" in round_tripped) is (report.check is not None)
 
 
-def test_cli_prints_every_section(capsys: pytest.CaptureFixture[str]) -> None:
+def test_to_dict_omits_mermaid_unless_asked() -> None:
+    report = analyze(CLIENT)
+
+    assert "mermaid" not in report.to_dict()["parse"]
+    assert report.to_dict(mermaid=True)["parse"]["mermaid"] == report.mermaid
+
+
+def test_cli_json_adds_the_flowchart_only_when_asked(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--json", CLIENT]) == 0
+    assert "mermaid" not in json.loads(capsys.readouterr().out)["parse"]
+
+    assert main(["--json", "--mermaid", CLIENT]) == 0
+    assert "mermaid" in json.loads(capsys.readouterr().out)["parse"]
+
+
+def test_cli_prints_markdown_with_every_section(capsys: pytest.CaptureFixture[str]) -> None:
     assert main([CLIENT]) == 0
     out = capsys.readouterr().out
 
-    for section in ("dialect", "lexing", "parse", "types", "platforms", "complexity"):
-        assert f"== {section} " in out
-    assert "breakdown probes" in out
+    assert out.startswith("# Relevance Analysis\n")
+    assert f"```\n{CLIENT}\n```" in out
+    for section in ("Summary", "Lexing", "Parse tree", "Platforms", "Complexity"):
+        assert f"## {section}" in out
+    assert "## Breakdown probes" in out
+    # The summary table is a real Markdown table with a header separator.
+    assert "| | |\n|---|---|" in out
+    assert "| Name | Status | Returns | Platforms |" in out
+    # The flowchart is opt-in; the S-expression above it is not.
+    assert "```mermaid" not in out
+    assert "(exists (whose " in out
+
+
+def test_cli_adds_the_flowchart_only_when_asked(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--mermaid", CLIENT]) == 0
+    with_flag = capsys.readouterr().out
+
+    assert "```mermaid\nflowchart TD\n" in with_flag
+
+    assert main([CLIENT]) == 0
+    without_flag = capsys.readouterr().out
+
+    assert "```mermaid" not in without_flag
+    # The flag adds exactly the fenced diagram block and changes nothing else.
+    stripped = re.sub(r"```mermaid\n.*?\n```\n\n", "", with_flag, flags=re.DOTALL)
+    assert stripped == without_flag
+
+
+def test_cli_mermaid_block_is_deterministic_across_separate_runs(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    main([CLIENT])
+    first = capsys.readouterr().out
+    main([CLIENT])
+    second = capsys.readouterr().out
+
+    assert first == second
 
 
 def test_cli_reports_a_parse_failure_and_exits_nonzero(
@@ -192,11 +245,13 @@ def test_cli_reports_a_parse_failure_and_exits_nonzero(
     assert main([BROKEN]) == 1
     out = capsys.readouterr().out
 
-    assert "FAILED at line 1, column 13" in out
+    assert ":x: line 1, col 13: unterminated string literal" in out
+    assert "## Parse error" in out
+    assert "> Line 1, column 13: unterminated string literal" in out
     # Lexical metrics survive, so the complexity section is still printed.
-    assert "== complexity " in out
-    assert "error_tokens: 1" in out
-    assert "== types " not in out
+    assert "## Complexity" in out
+    assert "| error_tokens | 1 |" in out
+    assert "## Platforms" not in out
 
 
 def test_cli_json_matches_to_dict(capsys: pytest.CaptureFixture[str]) -> None:
@@ -227,12 +282,15 @@ def test_cli_treats_a_real_file_path_as_a_file_to_extract(
     assert main([str(BES_EXAMPLE)]) == 0
     out = capsys.readouterr().out
 
-    assert "2 relevance site(s)" in out
+    assert "2 relevance site(s) found." in out
+    assert "## Site 1:" in out and "## Site 2:" in out
     assert "names of current fixlets" in out
     assert "NOT in proxy agent context" in out
-    # Each site is analysed against the dialect extraction already determined.
-    assert out.count("effective:  session") == 1
-    assert out.count("effective:  client") == 1
+    # Each site is analysed against the dialect extraction already determined,
+    # and nests one heading level deeper than a standalone report.
+    assert out.count("| Dialect | `session`") == 1
+    assert out.count("| Dialect | `client`") == 1
+    assert "### Summary" in out
 
 
 def test_cli_json_for_a_file_carries_each_sites_own_dialect(
@@ -255,7 +313,7 @@ def test_cli_reports_a_file_with_no_relevance_sites(
     plain.write_text("just some notes, no relevance here\n")
 
     assert main([str(plain)]) == 0
-    assert "no relevance found" in capsys.readouterr().out
+    assert "No relevance found." in capsys.readouterr().out
 
 
 def test_cli_a_nonexistent_path_is_analysed_as_relevance_text(
@@ -269,7 +327,38 @@ def test_cli_a_nonexistent_path_is_analysed_as_relevance_text(
     out = capsys.readouterr().out
     assert missing in out
     assert "relevance site(s)" not in out
-    assert "FAILED" in out
+    assert ":x:" in out
+    assert "## Parse error" in out
+
+
+def test_cell_escapes_pipes_so_a_table_row_cannot_be_split() -> None:
+    # '|' is a real relevance operator (error fallback), so a source snippet
+    # placed in a table cell can legitimately contain one.
+    assert _cell("it | false") == "`it \\| false`"
+
+
+def test_cell_collapses_whitespace_and_truncates_long_context() -> None:
+    long_text = "a" * 100
+    assert _cell(f"line one\n   line two  {long_text}", max_len=20) == "`line one line two a...`"
+
+
+def test_cli_renders_a_valid_table_row_when_it_binding_context_has_a_pipe(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["1 of (it | false; it | true) whose (exists it)"]) == 0
+    out = capsys.readouterr().out
+
+    bindings_section = out.split("`it` bindings")[1].split("\n## ")[0]
+    binding_rows = [
+        line
+        for line in bindings_section.splitlines()
+        if line.startswith("| ") and "Location" not in line and "---" not in line
+    ]
+    assert binding_rows
+    for row in binding_rows:
+        # Splitting on unescaped '|' must yield exactly the table's own 3
+        # columns (plus the two empty edges from the leading/trailing '|').
+        assert len(row.replace("\\|", "").split("|")) == 5
 
 
 def test_cli_forced_dialect_overrides_every_site_in_a_file(
@@ -278,4 +367,4 @@ def test_cli_forced_dialect_overrides_every_site_in_a_file(
     assert main(["--dialect", "client", str(BES_EXAMPLE)]) == 0
     out = capsys.readouterr().out
 
-    assert out.count("effective:  client") == 2
+    assert out.count("| Dialect | `client`") == 2

@@ -46,7 +46,7 @@ from bigfix_relevance_analyzer.complexity import (
 )
 from bigfix_relevance_analyzer.complexity import analyze as analyze_complexity
 from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect, is_definite
-from bigfix_relevance_analyzer.nodes import Node, Reference, Span, to_sexpr
+from bigfix_relevance_analyzer.nodes import Node, Reference, Span, to_mermaid, to_sexpr
 from bigfix_relevance_analyzer.parser import ParseError, try_parse
 from bigfix_relevance_analyzer.tokenizer import Token, TokenKind, tokenize
 from bigfix_relevance_analyzer.typecheck import CheckResult, TypeEnvironment, check
@@ -338,6 +338,15 @@ class RelevanceAnalysis:
         return None if self.node is None else to_sexpr(self.node)
 
     @property
+    def mermaid(self) -> str | None:
+        """The tree as a Mermaid ``flowchart``, via
+        :func:`~bigfix_relevance_analyzer.nodes.to_mermaid` -- a real graph
+        of the parsed structure, not a description of one. ``None`` when it
+        did not parse.
+        """
+        return None if self.node is None else to_mermaid(self.node)
+
+    @property
     def platforms(self) -> frozenset[str]:
         """Client platforms the statement as a whole can run on.
 
@@ -369,12 +378,17 @@ class RelevanceAnalysis:
         """Occurrences of ``it`` with no context to bind to."""
         return tuple(entry for entry in self.it_bindings if entry.context is None)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self, *, mermaid: bool = False) -> dict[str, Any]:
         """The whole analysis as JSON-serializable plain data.
 
         For consumers across a wire -- an MCP server, a report file -- that
         cannot hold the node objects. Lossy by design: nodes become source
         text and S-expressions, enums become their values.
+
+        ``mermaid`` adds the parse tree's flowchart under ``parse.mermaid``.
+        Off by default for the same reason the CLI's ``--mermaid`` flag is
+        opt-in: a line per box and per edge dwarfs the rest of the payload on
+        a real statement, and the S-expression already carries the same tree.
         """
         report: dict[str, Any] = {
             "text": self.text,
@@ -412,6 +426,7 @@ class RelevanceAnalysis:
                     }
                 ),
                 "sexpr": self.sexpr,
+                **({"mermaid": self.mermaid} if mermaid else {}),
                 "node_count": len(self.nodes),
                 "tree_depth": self.tree_depth,
                 "node_kinds": self.node_kinds,

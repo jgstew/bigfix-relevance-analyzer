@@ -93,6 +93,7 @@ report = analyze_relevance(r'exists file "C:\foo.txt" whose (size of it > 100)')
 report.dialect  # Dialect.CLIENT  (report.dialect_assumed says if it was a guess)
 report.parsed  # True; report.parse_error is None
 report.sexpr  # '(exists (whose (ref "file" ...'
+report.mermaid  # 'flowchart TD\n    n0{{"exists"}}\n    n1{"whose"}\n...'
 report.check.value.types  # frozenset({'boolean'})
 report.platforms  # frozenset({'windows', 'macos', 'debian', 'rhel', 'ubuntu'})
 report.unknown_references  # () - every name resolved
@@ -116,6 +117,33 @@ is a client-only inspector - real evidence a text classifier can never use.
 `report.dialect_assumed` checks both: false the moment either one, or an
 explicit `dialect` argument, settles on one specific dialect.
 
+`report.mermaid` (`nodes.to_mermaid`) renders the same tree as a Mermaid
+`flowchart` instead of an S-expression - a real graph built by walking the
+parsed structure, not a 1:1 rendering of every node. `to_sexpr` already is
+that, in text; a diagram's job is to stay legible instead, so three things
+fold without losing information: an `of` chain becomes a chain of
+`--"of"-->` edges rather than a box per link (`Of` is right-associative, so
+it never branches - except an explicit `(a of b) of c`, which keeps its own
+`of` box, since collapsing it would be ambiguous with the un-parenthesized
+form); a `Reference`'s literal index folds into its own label (`key 0`,
+`firsts "\Sites\"`); an all-literal tuple/collection folds to one box. What
+used to be a `ref`/`str`/`num` label prefix is a node shape instead - a
+rectangle is a name, a stadium a literal, a hexagon an operator, a rhombus a
+branch point (`if`, `whose`). On a real 49-node statement this took the
+diagram to 24 boxes. Arrows point the way evaluation actually flows, not the
+way the tree nests - an object into the property read off it, a condition
+into `if` - so a long chain's true starting point (the innermost object)
+lands at the top, with the final result at the bottom; that is what makes
+`TD` read top-to-bottom as a flowchart instead of upside down. Following
+evaluation is also why an object routes *past* a `whose` to the collection it
+filters: `files whose (P) of folders` nests as `Of(Whose(files, P), folders)`,
+but nothing about the folders flows into the filter - the folders yield their
+files, and only then does `P` reduce them - so it draws as
+`folders --of--> files --collection--> whose`, with the reduced set flowing
+onward. The CLI embeds it as a fenced ` ```mermaid ` block,
+which GitHub, VS Code, and most Markdown viewers render
+inline.
+
 Analysis never raises on bad relevance. A statement that does not parse comes
 back with `parse_error` set, `parsed` false, and the tree-dependent fields
 empty; the dialect, the token stream with its error tokens positioned, and the
@@ -132,11 +160,20 @@ consumers across a wire.
 python -m bigfix_relevance_analyzer 'exists file "C:\foo.txt" whose (size of it > 100)'
 ```
 
-One section per analysis, or `--json` for `to_dict()` output. `--dialect
-client|session` forces the dialect and `--platform windows` narrows the lookups;
-with no argument the statement is read from stdin. The exit status is 1 when the
-statement does not parse, so a shell check can use it. This is the only part of
-the package that writes to stdout - importing the library still prints nothing.
+The default output is Markdown: a summary table up top, then one heading per
+analysis (Lexing, Parse tree, Platforms, Inspectors, `it` bindings, Breakdown
+probes, Complexity), with GitHub-flavored tables for the tabular sections and
+fenced code blocks for the statement source, the S-expression, and each
+breakdown probe - paste it straight into an issue or a PR comment. The
+S-expression is always there; the Mermaid flowchart is opt-in behind
+`--mermaid` in both output modes - Markdown and `--json`'s `to_dict()` (whose
+own `mermaid` parameter defaults to off the same way) - since it costs a line
+per box and per edge and on a real statement outweighs the rest of the report
+combined. `--dialect client|session` forces the dialect and `--platform
+windows` narrows the lookups; with no argument the statement is read from
+stdin. The exit status is 1 when the statement does not parse, so a shell
+check can use it. This is the only part of the package that writes to stdout
+- importing the library still prints nothing.
 
 When the argument is a path to a file that actually exists, it is run through
 `extract_relevance_from_file` first, and every relevance site found is analysed

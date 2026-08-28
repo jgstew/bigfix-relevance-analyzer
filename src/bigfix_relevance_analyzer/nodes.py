@@ -24,7 +24,8 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from typing import Final
+from itertools import count
+from typing import Final, NamedTuple
 
 __all__ = [
     "MAX_INTEGER",
@@ -47,6 +48,7 @@ __all__ = [
     "TupleExpr",
     "Unary",
     "Whose",
+    "to_mermaid",
     "to_sexpr",
 ]
 
@@ -373,3 +375,275 @@ def to_sexpr(node: Node) -> str:
             return f"(tuple {' '.join(to_sexpr(item) for item in items)})"
         case Collection(items=items):
             return f"(coll {' '.join(to_sexpr(item) for item in items)})"
+
+
+def _mermaid_escape(text: str) -> str:
+    """Make ``text`` safe inside a Mermaid node label: ``id["text"]``.
+
+    Collapses embedded whitespace first -- a string literal's raw content can
+    contain a newline, which would otherwise split one node's definition
+    across lines -- then escapes the characters Mermaid's own label syntax
+    treats specially, using Mermaid's ``#<decimal>;`` numeric-character-
+    reference convention (``#34;`` for ``"``), not HTML's ``&name;`` one.
+
+    That distinction is not cosmetic. This same escaped text ends up in two
+    different places: a plain-text ` ```mermaid ` fence (the CLI's Markdown
+    output), and inside a real ``<pre class="mermaid">`` element in an HTML
+    page (an Artifact). A browser HTML-decodes ``&quot;`` back into a literal
+    ``"`` *before* Mermaid ever reads the element's text -- so HTML-style
+    escaping silently corrupts the diagram the moment it is embedded in HTML,
+    even though the same text is fine in a plain fence. ``#34;`` contains no
+    ``&``, so no HTML parser touches it either way, and Mermaid decodes it
+    identically in both contexts. Confirmed against a real Mermaid render,
+    not just inferred from the spec.
+    """
+    collapsed = " ".join(text.split())
+    return (
+        collapsed.replace("&", "#38;")
+        .replace('"', "#34;")
+        .replace("<", "#60;")
+        .replace(">", "#62;")
+    )
+
+
+_MERMAID_SHAPES: dict[str, tuple[str, str]] = {
+    # Shape carries what a ``ref``/``str``/``num`` label prefix used to: which
+    # kind of thing a box is, at a glance, without spending label text on it.
+    "rectangle": ('["', '"]'),  # a name: Reference
+    "stadium": ('(["', '"])'),  # a literal value: NumberLiteral, StringLiteral
+    "rounded": ('("', '")'),  # the closure variable: It
+    "hexagon": ('{{"', '"}}'),  # an operator/transform: Binary, Unary, Bar,
+    # Cast, Exists, NumberOf, ItemOf, and an explicit (non-collapsed) Of
+    "rhombus": ('{"', '"}'),  # a branch point: If, Whose
+    "subroutine": ('[["', '"]]'),  # a fixed group: TupleExpr, Collection
+}
+
+
+class _Rendered(NamedTuple):
+    """One rendered sub-expression: what flows out of it, and what flows in.
+
+    Two ids rather than one, because for a filtered collection they differ.
+    ``files whose (P) of folders`` nests as ``Of(Whose(files, P), folders)``,
+    since ``whose`` binds tighter than ``of`` -- but that nesting is not the
+    evaluation order. What actually happens is: the folders yield their
+    files, *then* ``P`` reduces them. So the incoming object has to reach
+    ``files``, not the ``whose`` that wraps it, while the value flowing
+    onward is the filtered result at the ``whose``.
+    """
+
+    result: str
+    """The node id this expression's value flows out of."""
+
+    sink: str
+    """The node id an incoming ``of`` object should flow into.
+
+    The same as :attr:`result` for everything except :class:`Whose`, which
+    passes it through to whatever it filters -- recursively, so a chained
+    ``x whose (a) whose (b)`` still routes an object all the way to ``x``.
+    """
+
+
+def _plain(node_id: str) -> _Rendered:
+    """A node an incoming object attaches to directly: everything but ``whose``."""
+    return _Rendered(result=node_id, sink=node_id)
+
+
+def _literal_text(node: Node) -> str | None:
+    """The label for ``node`` if it is a literal, else ``None``.
+
+    A number renders bare; a string keeps quotes, so ``key 0`` and ``key
+    "0"`` -- a real distinction in relevance -- still read differently once
+    folded into a single box. Shared by both the literal-index fold on
+    :class:`Reference` and the all-literal fold on :class:`TupleExpr` /
+    :class:`Collection`, so the two stay rendered the same way.
+    """
+    match node:
+        case NumberLiteral(text=text):
+            return text
+        case StringLiteral():
+            return f'"{node.content}"'
+        case _:
+            return None
+
+
+def to_mermaid(node: Node) -> str:
+    """Render a tree as a Mermaid ``flowchart`` -- a real graph, not prose.
+
+    Walks the actual parsed tree and emits one line per node and edge from
+    that structure, the same way :func:`to_sexpr` does -- nothing here is
+    approximated or hand-drawn. Node ids are a plain sequential counter
+    (``n0``, ``n1``, ...) assigned during one fixed depth-first walk, the
+    same field order :func:`to_sexpr` uses; a side effect of that -- not the
+    point of it -- is that the same tree always renders identically.
+
+    Unlike :func:`to_sexpr`, this is not a 1:1 rendering of every node --
+    that reads as scaffolding once a chain gets long, and the point of a
+    *diagram* is to be legible, not exhaustively faithful; :func:`to_sexpr`
+    already is that, in text. Three things fold, none of them losing
+    information:
+
+    * An ``Of`` chain is linear, because ``Of`` is right-associative -- ``a
+      of b of c`` is ``a of (b of c)``, never a branch -- so it draws as
+      ``a -- "of" --> b -- "of" --> c`` instead of three ``of`` boxes plus
+      three leaves. The one case that is *not* this shape, an explicitly
+      parenthesized ``(a of b) of c``, keeps its own ``of`` box, since
+      collapsing it would hang two ``of`` edges off ``a`` and read as the
+      chain it is not.
+    * A :class:`Reference`'s index folds into its own label when the index
+      is a literal (``key 0``, ``firsts "\\Sites\\"``) -- a name and a
+      constant read as one term. A non-literal index (``file (pathname of
+      it)``) keeps its separate box; that genuinely is a sub-expression.
+    * A :class:`TupleExpr` / :class:`Collection` whose members are all
+      literals folds to one box listing them, instead of one box per member
+      of what is really a single value (a set of extensions, a list of
+      paths).
+
+    What used to be a label prefix (``ref``, ``str``, ``num``) is now a node
+    shape instead, so a folded label still reads like source: a rectangle is
+    a name, a stadium a literal, a hexagon an operator or transform, a
+    rhombus a branch point (``if``, ``whose``), a subroutine box a fixed
+    group. No truncation and no size limit otherwise -- a large tree still
+    makes a large diagram, just a smaller one than before.
+
+    Laid out top-down (``TD``), and arrows point the way evaluation actually
+    flows, not the way the tree nests. ``Of``'s object has to resolve before
+    its property can be read off it -- relevance itself reads right-to-left,
+    the same right-associativity above -- so an edge is drawn from the
+    operand *to* the thing that consumes it (object into property, condition
+    into ``if``, items into a tuple), never the reverse. The practical
+    consequence: a long chain's ultimate starting point -- the innermost
+    object, e.g. a bare path at the end of a long ``of`` chain -- lands at
+    the *top* of the diagram, with the final result at the bottom, which is
+    what makes ``TD`` read as a flowchart rather than upside down. (``TD``
+    itself is still the right call over a left/right layout for the reason
+    given above: a deep tree stays legible top-down in a way it would not
+    running off the side.)
+
+    Following evaluation rather than nesting is also why an object routes
+    *past* a ``whose`` to the collection it filters. ``files whose (P) of
+    folders`` nests as ``Of(Whose(files, P), folders)``, but nothing about
+    the folders flows into the filter: the folders yield their files, and
+    only then does ``P`` reduce them. So the diagram draws ``folders --of-->
+    files --collection--> whose``, and it is the ``whose`` -- the reduced
+    set -- that flows onward. See :class:`_Rendered`.
+    """
+    lines = ["flowchart TD"]
+    counter = count()
+
+    def emit(label: str, shape: str = "rectangle") -> str:
+        node_id = f"n{next(counter)}"
+        opening, closing = _MERMAID_SHAPES[shape]
+        lines.append(f"    {node_id}{opening}{_mermaid_escape(label)}{closing}")
+        return node_id
+
+    def edge(consumer: str, operand: str, label: str | None = None) -> None:
+        # Drawn operand -> consumer, not consumer -> operand: the arrow is
+        # evaluation flow (what feeds what), which runs opposite the tree's
+        # own parent/child direction. See the flow-direction paragraph above.
+        arrow = f'-- "{_mermaid_escape(label)}" -->' if label else "-->"
+        lines.append(f"    {operand} {arrow} {consumer}")
+
+    def literal_group(items: tuple[Node, ...]) -> str | None:
+        """The folded label for an all-literal tuple/collection, else None."""
+        texts = [_literal_text(item) for item in items]
+        if any(text is None for text in texts):
+            return None
+        return "; ".join(text for text in texts if text is not None)
+
+    def walk(node: Node) -> _Rendered:
+        match node:
+            case NumberLiteral(text=text):
+                return _plain(emit(text, "stadium"))
+            case StringLiteral():
+                return _plain(emit(f'"{node.content}"', "stadium"))
+            case It():
+                return _plain(emit("it", "rounded"))
+            case Reference(phrase=phrase, index=None):
+                return _plain(emit(phrase))
+            case Reference(phrase=phrase, index=index):
+                assert index is not None
+                literal = _literal_text(index)
+                if literal is not None:
+                    return _plain(emit(f"{phrase} {literal}"))
+                me = emit(phrase)
+                edge(me, walk(index).result, "index")
+                return _plain(me)
+            case Of(prop=prop, obj=obj) if isinstance(prop, Of):
+                # An explicit (a of b) of c: collapsing would hang two `of`
+                # edges off `a`, which is the shape of `a of b of c` instead.
+                me = emit("of", "hexagon")
+                edge(me, walk(prop).result, "prop")
+                edge(me, walk(obj).result, "obj")
+                return _plain(me)
+            case Of(prop=prop, obj=obj):
+                # The object flows into the property's *sink*, which is the
+                # property itself unless a `whose` wraps it -- see _Rendered.
+                rendered_prop = walk(prop)
+                rendered_obj = walk(obj)
+                edge(rendered_prop.sink, rendered_obj.result, "of")
+                return _Rendered(result=rendered_prop.result, sink=rendered_obj.sink)
+            case ItemOf(index=index, operand=operand):
+                me = emit("item of", "hexagon")
+                edge(me, walk(index).result, "index")
+                edge(me, walk(operand).result, "of")
+                return _plain(me)
+            case NumberOf(operand=operand):
+                me = emit("number of", "hexagon")
+                edge(me, walk(operand).result)
+                return _plain(me)
+            case Bar(left=left, right=right):
+                me = emit("|", "hexagon")
+                edge(me, walk(left).result)
+                edge(me, walk(right).result)
+                return _plain(me)
+            case Binary(op=op, left=left, right=right):
+                me = emit(op, "hexagon")
+                edge(me, walk(left).result)
+                edge(me, walk(right).result)
+                return _plain(me)
+            case Unary(op=op, operand=operand):
+                me = emit(op, "hexagon")
+                edge(me, walk(operand).result)
+                return _plain(me)
+            case Exists(negated=negated, operand=operand):
+                me = emit("not exists" if negated else "exists", "hexagon")
+                edge(me, walk(operand).result)
+                return _plain(me)
+            case Whose(collection=collection, predicate=predicate):
+                # The filtered collection flows *through* here: an object
+                # arriving from an enclosing `of` belongs to what is being
+                # filtered, so this passes that collection's sink onward.
+                me = emit("whose", "rhombus")
+                rendered_collection = walk(collection)
+                edge(me, rendered_collection.result, "collection")
+                edge(me, walk(predicate).result, "predicate")
+                return _Rendered(result=me, sink=rendered_collection.sink)
+            case Cast(operand=operand, target=target):
+                me = emit(f"as {target}", "hexagon")
+                edge(me, walk(operand).result)
+                return _plain(me)
+            case If(condition=condition, then_branch=then_branch, else_branch=else_branch):
+                me = emit("if", "rhombus")
+                edge(me, walk(condition).result, "condition")
+                edge(me, walk(then_branch).result, "then")
+                edge(me, walk(else_branch).result, "else")
+                return _plain(me)
+            case TupleExpr(items=items):
+                group = literal_group(items)
+                if group is not None:
+                    return _plain(emit(group, "subroutine"))
+                me = emit("tuple", "subroutine")
+                for item in items:
+                    edge(me, walk(item).result)
+                return _plain(me)
+            case Collection(items=items):
+                group = literal_group(items)
+                if group is not None:
+                    return _plain(emit(group, "subroutine"))
+                me = emit(";", "subroutine")
+                for item in items:
+                    edge(me, walk(item).result)
+                return _plain(me)
+
+    walk(node)
+    return "\n".join(lines)

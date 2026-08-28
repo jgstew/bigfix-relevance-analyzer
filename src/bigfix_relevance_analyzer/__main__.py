@@ -2,7 +2,13 @@
 
     python -m bigfix_relevance_analyzer 'exists file "C:\\foo.txt"'
     echo 'names of processes' | python -m bigfix_relevance_analyzer --json
+    python -m bigfix_relevance_analyzer --mermaid 'names of files of folder "/tmp"'
     python -m bigfix_relevance_analyzer MyFixlet.bes
+
+The parse tree's Mermaid flowchart is behind ``--mermaid`` in both output
+modes -- Markdown and ``--json`` -- because it costs a line per box and per
+edge, which on a real statement outweighs every other section combined, and
+the S-expression right beside it already says the same thing in one line.
 
 The last form is not relevance itself -- it is a path to a real file. When the
 sole argument names one that exists, it is run through
@@ -36,164 +42,242 @@ from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 from bigfix_relevance_analyzer.extract import RelevanceSite, extract_relevance_from_file
 from bigfix_relevance_analyzer.typecheck import Plurality
 
-_WIDTH = 62
+
+def _heading(level: int, text: str) -> str:
+    return f"{'#' * level} {text}"
 
 
-def _section(title: str) -> None:
-    print(f"\n== {title} " + "=" * max(3, _WIDTH - len(title)))
+def _cell(text: str, *, max_len: int = 72) -> str:
+    """Render arbitrary text as a table cell: collapsed, truncated, escaped.
+
+    Relevance source is table-hostile in two ways a fixed value never is: it
+    can run to hundreds of characters (a `whose` context can be the entire
+    outer expression), and `|` is a real operator (error fallback) that would
+    otherwise be read as a column break -- even inside the code span this
+    wraps it in, which is a GFM quirk, not an oversight. Collapsing whitespace
+    also flattens a source snippet's own embedded newlines onto one line.
+    """
+    collapsed = " ".join(text.split())
+    if len(collapsed) > max_len:
+        collapsed = collapsed[: max_len - 1] + "..."
+    return f"`{collapsed.replace('|', chr(92) + '|')}`"
 
 
-def _render_dialect(report: RelevanceAnalysis) -> None:
-    _section("dialect")
-    classified = report.classified_dialect
-    print(f"classified: {classified.value if classified else 'undetermined (text markers only)'}")
+def _fence(text: str, *, lang: str = "") -> list[str]:
+    return [f"```{lang}", text, "```"]
+
+
+def _dialect_summary(report: RelevanceAnalysis) -> str:
+    if report.dialect_assumed:
+        return f"`{report.dialect.value}` - assumed, nothing settles it"
+    return f"`{report.dialect.value}`"
+
+
+def _render_summary(report: RelevanceAnalysis, level: int) -> list[str]:
+    lines = [_heading(level, "Summary"), "", "| | |", "|---|---|"]
+    lines.append(f"| Dialect | {_dialect_summary(report)} |")
     if report.parsed:
-        resolved = report.resolved_dialect
-        rendered = resolved.value if resolved else "undetermined (no reference settles it)"
-        print(f"resolved:   {rendered}")
-    if report.requested_dialect is not None:
-        print(f"requested:  {report.requested_dialect.value}")
-    suffix = (
-        "  (assumed -- nothing settles it, not even resolved references)"
-        if report.dialect_assumed
-        else ""
-    )
-    print(f"effective:  {report.dialect.value}{suffix}")
-
-
-def _render_lexing(report: RelevanceAnalysis) -> None:
-    _section("lexing")
-    print(f"{len(report.code_tokens)} code tokens of {len(report.tokens)}: {report.token_kinds}")
-    for token in report.error_tokens:
-        print(f"  ERROR token {token.text!r} at line {token.line}, column {token.column}")
-
-
-def _render_parse(report: RelevanceAnalysis) -> None:
-    _section("parse")
-    if report.parse_error is not None:
-        error = report.parse_error
-        print(f"FAILED at line {error.line}, column {error.column}: {error.message}")
-        return
-    print(f"ok: {len(report.nodes)} nodes, tree depth {report.tree_depth}")
-    print(f"kinds: {report.node_kinds}")
-    print(f"sexpr: {report.sexpr}")
-
-
-def _render_types(report: RelevanceAnalysis) -> None:
-    checked = report.check
-    if checked is None:
-        return
-    _section("types")
-    types = checked.value.types
-    plurality = checked.value.plurality
-    if types is None:
-        rendered = "unknown -- no table entry settles it"
-    elif not types:
-        rendered = "none -- every candidate was ruled out"
+        parsed = f"{len(report.nodes)} nodes, tree depth {report.tree_depth}"
+        lines.append(f"| Parse | :white_check_mark: ok - {parsed} |")
     else:
-        # The engine's own diagnostics word this pair as '{plurality} {type}'.
-        prefix = "" if plurality is Plurality.UNKNOWN else f"{plurality.value} "
-        rendered = prefix + " or ".join(sorted(types))
-    print(f"evaluates to: {rendered}")
-    if not checked.diagnostics:
-        print("diagnostics: none")
-    for diagnostic in checked.diagnostics:
-        where = f"line {diagnostic.span.line}, col {diagnostic.span.column}"
-        print(f"  [{diagnostic.code}] {where}: {diagnostic.message}")
+        assert report.parse_error is not None
+        error = report.parse_error
+        lines.append(f"| Parse | :x: line {error.line}, col {error.column}: {error.message} |")
+    if report.check is not None:
+        types = report.check.value.types
+        plurality = report.check.value.plurality
+        if types is None:
+            rendered = "unknown"
+        elif not types:
+            rendered = "none"
+        else:
+            prefix = "" if plurality is Plurality.UNKNOWN else f"{plurality.value} "
+            rendered = prefix + " or ".join(sorted(types))
+        lines.append(f"| Type | {rendered} |")
+    if report.dialect is Dialect.CLIENT and report.parsed:
+        lines.append(
+            f"| Platforms | {len(report.platforms)}/{len(report.environment.universe)} viable |"
+        )
+    lines.append(f"| Complexity score | {report.complexity.score:.3g} |")
+    if report.complexity.evaluation_cost:
+        lines.append(f"| Evaluation cost | {report.complexity.evaluation_cost:.3g} |")
+    lines.append("")
+    return lines
 
 
-def _render_platforms(report: RelevanceAnalysis) -> None:
-    _section("platforms")
+def _render_lexing(report: RelevanceAnalysis, level: int) -> list[str]:
+    lines = [_heading(level, "Lexing"), ""]
+    lines.append(f"- {len(report.code_tokens)} code tokens of {len(report.tokens)} total")
+    lines.append(f"- by kind: {_cell(str(report.token_kinds), max_len=200)}")
+    for token in report.error_tokens:
+        lines.append(
+            f"- :warning: ERROR token {_cell(token.text)} at line {token.line}, col {token.column}"
+        )
+    lines.append("")
+    return lines
+
+
+def _render_parse(report: RelevanceAnalysis, level: int, *, mermaid: bool) -> list[str]:
+    lines = [_heading(level, "Parse tree"), ""]
+    lines.append(f"- {len(report.nodes)} nodes, tree depth {report.tree_depth} of {200} max")
+    lines.append(f"- node kinds: {_cell(str(report.node_kinds), max_len=200)}")
+    lines.append("")
+    assert report.sexpr is not None
+    lines.extend(_fence(report.sexpr))
+    lines.append("")
+    # Opt-in: the diagram is one line per box and per edge, so it outweighs
+    # every other section combined on anything but a small statement.
+    if mermaid:
+        assert report.mermaid is not None
+        lines.extend(_fence(report.mermaid, lang="mermaid"))
+        lines.append("")
+    return lines
+
+
+def _render_platforms(report: RelevanceAnalysis, level: int) -> list[str]:
+    lines = [_heading(level, "Platforms"), ""]
     if report.dialect is not Dialect.CLIENT:
-        print("not an axis: session relevance runs on the server, not an endpoint")
-        return
-    print(f"viable:  {', '.join(sorted(report.platforms)) or 'none reported'}")
-    print(f"missing: {', '.join(sorted(report.missing_platforms)) or 'none'}")
-    print("note:    tables only -- a platform absent from the dumps is not proven unsupported")
+        lines.append("Not an axis: session relevance runs on the server, not an endpoint.")
+        lines.append("")
+        return lines
+    viable = sorted(report.platforms)
+    missing = sorted(report.missing_platforms)
+    lines.append(f"- **Viable:** {', '.join(viable) or 'none reported'}")
+    lines.append(f"- **Missing:** {', '.join(missing) or 'none'}")
+    lines.append("- _Tables only - a platform absent from the dumps is not proven unsupported._")
+    lines.append("")
+    return lines
 
 
-def _render_inspectors(report: RelevanceAnalysis) -> None:
-    _section("inspectors")
+def _render_inspectors(report: RelevanceAnalysis, level: int) -> list[str]:
+    lines = [_heading(level, "Inspectors"), ""]
     if not report.references:
-        print("no names to resolve")
+        lines.append("No names to resolve.")
+        lines.append("")
+        return lines
+    lines.append("| Name | Status | Returns | Platforms |")
+    lines.append("|---|---|---|---|")
     for entry in report.references:
         if entry.visible:
-            mark = "ok"
+            status = ":white_check_mark: ok"
         elif entry.known:
-            mark = "??"  # real, but not reachable in this dialect or platform
+            status = ":warning: not visible here"
         else:
-            mark = "!!"
-        print(f"{mark} {entry.phrase!r} -> {', '.join(entry.return_types) or 'unknown'}")
-        for signature in sorted({row.signature for row in entry.resolved}):
-            print(f"     {signature}")
-        visible_platforms = entry.platforms & report.environment.universe
-        if visible_platforms:
-            print(f"     platforms: {', '.join(sorted(visible_platforms))}")
-        if entry.known and not entry.visible:
-            print(f"     not visible as {report.dialect.value} relevance here")
+            status = ":x: unknown"
+        platforms = ", ".join(sorted(entry.platforms & report.environment.universe))
+        returns = ", ".join(entry.return_types) or "-"
+        lines.append(f"| `{entry.phrase}` | {status} | {returns} | {platforms or '-'} |")
+    lines.append("")
     if report.unknown_references:
-        print(f"unknown to every dump: {', '.join(report.unknown_references)}")
+        lines.append(f"**Unknown to every dump:** {', '.join(report.unknown_references)}")
+        lines.append("")
+    return lines
 
 
-def _render_bindings(report: RelevanceAnalysis) -> None:
-    _section("it bindings")
+def _render_bindings(report: RelevanceAnalysis, level: int) -> list[str]:
+    lines = [_heading(level, "`it` bindings"), ""]
     if not report.it_bindings:
-        print("none")
+        lines.append("None.")
+        lines.append("")
+        return lines
+    lines.append("| Location | Binder | Bound to |")
+    lines.append("|---|---|---|")
     for entry in report.it_bindings:
-        where = f"line {entry.it.span.line}, col {entry.it.span.column}"
+        where = f"{entry.it.span.line}:{entry.it.span.column}"
         if entry.context is None:
-            print(f"{where}: UNBOUND -- 'it' used with no context")
+            lines.append(f"| {where} | - | :warning: **UNBOUND** - used with no context |")
             continue
         context = report.text[entry.context.span.start : entry.context.span.end]
         binder = entry.binder.value if entry.binder else "?"
-        print(f"{where}: bound by {binder} to {context!r}")
+        lines.append(f"| {where} | {binder} | {_cell(context)} |")
+    lines.append("")
+    return lines
 
 
-def _render_levels(report: RelevanceAnalysis) -> None:
-    _section("breakdown probes")
+def _render_levels(report: RelevanceAnalysis, level: int) -> list[str]:
+    lines = [_heading(level, "Breakdown probes"), ""]
     if not report.levels:
-        print("no measurable levels")
-    for level in report.levels:
-        print(f"level: {level.label}")
-        print(f"  {level.probe.relevance}")
-        if level.unfiltered is not None:
-            print(f"  unfiltered: {level.unfiltered.relevance}")
+        lines.append("No measurable levels.")
+        lines.append("")
+        return lines
+    for index, probe_level in enumerate(report.levels, 1):
+        lines.append(f"{index}. **{_cell(probe_level.label, max_len=88)}**")
+        lines.extend(f"   {line}" for line in _fence(probe_level.probe.relevance))
+        if probe_level.unfiltered is not None:
+            lines.append("   unfiltered:")
+            lines.extend(f"   {line}" for line in _fence(probe_level.unfiltered.relevance))
+    lines.append("")
+    return lines
 
 
-def _render_complexity(report: RelevanceAnalysis) -> None:
+def _render_complexity(report: RelevanceAnalysis, level: int) -> list[str]:
     metrics = report.complexity
-    _section("complexity")
-    print(f"score: {metrics.score:.3g}   evaluation cost: {metrics.evaluation_cost:.3g}")
-    # Only the non-zero counts: a metric a statement does not exercise says
-    # nothing, and printing thirty zeroes buries the handful that do.
-    for field in dataclasses.fields(metrics):
-        value = getattr(metrics, field.name)
-        if value and field.name not in {"evaluation_cost", "costly_inspectors"}:
-            print(f"  {field.name}: {value}")
+    lines = [_heading(level, "Complexity"), ""]
+    lines.append(
+        f"Score **{metrics.score:.3g}**, evaluation cost **{metrics.evaluation_cost:.3g}**."
+    )
+    lines.append("")
+    nonzero = [
+        (field.name, getattr(metrics, field.name))
+        for field in dataclasses.fields(metrics)
+        if field.name not in {"evaluation_cost", "costly_inspectors"}
+        and getattr(metrics, field.name)
+    ]
+    if nonzero:
+        lines.append("| Metric | Value |")
+        lines.append("|---|---|")
+        # Only the non-zero counts: a metric a statement does not exercise
+        # says nothing, and printing thirty zeroes buries the ones that do.
+        lines.extend(f"| {name} | {value} |" for name, value in nonzero)
+        lines.append("")
     for rule in report.cost_rules:
-        print(f"  cost rule: {rule.label} (+{rule.cost_for(report.dialect):.3g}) -- {rule.why}")
+        cost = rule.cost_for(report.dialect)
+        lines.append(f"- **{rule.label}** (+{cost:.3g}) - {rule.why}")
+    if report.cost_rules:
+        lines.append("")
+    return lines
 
 
-def render(report: RelevanceAnalysis, *, heading: str | None = None) -> None:
-    """Print the whole analysis. Tree-dependent sections are skipped when the
-    statement did not parse, since there is nothing to report in them.
+def render(
+    report: RelevanceAnalysis,
+    *,
+    level: int = 1,
+    heading: str | None = None,
+    mermaid: bool = False,
+) -> str:
+    """Render the whole analysis as Markdown. Returns the text; prints nothing.
 
-    ``heading`` replaces the plain ``input`` section title -- used for a site
-    pulled out of a file, so its origin (kind, line, context) prints alongside
-    the text rather than only the text itself.
+    ``level`` is the heading depth for this report's own title (``#`` by
+    default); every section below it nests one level deeper, so a report
+    embedded under a file's per-site heading still forms a coherent outline.
+    Tree-dependent sections are skipped when the statement did not parse,
+    since there is nothing to report in them.
+
+    ``mermaid`` adds the parse tree's flowchart to the parse section. Off by
+    default because it costs a line per box and per edge, which on a real
+    statement outweighs the whole rest of the report; the S-expression right
+    above it already says the same thing in one line.
     """
-    _section(heading or "input")
-    print(report.text)
-    _render_dialect(report)
-    _render_lexing(report)
-    _render_parse(report)
+    lines = [_heading(level, heading or "Relevance Analysis"), ""]
+    lines.extend(_fence(report.text))
+    lines.append("")
+    lines.extend(_render_summary(report, level + 1))
+    lines.extend(_render_lexing(report, level + 1))
     if report.parsed:
-        _render_types(report)
-        _render_platforms(report)
-        _render_inspectors(report)
-        _render_bindings(report)
-        _render_levels(report)
-    _render_complexity(report)
+        lines.extend(_render_parse(report, level + 1, mermaid=mermaid))
+        lines.extend(_render_platforms(report, level + 1))
+        lines.extend(_render_inspectors(report, level + 1))
+        lines.extend(_render_bindings(report, level + 1))
+        lines.extend(_render_levels(report, level + 1))
+    else:
+        assert report.parse_error is not None
+        lines.append(_heading(level + 1, "Parse error"))
+        lines.append("")
+        error = report.parse_error
+        lines.append(f"> Line {error.line}, column {error.column}: {error.message}")
+        lines.append("")
+    lines.extend(_render_complexity(report, level + 1))
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def _site_heading(site: RelevanceSite) -> str:
@@ -213,14 +297,21 @@ def _analyze_site(
     return analyze(site.text, dialect, platform)
 
 
-def _run_file(path: Path, forced: Dialect | None, platform: str | None, *, as_json: bool) -> int:
+def _run_file(
+    path: Path,
+    forced: Dialect | None,
+    platform: str | None,
+    *,
+    as_json: bool,
+    mermaid: bool,
+) -> int:
     sites = extract_relevance_from_file(path)
     if not sites:
         if as_json:
             json.dump({"file": str(path), "sites": []}, sys.stdout, indent=2)
             print()
         else:
-            print(f"no relevance found in {path}")
+            print(f"# Relevance Analysis: {path}\n\nNo relevance found.")
         return 0
 
     reports = [(site, _analyze_site(site, forced, platform)) for site in sites]
@@ -234,7 +325,7 @@ def _run_file(path: Path, forced: Dialect | None, platform: str | None, *, as_js
                         "line": site.line,
                         "context": site.context,
                         "site_dialect": site.dialect.value,
-                        "analysis": report.to_dict(),
+                        "analysis": report.to_dict(mermaid=mermaid),
                     }
                     for site, report in reports
                 ],
@@ -244,9 +335,11 @@ def _run_file(path: Path, forced: Dialect | None, platform: str | None, *, as_js
         )
         print()
     else:
-        print(f"{len(sites)} relevance site(s) in {path}")
-        for site, report in reports:
-            render(report, heading=_site_heading(site))
+        print(f"# Relevance Analysis: {path}\n")
+        print(f"{len(sites)} relevance site(s) found.\n")
+        for index, (site, report) in enumerate(reports, 1):
+            heading = f"Site {index}: {_site_heading(site)}"
+            print(render(report, level=2, heading=heading, mermaid=mermaid))
     return 0 if all(report.parsed for _site, report in reports) else 1
 
 
@@ -270,6 +363,11 @@ def main(argv: list[str] | None = None) -> int:
         help="force the dialect instead of classifying it (or trusting extraction)",
     )
     parser.add_argument("--platform", help="narrow client lookups to one platform, e.g. windows")
+    parser.add_argument(
+        "--mermaid",
+        action="store_true",
+        help="add the parse tree as a Mermaid flowchart (verbose: a line per box and edge)",
+    )
     parser.add_argument("--json", action="store_true", help="emit the analysis as JSON")
     args = parser.parse_args(argv)
     forced = Dialect(args.dialect) if args.dialect else None
@@ -284,7 +382,9 @@ def main(argv: list[str] | None = None) -> int:
             # as such rather than letting the OSError escape.
             is_file = False
         if is_file:
-            return _run_file(candidate, forced, args.platform, as_json=args.json)
+            return _run_file(
+                candidate, forced, args.platform, as_json=args.json, mermaid=args.mermaid
+            )
         text = args.relevance.strip()
     else:
         text = sys.stdin.read().strip()
@@ -294,10 +394,10 @@ def main(argv: list[str] | None = None) -> int:
 
     report = analyze(text, forced, args.platform)
     if args.json:
-        json.dump(report.to_dict(), sys.stdout, indent=2)
+        json.dump(report.to_dict(mermaid=args.mermaid), sys.stdout, indent=2)
         print()
     else:
-        render(report)
+        print(render(report, mermaid=args.mermaid), end="")
     # Unparsable input is a finding, not a crash, but a hook wants to know.
     return 0 if report.parsed else 1
 
