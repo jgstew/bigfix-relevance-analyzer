@@ -105,6 +105,17 @@ Pass the `dialect` extraction already worked out rather than having it guessed
 again from a fragment, and `platform` to narrow client lookups to one platform:
 `analyze_relevance(site.text, site.dialect, platform="windows")`.
 
+`classify_relevance_dialect` runs on raw text before parsing and is deliberately
+blind to common English words like `file` - too collision-prone in unparsed
+prose to trust, per its own docstring. Once the statement has parsed,
+`report.resolved_dialect` fills that gap from the other direction: the
+intersection, across every resolved `Reference`, of the dialects its table rows
+are actually defined in. `files of folder "C:\Windows"` classifies as
+`None` (no text marker fires) but resolves as `Dialect.CLIENT`, because `files`
+is a client-only inspector - real evidence a text classifier can never use.
+`report.dialect_assumed` checks both: false the moment either one, or an
+explicit `dialect` argument, settles on one specific dialect.
+
 Analysis never raises on bad relevance. A statement that does not parse comes
 back with `parse_error` set, `parsed` false, and the tree-dependent fields
 empty; the dialect, the token stream with its error tokens positioned, and the

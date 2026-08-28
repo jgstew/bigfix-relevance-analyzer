@@ -81,10 +81,49 @@ def test_session_statement_is_classified_and_has_no_platform_axis() -> None:
 
 
 def test_dialect_is_assumed_only_when_nothing_settles_it() -> None:
-    assert analyze(CLIENT).dialect_assumed
-    assert analyze(CLIENT).dialect is Dialect.CLIENT
-    assert not analyze(CLIENT, Dialect.CLIENT).dialect_assumed
+    # CLIENT is deliberately not used here any more: it contains 'file', which
+    # resolves client-only and so settles resolved_dialect on its own -- see
+    # test_resolved_dialect_settles_what_the_text_classifier_cannot below.
+    both_dialects = "size of it"
+    assert analyze(both_dialects).dialect_assumed
+    assert analyze(both_dialects).dialect is Dialect.CLIENT
+    assert not analyze(both_dialects, Dialect.CLIENT).dialect_assumed
     assert not analyze(SESSION).dialect_assumed
+    assert not analyze(CLIENT).dialect_assumed  # settled by resolved_dialect instead
+
+
+def test_resolved_dialect_settles_what_the_text_classifier_cannot() -> None:
+    # 'files'/'folders' are excluded from the text classifier's marker list on
+    # purpose (too collision-prone in prose), but they resolve as client-only
+    # inspectors, so a parsed reference to them is real, unambiguous evidence.
+    report = analyze('files of folder "C:\\Windows"')
+
+    assert report.classified_dialect is None  # the text classifier has no opinion
+    assert report.resolved_dialect is Dialect.CLIENT  # but every reference does
+    assert not report.dialect_assumed
+    assert report.dialect is Dialect.CLIENT
+
+
+def test_resolved_dialect_is_both_when_every_reference_supports_both() -> None:
+    report = analyze("names of it of properties")
+
+    assert report.resolved_dialect is Dialect.BOTH
+    # BOTH does not settle which one this actually is, so it still counts as
+    # an assumption -- unlike a definite CLIENT or SESSION verdict.
+    assert report.dialect_assumed
+
+
+def test_resolved_dialect_is_uncertain_when_references_contradict() -> None:
+    # 'files' is client-only; 'current fixlet' is session-only (a Web Reports
+    # marker). No single dialect supports both.
+    report = analyze('files of folder "x"; current fixlet')
+
+    assert report.resolved_dialect is Dialect.UNCERTAIN
+
+
+def test_resolved_dialect_is_none_before_parsing_and_when_nothing_resolves() -> None:
+    assert analyze(BROKEN).resolved_dialect is None
+    assert analyze("totallymadeupinspectorname").resolved_dialect is None
 
 
 def test_forced_dialect_overrides_classification() -> None:

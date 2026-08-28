@@ -46,10 +46,18 @@ def _section(title: str) -> None:
 def _render_dialect(report: RelevanceAnalysis) -> None:
     _section("dialect")
     classified = report.classified_dialect
-    print(f"classified: {classified.value if classified else 'undetermined'}")
+    print(f"classified: {classified.value if classified else 'undetermined (text markers only)'}")
+    if report.parsed:
+        resolved = report.resolved_dialect
+        rendered = resolved.value if resolved else "undetermined (no reference settles it)"
+        print(f"resolved:   {rendered}")
     if report.requested_dialect is not None:
         print(f"requested:  {report.requested_dialect.value}")
-    suffix = "  (assumed -- nothing in the text settles it)" if report.dialect_assumed else ""
+    suffix = (
+        "  (assumed -- nothing settles it, not even resolved references)"
+        if report.dialect_assumed
+        else ""
+    )
     print(f"effective:  {report.dialect.value}{suffix}")
 
 

@@ -45,7 +45,7 @@ from bigfix_relevance_analyzer.complexity import (
     evaluation_cost_rules,
 )
 from bigfix_relevance_analyzer.complexity import analyze as analyze_complexity
-from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect
+from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect, is_definite
 from bigfix_relevance_analyzer.nodes import Node, Reference, Span, to_sexpr
 from bigfix_relevance_analyzer.parser import ParseError, try_parse
 from bigfix_relevance_analyzer.tokenizer import Token, TokenKind, tokenize
@@ -213,14 +213,72 @@ class RelevanceAnalysis:
         return self.environment.dialect
 
     @property
+    def resolved_dialect(self) -> Dialect | None:
+        """Which dialect every resolved reference's own table facts settle on.
+
+        :func:`~bigfix_relevance_analyzer.dialect.classify_relevance_dialect`
+        runs on raw text, before parsing, and is deliberately blind to common
+        English words such as ``file`` -- see its module docstring -- because
+        in unparsed text those are too collision-prone to trust. Once the
+        statement has parsed, that risk is gone: a :class:`ReferenceReport`'s
+        :attr:`~ReferenceReport.matches` are inspector-table rows resolved by
+        name, not a guess about a word in prose, so ``files`` or ``folders``
+        being client-only is real evidence a text classifier could never use.
+
+        Computed as the intersection, across every reference with at least one
+        known match, of the dialects that reference's rows are defined in --
+        the same "valid in every dialect this could be" reasoning
+        :func:`~bigfix_relevance_analyzer.dialect.classify_relevance_dialect`
+        cannot apply without a parse tree. An unknown name (no match at all)
+        contributes no evidence either way.
+
+        :attr:`~bigfix_relevance_analyzer.dialect.Dialect.CLIENT` or
+        :attr:`~bigfix_relevance_analyzer.dialect.Dialect.SESSION` means every
+        resolved reference supports that dialect and not both dialects at
+        once. :attr:`~bigfix_relevance_analyzer.dialect.Dialect.BOTH` means
+        every resolved reference supports both -- provable here in a way the
+        text classifier's own docstring says it cannot be, because a parse
+        tree already exists by this point.
+        :attr:`~bigfix_relevance_analyzer.dialect.Dialect.UNCERTAIN` means the
+        references contradict each other: some resolve only in client
+        relevance, others only in session, so this statement cannot be valid
+        as either. ``None`` means nothing parsed, or nothing resolved to a
+        known name at all.
+        """
+        if self.node is None:
+            return None
+        supported: frozenset[Dialect] | None = None
+        for reference in self.references:
+            found: frozenset[Dialect] = frozenset(
+                dialect for entry in reference.matches for dialect in entry.dialects
+            )
+            if not found:
+                continue  # an unknown name, or one with no dialect at all
+            supported = found if supported is None else supported & found
+        if supported is None:
+            return None
+        if supported == {Dialect.CLIENT, Dialect.SESSION}:
+            return Dialect.BOTH
+        if supported == {Dialect.CLIENT}:
+            return Dialect.CLIENT
+        if supported == {Dialect.SESSION}:
+            return Dialect.SESSION
+        return Dialect.UNCERTAIN  # empty intersection: genuinely contradictory
+
+    @property
     def dialect_assumed(self) -> bool:
         """Whether :attr:`dialect` is a fallback rather than a finding.
 
-        True when the caller forced nothing and classification was
-        undetermined. Every dialect-dependent conclusion below is then
-        conditional on a guess, which a report should say out loud.
+        False when the caller forced a dialect, when the pre-parse text
+        classifier reached a verdict, or when :attr:`resolved_dialect` -- the
+        reference table's own post-parse evidence -- settles on one specific
+        dialect by itself. True only when none of the three determined
+        anything, so every dialect-dependent conclusion below is conditional
+        on a guess, which a report should say out loud.
         """
-        return self.requested_dialect is None and self.classified_dialect is None
+        if self.requested_dialect is not None or self.classified_dialect is not None:
+            return False
+        return not is_definite(self.resolved_dialect)
 
     @property
     def parsed(self) -> bool:
@@ -322,6 +380,7 @@ class RelevanceAnalysis:
             "text": self.text,
             "dialect": {
                 "classified": self.classified_dialect.value if self.classified_dialect else None,
+                "resolved": self.resolved_dialect.value if self.resolved_dialect else None,
                 "requested": self.requested_dialect.value if self.requested_dialect else None,
                 "effective": self.dialect.value,
                 "assumed": self.dialect_assumed,
