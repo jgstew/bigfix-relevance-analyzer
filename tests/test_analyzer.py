@@ -6,6 +6,7 @@ parts that depend on it, and that broken input degrades instead of raising.
 """
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -18,6 +19,7 @@ from bigfix_relevance_analyzer.typecheck import Plurality
 
 CLIENT = 'exists file "C:\\foo.txt" whose (size of it > 100)'
 SESSION = "names of bes computers"
+BES_EXAMPLE = Path("tests/examples/mixed_context/task_with_client_and_session_relevance.bes")
 BROKEN = 'exists file "unterminated'
 
 
@@ -178,3 +180,63 @@ def test_cli_reads_stdin_when_no_argument(
 def test_cli_rejects_empty_input() -> None:
     with pytest.raises(SystemExit):
         main(["   "])
+
+
+def test_cli_treats_a_real_file_path_as_a_file_to_extract(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main([str(BES_EXAMPLE)]) == 0
+    out = capsys.readouterr().out
+
+    assert "2 relevance site(s)" in out
+    assert "names of current fixlets" in out
+    assert "NOT in proxy agent context" in out
+    # Each site is analysed against the dialect extraction already determined.
+    assert out.count("effective:  session") == 1
+    assert out.count("effective:  client") == 1
+
+
+def test_cli_json_for_a_file_carries_each_sites_own_dialect(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["--json", str(BES_EXAMPLE)]) == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["file"] == str(BES_EXAMPLE)
+    dialects = {site["site_dialect"] for site in payload["sites"]}
+    assert dialects == {"session", "client"}
+    for site in payload["sites"]:
+        assert site["analysis"]["dialect"]["effective"] == site["site_dialect"]
+
+
+def test_cli_reports_a_file_with_no_relevance_sites(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    plain = tmp_path / "notes.txt"
+    plain.write_text("just some notes, no relevance here\n")
+
+    assert main([str(plain)]) == 0
+    assert "no relevance found" in capsys.readouterr().out
+
+
+def test_cli_a_nonexistent_path_is_analysed_as_relevance_text(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    missing = "/definitely/not/a/real/path.bes"
+
+    # It fails to parse as relevance too -- the point is *how* it fails: as a
+    # single badly-lexed statement, not as a file-extraction error.
+    assert main([missing]) == 1
+    out = capsys.readouterr().out
+    assert missing in out
+    assert "relevance site(s)" not in out
+    assert "FAILED" in out
+
+
+def test_cli_forced_dialect_overrides_every_site_in_a_file(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["--dialect", "client", str(BES_EXAMPLE)]) == 0
+    out = capsys.readouterr().out
+
+    assert out.count("effective:  client") == 2
