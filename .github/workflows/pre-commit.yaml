@@ -7,6 +7,9 @@ on:
     branches:
       - main
   workflow_dispatch:
+  # so .github/workflows/tag_and_release.yaml can gate a release on this exact
+  # job rather than polling for other checks to go green
+  workflow_call:
 
 # read-only by default; the cross-repo checkout uses secrets.CROSSREPO_PAT
 permissions:
@@ -89,7 +92,7 @@ jobs:
         run: python -m pip install "uv==${UV_VERSION}"
 
       - name: pre-commit local action test
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
         uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
         with:
           extra_args: >-
@@ -98,12 +101,14 @@ jobs:
             --to-ref ${{ github.event.pull_request.head.sha || github.sha }}
             --hook-stage manual
 
-      # manual dispatch: run every hook (including the manual-stage ones -
-      # validate-pyproject, the pytest wrapper, the check-useless-excludes/
-      # check-hooks-apply meta hooks) against the full tree, not just the
-      # diff range a PR/push would use
+      # manual dispatch, and a workflow_call from tag_and_release.yaml: run
+      # every hook (including the manual-stage ones - validate-pyproject, the
+      # pytest wrapper, the check-useless-excludes/check-hooks-apply meta
+      # hooks) against the full tree, not just the diff range a PR/push would
+      # use. workflow_call has no pull_request/before ref to diff against
+      # anyway - github.event there is the caller's payload, not a diff range.
       - name: pre-commit local action test (manual dispatch)
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
         uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
         with:
           extra_args: --color=always --all-files --hook-stage manual
