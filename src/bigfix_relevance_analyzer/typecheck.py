@@ -942,10 +942,10 @@ class _Checker:
         )
 
     def combine_bar(self, node: Bar, left: RelevanceValue, right: RelevanceValue) -> RelevanceValue:
-        # The evaluator's own message for this is the terse "Incompatible
-        # types." -- qna/the debugger don't say which types. The template
-        # leads with that confirmed string verbatim and appends the types,
-        # since the built-in message alone isn't enough to act on.
+        # The evaluator's own message for this is the terse "Incompatible types."
+        # -- qna/the debugger don't say what was actually mismatched. The
+        # template leads with that confirmed string verbatim and appends the
+        # two names, since the built-in message alone isn't enough to act on.
         if (
             left.types
             and right.types

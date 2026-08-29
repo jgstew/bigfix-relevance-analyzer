@@ -197,9 +197,9 @@ _TYPE_CHECK: Final = [
         "operand-types-incompatible",
         Origin.TYPE_CHECK,
         # `|` has no operator-table row of its own, so there is no recovered
-        # type-checker string to quote for it. What *is* confirmed is the
-        # runtime's terse `incompatible-types` ("Incompatible types."), which
-        # this leads with verbatim; the clause after the colon is this
+        # string from the type checker to quote for it. What *is* confirmed
+        # is the runtime's terse `incompatible-types` ("Incompatible types."),
+        # which this leads with verbatim; the clause after the colon is this
         # package's own addition, naming both types, because the runtime
         # message alone doesn't say what was actually mismatched.
         "Incompatible types: the types in '<{left_type}> {token} <{right_type}>' "
