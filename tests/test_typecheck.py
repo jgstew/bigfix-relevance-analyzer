@@ -261,6 +261,51 @@ def test_findings_use_the_engines_own_wording(env: TypeEnvironment) -> None:
     )
 
 
+def test_bar_message_leads_with_the_evaluators_own_wording(env: TypeEnvironment) -> None:
+    """`|` has no operator-table row, so unlike `+` there is no recovered
+    type-checker string to quote -- only the runtime's terse "Incompatible
+    types." The message leads with that confirmed string verbatim, then adds
+    the types the runtime message alone doesn't provide."""
+    assert check(parse('"a" | 42'), env).diagnostics[0].message == (
+        "Incompatible types: the types in '<string> | <integer>' are not compatible"
+    )
+
+
+def test_a_too_large_tuple_index_leads_with_the_evaluators_own_wording(
+    env: TypeEnvironment,
+) -> None:
+    """`item <large integer> of (...)` errors identically to a non-literal
+    index on a real evaluator (confirmed live against qna 11.0.6.137) even
+    though the token *is* an integer literal, just too big to index with. The
+    message leads with that confirmed sentence, then adds the accurate detail
+    the runtime string omits."""
+    result = check(parse("item 99999999999999999999999 of (1, 2, 3)"), env)
+    assert [d.code for d in result.diagnostics] == ["tuple-index-unreasonable"]
+    assert result.diagnostics[0].message == (
+        "This expression contained a tuple index which was not an integer "
+        "literal: the tuple index '99999999999999999999999' is too big "
+        "(it's quite unreasonably large)"
+    )
+
+
+def test_a_numeral_beyond_the_engines_parse_ceiling_is_its_own_finding(
+    env: TypeEnvironment,
+) -> None:
+    """Past `MAX_LARGE_INTEGER` the engine cannot parse the numeral into any
+    type at all, in any context -- confirmed live: a bare literal this size
+    and a tuple index of the same size fail identically, with the same
+    message, distinct from both `tuple-index-unreasonable` and
+    `tuple-index-not-literal`."""
+    too_large = "999999999999999999999999999999999999999999999999999999"
+
+    bare = check(parse(too_large), env)
+    assert [d.code for d in bare.diagnostics] == ["integer-constant-too-large"]
+
+    as_index = check(parse(f"item {too_large} of (1, 2, 3)"), env)
+    assert [d.code for d in as_index.diagnostics] == ["integer-constant-too-large"]
+    assert as_index.diagnostics[0].message == bare.diagnostics[0].message
+
+
 def test_a_tuple_index_is_zero_based(env: TypeEnvironment) -> None:
     assert types_of("item 0 of (1, 2, 3)", env) == {"integer"}
     assert types_of('item 2 of (1, 2, "c")', env) == {"string"}

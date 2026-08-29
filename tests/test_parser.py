@@ -14,6 +14,7 @@ import pytest
 from bigfix_relevance_analyzer import inspectors
 from bigfix_relevance_analyzer.nodes import (
     MAX_INTEGER,
+    MAX_LARGE_INTEGER,
     Bar,
     It,
     ItemOf,
@@ -434,6 +435,9 @@ def test_to_mermaid_also_survives_the_deepest_accepted_tree() -> None:
         (str(MAX_INTEGER), NumberKind.INTEGER),
         (str(MAX_INTEGER + 1), NumberKind.LARGE_INTEGER),
         ("99999999999999999999999", NumberKind.LARGE_INTEGER),
+        (str(MAX_LARGE_INTEGER), NumberKind.LARGE_INTEGER),
+        (str(MAX_LARGE_INTEGER + 1), NumberKind.CONSTANT_TOO_LARGE),
+        ("99999999999999999999999999999999999999999", NumberKind.CONSTANT_TOO_LARGE),
         ("1.5", NumberKind.NOT_AN_INTEGER),
         ("0.0", NumberKind.NOT_AN_INTEGER),
     ],

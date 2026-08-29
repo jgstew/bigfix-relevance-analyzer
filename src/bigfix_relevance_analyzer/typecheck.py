@@ -70,6 +70,7 @@ from bigfix_relevance_analyzer.diagnostics import (
 )
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.nodes import (
+    MAX_LARGE_INTEGER,
     Bar,
     Binary,
     Cast,
@@ -563,6 +564,17 @@ class _Checker:
         the last one appended is the first one taken.
         """
         match node:
+            case NumberLiteral(kind=NumberKind.CONSTANT_TOO_LARGE):
+                # Unlike `large integer`, this numeral fails to parse *at all*,
+                # wherever it appears -- not only as a tuple index. Confirmed
+                # live: a bare literal this size errors identically.
+                self.report(
+                    "integer-constant-too-large",
+                    node.span,
+                    token=node.text,
+                    max_value=MAX_LARGE_INTEGER,
+                )
+                self.values.append(RelevanceValue(types=frozenset(), platforms=frozenset()))
             case NumberLiteral(kind=kind):
                 self.values.append(self.literal(_NUMBER_TYPES[kind]))
             case StringLiteral():
@@ -919,10 +931,10 @@ class _Checker:
         )
 
     def combine_bar(self, node: Bar, left: RelevanceValue, right: RelevanceValue) -> RelevanceValue:
-        # The evaluator prints the terse `Incompatible types.` for this; the
-        # checker's own templated form names both types, which is the one worth
-        # showing. [unverified] -- the wording is the checker's, but `|` has no
-        # operator-table row to confirm which of the two it uses.
+        # The evaluator's own message for this is the terse "Incompatible
+        # types." -- qna/the debugger don't say which types. The template
+        # leads with that confirmed string verbatim and appends the types,
+        # since the built-in message alone isn't enough to act on.
         if (
             left.types
             and right.types
@@ -949,6 +961,18 @@ class _Checker:
         )
 
     def combine_item_of(self, node: ItemOf, operand: RelevanceValue) -> RelevanceValue:
+        if node.index.kind is NumberKind.CONSTANT_TOO_LARGE:
+            # This numeral never parses, regardless of context -- the same
+            # finding `descend` would report for it anywhere else. It is
+            # caught here too because the index is read directly off the node
+            # rather than descended into as a child value (see `descend`).
+            self.report(
+                "integer-constant-too-large",
+                node.span,
+                token=node.index.text,
+                max_value=MAX_LARGE_INTEGER,
+            )
+            return RelevanceValue(types=frozenset(), platforms=frozenset())
         if node.index.kind is NumberKind.LARGE_INTEGER:
             self.report("tuple-index-unreasonable", node.span, token=node.index.text)
             return RelevanceValue(types=frozenset(), platforms=frozenset())

@@ -29,6 +29,7 @@ from typing import Final, NamedTuple
 
 __all__ = [
     "MAX_INTEGER",
+    "MAX_LARGE_INTEGER",
     "Bar",
     "Binary",
     "Cast",
@@ -64,6 +65,19 @@ ceiling may be ``2**64 - 1``. A literal between the two is classified
 :attr:`NumberKind.LARGE_INTEGER` here and might be a ``uinteger`` there.
 """
 
+MAX_LARGE_INTEGER: Final = 2**128 - 1
+"""Largest value the engine can parse a numeral into at all, above which a
+literal is rejected outright rather than typed.
+
+Confirmed live against qna 11.0.6.137: ``item 340282366920938463463374607431768211455
+of (1,2,3)`` types and evaluates the literal (as a ``large integer``, in every
+context, not only as a tuple index); ``item 340282366920938463463374607431768211456
+of (1,2,3)`` -- one more -- fails to parse at all, with ``An integer constant was
+too large.``, regardless of where the literal appears (a bare literal or
+arithmetic fail identically). The boundary is exactly ``2**128 - 1``, i.e.
+unsigned 128-bit range; see :attr:`NumberKind.CONSTANT_TOO_LARGE`.
+"""
+
 
 class NumberKind(enum.Enum):
     """How the engine classifies a numeral, by magnitude, at parse time.
@@ -84,7 +98,20 @@ class NumberKind(enum.Enum):
     """Whole, and within :data:`MAX_INTEGER`."""
 
     LARGE_INTEGER = "large integer"
-    """Whole, but beyond :data:`MAX_INTEGER`."""
+    """Whole, but beyond :data:`MAX_INTEGER`. Still a real, usable literal of
+    this type everywhere -- confirmed live, it evaluates fine as a bare value
+    or in arithmetic. The one place it is refused is as a tuple index, and even
+    there the engine's own message is identical to :attr:`NOT_AN_INTEGER`'s
+    (``"...was not an integer literal."``); it does not, contrary to an earlier
+    assumption here, complain separately about a literal that is merely too big
+    to index with."""
+
+    CONSTANT_TOO_LARGE = "constant too large"
+    """Beyond :data:`MAX_LARGE_INTEGER`: the engine cannot parse this numeral
+    into any type at all, in any context -- confirmed live, a bare literal this
+    large fails the same way a tuple index does. Its own message, ``"An integer
+    constant was too large."``, is genuinely distinct from both
+    :attr:`LARGE_INTEGER` and :attr:`NOT_AN_INTEGER`."""
 
     NOT_AN_INTEGER = "not an integer"
     """Not whole -- a decimal literal, which the engine types as
@@ -125,16 +152,25 @@ class NumberLiteral:
         """
         if not self.text.isdigit():
             return NumberKind.NOT_AN_INTEGER
-        if int(self.text) > MAX_INTEGER:
+        value = int(self.text)
+        if value > MAX_LARGE_INTEGER:
+            return NumberKind.CONSTANT_TOO_LARGE
+        if value > MAX_INTEGER:
             return NumberKind.LARGE_INTEGER
         return NumberKind.INTEGER
 
     @property
     def is_integer_literal(self) -> bool:
-        """Whether this is a whole number, of any magnitude.
+        """Whether this is written as a whole number, of any magnitude.
 
-        The distinction a tuple index turns on: the engine requires an integer
-        literal there, and complains separately about one that is merely too big.
+        The distinction a tuple index turns on: the parser needs to tell a
+        tuple subscript from the real `item <string> of <folder>` property by
+        the index's written form alone (see :func:`parser._of`), before any
+        magnitude check runs. A numeral too large even to parse is still
+        written as a whole number, so it counts here too -- the checker is
+        what tells :attr:`~NumberKind.LARGE_INTEGER` and
+        :attr:`~NumberKind.CONSTANT_TOO_LARGE` apart from there, since each has
+        its own, distinct, confirmed message.
         """
         return self.kind is not NumberKind.NOT_AN_INTEGER
 

@@ -22,13 +22,24 @@ Prefer :attr:`Origin.TYPE_CHECK` where both exist. Both are kept, and each entry
 says which it is, because a tool reporting what an *engine* said should quote the
 engine.
 
-One message is wrong and is kept anyway
----------------------------------------
+Some messages are wrong and are kept anyway
+--------------------------------------------
 ``"It" used outside of "whose" clause.`` is what the runtime prints, and it
 describes a narrower rule than the engine implements -- ``of`` binds ``it`` too
 (see :mod:`bigfix_relevance_analyzer.binding`). It is catalogued as the runtime
 string it is; ``used-without-context`` is the accurate one and is what a checker
 in this package should emit.
+
+``tuple-index-unreasonable`` is the same pattern for a second case:
+``item <large integer> of (...)`` prints the identical ``"...was not an
+integer literal."`` as a genuinely non-literal index, even though the token
+*is* an integer literal, just too big to index a tuple with (confirmed live
+against qna 11.0.6.137). Rather than quote the misleading runtime string
+outright or silently replace it, its template leads with that confirmed
+sentence verbatim and appends the accurate detail after a colon -- the same
+treatment given to ``operand-types-incompatible``'s runtime-message base
+(``"Incompatible types: ..."``), for the same reason: the built-in message
+alone is not enough to act on.
 
 Provenance and licensing
 ------------------------
@@ -39,7 +50,13 @@ are behavioral findings about a proprietary HCL binary, gathered so an
 independent open-source analyzer can interoperate with it. No code was copied.
 Matching HCL's exact wording is the entire point here, because users recognize
 it -- which is also why the templates are reproduced as recovered rather than
-tidied up. See :data:`DIAGNOSTICS` for the one place that asymmetry shows.
+tidied up. See :data:`DIAGNOSTICS` for where that asymmetry shows.
+
+One entry, ``integer-constant-too-large``, is not from that binary-string
+recovery at all -- it was found by probing the live evaluator (see
+:data:`bigfix_relevance_analyzer.nodes.MAX_LARGE_INTEGER`), and has not been
+cross-checked against ``FixletDebugger.exe``'s string tables the way the rest
+of this catalog was.
 """
 
 from __future__ import annotations
@@ -86,6 +103,7 @@ FIELDS: Final = frozenset(
         "item_keyword",
         "left_type",
         "max_depth",
+        "max_value",
         "name",
         "of_keyword",
         "phrase",
@@ -178,7 +196,14 @@ _TYPE_CHECK: Final = [
     _entry(
         "operand-types-incompatible",
         Origin.TYPE_CHECK,
-        "the types in '<{left_type}> {token} <{right_type}>' are not compatible",
+        # `|` has no operator-table row of its own, so there is no recovered
+        # type-checker string to quote for it. What *is* confirmed is the
+        # runtime's terse `incompatible-types` ("Incompatible types."), which
+        # this leads with verbatim; the clause after the colon is this
+        # package's own addition, naming both types, because the runtime
+        # message alone doesn't say what was actually mismatched.
+        "Incompatible types: the types in '<{left_type}> {token} <{right_type}>' "
+        "are not compatible",
     ),
     _entry(
         "binary-operator-not-defined",
@@ -259,10 +284,19 @@ _TYPE_CHECK: Final = [
         Origin.TYPE_CHECK,
         "the tuple index '{token}' is too big (there are {total} items in the tuple)",
     ),
+    # A second instance of the pattern below: the runtime's own message here
+    # is confirmed but wrong. `item <large integer> of (...)` prints the exact
+    # same "...was not an integer literal." as a genuinely non-literal index
+    # (confirmed live against qna 11.0.6.137, up to `MAX_LARGE_INTEGER`) --
+    # even though the token *is* an integer literal, just too big to index
+    # with. The template leads with that confirmed sentence verbatim, then
+    # adds the accurate clause the runtime string omits.
     _entry(
         "tuple-index-unreasonable",
         Origin.TYPE_CHECK,
-        "the tuple index '{token}' is too big (it's quite unreasonably large)",
+        "This expression contained a tuple index which was not an integer "
+        "literal: the tuple index '{token}' is too big (it's quite unreasonably "
+        "large)",
     ),
     # Context. This is the accurate counterpart to the runtime's misleading
     # "It used outside of whose clause" -- `of` introduces a context too.
@@ -338,6 +372,18 @@ _RUNTIME: Final = [
     ),
     _entry("conversion-failed", Origin.RUNTIME, "Could not convert value to required type."),
     _entry("incompatible-types", Origin.RUNTIME, "Incompatible types."),
+    # Confirmed live against qna 11.0.6.137, not (yet) cross-checked against
+    # FixletDebugger.exe's string tables the way the rest of this catalog was
+    # (see the module docstring's Provenance section) -- unlike those, this one
+    # was found by probing the running evaluator, not read off the binary.
+    # Fires for any numeral past `MAX_LARGE_INTEGER`, in any context: a bare
+    # literal, arithmetic, and a tuple index all fail identically.
+    _entry(
+        "integer-constant-too-large",
+        Origin.RUNTIME,
+        "An integer constant was too large: '{token}' exceeds "
+        "{max_value}, the largest value the engine can parse a numeral into",
+    ),
     _entry(
         "conversion-wrong-type",
         Origin.RUNTIME,
