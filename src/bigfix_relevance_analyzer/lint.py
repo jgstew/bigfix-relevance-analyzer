@@ -19,33 +19,43 @@ itself something to report, not something to crash over.
     if any(f.severity is Severity.ERROR for f in findings):
         raise SystemExit(1)
 
-Seven rules, four of them always on and three opt-in:
+Eight rules, six of them always on and two tunable:
 
 - ``parse-error`` / ``error-token`` -- the statement is broken. Always an
   error; nothing to configure.
 - ``unbound-it`` -- an ``it`` with no context to bind to. Always an error:
   it means the reference is meaningless in the engine, not merely unusual.
+- ``type-error`` -- any other
+  :attr:`~bigfix_relevance_analyzer.typecheck.CheckResult.diagnostics` the
+  type checker reported (a type mismatch, a non-boolean ``whose`` filter, a
+  tuple index out of range, ...). Always an error: these come from checking
+  the parsed tree against the real inspector tables, not a heuristic, so a
+  genuine type mismatch is as concrete a defect as a parse error. The
+  ``used-without-context`` diagnostic is excluded here -- it is the checker's
+  own independent detection of the same unbound ``it`` the ``unbound-it``
+  rule above already reports, and including both would report one root cause
+  twice.
 - ``unknown-inspector`` -- a name no dump defines. Always a warning, never an
   error by default, because the dumps do not cover every platform or product
   version -- a name absent from them is a lead, not proof of a typo.
 - ``complexity`` / ``evaluation-cost`` -- :attr:`RelevanceComplexity.score`
-  and ``.evaluation_cost`` past a caller-supplied ceiling. Silent unless
-  :attr:`LintConfig.max_score` / ``.max_evaluation_cost`` is set, because a
-  baked-in number would fail every existing repo on day one; the ceiling is
-  the adopting repo's ratchet to set, not this package's to assume.
+  and ``.evaluation_cost`` past a ceiling. On by default, at a generous
+  built-in ceiling (:data:`DEFAULT_MAX_SCORE`, :data:`DEFAULT_MAX_EVALUATION_COST`)
+  chosen to sit well above ordinary content and catch only the genuinely
+  extreme -- content that legitimately needs to be this complex should raise
+  :attr:`LintConfig.max_score` / ``.max_evaluation_cost`` rather than stay
+  silent about it. Pass ``None`` for either (via the library API; there is no
+  CLI spelling for it) to disable the rule entirely.
 - ``max-depth-exceeded`` -- only from :func:`lint_directory`: a directory tree
   deeper than its ``max_depth`` was not fully walked. Always an error, because
   a limit this generous (6 levels, by default) being hit at all is itself
   worth a human's attention, and a silently truncated walk would look
   identical to a clean, fully-scanned one.
 
-Deliberately not a rule here: :attr:`RelevanceAnalysis.missing_platforms`
-(absence from the dumps is not proof of lack of support) and any
-:attr:`~bigfix_relevance_analyzer.typecheck.CheckResult.diagnostics` beyond
-unbound ``it`` (too noisy for a default until the type layer has more
-mileage). A caller that wants either can still read them off the analysis
-directly -- this module has no monopoly on the facts, only an opinion about
-which of them should fail a commit by default.
+Deliberately not a rule here: :attr:`RelevanceAnalysis.missing_platforms` --
+absence from the dumps is not proof of lack of support, so it stays a fact a
+caller can read off the analysis directly rather than a finding this module
+asserts an opinion about.
 
 :func:`lint_paths` and :func:`lint_file` never expand a directory argument --
 a path is taken literally, exactly like the extractor they wrap. Only
@@ -71,6 +81,8 @@ from bigfix_relevance_analyzer.extract import RelevanceSite, extract_relevance_f
 
 __all__ = [
     "DEFAULT_MAX_DEPTH",
+    "DEFAULT_MAX_EVALUATION_COST",
+    "DEFAULT_MAX_SCORE",
     "DEFAULT_SEVERITIES",
     "RULES",
     "Finding",
@@ -92,6 +104,28 @@ DEFAULT_MAX_DEPTH = 6
 The root itself is depth 0, so is a file directly inside it; each subdirectory
 adds one. Chosen as a generous default rather than an unbounded walk, and
 never exceeded silently -- see the ``max-depth-exceeded`` rule above.
+"""
+
+DEFAULT_MAX_SCORE = 500.0
+"""The built-in ceiling for the ``complexity`` rule.
+
+Chosen to sit well above ordinary content -- the package's own pinned test
+statements score in the single digits to the mid-30s, and even a statement
+with real nesting and several filters lands well under this -- while still
+catching a statement that is genuinely, unusually complex. Raise
+:attr:`LintConfig.max_score` for content that legitimately needs to be this
+elaborate; pass ``None`` via the library API to disable the rule entirely.
+"""
+
+DEFAULT_MAX_EVALUATION_COST = 50.0
+"""The built-in ceiling for the ``evaluation-cost`` rule.
+
+Evaluation cost is summed from a small number of fixed per-occurrence tiers
+(1, 3, 6, or 12 -- see :mod:`~bigfix_relevance_analyzer.complexity`), so this
+ceiling tolerates several costly-inspector calls in one statement before
+firing. Raise :attr:`LintConfig.max_evaluation_cost` for content that
+legitimately needs them; pass ``None`` via the library API to disable the
+rule entirely.
 """
 
 _SKIP_DIR_NAMES = frozenset({"__pycache__", "node_modules", "dist", "build", "venv", "env"})
@@ -143,19 +177,22 @@ class LintRule:
     """Why the rule exists, and why it defaults the way it does. Full sentences."""
 
     gated: bool
-    """Whether the rule is silent until a threshold is configured.
+    """Whether the rule is controlled by a numeric ceiling rather than being
+    unconditionally on.
 
     Deliberately not called ``configurable``: *every* rule's severity is
     configurable through :attr:`LintConfig.severities`, so that name would be
     true of all of them and distinguish nothing. What these two have that the
-    others do not is that they report nothing at all by default.
+    others do not is a ceiling with its own default, tunable independently of
+    severity -- they still report by default, just only past that ceiling.
     """
 
     threshold: str | None = None
-    """The :class:`LintConfig` field that switches a :attr:`gated` rule on.
+    """The :class:`LintConfig` field that carries a :attr:`gated` rule's ceiling.
 
-    ``None`` for every rule that is always on, so a consumer can render "set
-    ``max_score`` to enable this" without a lookup table of its own.
+    ``None`` for every rule that is always on with no ceiling to tune, so a
+    consumer can render "raise ``max_score`` to relax this" without a lookup
+    table of its own.
     """
 
     def to_dict(self) -> dict[str, Any]:
@@ -218,6 +255,16 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "the runtime's own message claims otherwise and is wrong.",
             ),
             _rule(
+                "type-error",
+                Severity.ERROR,
+                "the type checker reported a problem beyond an unbound `it`",
+                "A type mismatch, a non-boolean `whose` filter, a tuple index out of range, "
+                "and the rest of the type checker's diagnostic catalog -- these come from "
+                "checking the parsed tree against the real inspector tables, not a "
+                "heuristic, so a genuine type error is as concrete a defect as a parse "
+                "error. Always an error, with nothing to configure.",
+            ),
+            _rule(
                 "unknown-inspector",
                 Severity.WARNING,
                 "a name no inspector dump defines",
@@ -229,19 +276,23 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
             _rule(
                 "complexity",
                 Severity.ERROR,
-                "the complexity score is above the configured ceiling",
-                "Silent until `max_score` is set, because a baked-in number would fail "
-                "every existing content repo on day one. The ceiling is the adopting "
-                "repo's ratchet to set, not this package's to assume.",
+                "the complexity score is above the ceiling",
+                "On by default at a generous built-in ceiling (`DEFAULT_MAX_SCORE`) chosen "
+                "to sit well above ordinary content and catch only the genuinely extreme. "
+                "Content that legitimately needs to be this complex should raise "
+                "`max_score` rather than stay silent about it; pass `None` via the library "
+                "API to disable the rule entirely.",
                 threshold="max_score",
             ),
             _rule(
                 "evaluation-cost",
                 Severity.ERROR,
-                "the evaluation cost is above the configured ceiling",
-                "Silent until `max_evaluation_cost` is set, for the same reason as the "
-                "complexity ceiling: what counts as too expensive depends on the estate "
-                "the content runs on.",
+                "the evaluation cost is above the ceiling",
+                "On by default at a generous built-in ceiling (`DEFAULT_MAX_EVALUATION_COST`), "
+                "for the same reason as the complexity ceiling: content that legitimately "
+                "needs to run this expensively should raise `max_evaluation_cost` rather "
+                "than stay silent about it; pass `None` via the library API to disable the "
+                "rule entirely.",
                 threshold="max_evaluation_cost",
             ),
             _rule(
@@ -345,10 +396,14 @@ class Finding:
 
 @dataclass(frozen=True, slots=True)
 class LintConfig:
-    """What to gate on. Every threshold defaults to off -- see the module docstring."""
+    """What to gate on. See the module docstring for what each rule does by default."""
 
-    max_score: float | None = None
-    max_evaluation_cost: float | None = None
+    max_score: float | None = DEFAULT_MAX_SCORE
+    """Ceiling for the ``complexity`` rule. ``None`` disables it entirely."""
+
+    max_evaluation_cost: float | None = DEFAULT_MAX_EVALUATION_COST
+    """Ceiling for the ``evaluation-cost`` rule. ``None`` disables it entirely."""
+
     severities: Mapping[str, Severity] = field(default_factory=dict)
     """Per-code overrides of :data:`DEFAULT_SEVERITIES`. Unlisted codes keep their default."""
 
@@ -455,6 +510,16 @@ def lint_analysis(
 
     for binding in report.unbound_its:
         emit("unbound-it", "`it` used with no context to bind to", binding.it.span.line)
+
+    if report.check is not None:
+        for diagnostic in report.check.diagnostics:
+            # `used-without-context` is the checker's own independent detection
+            # of the same unbound `it` the loop above already reports -- see
+            # the module docstring's `type-error` entry. Skipping it here
+            # keeps one root cause from becoming two findings.
+            if diagnostic.code == "used-without-context":
+                continue
+            emit("type-error", diagnostic.message, diagnostic.span.line)
 
     if report.unknown_references:
         names = ", ".join(f"`{name}`" for name in report.unknown_references)

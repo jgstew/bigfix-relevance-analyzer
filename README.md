@@ -163,20 +163,28 @@ consumers across a wire.
 python -m bigfix_relevance_analyzer 'exists file "C:\foo.txt" whose (size of it > 100)'
 ```
 
-The default output is Markdown: a summary table up top, then one heading per
-analysis (Lexing, Parse tree, Platforms, Inspectors, `it` bindings, Breakdown
-probes, Complexity), with GitHub-flavored tables for the tabular sections and
-fenced code blocks for the statement source, the S-expression, and each
-breakdown probe - paste it straight into an issue or a PR comment. The
-S-expression is always there; the Mermaid flowchart is opt-in behind
-`--mermaid` in both output modes - Markdown and `--json`'s `to_dict()` (whose
-own `mermaid` parameter defaults to off the same way) - since it costs a line
-per box and per edge and on a real statement outweighs the rest of the report
-combined. `--dialect client|session` forces the dialect and `--platform
-windows` narrows the lookups; with no argument the statement is read from
-stdin. The exit status is 1 when the statement does not parse, so a shell
-check can use it. This is the only part of the package that writes to stdout
-- importing the library still prints nothing.
+The default output is Markdown, and compact: the statement, a summary table,
+and - only when `lint.py`'s rules found something worth flagging (a parse
+error, an unbound `it`, a type error, an unknown inspector, or complexity /
+evaluation cost past its default ceiling) - an `Issues` section, one
+grep-able line per finding, the same wording `--check` prints. A clean
+statement's report ends after the summary; there is nothing to say about
+something that isn't wrong. `--verbose` adds one heading per further analysis
+(Lexing, Parse tree, Platforms, Inspectors, `it` bindings, Breakdown probes,
+Complexity), with GitHub-flavored tables for the tabular sections and fenced
+code blocks for the statement source, the S-expression, and each breakdown
+probe - paste it straight into an issue or a PR comment. The S-expression is
+always there in verbose mode; the Mermaid flowchart is additionally behind
+`--mermaid` (which implies `--verbose`, since the parse tree is the only
+place it renders) in both output modes - Markdown and `--json`'s `to_dict()`
+(whose own `mermaid` parameter defaults to off the same way) - since it costs
+a line per box and per edge and on a real statement outweighs the rest of the
+report combined. `--json` always includes everything, verbose or not, plus
+the same findings under `"findings"`. `--dialect client|session` forces the
+dialect and `--platform windows` narrows the lookups; with no argument the
+statement is read from stdin. The exit status is 1 when the statement does
+not parse, so a shell check can use it. This is the only part of the package
+that writes to stdout - importing the library still prints nothing.
 
 When the argument is a path to a file that actually exists, it is run through
 `extract_relevance_from_file` first, and every relevance site found is analysed
@@ -355,24 +363,27 @@ same input always lexes the same way, regardless of which dumps happen to exist.
 ## Linting content
 
 `bigfix_relevance_analyzer.lint` turns the analyses above into pre-commit-shaped
-verdicts: parse failures and an `it` with nothing to bind to are always errors,
-an inspector no dump defines is always a warning, and the complexity score and
-evaluation cost from the section above are checked only once a threshold is
-configured - a baked-in number would fail every existing content repo on day
-one, so the ceiling is the adopting repo's ratchet to set, not this package's
-to assume.
+verdicts. Six of the eight rules are always on: parse failures, an `it` with
+nothing to bind to, and any other type-check diagnostic are always errors; an
+inspector no dump defines is always a warning. The other two - complexity
+score and evaluation cost - are *also* on by default, at a generous built-in
+ceiling (`DEFAULT_MAX_SCORE = 500`, `DEFAULT_MAX_EVALUATION_COST = 50`) chosen
+to sit well above ordinary content and catch only the genuinely extreme;
+content that legitimately needs to be this complex or this expensive should
+raise the ceiling rather than have the rule stay silent about it:
 
 ```python
 from bigfix_relevance_analyzer import LintConfig, lint_paths
 
-findings = lint_paths(changed_paths, LintConfig(max_score=350, max_evaluation_cost=40))
+findings = lint_paths(changed_paths, LintConfig())            # built-in ceilings
+findings = lint_paths(changed_paths, LintConfig(max_score=800))  # raised for this repo
 for finding in findings:
     print(finding)
 ```
 
 ```
 MyFixlet.bes:41: error [parse-error] col 18: expected ')'
-MyTask.bes:88: error [complexity] score 412 > 350 (whose_clauses=6, max_of_chain=5, tokens=214)
+MyTask.bes:88: error [complexity] score 640 > 500 (whose_clauses=9, max_of_chain=7, tokens=340)
 MyDashboard.ojo:12: warning [unknown-inspector] no dump defines `bes computer group`
 ```
 
@@ -382,18 +393,23 @@ generated from `lint.RULES`, which is also what `bigfix-relevance-lint
 against - so a hook, a CI log and an MCP server all explain a finding the
 same way instead of each inventing a description:
 
-| Code | Default | Fires when | Needs |
+| Code | Default | Fires when | Ceiling |
 | --- | --- | --- | --- |
-| `complexity` | error | the complexity score is above the configured ceiling | `max_score` |
+| `complexity` | error | the complexity score is above the ceiling | `max_score` (default 500) |
 | `error-token` | error | the statement contains text that could not be lexed | always on |
-| `evaluation-cost` | error | the evaluation cost is above the configured ceiling | `max_evaluation_cost` |
+| `evaluation-cost` | error | the evaluation cost is above the ceiling | `max_evaluation_cost` (default 50) |
 | `max-depth-exceeded` | error | a directory tree was deeper than the walk's limit, so it was not fully scanned | always on |
 | `parse-error` | error | the statement could not be parsed | always on |
+| `type-error` | error | the type checker reported a problem beyond an unbound `it` | always on |
 | `unbound-it` | error | `it` is used where there is no context to bind it to | always on |
 | `unknown-inspector` | warning | a name no inspector dump defines | always on |
 
+There is no CLI spelling to disable `complexity`/`evaluation-cost` entirely -
+only to raise their ceiling. A caller that wants a rule off altogether passes
+`None` for it through the library API: `LintConfig(max_score=None)`.
+
 The same rules are reachable two other ways: `python -m bigfix_relevance_analyzer
---check --max-score=350 file1.bes file2.bes` for a one-off run, or the
+--check --max-score=800 file1.bes file2.bes` for a one-off run, or the
 `bigfix-relevance-lint` console script this package installs, which is what a
 pre-commit hook's `entry:` calls:
 
@@ -402,7 +418,6 @@ pre-commit hook's `entry:` calls:
   rev: <sha>
   hooks:
     - id: bigfix-relevance-lint
-      args: [--max-score=350, --max-evaluation-cost=40]
 ```
 
 `bigfix-relevance-lint` adds `--error CODE` / `--warn CODE` / `--ignore CODE`
@@ -433,12 +448,10 @@ bigfix-relevance-lint --max-depth=10     # walk ., 10 levels deep
 bigfix-relevance-lint .                  # NOT a walk -- one literal path, "."
 ```
 
-Not gated by any of the three entry points: `RelevanceAnalysis.missing_platforms`
-(a platform absent from the dumps is not proof it's unsupported there) and
-`CheckResult.diagnostics` beyond unbound `it` (too noisy as a default until the
-type layer has more mileage). Read `RelevanceComplexity` or `RelevanceAnalysis`
-directly for those - `lint.py` has no monopoly on the facts, only an opinion
-about which of them should fail a commit by default.
+Not a rule at any of the three entry points: `RelevanceAnalysis.missing_platforms`
+- a platform absent from the dumps is not proof it's unsupported there, so it
+stays a fact to read off the analysis directly rather than a finding this
+package asserts an opinion about.
 
 ## Serving this from an MCP server
 

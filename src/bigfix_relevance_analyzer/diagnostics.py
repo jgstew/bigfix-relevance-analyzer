@@ -1,9 +1,12 @@
 """The wording BigFix itself uses when relevance is wrong.
 
-This is a **catalog, not a checker**. Nothing in this package emits these yet.
-It exists so that when something does, its output is the wording BigFix authors
-already recognize from the console and the Fixlet Debugger, rather than a second
-vocabulary they have to learn.
+This is a **catalog**: :mod:`~bigfix_relevance_analyzer.typecheck` emits the
+``TYPE_CHECK``-origin entries here as :class:`~bigfix_relevance_analyzer.typecheck.TypeDiagnostic`
+(and :mod:`~bigfix_relevance_analyzer.lint` turns most of those into ``type-error``
+findings); the ``LEXICAL``, ``PARSE``, and ``RUNTIME`` entries remain unemitted
+reference material for now. Either way, its output is the wording BigFix
+authors already recognize from the console and the Fixlet Debugger, rather
+than a second vocabulary they have to learn.
 
 Two vocabularies, and which to prefer
 -------------------------------------

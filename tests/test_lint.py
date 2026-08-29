@@ -17,6 +17,8 @@ from bigfix_relevance_analyzer.analyzer import analyze
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
+    DEFAULT_MAX_EVALUATION_COST,
+    DEFAULT_MAX_SCORE,
     DEFAULT_SEVERITIES,
     RULES,
     Finding,
@@ -34,6 +36,10 @@ BROKEN = 'exists file "unterminated'
 UNBOUND_IT = "size of it"  # `it` with nothing to bind to
 UNKNOWN_INSPECTOR = "totally bogus made up inspector"
 BES_EXAMPLE = Path("tests/examples/mixed_context/task_with_client_and_session_relevance.bes")
+# A real type mismatch, not merely an unbound `it` (which the type checker
+# also reports, under `used-without-context` -- deliberately excluded from
+# `type-error`, see the `lint` module docstring).
+TYPE_MISMATCH = '1 + "a"'
 # Non-zero evaluation cost, so the `evaluation-cost` ceiling has something to
 # exceed: hashing a file is the `COST_EXTREME` tier on the client.
 COSTLY = 'sha1 of file "/tmp/x" = "abc"'
@@ -71,6 +77,24 @@ def test_unbound_it_is_reported_as_error() -> None:
     assert unbound.severity is Severity.ERROR
 
 
+def test_type_mismatch_is_reported_as_error() -> None:
+    report = analyze(TYPE_MISMATCH, Dialect.CLIENT)
+    findings = lint_analysis(report, LintConfig())
+    assert "type-error" in codes(findings)
+    finding = next(f for f in findings if f.code == "type-error")
+    assert finding.severity is Severity.ERROR
+    assert "not defined" in finding.message
+
+
+def test_unbound_it_does_not_also_report_as_a_type_error() -> None:
+    # The type checker independently detects the same unbound `it` under its
+    # own `used-without-context` diagnostic -- it must not double up with the
+    # `unbound-it` rule above as a second `type-error` finding.
+    report = analyze(UNBOUND_IT, Dialect.CLIENT)
+    findings = lint_analysis(report, LintConfig())
+    assert codes(findings) == {"unbound-it"}
+
+
 def test_unknown_inspector_is_reported_as_warning() -> None:
     report = analyze(UNKNOWN_INSPECTOR, Dialect.CLIENT)
     findings = lint_analysis(report, LintConfig())
@@ -79,25 +103,36 @@ def test_unknown_inspector_is_reported_as_warning() -> None:
     assert unknown.severity is Severity.WARNING
 
 
-def test_complexity_is_silent_without_a_configured_threshold() -> None:
-    # A nested, filtered statement that scores meaningfully above zero.
+def test_complexity_is_silent_under_the_default_ceiling() -> None:
+    # A nested, filtered statement that scores meaningfully above zero, but
+    # nowhere near the default ceiling (`DEFAULT_MAX_SCORE`).
     report = analyze(
         'exists files whose (name of it starts with "bes" AND size of it > 0) '
         'of folders whose (name of it as lowercase as string != "") of folder "/tmp"'
     )
-    assert report.complexity.score > 0
+    assert 0 < report.complexity.score < DEFAULT_MAX_SCORE
     findings = lint_analysis(report, LintConfig())
     assert "complexity" not in codes(findings)
 
 
-def test_complexity_fires_when_score_exceeds_configured_max() -> None:
+def test_complexity_fires_by_default_once_it_is_genuinely_extreme() -> None:
+    # `complexity` is on by default: a statement scoring above the built-in
+    # ceiling fires with no configuration at all.
     report = analyze(CLIENT)
-    threshold = report.complexity.score - 1
-    findings = lint_analysis(report, LintConfig(max_score=threshold))
+    findings = lint_analysis(report, LintConfig(max_score=report.complexity.score - 1))
     assert "complexity" in codes(findings)
     finding = next(f for f in findings if f.code == "complexity")
     assert finding.severity is Severity.ERROR
     assert "score" in finding.message
+
+
+def test_complexity_fires_with_the_bare_default_config_when_truly_extreme() -> None:
+    # No threshold configured at all -- `LintConfig()` alone -- for a
+    # statement genuinely past the built-in ceiling.
+    report = analyze("(" * 40 + "1" + ")" * 40)
+    assert report.complexity.score > DEFAULT_MAX_SCORE
+    findings = lint_analysis(report, LintConfig())
+    assert "complexity" in codes(findings)
 
 
 def test_complexity_is_silent_when_score_is_under_configured_max() -> None:
@@ -106,20 +141,44 @@ def test_complexity_is_silent_when_score_is_under_configured_max() -> None:
     assert "complexity" not in codes(findings)
 
 
-def test_evaluation_cost_is_silent_without_a_configured_threshold() -> None:
+def test_complexity_can_be_disabled_entirely_via_the_library_api() -> None:
+    report = analyze(CLIENT)
+    findings = lint_analysis(report, LintConfig(max_score=None))
+    assert "complexity" not in codes(findings)
+
+
+def test_evaluation_cost_is_silent_under_the_default_ceiling() -> None:
     report = analyze('exists descendants of folder "C:\\"', Dialect.CLIENT)
-    assert report.complexity.evaluation_cost > 0
+    assert 0 < report.complexity.evaluation_cost < DEFAULT_MAX_EVALUATION_COST
     findings = lint_analysis(report, LintConfig())
     assert "evaluation-cost" not in codes(findings)
 
 
-def test_evaluation_cost_fires_when_over_configured_max() -> None:
+def test_evaluation_cost_fires_by_default_once_it_is_genuinely_extreme() -> None:
     report = analyze('exists descendants of folder "C:\\"', Dialect.CLIENT)
-    threshold = report.complexity.evaluation_cost - 1
-    findings = lint_analysis(report, LintConfig(max_evaluation_cost=threshold))
+    findings = lint_analysis(
+        report, LintConfig(max_evaluation_cost=report.complexity.evaluation_cost - 1)
+    )
     assert "evaluation-cost" in codes(findings)
     finding = next(f for f in findings if f.code == "evaluation-cost")
     assert finding.severity is Severity.ERROR
+
+
+def test_evaluation_cost_fires_with_the_bare_default_config_when_truly_extreme() -> None:
+    stmt = (
+        'sha1 of file "/a" ; sha1 of file "/b" ; sha1 of file "/c" ; '
+        'sha1 of file "/d" ; sha1 of file "/e"'
+    )
+    report = analyze(stmt, Dialect.CLIENT)
+    assert report.complexity.evaluation_cost > DEFAULT_MAX_EVALUATION_COST
+    findings = lint_analysis(report, LintConfig())
+    assert "evaluation-cost" in codes(findings)
+
+
+def test_evaluation_cost_can_be_disabled_entirely_via_the_library_api() -> None:
+    report = analyze('exists descendants of folder "C:\\"', Dialect.CLIENT)
+    findings = lint_analysis(report, LintConfig(max_evaluation_cost=None))
+    assert "evaluation-cost" not in codes(findings)
 
 
 def test_severity_override_can_promote_a_warning_to_an_error() -> None:
@@ -286,7 +345,7 @@ def _every_emitted_code() -> set[str]:
     """
     emitted: set[str] = set()
     thresholds = LintConfig(max_score=0.0, max_evaluation_cost=0.0)
-    for text in (BROKEN, UNBOUND_IT, UNKNOWN_INSPECTOR, CLIENT, COSTLY):
+    for text in (BROKEN, UNBOUND_IT, UNKNOWN_INSPECTOR, CLIENT, COSTLY, TYPE_MISMATCH):
         for config in (LintConfig(), thresholds):
             emitted.update(finding.code for finding in lint_analysis(analyze(text), config))
     return emitted
@@ -314,24 +373,29 @@ def test_every_rule_in_the_catalog_is_a_rule_that_fires(tmp_path: Path) -> None:
     assert emitted == set(RULES)
 
 
-def test_a_gated_rule_is_silent_until_its_threshold_is_set() -> None:
-    """``gated`` marks the rules that report nothing until configured.
+def test_a_gated_rule_ships_on_by_default_with_a_ceiling() -> None:
+    """``gated`` marks the two rules controlled by a numeric ceiling.
 
     Named ``gated`` rather than ``configurable`` on purpose: *every* rule's
     severity is configurable via :attr:`LintConfig.severities`, so
-    ``configurable`` would read as true of all seven. What distinguishes these
-    two is that they are switched off entirely by default -- a baked-in ceiling
-    would fail every existing content repo on day one.
+    ``configurable`` would read as true of all eight. What distinguishes
+    these two is a ceiling with its own default (:data:`DEFAULT_MAX_SCORE`,
+    :data:`DEFAULT_MAX_EVALUATION_COST`), tunable independently of severity --
+    they still report by default, just only past that ceiling.
     """
     gated = {code for code, rule in RULES.items() if rule.gated}
     assert gated == {"complexity", "evaluation-cost"}
 
+    # An ordinary statement, nowhere near either default ceiling: silent.
     silent = {finding.code for finding in lint_analysis(analyze(CLIENT), LintConfig())}
     assert not silent & gated
 
     # `COSTLY` rather than `CLIENT`: both ceilings are `>` comparisons, so a
     # statement whose evaluation cost is genuinely 0.0 cannot exceed 0.0 and
-    # the second rule would look broken when it is only unexercised.
+    # the second rule would look broken when it is only unexercised. Lowering
+    # both ceilings to 0.0 here demonstrates they are tunable, not that they
+    # are off by default -- see the dedicated "bare default config" tests for
+    # that.
     loud = {
         finding.code
         for finding in lint_analysis(

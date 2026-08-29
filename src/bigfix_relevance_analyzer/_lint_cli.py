@@ -1,7 +1,7 @@
 """Command line for :mod:`~bigfix_relevance_analyzer.lint`: one line per finding.
 
     bigfix-relevance-lint MyFixlet.bes MyTask.bes
-    bigfix-relevance-lint --max-score=350 --max-evaluation-cost=40 *.bes
+    bigfix-relevance-lint --max-score=800 --max-evaluation-cost=80 *.bes
     bigfix-relevance-lint
 
 Shaped for a pre-commit hook, not a human report -- see ``__main__`` for that.
@@ -11,6 +11,14 @@ cleanly into something else. Exit status is ``0`` when nothing at
 error-severity was found (warnings do not fail a commit unless
 ``--fail-on-warning`` says otherwise), ``1`` when something did, ``2`` on a
 usage error.
+
+``--max-score``/``--max-evaluation-cost`` *raise* the complexity/evaluation-cost
+ceilings above :mod:`~bigfix_relevance_analyzer.lint`'s built-in defaults
+(:data:`~bigfix_relevance_analyzer.lint.DEFAULT_MAX_SCORE`,
+:data:`~bigfix_relevance_analyzer.lint.DEFAULT_MAX_EVALUATION_COST`) rather
+than switching the rules on -- they are on by default. There is no CLI
+spelling to disable them entirely; a caller that wants that uses the library
+API directly.
 
 Called with no paths at all, this walks the current directory (see
 :func:`~bigfix_relevance_analyzer.lint.lint_directory`) instead of erroring --
@@ -27,12 +35,15 @@ still prints nothing on its own.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import sys
 
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
+    DEFAULT_MAX_EVALUATION_COST,
+    DEFAULT_MAX_SCORE,
     LintConfig,
     Severity,
     counts,
@@ -62,9 +73,15 @@ def _print_rules(*, as_json: bool) -> int:
         print()
         return 0
 
+    defaults = LintConfig()
     width = max(len(rule.code) for rule in listed)
     for rule in listed:
-        gate = f" (needs --{rule.threshold.replace('_', '-')})" if rule.threshold else ""
+        if rule.threshold:
+            ceiling = getattr(defaults, rule.threshold)
+            flag = f"--{rule.threshold.replace('_', '-')}"
+            gate = f" (default {ceiling:g}, raise with {flag})"
+        else:
+            gate = ""
         print(f"{rule.code:<{width}}  {rule.default_severity.value:<7}  {rule.summary}{gate}")
     return 0
 
@@ -74,17 +91,21 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="bigfix-relevance-lint",
         description=(
-            "Lint every relevance site found in the given files: parse failures "
-            "and unbound `it` are always errors, unknown inspectors are always "
-            "warnings, and complexity / evaluation cost are checked only when a "
-            "threshold is given."
+            "Lint every relevance site found in the given files: parse failures, "
+            "unbound `it`, and type errors are always errors, unknown inspectors "
+            "are always warnings, and complexity / evaluation cost are errors "
+            f"past a built-in ceiling (default {DEFAULT_MAX_SCORE:g} / "
+            f"{DEFAULT_MAX_EVALUATION_COST:g}) that --max-score/--max-evaluation-cost raise."
         ),
     )
     parser.add_argument(
         "paths", nargs="*", help="files to lint; omit entirely to walk the current directory"
     )
     parser.add_argument(
-        "--max-score", type=float, default=None, help="fail a site scoring above this"
+        "--max-score",
+        type=float,
+        default=None,
+        help=f"fail a site scoring above this (default {DEFAULT_MAX_SCORE:g})",
     )
     parser.add_argument(
         "--max-depth",
@@ -98,7 +119,10 @@ def main(argv: list[str] | None = None) -> int:
         "--max-evaluation-cost",
         type=float,
         default=None,
-        help="fail a site whose evaluation cost is above this",
+        help=(
+            "fail a site whose evaluation cost is above this "
+            f"(default {DEFAULT_MAX_EVALUATION_COST:g})"
+        ),
     )
     parser.add_argument(
         "--error",
@@ -150,13 +174,18 @@ def main(argv: list[str] | None = None) -> int:
     severities.update(_severity_map(args.error, Severity.ERROR))
     severities.update(_severity_map(args.ignore, Severity.IGNORE))
 
+    # Only override `max_score`/`max_evaluation_cost` when the flag was
+    # actually given -- omitting a flag means "use LintConfig's own default
+    # ceiling", not "pass None and disable the rule".
     config = LintConfig(
-        max_score=args.max_score,
-        max_evaluation_cost=args.max_evaluation_cost,
         severities=severities,
         dialect=Dialect(args.dialect) if args.dialect else None,
         platform=args.platform,
     )
+    if args.max_score is not None:
+        config = dataclasses.replace(config, max_score=args.max_score)
+    if args.max_evaluation_cost is not None:
+        config = dataclasses.replace(config, max_evaluation_cost=args.max_evaluation_cost)
 
     if args.paths:
         findings = lint_paths(args.paths, config)

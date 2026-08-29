@@ -2,13 +2,27 @@
 
     python -m bigfix_relevance_analyzer 'exists file "C:\\foo.txt"'
     echo 'names of processes' | python -m bigfix_relevance_analyzer --json
-    python -m bigfix_relevance_analyzer --mermaid 'names of files of folder "/tmp"'
+    python -m bigfix_relevance_analyzer --verbose 'names of files of folder "/tmp"'
     python -m bigfix_relevance_analyzer MyFixlet.bes
 
-The parse tree's Mermaid flowchart is behind ``--mermaid`` in both output
-modes -- Markdown and ``--json`` -- because it costs a line per box and per
-edge, which on a real statement outweighs every other section combined, and
-the S-expression right beside it already says the same thing in one line.
+Default output is compact: the statement, a one-screen summary, and -- only
+when :mod:`~bigfix_relevance_analyzer.lint`'s rules found something worth
+flagging (a parse error, an unbound ``it``, a type error, an unknown
+inspector, or complexity/evaluation cost past its default ceiling) -- an
+``Issues`` list of one grep-able line each, the same wording ``--check``
+prints. A clean statement's default output is just the summary: nothing to
+say about something that isn't wrong is itself the point. ``--verbose``
+restores every other section (lexing, the parse tree, platforms, inspectors,
+``it`` bindings, breakdown probes, complexity metrics) for when the full
+picture is wanted rather than only what might be wrong. ``--json`` always
+includes everything, verbose or not, plus the same findings under
+``"findings"``.
+
+The parse tree's Mermaid flowchart is additionally behind ``--mermaid`` (and
+implies ``--verbose``, since the parse tree only renders there) -- because it
+costs a line per box and per edge, which on a real statement outweighs every
+other section combined, and the S-expression right beside it already says the
+same thing in one line.
 
 The last form is not relevance itself -- it is a path to a real file. When the
 sole argument names one that exists, it is run through
@@ -25,8 +39,9 @@ when invoked as a script -- importing the library, including
 keeps it safe inside a stdio MCP server.
 
 Rendering only; every conclusion comes from
-:func:`~bigfix_relevance_analyzer.analyzer.analyze` and
-:func:`~bigfix_relevance_analyzer.extract.extract_relevance_from_file`.
+:func:`~bigfix_relevance_analyzer.analyzer.analyze`,
+:func:`~bigfix_relevance_analyzer.extract.extract_relevance_from_file`, and
+:func:`~bigfix_relevance_analyzer.lint.lint_analysis`.
 """
 
 from __future__ import annotations
@@ -42,9 +57,13 @@ from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 from bigfix_relevance_analyzer.extract import RelevanceSite, extract_relevance_from_file
 from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
+    DEFAULT_MAX_EVALUATION_COST,
+    DEFAULT_MAX_SCORE,
+    Finding,
     LintConfig,
     Severity,
     counts,
+    lint_analysis,
     lint_directory,
     lint_paths,
     rules,
@@ -110,6 +129,23 @@ def _render_summary(report: RelevanceAnalysis, level: int) -> list[str]:
     lines.append(f"| Complexity score | {report.complexity.score:.3g} |")
     if report.complexity.evaluation_cost:
         lines.append(f"| Evaluation cost | {report.complexity.evaluation_cost:.3g} |")
+    lines.append("")
+    return lines
+
+
+def _render_issues(findings: tuple[Finding, ...], level: int) -> list[str]:
+    """The compact, grep-able signal a caller should not have to go looking for.
+
+    One bullet per :class:`~bigfix_relevance_analyzer.lint.Finding`, in
+    :meth:`~bigfix_relevance_analyzer.lint.Finding.__str__`'s own wording --
+    the same line ``--check`` prints, so a finding reads identically wherever
+    it surfaces. Empty when nothing fired, and then this renders nothing at
+    all: a clean statement should not have to say so.
+    """
+    if not findings:
+        return []
+    lines = [_heading(level, "Issues"), ""]
+    lines.extend(f"- {finding}" for finding in findings)
     lines.append("")
     return lines
 
@@ -253,24 +289,36 @@ def render(
     level: int = 1,
     heading: str | None = None,
     mermaid: bool = False,
+    findings: tuple[Finding, ...] = (),
+    verbose: bool = False,
 ) -> str:
-    """Render the whole analysis as Markdown. Returns the text; prints nothing.
+    """Render the analysis as Markdown. Returns the text; prints nothing.
 
     ``level`` is the heading depth for this report's own title (``#`` by
     default); every section below it nests one level deeper, so a report
     embedded under a file's per-site heading still forms a coherent outline.
-    Tree-dependent sections are skipped when the statement did not parse,
-    since there is nothing to report in them.
 
-    ``mermaid`` adds the parse tree's flowchart to the parse section. Off by
-    default because it costs a line per box and per edge, which on a real
-    statement outweighs the whole rest of the report; the S-expression right
-    above it already says the same thing in one line.
+    Compact by default (``verbose=False``): just the ``Summary`` table, plus
+    an ``Issues`` section listing ``findings`` -- one grep-able line each, in
+    :class:`~bigfix_relevance_analyzer.lint.Finding`'s own wording -- when
+    there are any. Nothing to flag means nothing further to print; a clean
+    statement's report ends after the summary.
+
+    ``verbose=True`` additionally renders every other section this analysis
+    can produce (Lexing, Parse tree, Platforms, Inspectors, ``it`` bindings,
+    Breakdown probes, Complexity), tree-dependent ones skipped when the
+    statement did not parse since there is nothing to report in them. This is
+    the only mode that can show anything from ``mermaid=True`` -- the parse
+    tree section is where the flowchart lives, so ``--mermaid`` implies
+    ``--verbose`` on the CLI.
     """
     lines = [_heading(level, heading or "Relevance Analysis"), ""]
     lines.extend(_fence(report.text))
     lines.append("")
     lines.extend(_render_summary(report, level + 1))
+    lines.extend(_render_issues(findings, level + 1))
+    if not verbose:
+        return "\n".join(lines).rstrip() + "\n"
     lines.extend(_render_lexing(report, level + 1))
     if report.parsed:
         lines.extend(_render_parse(report, level + 1, mermaid=mermaid))
@@ -287,6 +335,31 @@ def render(
         lines.append("")
     lines.extend(_render_complexity(report, level + 1))
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _lint_config(
+    forced: Dialect | None,
+    platform: str | None,
+    *,
+    max_score: float | None,
+    max_evaluation_cost: float | None,
+) -> LintConfig:
+    """Build a :class:`~bigfix_relevance_analyzer.lint.LintConfig` from CLI flags.
+
+    ``max_score``/``max_evaluation_cost`` come straight from ``argparse``,
+    which defaults each to ``None`` when its flag is omitted. Passing that
+    ``None`` straight through would override :class:`LintConfig`'s own
+    built-in ceiling to "disabled" -- the opposite of what an omitted flag
+    should mean. Only override a field when the caller actually gave a
+    value, so an omitted flag keeps the default ceiling instead of erasing
+    it.
+    """
+    config = LintConfig(dialect=forced, platform=platform)
+    if max_score is not None:
+        config = dataclasses.replace(config, max_score=max_score)
+    if max_evaluation_cost is not None:
+        config = dataclasses.replace(config, max_evaluation_cost=max_evaluation_cost)
+    return config
 
 
 def _site_heading(site: RelevanceSite) -> str:
@@ -313,6 +386,9 @@ def _run_file(
     *,
     as_json: bool,
     mermaid: bool,
+    verbose: bool,
+    max_score: float | None,
+    max_evaluation_cost: float | None,
 ) -> int:
     sites = extract_relevance_from_file(path)
     if not sites:
@@ -323,7 +399,14 @@ def _run_file(
             print(f"# Relevance Analysis: {path}\n\nNo relevance found.")
         return 0
 
+    config = _lint_config(
+        forced, platform, max_score=max_score, max_evaluation_cost=max_evaluation_cost
+    )
     reports = [(site, _analyze_site(site, forced, platform)) for site in sites]
+    findings = [
+        lint_analysis(report, config, path=path, base_line=site.line, site=site)
+        for site, report in reports
+    ]
     if as_json:
         json.dump(
             {
@@ -335,8 +418,9 @@ def _run_file(
                         "context": site.context,
                         "site_dialect": site.dialect.value,
                         "analysis": report.to_dict(mermaid=mermaid),
+                        "findings": [finding.to_dict() for finding in site_findings],
                     }
-                    for site, report in reports
+                    for (site, report), site_findings in zip(reports, findings, strict=True)
                 ],
             },
             sys.stdout,
@@ -346,9 +430,19 @@ def _run_file(
     else:
         print(f"# Relevance Analysis: {path}\n")
         print(f"{len(sites)} relevance site(s) found.\n")
-        for index, (site, report) in enumerate(reports, 1):
+        paired = enumerate(zip(reports, findings, strict=True), 1)
+        for index, ((site, report), site_findings) in paired:
             heading = f"Site {index}: {_site_heading(site)}"
-            print(render(report, level=2, heading=heading, mermaid=mermaid))
+            print(
+                render(
+                    report,
+                    level=2,
+                    heading=heading,
+                    mermaid=mermaid,
+                    findings=site_findings,
+                    verbose=verbose,
+                )
+            )
     return 0 if all(report.parsed for _site, report in reports) else 1
 
 
@@ -374,11 +468,8 @@ def _run_check(
     ``--quiet``) for a caller that needs them -- this flag exists so the same
     judgement is reachable without a second console script installed.
     """
-    config = LintConfig(
-        max_score=max_score,
-        max_evaluation_cost=max_evaluation_cost,
-        dialect=forced,
-        platform=platform,
+    config = _lint_config(
+        forced, platform, max_score=max_score, max_evaluation_cost=max_evaluation_cost
     )
     if paths:
         findings = lint_paths(paths, config)
@@ -404,12 +495,16 @@ def _run_rules(*, as_json: bool) -> int:
         print()
         return 0
 
+    defaults = LintConfig()
     print("# Lint rules\n")
-    print("| Code | Default | Fires when | Needs |")
+    print("| Code | Default | Fires when | Ceiling |")
     print("| --- | --- | --- | --- |")
     for rule in listed:
-        needs = f"`{rule.threshold}`" if rule.threshold else "always on"
-        print(f"| `{rule.code}` | {rule.default_severity.value} | {rule.summary} | {needs} |")
+        if rule.threshold:
+            ceiling = f"`{rule.threshold}` (default {getattr(defaults, rule.threshold):g})"
+        else:
+            ceiling = "always on"
+        print(f"| `{rule.code}` | {rule.default_severity.value} | {rule.summary} | {ceiling} |")
     return 0
 
 
@@ -483,9 +578,12 @@ def main(argv: list[str] | None = None) -> int:
         prog="python -m bigfix_relevance_analyzer",
         description=(
             "Analyse one BigFix Relevance statement: dialect, parse, types, "
-            "platforms, bindings, breakdown probes, complexity. Given a path to "
-            "an existing file instead, extract and analyse every relevance site "
-            "in it."
+            "platforms, bindings, breakdown probes, complexity. Prints a "
+            "compact summary plus any issues found (parse errors, unbound `it`, "
+            "type errors, unknown inspectors, complexity/evaluation cost past a "
+            "default ceiling); --verbose adds every other section. Given a path "
+            "to an existing file instead, extract and analyse every relevance "
+            "site in it."
         ),
     )
     parser.add_argument(
@@ -503,9 +601,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--platform", help="narrow client lookups to one platform, e.g. windows")
     parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help=(
+            "print every section (lexing, parse tree, platforms, inspectors, "
+            "`it` bindings, breakdown probes, complexity) instead of just the "
+            "summary and any issues found"
+        ),
+    )
+    parser.add_argument(
         "--mermaid",
         action="store_true",
-        help="add the parse tree as a Mermaid flowchart (verbose: a line per box and edge)",
+        help=(
+            "add the parse tree as a Mermaid flowchart (verbose: a line per box "
+            "and edge); implies --verbose, since that is the only mode with a "
+            "parse tree section to add it to"
+        ),
     )
     parser.add_argument("--json", action="store_true", help="emit the analysis as JSON")
     parser.add_argument(
@@ -546,13 +657,19 @@ def main(argv: list[str] | None = None) -> int:
         "--max-score",
         type=float,
         default=None,
-        help="with --check, fail a site scoring above this",
+        help=(
+            "raise the complexity ceiling above its default "
+            f"({DEFAULT_MAX_SCORE:g}); a score over it is always reported"
+        ),
     )
     parser.add_argument(
         "--max-evaluation-cost",
         type=float,
         default=None,
-        help="with --check, fail a site whose evaluation cost is above this",
+        help=(
+            "raise the evaluation-cost ceiling above its default "
+            f"({DEFAULT_MAX_EVALUATION_COST:g}); a cost over it is always reported"
+        ),
     )
     parser.add_argument(
         "--max-depth",
@@ -565,6 +682,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     forced = Dialect(args.dialect) if args.dialect else None
+    # The parse tree section -- where the flowchart lives -- only renders in
+    # verbose mode, so --mermaid without --verbose would otherwise do nothing.
+    verbose = args.verbose or args.mermaid
 
     # Both of these are questions about the language or the tool rather than
     # about a statement, so they are answered before anything else looks at the
@@ -602,7 +722,14 @@ def main(argv: list[str] | None = None) -> int:
             is_file = False
         if is_file:
             return _run_file(
-                candidate, forced, args.platform, as_json=args.json, mermaid=args.mermaid
+                candidate,
+                forced,
+                args.platform,
+                as_json=args.json,
+                mermaid=args.mermaid,
+                verbose=verbose,
+                max_score=args.max_score,
+                max_evaluation_cost=args.max_evaluation_cost,
             )
         text = args.relevance[0].strip()
     else:
@@ -612,11 +739,25 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("no relevance statement given")
 
     report = analyze(text, forced, args.platform)
+    config = _lint_config(
+        forced,
+        args.platform,
+        max_score=args.max_score,
+        max_evaluation_cost=args.max_evaluation_cost,
+    )
+    findings = lint_analysis(report, config)
     if args.json:
-        json.dump(report.to_dict(mermaid=args.mermaid), sys.stdout, indent=2)
+        json.dump(
+            {
+                **report.to_dict(mermaid=args.mermaid),
+                "findings": [finding.to_dict() for finding in findings],
+            },
+            sys.stdout,
+            indent=2,
+        )
         print()
     else:
-        print(render(report, mermaid=args.mermaid), end="")
+        print(render(report, mermaid=args.mermaid, findings=findings, verbose=verbose), end="")
     # Unparsable input is a finding, not a crash, but a hook wants to know.
     return 0 if report.parsed else 1
 

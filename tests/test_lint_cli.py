@@ -274,7 +274,7 @@ def test_list_rules_prints_every_rule_and_exits_zero(
     out = capsys.readouterr().out
     for code in RULES:
         assert code in out
-    assert "needs --max-score" in out, "a gated rule must say what switches it on"
+    assert "--max-score" in out, "a gated rule must say what switches it on"
 
 
 def test_list_rules_json_is_the_catalog_verbatim(

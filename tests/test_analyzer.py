@@ -16,12 +16,14 @@ from bigfix_relevance_analyzer.__main__ import _cell, main
 from bigfix_relevance_analyzer.analyzer import analyze
 from bigfix_relevance_analyzer.binding import Binder
 from bigfix_relevance_analyzer.dialect import Dialect
+from bigfix_relevance_analyzer.lint import LintConfig, lint_analysis
 from bigfix_relevance_analyzer.typecheck import Plurality
 
 CLIENT = 'exists file "C:\\foo.txt" whose (size of it > 100)'
 SESSION = "names of bes computers"
 BES_EXAMPLE = Path("tests/examples/mixed_context/task_with_client_and_session_relevance.bes")
 BROKEN = 'exists file "unterminated'
+UNKNOWN_INSPECTOR = "totally bogus made up inspector"
 
 
 def test_version_is_importable_and_nonempty() -> None:
@@ -204,7 +206,7 @@ def test_cli_json_adds_the_flowchart_only_when_asked(capsys: pytest.CaptureFixtu
 
 
 def test_cli_prints_markdown_with_every_section(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main([CLIENT]) == 0
+    assert main(["--verbose", CLIENT]) == 0
     out = capsys.readouterr().out
 
     assert out.startswith("# Relevance Analysis\n")
@@ -220,13 +222,37 @@ def test_cli_prints_markdown_with_every_section(capsys: pytest.CaptureFixture[st
     assert "(exists (whose " in out
 
 
+def test_cli_default_output_is_compact_with_no_issues_when_clean(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main([CLIENT]) == 0
+    out = capsys.readouterr().out
+
+    assert "## Summary" in out
+    assert "## Issues" not in out
+    for section in ("Lexing", "Parse tree", "Platforms", "Complexity", "Breakdown probes"):
+        assert f"## {section}" not in out
+
+
+def test_cli_default_output_shows_issues_when_something_is_wrong(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main([UNKNOWN_INSPECTOR]) == 0
+    out = capsys.readouterr().out
+
+    assert "## Issues" in out
+    assert "warning [unknown-inspector]" in out
+
+
 def test_cli_adds_the_flowchart_only_when_asked(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["--mermaid", CLIENT]) == 0
     with_flag = capsys.readouterr().out
 
     assert "```mermaid\nflowchart TD\n" in with_flag
 
-    assert main([CLIENT]) == 0
+    # --mermaid implies --verbose: the parse tree section it lives in only
+    # renders in verbose mode.
+    assert main(["--verbose", CLIENT]) == 0
     without_flag = capsys.readouterr().out
 
     assert "```mermaid" not in without_flag
@@ -252,21 +278,33 @@ def test_cli_reports_a_parse_failure_and_exits_nonzero(
     assert main([BROKEN]) == 1
     out = capsys.readouterr().out
 
+    # A parse failure is a compact Issues line even without --verbose.
     assert ":x: line 1, col 13: unterminated string literal" in out
-    assert "## Parse error" in out
-    assert "> Line 1, column 13: unterminated string literal" in out
+    assert "error [parse-error]" in out
+    assert "error [error-token]" in out
+
+    assert main(["--verbose", BROKEN]) == 1
+    verbose_out = capsys.readouterr().out
+    assert "## Parse error" in verbose_out
+    assert "> Line 1, column 13: unterminated string literal" in verbose_out
     # Lexical metrics survive, so the complexity section is still printed.
-    assert "## Complexity" in out
-    assert "| error_tokens | 1 |" in out
-    assert "## Platforms" not in out
+    assert "## Complexity" in verbose_out
+    assert "| error_tokens | 1 |" in verbose_out
+    assert "## Platforms" not in verbose_out
 
 
 def test_cli_json_matches_to_dict(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["--json", "--platform", "windows", CLIENT]) == 0
 
     emitted = json.loads(capsys.readouterr().out)
-    assert emitted == json.loads(json.dumps(analyze(CLIENT, platform="windows").to_dict()))
+    report = analyze(CLIENT, platform="windows")
+    expected = {
+        **report.to_dict(),
+        "findings": [f.to_dict() for f in lint_analysis(report, LintConfig(platform="windows"))],
+    }
+    assert emitted == json.loads(json.dumps(expected))
     assert emitted["platforms"]["universe"] == ["windows"]
+    assert emitted["findings"] == []
 
 
 def test_cli_reads_stdin_when_no_argument(
@@ -330,7 +368,7 @@ def test_cli_a_nonexistent_path_is_analysed_as_relevance_text(
 
     # It fails to parse as relevance too -- the point is *how* it fails: as a
     # single badly-lexed statement, not as a file-extraction error.
-    assert main([missing]) == 1
+    assert main(["--verbose", missing]) == 1
     out = capsys.readouterr().out
     assert missing in out
     assert "relevance site(s)" not in out
@@ -352,7 +390,7 @@ def test_cell_collapses_whitespace_and_truncates_long_context() -> None:
 def test_cli_renders_a_valid_table_row_when_it_binding_context_has_a_pipe(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert main(["1 of (it | false; it | true) whose (exists it)"]) == 0
+    assert main(["--verbose", "1 of (it | false; it | true) whose (exists it)"]) == 0
     out = capsys.readouterr().out
 
     bindings_section = out.split("`it` bindings")[1].split("\n## ")[0]
