@@ -224,7 +224,7 @@ described under [Which dialect a statement is in](#which-dialect-a-statement-is-
 | `.ojo`, `.besrpt`, `.beswrpt`, `.webreport` | `<?Relevance ?>` substitutions and JavaScript `Relevance(...)` / `EvaluateRelevance(...)` calls |
 | `.html`, `.htm` | the same, read as a ClientUI dashboard (see below) |
 | `.bsr`, `.rel` | the whole file as one statement |
-| `.md` | each fenced code block as one statement |
+| `.md` | each fenced code block tagged ```` ```relevance ````, ```` ```client_relevance ````, or ```` ```session_relevance ```` as one statement -- untagged fences and other languages (```` ```python ````, ```` ```bash ````, ...) are skipped |
 
 Lower-level entry points (`extract_relevance_from_bes_xml`,
 `extract_relevance_from_html_text`, `extract_relevance_from_actionscript`,

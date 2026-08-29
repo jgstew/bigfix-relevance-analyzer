@@ -7,6 +7,6 @@ the same introspection meta-layer. So nothing in this statement identifies its
 dialect, and the content classifier is right to have no opinion on it -- this
 example is the regression test for that trap.
 
-```
+```relevance
 ( it, ("https://developer.bigfix.com/relevance/reference/" & it & ".html") of (concatenations "-" of substrings separated by " " of it) ) of (it as string as trimmed string) whose("" != it) of types
 ```

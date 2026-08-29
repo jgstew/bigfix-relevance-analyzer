@@ -36,8 +36,8 @@ client_relevance/
     plain_text/          Files whose entire contents is one client relevance
                           expression, no markup
     markdown_codeblocks/ Markdown files with client relevance in a fenced
-                          ``` code block, where the whole block is the
-                          expression
+                          ```relevance code block, where the whole block is
+                          the expression
 
 session_relevance/
     dashboards/          Dashboard .ojo files with <?relevance ?> / <?Relevance ?>
@@ -53,8 +53,8 @@ session_relevance/
     plain_text/          Files whose entire contents is one session relevance
                           expression, no markup
     markdown_codeblocks/ Markdown files with session relevance in a fenced
-                          ``` code block, where the whole block is the
-                          expression
+                          ```relevance code block, where the whole block is
+                          the expression
 
 mixed_context/
     A Task .bes file whose <Relevance> (applicability, client relevance) is

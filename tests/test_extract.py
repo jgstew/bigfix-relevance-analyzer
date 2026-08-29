@@ -482,12 +482,15 @@ def test_package_imports_without_lxml(monkeypatch: pytest.MonkeyPatch) -> None:
 # --------------------------------------------------------------------------
 
 
-def test_markdown_extracts_fenced_code_blocks() -> None:
-    text = "# Title\n\nSome prose.\n\n```\nwindows of operating system\n```\n\nMore prose.\n"
+def test_markdown_extracts_relevance_tagged_code_blocks() -> None:
+    text = (
+        "# Title\n\nSome prose.\n\n```relevance\nwindows of operating system\n```\n\nMore prose.\n"
+    )
     sites = extract_relevance_from_markdown(text)
     assert kinds_lines(sites) == [("markdown-codeblock", 6)]
     assert texts(sites) == ["windows of operating system"]
-    # A fence carries no context signal, so the content classifier settles it.
+    # `relevance` names the language without committing to a dialect, so the
+    # content classifier settles it, same as an untagged fence used to.
     assert sites[0].context_dialect is Dialect.UNCERTAIN
     assert sites[0].dialect is Dialect.CLIENT
 
@@ -496,8 +499,36 @@ def test_markdown_ignores_inline_code_spans() -> None:
     assert extract_relevance_from_markdown("Use `now` for the time.\n") == []
 
 
-def test_markdown_extracts_multiple_blocks_with_language_tags() -> None:
-    text = "```relevance\nnow\n```\n\ntext\n\n```\nnumber of files of client\n```\n"
+def test_markdown_ignores_untagged_fences() -> None:
+    """No tag is no signal this is even relevance -- most fenced markdown isn't."""
+    text = "# Title\n\n```\nwindows of operating system\n```\n"
+    assert extract_relevance_from_markdown(text) == []
+
+
+def test_markdown_ignores_fences_tagged_as_another_language() -> None:
+    text = "```python\nprint('hello')\n```\n\n```bash\necho hi\n```\n"
+    assert extract_relevance_from_markdown(text) == []
+
+
+def test_markdown_client_relevance_tag_commits_the_context_dialect() -> None:
+    sites = extract_relevance_from_markdown("```client_relevance\nname of operating system\n```\n")
+    assert sites[0].context_dialect is Dialect.CLIENT
+    assert sites[0].dialect is Dialect.CLIENT
+
+
+def test_markdown_session_relevance_tag_commits_the_context_dialect() -> None:
+    sites = extract_relevance_from_markdown("```session_relevance\nnames of bes computers\n```\n")
+    assert sites[0].context_dialect is Dialect.SESSION
+    assert sites[0].dialect is Dialect.SESSION
+
+
+def test_markdown_tag_matching_is_case_insensitive() -> None:
+    sites = extract_relevance_from_markdown("```RELEVANCE\nnow\n```\n")
+    assert kinds_lines(sites) == [("markdown-codeblock", 2)]
+
+
+def test_markdown_extracts_multiple_relevance_tagged_blocks() -> None:
+    text = "```relevance\nnow\n```\n\ntext\n\n```client_relevance\nnumber of files of client\n```\n"
     sites = extract_relevance_from_markdown(text)
     assert kinds_lines(sites) == [("markdown-codeblock", 2), ("markdown-codeblock", 8)]
 
@@ -693,7 +724,7 @@ def test_a_conflict_warning_reports_the_files_own_line_numbers() -> None:
 
 
 def test_uncertain_context_filled_in_by_content_is_not_a_conflict() -> None:
-    sites = extract_relevance_from_markdown("```\nnumber of bes computers\n```\n")
+    sites = extract_relevance_from_markdown("```relevance\nnumber of bes computers\n```\n")
     assert sites[0].context_dialect is Dialect.UNCERTAIN
     assert sites[0].content_dialect is Dialect.SESSION
     assert sites[0].dialect is Dialect.SESSION
@@ -701,7 +732,7 @@ def test_uncertain_context_filled_in_by_content_is_not_a_conflict() -> None:
 
 
 def test_uncertain_context_and_no_content_opinion_stays_uncertain() -> None:
-    sites = extract_relevance_from_markdown("```\nnames of types\n```\n")
+    sites = extract_relevance_from_markdown("```relevance\nnames of types\n```\n")
     assert sites[0].context_dialect is Dialect.UNCERTAIN
     assert sites[0].content_dialect is None
     assert sites[0].dialect is Dialect.UNCERTAIN
@@ -712,7 +743,7 @@ def test_classifier_opinion_fills_in_an_uncertain_site(monkeypatch: pytest.Monke
     from bigfix_relevance_analyzer import extract as extract_module
 
     monkeypatch.setattr(extract_module, "classify_relevance_dialect", lambda _text: Dialect.SESSION)
-    sites = extract_relevance_from_markdown("```\nnumber of bes computers\n```\n")
+    sites = extract_relevance_from_markdown("```relevance\nnumber of bes computers\n```\n")
     assert [site.dialect for site in sites] == [Dialect.SESSION]
 
 

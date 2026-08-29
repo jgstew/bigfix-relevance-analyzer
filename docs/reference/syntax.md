@@ -53,13 +53,13 @@ Three constructs turn a plural into something singular:
 `<plural> whose (<boolean>)` keeps only the values for which the boolean holds.
 Inside the filter, `it` is the value being tested:
 
-```
+```relevance
 files whose (size of it > 1000) of folder "/tmp"
 ```
 
 **`of` binds `it` as well.** In `a of b`, an `it` inside `a` refers to `b`:
 
-```
+```relevance
 (it as trimmed string) of values "SearchList" of keys "..." of registries
 ```
 
@@ -86,7 +86,7 @@ failing is the trigger.
 
 This is the idiomatic way to give a default for something that may not exist:
 
-```
+```relevance
 id of site of it | 0
 ```
 
@@ -107,7 +107,7 @@ Delimited by `"`. A literal **cannot contain a raw double quote**: one is
 written as `%22` inside the string. **A backslash escapes nothing** - `"C:\x"`
 is a backslash followed by `x`, which is why Windows paths are written plainly:
 
-```
+```relevance
 "C:\Windows\Temp\file.txt"
 ```
 
@@ -124,11 +124,11 @@ no line comment: `//` is division followed by division.
 `,` builds a tuple, `;` builds a collection. Both are ways of producing several
 values from one expression:
 
-```
+```relevance
 (id of site of it, id of it, applicable computer count of it) of fixlets of bes sites
 ```
 
-```
+```relevance
 (packages "docker-ce" of it; packages "docker" of it)
 ```
 

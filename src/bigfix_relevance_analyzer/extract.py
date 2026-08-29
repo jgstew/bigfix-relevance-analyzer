@@ -513,17 +513,41 @@ def extract_relevance_from_html_text(
 
 _FENCE_RE = re.compile(r"^(\s*)(`{3,}|~{3,})(.*)$")
 
+_MARKDOWN_RELEVANCE_TAGS: dict[str, Dialect] = {
+    "relevance": Dialect.UNCERTAIN,
+    "client_relevance": Dialect.CLIENT,
+    "session_relevance": Dialect.SESSION,
+}
+"""Fence language tags that mark a code block as relevance, and the context
+dialect each commits to.
+
+``relevance`` names the language without committing to a dialect, the same
+"no signal either way" position an untagged fence used to take; ``client_``/
+``session_relevance`` commit, which is a real context signal a markdown fence
+otherwise cannot carry at all -- there is no element or file type here for
+:attr:`RelevanceSite.context_dialect` to read the way BES XML or an HTML
+processing instruction can.
+"""
+
 
 def extract_relevance_from_markdown(text: str) -> list[RelevanceSite]:
-    """Extract each fenced code block of ``text`` as one relevance statement.
+    """Extract each relevance-tagged fenced code block of ``text`` as one statement.
 
-    A markdown fence carries no signal about which dialect its contents is, so
-    every site is :attr:`Dialect.UNCERTAIN` unless the content classifier has
-    an opinion.
+    Only a fence tagged ```` ```relevance ````, ```` ```client_relevance ````, or
+    ```` ```session_relevance ```` (case-insensitive) is extracted. Every other
+    fence -- untagged, or tagged as some other language entirely (` ```python `,
+    ` ```bash `, ...) -- is skipped, because most markdown in the wild fences
+    plenty of things that are not relevance at all, and a fence carries no
+    signal by default about what its contents even are, let alone which
+    dialect. Requiring one of these three tags is how a document says "this
+    one actually is relevance" rather than this module guessing from content
+    alone and finding whatever else happens to parse.
     """
     sites: list[RelevanceSite] = []
     lines = text.split("\n")
     fence: str | None = None
+    context_dialect = Dialect.UNCERTAIN
+    extracting = False
     block: list[str] = []
     block_start = 0
 
@@ -532,26 +556,31 @@ def extract_relevance_from_markdown(text: str) -> list[RelevanceSite]:
         if fence is None:
             if match and match.group(2):
                 fence = match.group(2)[0] * 3
+                tag = match.group(3).strip().lower()
+                context_dialect = _MARKDOWN_RELEVANCE_TAGS.get(tag, Dialect.UNCERTAIN)
+                extracting = tag in _MARKDOWN_RELEVANCE_TAGS
                 block = []
                 block_start = line_number + 1
             continue
 
         if match and match.group(2).startswith(fence) and not match.group(3).strip():
-            body = "\n".join(block).strip()
-            if body:
-                sites.append(
-                    _make_site(
-                        kind="markdown-codeblock",
-                        text=body,
-                        line=block_start,
-                        context="markdown code block",
-                        context_dialect=Dialect.UNCERTAIN,
+            if extracting:
+                body = "\n".join(block).strip()
+                if body:
+                    sites.append(
+                        _make_site(
+                            kind="markdown-codeblock",
+                            text=body,
+                            line=block_start,
+                            context="markdown code block",
+                            context_dialect=context_dialect,
+                        )
                     )
-                )
             fence = None
             continue
 
-        block.append(line)
+        if extracting:
+            block.append(line)
 
     if fence is not None:
         logger.warning("unterminated markdown code fence opened at line %d", block_start - 1)
@@ -887,8 +916,11 @@ def extract_relevance_from_file(path: str | bytes | os.PathLike[str]) -> list[Re
 
     Recognizes BES XML (`.bes`, `.bes.xml`), console dashboards and web reports
     (`.ojo`, `.besrpt`, `.beswrpt`, `.webreport`), HTML (`.html`, `.htm`),
-    whole-file relevance (`.bsr`, `.rel`) and markdown (`.md`). Returns an
-    empty list for a file type it does not recognize.
+    whole-file relevance (`.bsr`, `.rel`) and markdown (`.md`) -- the latter
+    only from fences explicitly tagged ```` ```relevance ````,
+    ```` ```client_relevance ````, or ```` ```session_relevance ````; see
+    :func:`extract_relevance_from_markdown`. Returns an empty list for a file
+    type it does not recognize.
 
     `.html`/`.htm` gets no context dialect from the extension alone -- unlike
     `.ojo` or `.besrpt`, it does not say which side renders the document.
