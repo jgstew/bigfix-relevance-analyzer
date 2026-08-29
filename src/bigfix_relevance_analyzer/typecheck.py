@@ -574,7 +574,18 @@ class _Checker:
                     token=node.text,
                     max_value=MAX_LARGE_INTEGER,
                 )
-                self.values.append(RelevanceValue(types=frozenset(), platforms=frozenset()))
+                # Typed as `integer`, not ruled out to `frozenset()`. `_ruled_out`
+                # exists to stop a finding from cascading into restatements of
+                # the same mistake -- but a sibling problem elsewhere in the
+                # same expression (`... | "string"`) is not a restatement, it is
+                # independent: the token is still, visibly, an integer literal,
+                # just one this large the engine can't parse into a value.
+                # Ruling it out would silently swallow that second finding, and
+                # confirmed live, `|` does not rescue either finding here --
+                # unlike a genuine runtime failure (`1/0`, which `|` really does
+                # catch and fall back from), a too-large constant is a type-shaped
+                # failure that survives `|` no matter what is on the other side.
+                self.values.append(self.literal("integer"))
             case NumberLiteral(kind=kind):
                 self.values.append(self.literal(_NUMBER_TYPES[kind]))
             case StringLiteral():

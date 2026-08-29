@@ -306,6 +306,28 @@ def test_a_numeral_beyond_the_engines_parse_ceiling_is_its_own_finding(
     assert as_index.diagnostics[0].message == bare.diagnostics[0].message
 
 
+def test_a_too_large_constant_still_types_as_integer_for_a_sibling_finding(
+    env: TypeEnvironment,
+) -> None:
+    """A too-large numeral is ruled out for its *own* purposes -- nothing can
+    be done with a value the engine refuses to parse -- but it is not the same
+    kind of ruled-out as `1 + "a"`'s `<none>`: the token is still, visibly, an
+    integer literal. Typing it `integer` rather than wiping it to `frozenset()`
+    lets an independent problem next to it still get its own finding, instead
+    of being silently swallowed by `_ruled_out`'s cascade guard -- confirmed
+    live, `|` does not rescue either finding here (contrast a genuine runtime
+    failure like `1/0`, which `|` really does catch and fall back from)."""
+    too_large = "999999999999999999999999999999999999999999999999999999"
+    result = check(parse(f'{too_large} | "string"'), env)
+    assert [d.code for d in result.diagnostics] == [
+        "integer-constant-too-large",
+        "operand-types-incompatible",
+    ]
+    assert result.diagnostics[1].message == (
+        "Incompatible types: the types in '<integer> | <string>' are not compatible"
+    )
+
+
 def test_a_tuple_index_is_zero_based(env: TypeEnvironment) -> None:
     assert types_of("item 0 of (1, 2, 3)", env) == {"integer"}
     assert types_of('item 2 of (1, 2, "c")', env) == {"string"}
