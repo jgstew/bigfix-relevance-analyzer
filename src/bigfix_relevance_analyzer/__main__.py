@@ -435,6 +435,48 @@ def _run_reference(slug: str, *, brief: bool, as_json: bool) -> int:
     return 0
 
 
+def _run_search(query: str, dialect: Dialect | None, *, as_json: bool) -> int:
+    """Search the inspector tables and print what was found.
+
+    Here for the same reason ``--reference`` is: it makes the capability
+    discoverable, and it gives the documentation something a reader can actually
+    run. ``--dialect`` narrows it, since suggesting a session inspector to
+    somebody writing client relevance is worse than suggesting nothing.
+
+    Exits 0 even when nothing matched -- an empty result is an answer, not a
+    failure, and a script asking "is there anything called this" should be able
+    to tell the two apart by reading the output rather than the status.
+    """
+    from bigfix_relevance_analyzer import inspectors
+
+    results = inspectors.search(query, dialect=dialect)
+    if as_json:
+        json.dump(
+            {"query": query, "results": [result.to_dict() for result in results]},
+            sys.stdout,
+            indent=2,
+        )
+        print()
+        return 0
+
+    if not results:
+        print(f"# Inspector search: {query}\n\nNothing matched.")
+        return 0
+
+    print(f"# Inspector search: {query}\n")
+    print("| Match | Name | Found via | Overloads | Returns |")
+    print("| --- | --- | --- | --- | --- |")
+    for result in results:
+        returns = ", ".join(f"`{name}`" for name in result.return_types[:3])
+        if len(result.return_types) > 3:
+            returns += " ..."
+        print(
+            f"| {result.match.value} | {_cell(result.name)} | {_cell(result.matched)} "
+            f"| {len(result.inspectors)} | {returns} |"
+        )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments, analyse, print. Returns a process exit status."""
     parser = argparse.ArgumentParser(
@@ -477,6 +519,14 @@ def main(argv: list[str] | None = None) -> int:
         help=(
             "print a relevance language reference and exit -- the same Markdown "
             "an MCP server would serve as a resource"
+        ),
+    )
+    parser.add_argument(
+        "--search",
+        metavar="QUERY",
+        help=(
+            "search the inspector tables for QUERY and exit -- partial names, "
+            "typos, and phrases like 'registry keys' all work"
         ),
     )
     parser.add_argument(
@@ -524,6 +574,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.reference is not None:
         return _run_reference(args.reference, brief=args.brief, as_json=args.json)
+
+    if args.search is not None:
+        return _run_search(args.search, forced, as_json=args.json)
 
     if args.check:
         return _run_check(

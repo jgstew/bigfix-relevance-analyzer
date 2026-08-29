@@ -454,3 +454,108 @@ def test_the_readme_rule_table_says_which_rules_are_gated() -> None:
             assert f"`{rule.threshold}`" in row, rule.code
         else:
             assert "always on" in row, rule.code
+
+
+# ---------------------------------------------------------------------------
+# `unknown-inspector` suggestions
+# ---------------------------------------------------------------------------
+# The rule's own rationale calls it "a lead rather than a fault". A lead is much
+# more useful with candidates attached -- but fuzzy matching costs milliseconds
+# per unknown name, and unknown names are common in a repo running newer
+# inspectors than the dumps, which is the rule's whole reason for existing. So
+# it is opt-in: off, nothing changes and nothing is paid for.
+
+# A deliberately garbled name whose correction is a real inspector. Reuses the
+# misspelling `tests/test_inspectors.py` already relies on, because `_typos.toml`
+# and `.codespellrc` allowlist it -- a fresh typo written here gets silently
+# "corrected" by the spell-check hooks, which quietly guts the test.
+TYPO = "exists oprating system"
+
+
+def test_suggestions_are_off_by_default() -> None:
+    """A default lint run pays nothing for fuzzy matching, and says nothing new.
+
+    This is the load-bearing test for the whole feature: a pre-commit hook over
+    a few thousand sites must not silently acquire seconds of latency for a
+    warning that blocks nothing.
+    """
+    findings = lint_analysis(analyze(TYPO), LintConfig())
+    unknown = [f for f in findings if f.code == "unknown-inspector"]
+    assert unknown, "the typo should still be reported"
+    assert unknown[0].suggestions == ()
+    assert "did you mean" not in unknown[0].message
+
+
+def test_suggestions_are_reported_when_asked_for() -> None:
+    """With ``suggest=True`` the warning names what the author probably meant."""
+    findings = lint_analysis(analyze(TYPO), LintConfig(suggest=True))
+    unknown = next(f for f in findings if f.code == "unknown-inspector")
+
+    assert "operating system" in unknown.suggestions
+    assert "did you mean" in unknown.message
+    assert "`operating system`" in unknown.message
+
+
+def test_suggestions_are_structured_as_well_as_rendered() -> None:
+    """A server gets a list; a human gets the sentence. Both, deliberately.
+
+    The duplication matches the precedent of ``Finding.to_dict()["text"]``
+    repeating the rendered line: an MCP server should not have to parse prose
+    back out of a message to act on it.
+    """
+    finding = next(
+        f
+        for f in lint_analysis(analyze(TYPO), LintConfig(suggest=True))
+        if f.code == "unknown-inspector"
+    )
+    payload = finding.to_dict()
+    assert payload["suggestions"] == list(finding.suggestions)
+    assert payload == json.loads(json.dumps(payload))
+    for name in payload["suggestions"]:
+        assert f"`{name}`" in payload["message"]
+
+
+def test_suggestions_are_absent_from_every_other_rule() -> None:
+    """``suggestions`` is empty, never null, on the six codes that cannot have any.
+
+    An empty list keeps the key's type honest for every finding, which is what
+    ``_serialize``'s never-omit rule is for; ``None`` would make a consumer
+    special-case six of seven codes.
+    """
+    findings = lint_analysis(
+        analyze(BROKEN), LintConfig(suggest=True, max_score=0.0, max_evaluation_cost=0.0)
+    )
+    for finding in findings:
+        if finding.code != "unknown-inspector":
+            assert finding.suggestions == ()
+            assert finding.to_dict()["suggestions"] == []
+
+
+def test_a_dialect_narrows_what_is_suggested() -> None:
+    """A suggestion must be writable where the author is writing.
+
+    Proposing a session inspector inside a fixlet's ``<Relevance>`` would be a
+    lead into a different failure, so the configured dialect is passed through
+    to the suggester rather than dropped.
+    """
+    # `wnidows` is the other allowlisted garble; its correction `windows` is a
+    # client inspector, so a session-scoped search must not offer it.
+    client = lint_analysis(
+        analyze("exists wnidows", Dialect.CLIENT),
+        LintConfig(suggest=True, dialect=Dialect.CLIENT),
+    )
+    assert "windows" in next(f for f in client if f.code == "unknown-inspector").suggestions
+
+    session = lint_analysis(
+        analyze("exists wnidows", Dialect.SESSION),
+        LintConfig(suggest=True, dialect=Dialect.SESSION),
+    )
+    assert "windows" not in next(f for f in session if f.code == "unknown-inspector").suggestions
+
+
+def test_a_name_with_no_plausible_correction_gets_no_suggestions() -> None:
+    """Nonsense stays nonsense here too -- an empty tuple, and no dangling prose."""
+    findings = lint_analysis(analyze("exists xyzzy"), LintConfig(suggest=True))
+    unknown = next(f for f in findings if f.code == "unknown-inspector")
+    assert unknown.suggestions == ()
+    assert "did you mean" not in unknown.message

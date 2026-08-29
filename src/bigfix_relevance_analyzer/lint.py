@@ -299,6 +299,21 @@ class Finding:
     site: RelevanceSite | None = None
     """The extraction site this analysis came from, when there was one."""
 
+    suggestions: tuple[str, ...] = ()
+    """Names the reported one may have been meant to be, best first.
+
+    Only ever populated for ``unknown-inspector``, and only when
+    :attr:`LintConfig.suggest` asked for it -- see that flag for why it is not
+    the default. Empty rather than ``None`` on every other rule, so a consumer
+    reads one type for every finding instead of special-casing six of seven
+    codes.
+
+    The same names appear in :attr:`message`. That duplication is deliberate,
+    for the same reason :meth:`to_dict` repeats the rendered line under
+    ``text``: a human wants the sentence, and a program should not have to
+    parse prose back out of it.
+    """
+
     def __str__(self) -> str:
         where = f"{self.path}:{self.line}" if self.path is not None else f"line {self.line}"
         return f"{where}: {self.severity.value} [{self.code}] {self.message}"
@@ -323,6 +338,7 @@ class Finding:
             "path": _path(self.path),
             "line": self.line,
             "site": None if self.site is None else self.site.to_dict(),
+            "suggestions": list(self.suggestions),
             "text": str(self),
         }
 
@@ -340,6 +356,22 @@ class LintConfig:
     """Force the dialect instead of trusting extraction or classifying the text."""
 
     platform: str | None = None
+
+    suggest: bool = False
+    """Whether to attach "did you mean" candidates to ``unknown-inspector``.
+
+    Off by default because it is not free and the rule it helps is the most
+    frequent one: unknown names are *common* in a repo running newer inspectors
+    than the snapshot, which is precisely why the rule is a warning rather than
+    an error. Fuzzy matching costs milliseconds per name, so a few thousand
+    sites would add real latency to a pre-commit hook for a finding that blocks
+    nothing.
+
+    Worth turning on for an interactive consumer -- an editor, or an MCP server
+    handing findings to a model -- where one extra millisecond buys a lead the
+    reader would otherwise have to go and look up. See
+    :func:`~bigfix_relevance_analyzer.inspectors.suggest`.
+    """
 
     def severity_for(self, code: str) -> Severity:
         return self.severities.get(code, DEFAULT_SEVERITIES.get(code, Severity.WARNING))
@@ -398,7 +430,7 @@ def lint_analysis(
     """
     findings: list[Finding] = []
 
-    def emit(code: str, message: str, line: int) -> None:
+    def emit(code: str, message: str, line: int, suggestions: tuple[str, ...] = ()) -> None:
         severity = config.severity_for(code)
         if severity is Severity.IGNORE:
             return
@@ -410,6 +442,7 @@ def lint_analysis(
                 path=path,
                 line=base_line + line - 1,
                 site=site,
+                suggestions=suggestions,
             )
         )
 
@@ -425,7 +458,31 @@ def lint_analysis(
 
     if report.unknown_references:
         names = ", ".join(f"`{name}`" for name in report.unknown_references)
-        emit("unknown-inspector", f"no dump defines {names}", base_line)
+        message = f"no dump defines {names}"
+        # Imported here rather than at module scope: `inspectors` is only needed
+        # on this one opt-in branch, and `lint` is otherwise reachable without
+        # paying for the search index at all.
+        leads: tuple[str, ...] = ()
+        if config.suggest:
+            from bigfix_relevance_analyzer.inspectors import suggest as _suggest
+
+            dialect = config.dialect or (report.dialect if not report.dialect_assumed else None)
+            leads = tuple(
+                dict.fromkeys(
+                    lead
+                    for name in report.unknown_references
+                    for lead in _suggest(name, dialect=dialect)
+                )
+            )
+            if leads:
+                quoted = [f"`{lead}`" for lead in leads]
+                # "a, b or c" rather than "a or b or c" -- three `or`s in one
+                # clause reads as a parser bug rather than a list.
+                offered = (
+                    quoted[0] if len(quoted) == 1 else f"{', '.join(quoted[:-1])} or {quoted[-1]}"
+                )
+                message = f"{message} -- did you mean {offered}?"
+        emit("unknown-inspector", message, base_line, leads)
 
     if config.max_score is not None and report.complexity.score > config.max_score:
         detail = _complexity_detail(report)

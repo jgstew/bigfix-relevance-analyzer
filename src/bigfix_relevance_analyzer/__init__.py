@@ -39,13 +39,17 @@ from bigfix_relevance_analyzer.extract import (
 from bigfix_relevance_analyzer.inspectors import (
     Inspector,
     InspectorKind,
+    MatchKind,
     RelevanceType,
+    SearchResult,
     all_inspectors,
     ancestors,
     inspector_names,
     known_types,
     lookup,
     relevance_types,
+    search,
+    suggest,
 )
 from bigfix_relevance_analyzer.lint import (
     RULES,
@@ -87,9 +91,12 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 # `reference` is deliberately NOT imported here. It is the only submodule whose
 # work is measured in kilobytes of text rather than microseconds, and a stdio
-# MCP server that never serves a document should not pay for one at import. Same
-# reasoning as `inspectors`' own note: reach it with an explicit
-# `from bigfix_relevance_analyzer import reference`.
+# MCP server that never serves a document should not pay for one at import.
+# Reach it with an explicit `from bigfix_relevance_analyzer import reference`.
+#
+# `inspectors` is different and is imported: its tables parse lazily on first
+# call, so importing it costs nothing a consumer will not spend anyway the
+# moment it asks about a name.
 
 __all__ = [
     "COST_RULES",
@@ -109,6 +116,7 @@ __all__ = [
     "Level",
     "LintConfig",
     "LintRule",
+    "MatchKind",
     "Origin",
     "Outcome",
     "ParseError",
@@ -122,6 +130,7 @@ __all__ = [
     "RelevanceComplexity",
     "RelevanceSite",
     "RelevanceType",
+    "SearchResult",
     "Severity",
     "SiteKind",
     "Token",
@@ -158,6 +167,8 @@ __all__ = [
     "resolve_it_bindings",
     "rules",
     "score_relevance_complexity",
+    "search",
+    "suggest",
     "to_mermaid",
     "to_sexpr",
     "tokenize",

@@ -496,6 +496,80 @@ rather than repeating two sentences of prose on every finding. Both CLIs can
 print it: `python -m bigfix_relevance_analyzer --rules` and
 `bigfix-relevance-lint --list-rules` (add `--json` to either).
 
+### Finding an inspector you cannot name
+
+`lookup()` is exact-match: it answers "how do I use `files`". `inspectors.search()`
+answers the question a consumer actually arrives with - "what is this called" -
+and returns names `lookup()` can then resolve.
+
+```python
+from bigfix_relevance_analyzer import inspectors
+
+inspectors.search("registry keys")  # -> keys of <registry key>, via MatchKind.SIGNATURE
+inspectors.search("operating system")  # -> operating system, via MatchKind.FUZZY
+inspectors.suggest("registry")  # -> ('registry', 'registries', 'x32 registry')
+```
+
+Six match tiers, strongest first - `EXACT`, `PREFIX`, `WORDS`, `SIGNATURE`,
+`SUBSTRING`, `FUZZY` - and the tier is on every result as `SearchResult.match`.
+That is the useful answer rather than a score: `EXACT` means don't say "did you
+mean", `FUZZY` means say it out loud, and `SIGNATURE` means "nothing is called
+that, but this expression reads it". A float could not express any of those, and
+exposing `difflib`'s ratio would make its internals part of this package's API.
+
+Three things worth knowing:
+
+- **`SIGNATURE` is why phrases work.** `registry keys` is nobody's name;
+  `keys of <registry key>` is the answer, and only the signature contains both
+  words. Without that tier the query gets a fuzzy guess (`difflib` alone answers
+  `retry delays`).
+- **`search()` knows the engine's spoken operator names, `lookup()` does not.**
+  `lookup("mod")` is empty - `mod` lives in `Inspector.written_name`, not in
+  `written_forms()` - while `search("mod")` finds the `%` rows with
+  `name="%"`, `matched="mod"`. Every result's `name` is one `lookup()` resolves;
+  `matched` is what actually hit.
+- **`fuzzy=False`** skips the `difflib` pass. Precise tiers are sub-millisecond
+  and the fuzzy pass can reach tens, so a caller doing completion rather than
+  correction should turn it off - and then every result is a name that exists.
+
+There is no `platform` filter, deliberately, though `dialect` and `kind` are
+both there. Absence from the snapshot is never evidence, so filtering on
+platform would drop candidates on the strength of a gap in the dumps - and in a
+"did you mean", the way to fail is to hide the right answer. `dialect` is
+different in kind: the dumps cover both sides, so proposing `bes computers` for
+client relevance is positively wrong rather than merely unobserved.
+
+**`SearchResult.to_dict()` never embeds the rows.** `lookup("name")` is 96
+overloads and about 43 KB of JSON for one name, so a 25-result search that
+inlined them would cost a six-figure token count to answer "did you mean".
+Instead it emits identifiers plus at most five signatures, with `overloads`
+carrying the true count and `signatures_omitted` accounting for the rest - about
+6 KB worst case. **Search hands you an identifier; `lookup` hands you the row.**
+
+Turn `unknown-inspector` warnings into leads with `LintConfig(suggest=True)`:
+the message gains `-- did you mean \`registry\`?` and `Finding.suggestions`
+carries the same names as structure, so a server is not parsing prose. Off by
+default, because unknown names are common in a repo running newer inspectors
+than the snapshot - that is the rule's whole rationale - and a few thousand
+sites would add real latency to a hook for a warning that blocks nothing.
+
+The loop a model runs: `analyze_relevance_to_dict` -> read `unknown_references`
+and `types.diagnostics` -> `suggest()` for a typo or `search()` for a concept ->
+`lookup()` on the candidate to see its `operands` and `return_type` -> re-analyze.
+The split matters: a model with only `search` re-guesses operand types, and one
+with only `lookup` cannot recover from a typo.
+
+Search belongs on a **tool**, not a resource: a resource is addressable by a
+stable URI with no arguments, and a free-text query served as one is a tool in a
+resource costume whose result is neither listable nor cacheable. `lookup`
+legitimately could be a resource template (`inspector://<name>`) - stable,
+cacheable, no ranking - but nothing in the library needs to change for a server
+to do that. From the command line:
+
+```bash
+python -m bigfix_relevance_analyzer --search "registry keys"
+```
+
 ### Language reference resources
 
 `bigfix_relevance_analyzer.reference` serves three Markdown documents a server
@@ -530,8 +604,8 @@ from.
 `Detail.STANDARD` is around 6k tokens, `Detail.BRIEF` around 2.5k, and a test
 pins a character ceiling so a generated section cannot grow into a manual. The
 full inspector table is not served: 6,000 rows is a search index, not a
-reference, so `lookup()` plus `Inspector.to_dict()` is how a consumer answers a
-question about one name.
+reference, so `search()` and `lookup()` are how a consumer answers a question
+about one name - see "Finding an inspector you cannot name" above.
 
 Importing the package does **not** import `reference`, and importing
 `reference` does not build any document - the prose and table modules are

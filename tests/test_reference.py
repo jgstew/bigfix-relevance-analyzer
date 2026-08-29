@@ -417,3 +417,51 @@ def test_asking_for_a_reference_never_analyses_anything(
 
     assert main(["--rules", "exists files ("]) == 0
     assert "unbound-it" in capsys.readouterr().out
+
+
+def test_the_cli_searches_the_inspector_tables(capsys: pytest.CaptureFixture[str]) -> None:
+    """``--search`` makes the capability discoverable and the docs runnable."""
+    from bigfix_relevance_analyzer.__main__ import main
+
+    assert main(["--search", "registry keys"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("# Inspector search: registry keys")
+    assert "`keys of <registry key>`" in out
+    assert "signature" in out
+
+
+def test_the_cli_search_narrows_by_dialect(capsys: pytest.CaptureFixture[str]) -> None:
+    """Suggesting a session inspector to a client-relevance author is worse than silence."""
+    from bigfix_relevance_analyzer.__main__ import main
+
+    assert main(["--search", "bes computers", "--dialect", "session"]) == 0
+    assert "bes computers" in capsys.readouterr().out
+
+    assert main(["--search", "bes computers", "--dialect", "client"]) == 0
+    assert "`bes computers`" not in capsys.readouterr().out
+
+
+def test_the_cli_search_reports_nothing_found_without_failing(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """An empty result is an answer, not an error -- exit stays 0.
+
+    A script asking "is there anything called this" reads the output; making it
+    read the exit status instead would conflate "no match" with "the tool
+    broke".
+    """
+    from bigfix_relevance_analyzer.__main__ import main
+
+    assert main(["--search", "xyzzy"]) == 0
+    assert "Nothing matched." in capsys.readouterr().out
+
+
+def test_the_cli_search_emits_json(capsys: pytest.CaptureFixture[str]) -> None:
+    """The shape a server would hand a model, straight from the CLI."""
+    from bigfix_relevance_analyzer import inspectors
+    from bigfix_relevance_analyzer.__main__ import main
+
+    assert main(["--search", "sha", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["query"] == "sha"
+    assert payload["results"] == [result.to_dict() for result in inspectors.search("sha")]

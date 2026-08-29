@@ -20,11 +20,14 @@ The data is generated from the dumps in
 importing this module costs only the data module's own load -- a few
 milliseconds cold, and effectively nothing once bytecode is cached.
 
-That cost is small but not free, and most callers only want to extract
-relevance, so this module is deliberately **not** re-exported from the package
-root. Reach for it explicitly::
+That laziness is what makes the module cheap to reach. The package root does
+import it -- :func:`lookup`, :func:`search` and the row types are re-exported
+from there, because a consumer answering a question about a name should not have
+to know which submodule holds it -- but importing the package still does not
+parse a table. The first call does. Either spelling works, and neither costs
+anything until you ask a question::
 
-    from bigfix_relevance_analyzer import inspectors
+    from bigfix_relevance_analyzer import inspectors    # or: ... import lookup
 
 What this table is not
 ----------------------
@@ -38,20 +41,25 @@ should ever be drawn from it, the same discipline
 
 from __future__ import annotations
 
+import difflib
 import enum
 import functools
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Final
 
 from bigfix_relevance_analyzer import _inspector_data
 from bigfix_relevance_analyzer._serialize import _enums, _names
 from bigfix_relevance_analyzer.dialect import Dialect
 
 __all__ = [
+    "SIGNATURE_SAMPLE",
     "Inspector",
     "InspectorKind",
+    "MatchKind",
     "RelevanceType",
+    "SearchResult",
     "WrittenForm",
     "ancestors",
     "binary_operators",
@@ -60,7 +68,9 @@ __all__ = [
     "known_types",
     "lookup",
     "properties",
+    "search",
     "sources",
+    "suggest",
     "unary_operators",
     "written_form_of",
     "written_forms",
@@ -518,8 +528,16 @@ def inspector_names() -> frozenset[str]:
     """Every identifying phrase across all four categories.
 
     This is the set a tokenizer needs in order to decide where a multi-word
-    inspector name ends, and the candidate pool a "did you mean" suggester
-    should be drawn from.
+    inspector name ends.
+
+    It is **not** the right pool for a "did you mean", which this docstring used
+    to claim: it holds each row's :attr:`~Inspector.name` only, so it is some
+    2,500 entries short of what :func:`lookup` will actually match. The missing
+    ones are mostly plurals -- ``absolute values``, ``access modes`` -- and a
+    suggester drawn from here would therefore never propose a plural spelling,
+    which is half of how relevance is written. :func:`search` and
+    :func:`suggest` index every written form instead, plus the spoken operator
+    names that no written form carries.
     """
     return frozenset(entry.name for entry in all_inspectors())
 
@@ -584,3 +602,379 @@ def written_form_of(entry: Inspector, name: str) -> WrittenForm:
 def sources() -> tuple[str, ...]:
     """The dump labels rows are attributed to, e.g. ``client:windows``."""
     return _inspector_data.SOURCES
+
+
+# ---------------------------------------------------------------------------
+# Search
+# ---------------------------------------------------------------------------
+# `lookup` resolves a name you already have. This resolves a name you do not:
+# a half-remembered phrase, a typo, or a description of a relationship
+# ("registry keys"). The two are siblings rather than layers -- search hands
+# back an identifier, `lookup` hands back the rows -- and both draw on the same
+# `_by_name` index, which is why they live in one module.
+
+
+class MatchKind(enum.Enum):
+    """How a result matched. **Declaration order is the ranking**, strongest first.
+
+    The tier is the useful answer, which is why there is no numeric score:
+    :attr:`EXACT` means do not say "did you mean", :attr:`FUZZY` means say it
+    out loud, and :attr:`SIGNATURE` means "no name reads like that, but this
+    expression does". A float cannot express any of those, and exposing
+    :mod:`difflib`'s ratio would make its internals part of this package's
+    public API -- a caller writing ``if score > 0.8`` would pin a stdlib
+    implementation detail and freeze the cutoff forever.
+    """
+
+    EXACT = "exact"
+    """The query is a written form, verbatim after normalization."""
+
+    PREFIX = "prefix"
+    """A written form starts with the query. What a completion wants."""
+
+    WORDS = "words"
+    """Every word of the query is a word of some written form, in any order."""
+
+    SIGNATURE = "signature"
+    """Every word of the query appears in a *signature*, and in no name.
+
+    The tier that answers a relationship question. ``registry keys`` is not the
+    name of anything; ``keys of <registry key>`` is the only right answer, and
+    only the signature contains both words.
+    """
+
+    SUBSTRING = "substring"
+    """The query appears inside a written form, but not at its start."""
+
+    FUZZY = "fuzzy"
+    """Nothing above matched and :mod:`difflib` judged a form close. A typo, probably."""
+
+
+_MATCH_RANK: Final[dict[MatchKind, int]] = {kind: rank for rank, kind in enumerate(MatchKind)}
+"""Tier order, derived from the declaration order rather than restated.
+
+A second hand-maintained table would be one more thing to drift, and the
+enum's own order is already the documented ranking.
+"""
+
+SIGNATURE_SAMPLE: Final = 5
+"""How many signatures :meth:`SearchResult.to_dict` includes.
+
+A payload cap, not a data limit -- :attr:`SearchResult.inspectors` always holds
+every row. It exists because the full rows are enormous: ``lookup("name")`` is
+96 overloads and about 43,000 bytes of JSON for one name, so a 25-result search
+that embedded them would cost a six-figure token count to answer "did you mean".
+``signatures_omitted`` reports whatever this dropped, so the count is never
+silently lost. Same shape as the ``returns[:3]`` cap in
+:mod:`bigfix_relevance_analyzer.reference._tables`.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class SearchResult:
+    """One thing a query found, and how it was found."""
+
+    name: str
+    """The form to write in relevance, and one :func:`lookup` can always resolve.
+
+    Not necessarily the text that matched -- see :attr:`matched`. For a spoken
+    operator form this is the symbol (``%`` for a ``mod`` query), because that
+    is what :func:`lookup` answers to.
+    """
+
+    match: MatchKind
+    matched: str
+    """The text that actually hit: a written form, a signature, or a spoken name.
+
+    Kept separate from :attr:`name` because a "did you mean" has to quote what
+    it recognised. A ``names`` query matching rows whose signature says ``name``
+    should say ``names``, not silently correct itself.
+    """
+
+    inspectors: tuple[Inspector, ...]
+    """Every row behind :attr:`name`, after this search's filters. Never empty."""
+
+    @property
+    def signatures(self) -> tuple[str, ...]:
+        """Every distinct signature behind this result, sorted."""
+        return tuple(sorted({entry.signature for entry in self.inspectors}))
+
+    @property
+    def return_types(self) -> tuple[str, ...]:
+        """Every distinct type this can evaluate to, sorted."""
+        return tuple(sorted({entry.return_type for entry in self.inspectors}))
+
+    @property
+    def kinds(self) -> frozenset[InspectorKind]:
+        """Which introspection categories the rows behind this come from."""
+        return frozenset(entry.kind for entry in self.inspectors)
+
+    @property
+    def dialects(self) -> frozenset[Dialect]:
+        """Every dialect that defines any row behind this result."""
+        return frozenset(dialect for entry in self.inspectors for dialect in entry.dialects)
+
+    def to_dict(self) -> dict[str, Any]:
+        """This result as JSON-serializable plain data, sized for a wire.
+
+        Identifiers and a sample, never the rows themselves -- see
+        :data:`SIGNATURE_SAMPLE` for why, and use :func:`lookup` on
+        :attr:`name` to get the full rows for the one result a consumer settled
+        on. ``overloads`` is always the true count even when ``signatures`` is
+        capped, so a reader can tell a one-row answer from a ninety-six-row one.
+        """
+        signatures = self.signatures
+        return {
+            "name": self.name,
+            "match": self.match.value,
+            "matched": self.matched,
+            "kinds": _enums(self.kinds),
+            "dialects": _enums(self.dialects),
+            "return_types": list(self.return_types),
+            "overloads": len(self.inspectors),
+            "signatures": list(signatures[:SIGNATURE_SAMPLE]),
+            "signatures_omitted": max(0, len(signatures) - SIGNATURE_SAMPLE),
+        }
+
+
+def _words(text: str) -> frozenset[str]:
+    """The distinct words of ``text``, with signature punctuation split off.
+
+    ``<`` and ``>`` become separators so ``keys of <registry key>`` yields
+    ``{keys, of, registry, key}`` -- otherwise a query word would have to match
+    ``<registry`` with the bracket attached.
+    """
+    return frozenset(text.lower().replace("<", " ").replace(">", " ").split())
+
+
+@dataclass(frozen=True, slots=True)
+class _SearchIndex:
+    """Everything a query needs, built once.
+
+    One unfiltered index rather than one per ``(dialect, kind)``: the build is a
+    few milliseconds and a filtered pass over the rows is a fraction of one, so
+    per-filter variants would trade eight builds for nothing -- and a
+    :func:`functools.cache` keyed on filters is a leak waiting for a caller that
+    passes many.
+    """
+
+    forms: tuple[str, ...]
+    """Every searchable form, sorted. The candidate pool :mod:`difflib` scans."""
+
+    by_form: Mapping[str, tuple[Inspector, ...]]
+    """Rows per form. A superset of :func:`_by_name`'s keys -- see the note below."""
+
+    form_words: Mapping[str, frozenset[str]]
+    signature_words: tuple[tuple[str, frozenset[str], Inspector], ...]
+
+
+@functools.cache
+def _search_index() -> _SearchIndex:
+    """Build the search index. Cached, and never built at import.
+
+    The pool is deliberately **wider than** :func:`lookup`'s. It adds each row's
+    :attr:`~Inspector.written_name` and :attr:`~Inspector.symbol` -- the engine's
+    own spoken words for an operator -- which :func:`written_forms` does not
+    carry. Without them ``search("mod")`` finds nothing, though ``mod`` is
+    exactly how modulo is written in relevance source, and a reader who saw the
+    engine's own ``the operator 'plus' is not defined`` has no way in either.
+
+    :func:`lookup` is left alone on purpose:
+    :data:`~bigfix_relevance_analyzer.grammar.CANONICAL_BINARY` already maps
+    ``mod`` to ``%`` before the tokenizer and type-checker consult it, so the
+    gap is a discovery problem rather than a resolution one, and widening a
+    function the parser depends on to fix a search issue would be the wrong
+    trade.
+    """
+    by_form: dict[str, list[Inspector]] = {}
+    for entry in all_inspectors():
+        forms = [*written_forms(entry)]
+        forms.extend(extra.lower() for extra in (entry.written_name, entry.symbol) if extra)
+        for form in dict.fromkeys(forms):
+            by_form.setdefault(form, []).append(entry)
+
+    frozen = {form: tuple(entries) for form, entries in by_form.items()}
+    return _SearchIndex(
+        forms=tuple(sorted(frozen)),
+        by_form=frozen,
+        form_words={form: _words(form) for form in frozen},
+        signature_words=tuple(
+            (entry.signature, _words(entry.signature), entry) for entry in all_inspectors()
+        ),
+    )
+
+
+def _normalize_query(query: str) -> str:
+    """Lowercase ``query`` and collapse every whitespace run to one space.
+
+    Stronger than :func:`lookup`'s ``.strip().lower()``, deliberately: a search
+    query is typed or pasted, so ``"Registry  Keys"`` and ``"registry keys"``
+    have to be the same question. :func:`lookup` stays literal because it
+    answers about an exact name.
+    """
+    return " ".join(query.split()).lower()
+
+
+def _canonical_name(form: str, entries: tuple[Inspector, ...]) -> str:
+    """The form to report as :attr:`SearchResult.name` for a match on ``form``.
+
+    ``form`` itself when :func:`lookup` can resolve it, which is the usual case.
+    Otherwise the rows' own name -- that is how a spoken-form match on ``mod``
+    reports ``%``, keeping the invariant that every result's ``name`` resolves.
+    """
+    return form if form in _by_name() else entries[0].name
+
+
+def search(
+    query: str,
+    *,
+    dialect: Dialect | None = None,
+    kind: InspectorKind | None = None,
+    fuzzy: bool = True,
+    limit: int = 25,
+) -> tuple[SearchResult, ...]:
+    """Find inspectors from a partial, misspelled, or descriptive ``query``.
+
+    The counterpart to :func:`lookup`: this answers "what is this called", and
+    :func:`lookup` then answers "how do I use it". One result per matched text,
+    best first, with :attr:`SearchResult.match` saying how each was found.
+
+    ``dialect`` narrows to one side of the language. ``kind`` narrows to one
+    introspection category. **There is deliberately no** ``platform`` **filter**,
+    despite :class:`~bigfix_relevance_analyzer.lint.LintConfig` having one: this
+    module's rule is that absence from the snapshot is never evidence, and
+    filtering on platform would *remove* candidates on the strength of a gap in
+    the dumps -- in a "did you mean", the way to fail is to hide the right
+    answer. ``dialect`` is different in kind, because the dumps cover both sides
+    and so proposing ``bes computers`` for client relevance is positively wrong
+    rather than merely unobserved. Filter on
+    :attr:`~Inspector.platforms` yourself if you want it.
+
+    ``fuzzy=False`` skips the :mod:`difflib` pass. That is a cost and a
+    semantics switch, not a tuning knob: the precise tiers are well under a
+    millisecond and the fuzzy pass can reach tens, and a caller doing
+    completion rather than correction does not want invented near-misses. With
+    it off, every result is a form that genuinely exists.
+
+    Returns ``()`` for a blank query or a non-positive ``limit`` -- never the
+    whole table -- and ``()`` when nothing matched, which is the honest answer
+    and the one a suggester needs. Never raises.
+    """
+    normalized = _normalize_query(query)
+    if not normalized or limit <= 0:
+        return ()
+
+    index = _search_index()
+
+    # Filter before ranking, always. A row that cannot be returned must not
+    # occupy a slot -- otherwise a narrow search comes back empty while answers
+    # existed -- and the pool is rebuilt from what survives, so a form whose
+    # every row was filtered out disappears rather than lingering as an empty
+    # result. `Inspector.dialects` recomputes on each access, so the membership
+    # test is resolved here, once per row, rather than inside a sort callback.
+    def keep(entry: Inspector) -> bool:
+        if kind is not None and entry.kind is not kind:
+            return False
+        return not (dialect is not None and dialect not in entry.dialects)
+
+    filtered = kind is not None or dialect is not None
+    by_form: Mapping[str, tuple[Inspector, ...]]
+    if filtered:
+        by_form = {
+            form: kept
+            for form, entries in index.by_form.items()
+            if (kept := tuple(entry for entry in entries if keep(entry)))
+        }
+        signature_words = tuple(row for row in index.signature_words if keep(row[2]))
+    else:
+        by_form = index.by_form
+        signature_words = index.signature_words
+    forms = tuple(sorted(by_form)) if filtered else index.forms
+
+    query_words = _words(normalized)
+    found: dict[str, tuple[MatchKind, str, tuple[Inspector, ...]]] = {}
+
+    def offer(matched: str, kind_: MatchKind, name: str, entries: tuple[Inspector, ...]) -> None:
+        """Record a match, keeping the strongest tier for any given matched text."""
+        current = found.get(matched)
+        if current is None or _MATCH_RANK[kind_] < _MATCH_RANK[current[0]]:
+            found[matched] = (kind_, name, entries)
+
+    # Name tiers, keyed on the form: this is what collapses `name`'s 96 rows
+    # into a single answer.
+    for form in forms:
+        entries = by_form[form]
+        name = _canonical_name(form, entries)
+        if form == normalized:
+            offer(form, MatchKind.EXACT, name, entries)
+        elif form.startswith(normalized):
+            offer(form, MatchKind.PREFIX, name, entries)
+        elif query_words <= index.form_words[form]:
+            offer(form, MatchKind.WORDS, name, entries)
+        elif normalized in form:
+            offer(form, MatchKind.SUBSTRING, name, entries)
+
+    # Signature tier, keyed on the *signature*, because there the signature is
+    # the answer: `files of <folder>` and `fifo files of <folder>` are two
+    # genuinely different things, and collapsing both to `files` would discard
+    # what the query was asking about.
+    if not any(state[0] is MatchKind.EXACT for state in found.values()):
+        for signature, words, entry in signature_words:
+            if query_words <= words:
+                form = written_forms(entry)[0]
+                offer(
+                    signature,
+                    MatchKind.SIGNATURE,
+                    _canonical_name(form, (entry,)),
+                    by_form.get(form, (entry,)),
+                )
+
+    if fuzzy and len(found) < limit:
+        for close in difflib.get_close_matches(normalized, forms, n=limit, cutoff=0.6):
+            entries = by_form[close]
+            offer(close, MatchKind.FUZZY, _canonical_name(close, entries), entries)
+
+    def sort_key(
+        item: tuple[str, tuple[MatchKind, str, tuple[Inspector, ...]]],
+    ) -> tuple[int, int, float, int, str]:
+        matched, (kind_, _name, _entries) = item
+        # The first-character preference applies to the fuzzy tier only, which
+        # is where it was measured: raw ratio ranks `lines` above `files` for
+        # `flies`, and this fixes it. In the exact and prefix tiers it is always
+        # zero, and in the substring tier the first character by definition does
+        # not match, so applying it there would be noise dressed as a heuristic.
+        penalty = 0 if kind_ is not MatchKind.FUZZY else int(not matched.startswith(normalized[:1]))
+        # Likewise the ratio: meaningful only where the tier itself does not
+        # already order things, and inert (1.0) above.
+        ratio = (
+            difflib.SequenceMatcher(None, normalized, matched).ratio()
+            if kind_ in (MatchKind.SUBSTRING, MatchKind.FUZZY)
+            else 1.0
+        )
+        return (_MATCH_RANK[kind_], penalty, -ratio, len(matched), matched)
+
+    ordered = sorted(found.items(), key=sort_key)
+    return tuple(
+        SearchResult(name=name, match=kind_, matched=matched, inspectors=entries)
+        for matched, (kind_, name, entries) in ordered[:limit]
+    )
+
+
+def suggest(name: str, *, dialect: Dialect | None = None, limit: int = 3) -> tuple[str, ...]:
+    """Names ``name`` was plausibly meant to be, best first. ``()`` when none are.
+
+    The join a consumer of the ``unknown-inspector`` rule would otherwise write,
+    and it is here because it carries decisions they should not each make
+    differently: how many leads help before they become noise, and that ``name``
+    itself is never among them -- echoing back the name just reported as unknown
+    reads as a contradiction, and it can happen, because a name can be a real
+    written form that this *dialect* does not define.
+
+    Names rather than :class:`SearchResult`s: a message wants a few strings, and
+    a caller that wants the rows has :func:`search` and :func:`lookup`.
+    """
+    return tuple(
+        result.name
+        for result in search(name, dialect=dialect, limit=limit + 1)
+        if result.name != _normalize_query(name)
+    )[:limit]
