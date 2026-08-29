@@ -709,6 +709,30 @@ grep -E '^(Q: )?A: ' | sed -E 's/^Q: A: //; s/^A: //; s/\r$//; s/%09/\t/g; s/%25
 extra `s/%09/\t/g`; for a direct `QnA`/`qna.exe` pipe without job-log framing,
 drop the two `sed -E` steps before `grep` and keep the rest.)
 
+### Doing all of that in one command
+
+`tools/generate_client_dumps.py` drives a local `QnA` through all five queries
+above and writes this folder's files directly, so a platform or a client
+version can be re-captured rather than transcribed:
+
+```bash
+python tools/generate_client_dumps.py --qna /path/to/QnA --context ubuntu
+```
+
+It handles both traps in code rather than by pipeline, and adds the check
+neither the pipeline nor a byte comparison can make: **each category's row
+count is compared against the engine's own `number of properties` / `number of
+casts` / `number of binary operators` / `number of unary operators` / `number
+of types`.** That is what catches the dropped first answer, which is invisible
+in the output and shows up only as a table one row short. The counts are
+verified where the engine is, at capture time; the per-file `Signatures`
+columns above stay the record on this side. `--stdout` prints without writing,
+`--out` writes elsewhere for review first, `--no-verify` skips the count check.
+
+`tests/test_generate_client_dumps.py` pins the parsing against fixture
+transcripts, and asserts the script's five queries are byte-identical to the
+ones documented above -- so this section and the tool cannot drift apart.
+
 ## Further reading
 
 Authoritative but not exhaustive - useful for looking up an inspector's full

@@ -44,8 +44,11 @@ interface for scorers and hooks - including for an expression nested deeper than
 escapes it. Every relevance site in the example corpus
 currently parses; grammar decisions that have not been spot-checked against a
 real evaluator are tagged `[unverified]` in their corpus record titles. Not
-done yet, deliberately: type-directed disambiguation, error-recovery nodes,
-and rebasing the complexity scorer onto the AST.
+done yet, deliberately: type-directed disambiguation, rebasing the complexity
+scorer onto the AST, and error-recovery nodes - the last of these tracked in
+[#10](https://github.com/jgstew/bigfix-relevance-analyzer/issues/10) with the
+rest of the editor-surface work, since a partial AST has no consumer until
+there is an editor to draw it.
 
 The node set follows the engine's own, so that later analysis is a translation
 rather than a mapping exercise. Three constructs the engine gives dedicated
@@ -736,10 +739,10 @@ expression - splicing the raw text gets you
 ## Diagnostic vocabulary
 
 `bigfix_relevance_analyzer.diagnostics` is a catalog of the messages BigFix
-itself produces, as `str.format` templates. Nothing emits them yet; it exists so
-that when a checker lands, its output is wording BigFix authors already
-recognize rather than a second vocabulary to learn. Imported explicitly, like
-`inspectors`.
+itself produces, as `str.format` templates. `typecheck` emits every type-check
+entry in it - a test fails on any that becomes unreachable - so the checker's
+output is wording BigFix authors already recognize rather than a second
+vocabulary to learn. Imported explicitly, like `inspectors`.
 
 Two vocabularies are kept, because the same broken expression produces different
 messages depending on which part of BigFix sees it. The runtime collapses
@@ -801,9 +804,21 @@ picked up with no code change.
 
 `bigfix_relevance_analyzer.typecheck` types an expression against the inspector
 table and reports findings in BigFix's own wording. It is imported explicitly,
-like `inspectors`. This is the first slice: literals, casts, operators,
-aggregation, tuples and conditionals are typed; `of` chains and `whose` filters
-still need property resolution and come back as unknown.
+like `inspectors`. Every construct is typed: literals, casts, operators,
+aggregation, tuples and conditionals, and the `of` chains, `whose` filters and
+`it` references that need property resolution.
+
+`of` and `whose` introduce the context `it` refers to, and the object comes
+first - in `A of B`, `B` is typed in the enclosing context and only then becomes
+the context `A` is typed in. `binding.py` states the same rule for the same
+reason, and a test holds the two together. A context does not hide the world: a
+global name written inside one still resolves against the world when the context
+defines nothing by that name, which is why
+`packages ... whose (exists properties whose (...))` types clean.
+
+One mistake produces one finding. A ruled-out value silences the checks it feeds
+rather than cascading `<none> as trimmed string` and `<none> != <string>` behind
+the property that actually went wrong.
 
 `analyze_relevance` calls this with an environment built from the dialect and
 platform it was given; reach for the module directly to control the environment

@@ -2,9 +2,21 @@
 
 The BigFix Fixlet Debugger carries a full static type checker, separate from the
 terse errors the evaluator prints, and it is the piece nothing in the open-source
-ecosystem reproduces. This module is the start of one: the type model, the
-environment resolution runs against, and checking for every construct that does
-not need property resolution.
+ecosystem reproduces. This module is one: the type model, the environment
+resolution runs against, and checking for every construct in the language --
+including the ones that need property resolution, which is most of them.
+
+Context, and why the walk is not in source order
+------------------------------------------------
+``of`` and ``whose`` introduce the context ``it`` refers to, and the object
+comes *first*: in ``A of B``, ``B`` is typed in the enclosing context and only
+then becomes the context ``A`` is typed in. The walk therefore queues the
+second child before the first, which is the one place its order departs from
+the source. :mod:`bigfix_relevance_analyzer.binding` states the same rule for
+the same reason, and the two are held together by a test.
+
+A context does not hide the world: a global name written inside one still
+resolves against the world when the context defines nothing by that name.
 
 Set-valued types
 ----------------
@@ -51,7 +63,11 @@ from typing import Any, assert_never
 
 from bigfix_relevance_analyzer import grammar, inspectors
 from bigfix_relevance_analyzer._serialize import _span
-from bigfix_relevance_analyzer.diagnostics import DIAGNOSTICS
+from bigfix_relevance_analyzer.diagnostics import (
+    DIAGNOSTICS,
+    PROPERTY_DIRECT_OBJECT_FRAGMENT,
+    PROPERTY_INDEX_FRAGMENT,
+)
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.nodes import (
     Bar,
@@ -237,19 +253,82 @@ def _render(types: frozenset[str] | None) -> str:
     return " or ".join(sorted(types))
 
 
+def _ruled_out(value: RelevanceValue) -> bool:
+    """Whether every candidate type was already eliminated.
+
+    The finding was reported where it happened. Anything downstream of it can
+    only repeat the same mistake in different words -- `<none> as trimmed
+    string`, `<none> != <string>` -- so a ruled-out value silences the checks
+    it feeds rather than cascading through them. The value stays empty rather
+    than becoming `None`: the statement really is known-broken, and
+    :attr:`CheckResult.ok` must keep saying so.
+    """
+    return value.types is not None and not value.types
+
+
+def _collapses(name: str) -> bool:
+    """Whether this name is the collapsing form of a multivalued property.
+
+    ``unique value of X``, ``maximum of X``, ``minimum of X``: written in the
+    singular, over rows the tables mark ``multivalued``. These consume their
+    object's plurality rather than distributing over it -- ``unique value of
+    dns domainnames of local computers of active directories`` is one string,
+    however many domain names went in, which is why the corpus writes
+    ``it contains unique value of ...`` where ``contains`` demands a singular
+    right operand.
+
+    Contrast ``name of files of folder "c:\\"``: ``name`` is not multivalued,
+    so it distributes and the chain stays plural.
+
+    [unverified] Reasoned from the tables plus the corpus usage above; not
+    executed against an engine.
+    """
+    rows = inspectors.lookup(name, kind=inspectors.InspectorKind.PROPERTY)
+    return bool(rows) and all(
+        entry.multivalued
+        and inspectors.written_form_of(entry, name) is inspectors.WrittenForm.SINGULAR
+        for entry in rows
+    )
+
+
+def _widen(*pluralities: Plurality) -> Plurality:
+    """Plural anywhere in a chain makes the chain plural; unknown poisons."""
+    if Plurality.PLURAL in pluralities:
+        return Plurality.PLURAL
+    if Plurality.UNKNOWN in pluralities:
+        return Plurality.UNKNOWN
+    return Plurality.SINGULAR
+
+
 def _diagnostic(code: str, span: Span, **fields: object) -> TypeDiagnostic:
     entry = DIAGNOSTICS[code]
     return TypeDiagnostic(code=code, message=entry.format(**fields), span=span)
 
 
 def resolve_property(
-    name: str, subject: frozenset[str] | None, environment: TypeEnvironment
+    name: str,
+    subject: frozenset[str] | None,
+    environment: TypeEnvironment,
+    *,
+    indexed: bool | None = None,
 ) -> RelevanceValue:
     """Resolve a property against the types its direct object might have.
 
     ``subject`` is the set of possible direct-object types, or ``None`` for a
     property written without one -- ``processors``, ``drives`` -- which the
     tables record with no operands.
+
+    ``indexed`` says whether the property was written with an index argument --
+    the ``"foo"`` in ``key "foo" of registry``. ``True`` keeps only rows that
+    take one and ``False`` only rows that do not, which is how ``processors``
+    and ``processor 0`` are told apart; ``None``, the default, does not
+    discriminate.
+
+    Only the *presence* of an index is matched, never its type. A string
+    literal legitimately satisfies a ``<binary_string>`` index -- the engine
+    converts implicitly, and this package does not model conversions -- so
+    comparing the two would reject ``file "c:\\windows"``, which is about the
+    most common expression in the language.
 
     This is where the set narrows. Only the candidate types that actually define
     ``name`` survive, and the platform set contracts to the rows that matched,
@@ -276,6 +355,9 @@ def resolve_property(
     ]
     if not rows:
         return RelevanceValue(types=None, platforms=environment.universe)
+
+    if indexed is not None:
+        rows = [entry for entry in rows if (entry.index_type is not None) is indexed]
 
     if subject is None:
         matched = [entry for entry in rows if not entry.operands]
@@ -307,11 +389,9 @@ def resolve_property(
 def check(node: Node, environment: TypeEnvironment) -> CheckResult:
     """Type ``node``, reporting findings in the engine's own wording.
 
-    Constructs needing property resolution -- :class:`~...nodes.Reference`,
-    :class:`~...nodes.Of`, :class:`~...nodes.It`, :class:`~...nodes.Whose` --
-    come back with ``types=None`` rather than a guess, and ``None`` propagates
-    without ever becoming an error. The checker is quiet about what it cannot
-    yet reason about rather than wrong about it.
+    A name the tables do not contain comes back with ``types=None`` rather than
+    a guess, and ``None`` propagates without ever becoming an error. The checker
+    is quiet about what it cannot reason about rather than wrong about it.
     """
     checker = _Checker(environment)
     value = checker.run(node)
@@ -342,7 +422,21 @@ class _EndBranch:
     """Set aside the findings this branch produced."""
 
 
-_Work = _Descend | _Combine | _BeginBranch | _EndBranch
+@dataclass(frozen=True, slots=True)
+class _PushContext:
+    """Make the value just computed the context `it` refers to.
+
+    Queued between the two children of an `of` or a `whose`, so that the object
+    is typed in the *enclosing* context and only the property sees it.
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class _PopContext:
+    """Leave that context again."""
+
+
+_Work = _Descend | _Combine | _BeginBranch | _EndBranch | _PushContext | _PopContext
 
 
 class _Checker:
@@ -362,6 +456,13 @@ class _Checker:
         self.values: list[RelevanceValue] = []
         self.marks: list[int] = []
         self.branches: list[list[TypeDiagnostic]] = []
+        # What `it` refers to, innermost last. Empty is the implicit world, and
+        # an `it` reached with it empty is the `used-without-context` finding.
+        # There is deliberately no World node: absence of a context *is* the
+        # root, and inventing a node for it would change every parse tree.
+        self.contexts: list[RelevanceValue] = []
+        # Reference nodes whose own resolution is not the finding to report.
+        self.suppressed: set[int] = set()
         # Per-item types, so `item N of (...)` can pick one out after the tuple
         # as a whole has been collapsed to a single value.
         self.tuple_items: dict[int, tuple[RelevanceValue, ...]] = {}
@@ -381,6 +482,12 @@ class _Checker:
                     at = self.marks.pop()
                     self.branches.append(self.diagnostics[at:])
                     del self.diagnostics[at:]
+                case _PushContext():
+                    # The object's value is still on the value stack; its
+                    # `combine` has not run yet.
+                    self.contexts.append(self.values[-1])
+                case _PopContext():
+                    self.contexts.pop()
                 case _:  # pragma: no cover - exhaustiveness over _Work
                     assert_never(item)
         return self.values.pop()
@@ -407,12 +514,37 @@ class _Checker:
         self, value: RelevanceValue, span: Span, code: str, **fields: object
     ) -> None:
         """Only complain on positive evidence: an unknown type is not a finding."""
-        if value.types is None:
+        if value.types is None or _ruled_out(value):
             return
         if "boolean" not in value.types or value.plurality is Plurality.PLURAL:
             self.report(
                 code, span, plurality=value.plurality.value, type=_render(value.types), **fields
             )
+
+    def require_singular(
+        self, value: RelevanceValue, span: Span, code: str, **fields: object
+    ) -> None:
+        """The engine's `A singular expression is required.`, said precisely.
+
+        Positive evidence only, the same as :meth:`require_singular_boolean`:
+        `Plurality.UNKNOWN` is not a finding.
+        """
+        if value.plurality is Plurality.PLURAL:
+            self.report(code, span, **fields)
+
+    def context_value(self, span: Span) -> RelevanceValue:
+        """What `it` refers to here, reporting the unbound case.
+
+        Always singular, however plural the context is: `A of B` evaluates `A`
+        once per element of `B`, so `it` is one element and not the collection.
+        """
+        if not self.contexts:
+            self.report("used-without-context", span, token="it")
+            return RelevanceValue(types=None, platforms=self.env.universe)
+        context = self.contexts[-1]
+        return RelevanceValue(
+            types=context.types, plurality=Plurality.SINGULAR, platforms=context.platforms
+        )
 
     def pop(self, count: int) -> list[RelevanceValue]:
         """The last `count` child values, back in source order."""
@@ -436,7 +568,7 @@ class _Checker:
             case StringLiteral():
                 self.values.append(self.literal("string"))
             case It():
-                self.values.append(self.unknown())
+                self.values.append(self.context_value(node.span))
             case Cast(operand=operand) | Unary(operand=operand) | Exists(operand=operand):
                 work.append(_Combine(node))
                 work.append(_Descend(operand))
@@ -447,12 +579,24 @@ class _Checker:
                 work.append(_Combine(node))
                 work.append(_Descend(right))
                 work.append(_Descend(left))
-            case Of(prop=first, obj=second) | Whose(collection=first, predicate=second):
-                # Not typed yet -- but still walked, because a type error inside
-                # one is a type error wherever it sits.
+            case Of(prop=first, obj=second) | Whose(collection=second, predicate=first):
+                # The context-introducing constructs, and the reason this walk
+                # cannot simply queue children in source order: `second` -- the
+                # object of an `of`, the collection of a `whose` -- is typed in
+                # the *enclosing* context, and only then becomes the context
+                # `first` is typed in. Getting this backwards silently binds the
+                # wrong node in every nested expression. `binding.py` spells out
+                # the same rule for the same reason.
+                if isinstance(node, Of) and self.bad_tuple_index(node) is not None:
+                    # `item "a" of (1,2,3)` is one mistake, not two: the tuple
+                    # rule is the finding, so the name is not also resolved as
+                    # the `item <string> of <folder>` property it is not.
+                    self.suppressed.add(id(node.prop))
                 work.append(_Combine(node))
-                work.append(_Descend(second))
+                work.append(_PopContext())
                 work.append(_Descend(first))
+                work.append(_PushContext())
+                work.append(_Descend(second))
             case Reference(index=index):
                 work.append(_Combine(node))
                 if index is not None:
@@ -505,12 +649,16 @@ class _Checker:
                 values = self.pop(len(items))
                 self.tuple_items[id(node)] = tuple(values)
                 self.values.append(self.combine_sequence(node, values))
-            case Of() | Whose():
-                self.pop(2)
-                self.values.append(self.unknown())
+            case Of():
+                # Pushed object-first by `descend`, so that is the order back.
+                obj, prop = self.pop(2)
+                self.values.append(self.combine_of(node, prop, obj))
+            case Whose():
+                collection, predicate = self.pop(2)
+                self.values.append(self.combine_whose(node, collection, predicate))
             case Reference(index=index):
-                self.pop(0 if index is None else 1)
-                self.values.append(self.unknown())
+                taken = self.pop(0 if index is None else 1)
+                self.values.append(self.combine_reference(node, taken[0] if taken else None))
             case NumberLiteral() | StringLiteral() | It():  # pragma: no cover - never queued
                 pass
             case _:  # pragma: no cover - exhaustiveness over the Node union
@@ -528,9 +676,135 @@ class _Checker:
             platforms=self.env.universe,
         )
 
+    def combine_reference(self, node: Reference, index: RelevanceValue | None) -> RelevanceValue:
+        """A name, resolved against whatever context encloses it.
+
+        At the root there is no context, and a property is looked up among the
+        rows that take no direct object -- `processors`, `drives`, `true`. That
+        is the same lookup the debugger makes against the implicit world.
+
+        A context does not hide the world. A global name written inside one
+        still resolves against the world when the context defines nothing by
+        that name -- `files whose (name of it = name of operating system)` is
+        ordinary relevance, and the corpus contains
+        `packages ... whose (exists properties whose (...))`, where `properties`
+        is the world's. So resolution falls back, and only a name the *world*
+        does not define either is a finding.
+        """
+        if id(node) in self.suppressed:
+            return self.unknown()
+        if self.contexts and _ruled_out(self.contexts[-1]):
+            return self.contexts[-1]
+        subject = self.contexts[-1].types if self.contexts else None
+        if self.contexts and subject is None:
+            # The context itself is unresolved, so nothing can be concluded
+            # about a property of it.
+            return self.unknown()
+        value = resolve_property(node.phrase, subject, self.env, indexed=node.index is not None)
+        if subject is not None and value.types is not None and not value.types:
+            world = resolve_property(node.phrase, None, self.env, indexed=node.index is not None)
+            if world.types:
+                return world
+        if value.types is not None and not value.types:
+            self.report(
+                "property-not-defined",
+                node.span,
+                phrase=node.phrase,
+                index=(
+                    ""
+                    if index is None
+                    else PROPERTY_INDEX_FRAGMENT.format(name=_render(index.types))
+                ),
+                direct_object=(
+                    ""
+                    if subject is None
+                    else PROPERTY_DIRECT_OBJECT_FRAGMENT.format(name=_render(subject))
+                ),
+            )
+        return value
+
+    def combine_of(self, node: Of, prop: RelevanceValue, obj: RelevanceValue) -> RelevanceValue:
+        """`A of B` -- the property's own type, over the object's plurality.
+
+        Plural anywhere in a chain makes the whole chain plural: `name of files
+        of folder "c:\\"` is one name per file, not one name.
+        """
+        index = self.bad_tuple_index(node)
+        if index is not None:
+            self.report("tuple-index-not-literal", node.span, token=index.text)
+            return RelevanceValue(types=frozenset(), platforms=frozenset())
+        collapses = isinstance(node.prop, Reference) and _collapses(node.prop.phrase)
+        return RelevanceValue(
+            types=prop.types,
+            # An aggregate consumes its object's plurality; everything else
+            # distributes over it.
+            plurality=prop.plurality if collapses else _widen(prop.plurality, obj.plurality),
+            # A chain intersects: every step has to hold at once.
+            platforms=prop.platforms & obj.platforms,
+        )
+
+    def bad_tuple_index(self, node: Of) -> NumberLiteral | StringLiteral | None:
+        """The offending index of an `item <not an integer literal> of <tuple>`.
+
+        The parser builds :class:`~...nodes.ItemOf` only for an integer-literal
+        index, because telling a tuple subscript from the real `item <string> of
+        <folder>` property needs the object's type -- which the checker has and
+        the parser deliberately does not. So the rule lands here.
+
+        Only a literal index is recognised, since the message names the
+        offending token and the checker is not given the source text to quote a
+        computed one from.
+        """
+        if not isinstance(node.obj, TupleExpr) or not isinstance(node.prop, Reference):
+            return None
+        index = node.prop.index
+        if node.prop.phrase != "item" or not isinstance(index, NumberLiteral | StringLiteral):
+            return None
+        return index
+
+    def branches_coexist(self, then_value: RelevanceValue, else_value: RelevanceValue) -> bool:
+        """Whether any one platform sees both branches of an `if` at once.
+
+        The type axis has to answer to the platform axis here. Two branches
+        with no platform in common are alternatives *by construction* -- one
+        reading exists on Windows, the other on Linux -- and their types
+        differing is the whole point, not a mistake. Only branches that some
+        single platform could take together can disagree about type.
+
+        Session relevance has no platform axis, so every branch coexists there.
+        """
+        if self.env.dialect is not Dialect.CLIENT:
+            return True
+        return bool(then_value.platforms & else_value.platforms)
+
+    def combine_whose(
+        self, node: Whose, collection: RelevanceValue, predicate: RelevanceValue
+    ) -> RelevanceValue:
+        """`X whose (P)` -- `X`'s type, filtered.
+
+        The filter must be boolean but **may be plural**, which is the asymmetry
+        against an `if` condition. The message reproduces that: it names no
+        plurality because the rule does not have one.
+        """
+        if (
+            predicate.types is not None
+            and not _ruled_out(predicate)
+            and "boolean" not in predicate.types
+        ):
+            self.report(
+                "whose-filter-not-boolean", node.predicate.span, type=_render(predicate.types)
+            )
+        return RelevanceValue(
+            types=collection.types,
+            plurality=Plurality.PLURAL,
+            platforms=collection.platforms & predicate.platforms,
+        )
+
     def combine_cast(self, node: Cast, operand: RelevanceValue) -> RelevanceValue:
         if operand.types is None:
             return self.unknown()
+        if _ruled_out(operand):
+            return operand
         rows = [
             entry
             for entry in self.rows(
@@ -571,6 +845,16 @@ class _Checker:
             )
             return self.literal("boolean")
 
+        # An operator takes one value a side, whatever its types. This is the
+        # engine's `A singular expression is required.`, and it is the
+        # operator's own rule -- `sizes of it > 1000` inside a `whose` fails
+        # here, not on the filter, which may itself be plural.
+        self.require_singular(left, node.left.span, "left-operand-not-singular", token=node.op)
+        self.require_singular(right, node.right.span, "right-operand-not-singular", token=node.op)
+
+        if _ruled_out(left) or _ruled_out(right):
+            return RelevanceValue(types=frozenset(), platforms=frozenset())
+
         form = grammar.CANONICAL_BINARY.get(node.op)
         if form is None or left.types is None or right.types is None:
             return self.unknown()
@@ -608,8 +892,11 @@ class _Checker:
                 operand, node.operand.span, "argument-not-boolean", token="not"
             )
             return self.literal("boolean")
+        self.require_singular(operand, node.operand.span, "argument-not-singular", token=node.op)
         if operand.types is None:
             return self.unknown()
+        if _ruled_out(operand):
+            return operand
         rows = [
             entry
             for entry in self.rows(
@@ -632,8 +919,27 @@ class _Checker:
         )
 
     def combine_bar(self, node: Bar, left: RelevanceValue, right: RelevanceValue) -> RelevanceValue:
-        if left.types is not None and right.types is not None and not (left.types & right.types):
-            self.report("incompatible-types", node.span)
+        # The evaluator prints the terse `Incompatible types.` for this; the
+        # checker's own templated form names both types, which is the one worth
+        # showing. [unverified] -- the wording is the checker's, but `|` has no
+        # operator-table row to confirm which of the two it uses.
+        if (
+            left.types
+            and right.types
+            and not _ruled_out(left)
+            and not _ruled_out(right)
+            and not (left.types & right.types)
+            # Same tolerance as an `if`: two sides no single platform sees
+            # together are alternatives, and their types differing is the point.
+            and self.branches_coexist(left, right)
+        ):
+            self.report(
+                "operand-types-incompatible",
+                node.span,
+                token="|",
+                left_type=_render(left.types),
+                right_type=_render(right.types),
+            )
         types = None if left.types is None or right.types is None else left.types | right.types
         return RelevanceValue(
             types=types,
@@ -674,6 +980,22 @@ class _Checker:
             self.report("both-if-branches-have-type-errors", node.span)
             self.diagnostics.extend(then_found)
             self.diagnostics.extend(else_found)
+
+        if (
+            then_value.types
+            and else_value.types
+            and not (then_value.types & else_value.types)
+            and not (then_found or else_found)
+            and self.branches_coexist(then_value, else_value)
+        ):
+            # Both branches typed cleanly and share nothing: the statement has
+            # no single type, whichever branch runs.
+            self.report(
+                "if-branch-types-incompatible",
+                node.span,
+                if_true_type=_render(then_value.types),
+                if_false_type=_render(else_value.types),
+            )
 
         types = (
             None

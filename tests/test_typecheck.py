@@ -9,10 +9,15 @@ tagged where they have not been confirmed against a real evaluator.
 
 from __future__ import annotations
 
+import pathlib
+import re
+
 import pytest
 from test_examples import corpus_files
 
-from bigfix_relevance_analyzer import inspectors
+from bigfix_relevance_analyzer import inspectors, typecheck
+from bigfix_relevance_analyzer.binding import resolve_it_bindings
+from bigfix_relevance_analyzer.diagnostics import DIAGNOSTICS, Origin
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.extract import extract_relevance_from_file
 from bigfix_relevance_analyzer.nodes import If, Node
@@ -240,7 +245,7 @@ def test_a_swapped_operator_resolves_through_its_defined_form(env: TypeEnvironme
         pytest.param('1 + "a"', "binary-operator-not-defined", id="no-such-overload"),
         pytest.param("if 1 then 2 else 3", "if-condition-not-singular-boolean", id="if-condition"),
         pytest.param("item 5 of (1, 2, 3)", "tuple-index-out-of-range", id="tuple-bounds"),
-        pytest.param('"a" | 42', "incompatible-types", id="bar-still-type-checked"),
+        pytest.param('"a" | 42', "operand-types-incompatible", id="bar-still-type-checked"),
         pytest.param("1 as bogus cast", "cast-not-defined", id="no-such-cast"),
     ],
 )
@@ -275,21 +280,239 @@ def test_one_bad_if_branch_is_tolerated_but_two_are_not(env: TypeEnvironment) ->
     assert "both-if-branches-have-type-errors" in {d.code for d in two.diagnostics}
 
 
-@pytest.mark.parametrize(
-    "source", ["name of it", "files whose (size of it > 1)", "processors", 'file "x"']
-)
-def test_constructs_awaiting_property_resolution_stay_silent(
-    source: str, env: TypeEnvironment
-) -> None:
-    """`None` propagates without ever becoming a finding."""
+@pytest.mark.parametrize("source", ['bogusproperty of file "x"', '"a" & bogus thing'])
+def test_a_name_absent_from_the_snapshot_stays_silent(source: str, env: TypeEnvironment) -> None:
+    """`None` propagates without ever becoming a finding.
+
+    The tables are a snapshot: a name they do not contain may simply postdate
+    them. Only a name they *do* contain, used on a direct object none of its
+    rows accept, is positive evidence of a mistake.
+    """
     result = check(parse(source), env)
     assert result.value.types is None
     assert result.diagnostics == ()
 
 
+# ---------------------------------------------------------------------------
+# Property resolution: `of`, `whose` and `it`
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("processors", {"processor"}),
+        ('file "c:\\x.txt"', {"file"}),
+        ('name of file "c:\\x.txt"', {"string"}),
+        ('size of file "c:\\x.txt"', {"integer"}),
+        ('files of folder "c:\\"', {"file"}),
+        # `of` binds `it`, which is what makes the inner `name` resolve.
+        ('name of it of file "c:\\x.txt"', {"string"}),
+        ('exists file "c:\\x.txt"', {"boolean"}),
+        # A `whose` keeps its collection's type and drops its filter.
+        ('files whose (size of it > 1) of folder "c:\\"', {"file"}),
+    ],
+)
+def test_a_property_types_through_its_direct_object(
+    source: str, expected: set[str], env: TypeEnvironment
+) -> None:
+    result = check(parse(source), env)
+    assert result.diagnostics == ()
+    assert types_of(source, env) == expected
+
+
+def test_a_chain_narrows_its_platforms_as_it_resolves(env: TypeEnvironment) -> None:
+    """The narrowing `resolve_property` documents, reached through real syntax."""
+    assert set(check(parse("block size of drives"), env).platforms) == {
+        "debian",
+        "rhel",
+        "ubuntu",
+    }
+    assert set(check(parse("allocation block count of drives"), env).platforms) == {"macos"}
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ('name of file "x"', Plurality.SINGULAR),
+        ('names of files of folder "c:\\"', Plurality.PLURAL),
+        # Plural anywhere in the chain makes the whole chain plural.
+        ('name of files of folder "c:\\"', Plurality.PLURAL),
+        ('files whose (size of it > 1) of folder "c:\\"', Plurality.PLURAL),
+    ],
+)
+def test_plurality_propagates_along_a_chain(
+    source: str, expected: Plurality, env: TypeEnvironment
+) -> None:
+    assert check(parse(source), env).value.plurality is expected
+
+
+def test_a_property_used_on_the_wrong_direct_object_is_a_finding(env: TypeEnvironment) -> None:
+    """`size` is real and `string` is a real type; no row joins them."""
+    result = check(parse('size of "a"'), env)
+    assert [d.code for d in result.diagnostics] == ["property-not-defined"]
+    assert result.diagnostics[0].message == "the property 'size of <string>' is not defined"
+    assert result.value.types == frozenset()
+
+
+def test_the_property_message_names_the_index_it_was_given(env: TypeEnvironment) -> None:
+    result = check(parse('key "a" of "b"'), env)
+    assert result.diagnostics[0].message == (
+        "the property 'key <string> of <string>' is not defined"
+    )
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "it",
+        # `if` passes its enclosing context through; it introduces none.
+        "if true then it else it",
+        # The object of an `of` sees the enclosing context, not its own.
+        'name of file "x" of it',
+    ],
+)
+def test_it_without_a_context_is_a_finding(source: str, env: TypeEnvironment) -> None:
+    found = [d for d in check(parse(source), env).diagnostics if d.code == "used-without-context"]
+    assert found
+    assert found[0].message == "'it' used without context"
+
+
+def test_it_is_singular_even_when_its_context_is_plural(env: TypeEnvironment) -> None:
+    """`A of B` evaluates `A` once per element of `B`, so `it` is one element."""
+    result = check(parse('name of files of folder "c:\\"'), env)
+    assert result.diagnostics == ()
+    assert types_of('size of it of files of folder "c:\\"', env) == {"integer"}
+
+
+def test_the_checker_and_the_binding_pass_agree(env: TypeEnvironment) -> None:
+    """Two passes over the same rule must not drift apart."""
+    source = 'name of it of file "x"'
+    bindings = resolve_it_bindings(parse(source))
+    assert [binding.context is not None for binding in bindings] == [True]
+    assert check(parse(source), env).diagnostics == ()
+
+
+# ---------------------------------------------------------------------------
+# The plurality rules the engine enforces
+# ---------------------------------------------------------------------------
+
+
+def test_a_whose_filter_may_be_plural_but_must_be_boolean(env: TypeEnvironment) -> None:
+    """The asymmetry against `if`: a filter may be plural, a condition may not."""
+    # `conjunctions of <boolean>` is a real row that returns a *plural* boolean,
+    # which is the only way to reach a plural filter -- an operator would impose
+    # its own singularity rule first and fail before the filter was reached.
+    plural = check(parse('files whose (conjunctions of (name of it = "x")) of folder "c:\\"'), env)
+    assert plural.diagnostics == ()
+    assert check(parse('files whose (name of it = "x") of folder "c:\\"'), env).diagnostics == ()
+
+    wrong = check(parse('files whose (size of it) of folder "c:\\"'), env)
+    assert [d.code for d in wrong.diagnostics] == ["whose-filter-not-boolean"]
+    assert wrong.diagnostics[0].message == (
+        "a whose filter must have type 'boolean' (it has type 'integer' now)"
+    )
+
+
+@pytest.mark.parametrize(
+    ("source", "code"),
+    [
+        pytest.param(
+            'sizes of files of folder "c:\\" > 1000',
+            "left-operand-not-singular",
+            id="binary-left",
+        ),
+        pytest.param(
+            '1000 < sizes of files of folder "c:\\"',
+            "right-operand-not-singular",
+            id="binary-right",
+        ),
+        pytest.param(
+            '-(sizes of files of folder "c:\\")', "argument-not-singular", id="unary-argument"
+        ),
+        pytest.param(
+            'true and sizes of files of folder "c:\\"',
+            "right-operand-not-boolean",
+            id="and-right",
+        ),
+        pytest.param(
+            'if names of files of folder "c:\\" then 1 else 2',
+            "if-condition-not-singular-boolean",
+            id="if-condition",
+        ),
+    ],
+)
+def test_an_operand_that_must_be_singular_and_is_not(
+    source: str, code: str, env: TypeEnvironment
+) -> None:
+    result = check(parse(source), env)
+    assert code in {d.code for d in result.diagnostics}
+
+
+def test_a_plural_operand_inside_a_filter_fails_on_the_operator(env: TypeEnvironment) -> None:
+    """The engine answers `sizes of it > 1000` inside a `whose` with `A singular
+    expression is required.` -- the *operator's* rule. The filter itself is
+    innocent: it may be plural, and it is boolean either way."""
+    result = check(parse('files whose (sizes of it > 1000) of folder "c:\\"'), env)
+    assert [d.code for d in result.diagnostics] == ["left-operand-not-singular"]
+
+
+def test_a_tuple_index_must_be_an_integer_literal(env: TypeEnvironment) -> None:
+    """A string index parses as `item <string> of ...`, a real property. It is
+    a finding only because no row defines that property on a tuple."""
+    result = check(parse('item "a" of (1, 2, 3)'), env)
+    assert [d.code for d in result.diagnostics] == ["tuple-index-not-literal"]
+    assert result.diagnostics[0].message == "the tuple index '\"a\"' is not an integer literal"
+
+
 def test_unknown_operands_do_not_produce_findings(env: TypeEnvironment) -> None:
     """Half-known is not enough to complain about."""
-    assert check(parse('name of it + "a"'), env).diagnostics == ()
+    assert check(parse('bogusproperty of file "x" + "a"'), env).diagnostics == ()
+
+
+def test_a_ruled_out_value_does_not_cascade(env: TypeEnvironment) -> None:
+    """One mistake, one finding.
+
+    Everything downstream of a ruled-out value can only restate it in worse
+    words -- `<none> as trimmed string`, `<none> != <string>` -- so the value
+    silences the checks it feeds. It stays empty rather than becoming unknown,
+    because the statement really is broken and `ok` has to keep saying so.
+    """
+    result = check(parse('exists (it as trimmed string) whose (it != "") of size of "a"'), env)
+    assert [d.code for d in result.diagnostics] == ["property-not-defined"]
+    assert not result.ok
+
+
+def test_branches_no_single_platform_shares_may_differ_in_type(env: TypeEnvironment) -> None:
+    """The type axis answers to the platform axis.
+
+    `if 1 then 2 else "a"` is a mistake; two branches that exist on disjoint
+    platforms differing in type is the idiom itself, and is covered by
+    `test_if_branches_union_their_platforms_rather_than_intersecting`.
+    """
+    result = check(parse('if true then 1 else "a"'), env)
+    assert [d.code for d in result.diagnostics] == ["if-branch-types-incompatible"]
+    assert result.diagnostics[0].message == (
+        "the types in 'then <integer> else <string>' are not compatible"
+    )
+    assert check(parse(f"({WINDOWS_ONLY}) | ({LINUX_ONLY})"), env).diagnostics == ()
+
+
+def test_every_type_check_diagnostic_is_reachable() -> None:
+    """The catalog and the checker must not drift apart.
+
+    `diagnostics.py` records the engine's vocabulary; this holds the checker to
+    emitting all of it, minus the entries that provably cannot be decided
+    without running the engine. A new orphan fails here rather than sitting
+    unnoticed as a message nothing ever produces.
+    """
+    source = pathlib.Path(typecheck.__file__).read_text(encoding="utf-8")
+    emitted = set(re.findall(r'"([a-z][a-z0-9-]+)"', source))
+    catalog = {code for code, entry in DIAGNOSTICS.items() if entry.origin is Origin.TYPE_CHECK}
+    # `item 0 of <not a tuple>`: the engine settles this by evaluating, and the
+    # parser only builds an `ItemOf` for a literal tuple in the first place, so
+    # the checker never has a case to report. Kept in the catalog as vocabulary.
+    assert catalog - emitted == {"argument-not-a-tuple"}
 
 
 def test_a_wide_expression_does_not_exhaust_the_python_stack(env: TypeEnvironment) -> None:

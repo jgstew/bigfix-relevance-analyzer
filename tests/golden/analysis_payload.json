@@ -430,9 +430,16 @@
     ],
     "text": "exists (it as trimmed string) whose(it != \"\") of values \"SearchList\" of registries",
     "types": {
-      "diagnostics": [],
+      "diagnostics": [
+        {
+          "code": "property-not-defined",
+          "column": 50,
+          "line": 1,
+          "message": "the property 'values <string> of <dummy type or registry>' is not defined"
+        }
+      ],
       "known": true,
-      "ok": true,
+      "ok": false,
       "plurality": "singular",
       "types": [
         "boolean"
@@ -861,10 +868,12 @@
     "text": "(id of site of it | 0, id of it | 0, applicable computer count of it | 0) of fixlets of bes sites whose(id of it is contained by set of (2;78;80))",
     "types": {
       "diagnostics": [],
-      "known": false,
+      "known": true,
       "ok": true,
-      "plurality": "unknown",
-      "types": null
+      "plurality": "plural",
+      "types": [
+        "integer"
+      ]
     },
     "unknown_references": []
   },
