@@ -36,8 +36,9 @@ import xml.parsers.expat
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
+from bigfix_relevance_analyzer._serialize import _enum
 from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect, is_definite
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -110,6 +111,26 @@ class RelevanceSite:
     either dialect. See
     :func:`~bigfix_relevance_analyzer.dialect.classify_relevance_dialect`.
     """
+
+    def to_dict(self) -> dict[str, Any]:
+        """This site as JSON-serializable plain data.
+
+        :attr:`dialect_conflict` is included even though it is derived: it is
+        the most actionable single fact about a site -- session inspectors sat
+        in a client-relevance element, or the reverse -- and every consumer
+        recomputing it from the three dialect fields is three chances to get
+        the ``UNCERTAIN`` handling subtly wrong.
+        """
+        return {
+            "kind": self.kind,
+            "text": self.text,
+            "line": self.line,
+            "context": self.context,
+            "dialect": self.dialect.value,
+            "context_dialect": self.context_dialect.value,
+            "content_dialect": _enum(self.content_dialect),
+            "dialect_conflict": self.dialect_conflict,
+        }
 
     @property
     def dialect_conflict(self) -> bool:

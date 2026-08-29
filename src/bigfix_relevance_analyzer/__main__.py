@@ -44,8 +44,10 @@ from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
     LintConfig,
     Severity,
+    counts,
     lint_directory,
     lint_paths,
+    rules,
 )
 from bigfix_relevance_analyzer.typecheck import Plurality
 
@@ -384,7 +386,53 @@ def _run_check(
         findings = lint_directory(".", config, max_depth=max_depth)
     for finding in findings:
         print(finding)
-    return 1 if any(f.severity is Severity.ERROR for f in findings) else 0
+    # Same verdict `bigfix-relevance-lint` exits on, from the same tally -- see
+    # :func:`~bigfix_relevance_analyzer.lint.counts`.
+    return 0 if counts(findings)[Severity.ERROR.value] == 0 else 1
+
+
+def _run_rules(*, as_json: bool) -> int:
+    """Print the lint rule catalog -- see :data:`~bigfix_relevance_analyzer.lint.RULES`.
+
+    Here as well as on ``bigfix-relevance-lint`` because the codes show up in
+    this CLI's ``--check`` output too, and a code should be lookup-able with
+    whichever entry point produced it.
+    """
+    listed = rules()
+    if as_json:
+        json.dump([rule.to_dict() for rule in listed], sys.stdout, indent=2)
+        print()
+        return 0
+
+    print("# Lint rules\n")
+    print("| Code | Default | Fires when | Needs |")
+    print("| --- | --- | --- | --- |")
+    for rule in listed:
+        needs = f"`{rule.threshold}`" if rule.threshold else "always on"
+        print(f"| `{rule.code}` | {rule.default_severity.value} | {rule.summary} | {needs} |")
+    return 0
+
+
+def _run_reference(slug: str, *, brief: bool, as_json: bool) -> int:
+    """Print one language reference document.
+
+    ``--reference client`` is spelled the way the ``--dialect`` flag is rather
+    than as the document's own slug, because a caller already knows the dialect
+    names from every other flag here; the slug is translated rather than made
+    the user's problem. Imported inside the function for the same reason the
+    package does not import :mod:`~bigfix_relevance_analyzer.reference` at all:
+    nothing pays for a document it did not ask for.
+    """
+    from bigfix_relevance_analyzer import reference
+
+    document = reference.get_document(slug if slug == "dialects" else f"{slug}-relevance")
+    detail = reference.Detail.BRIEF if brief else reference.Detail.STANDARD
+    if as_json:
+        json.dump(document.to_dict(detail=detail), sys.stdout, indent=2)
+        print()
+    else:
+        print(document.read(detail=detail), end="")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -419,6 +467,24 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--json", action="store_true", help="emit the analysis as JSON")
     parser.add_argument(
+        "--rules",
+        action="store_true",
+        help="print the lint rule catalog and exit, instead of analysing anything",
+    )
+    parser.add_argument(
+        "--reference",
+        choices=["client", "session", "dialects"],
+        help=(
+            "print a relevance language reference and exit -- the same Markdown "
+            "an MCP server would serve as a resource"
+        ),
+    )
+    parser.add_argument(
+        "--brief",
+        action="store_true",
+        help="with --reference, the authored prose only, without the generated tables",
+    )
+    parser.add_argument(
         "--check",
         action="store_true",
         help=(
@@ -449,6 +515,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     forced = Dialect(args.dialect) if args.dialect else None
+
+    # Both of these are questions about the language or the tool rather than
+    # about a statement, so they are answered before anything else looks at the
+    # positional arguments -- and they exit 0 even alongside a broken file.
+    if args.rules:
+        return _run_rules(as_json=args.json)
+
+    if args.reference is not None:
+        return _run_reference(args.reference, brief=args.brief, as_json=args.json)
 
     if args.check:
         return _run_check(

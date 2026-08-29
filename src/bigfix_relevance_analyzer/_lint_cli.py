@@ -27,6 +27,7 @@ still prints nothing on its own.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 
 from bigfix_relevance_analyzer.dialect import Dialect
@@ -34,8 +35,10 @@ from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
     LintConfig,
     Severity,
+    counts,
     lint_directory,
     lint_paths,
+    rules,
 )
 
 __all__ = ["main"]
@@ -43,6 +46,27 @@ __all__ = ["main"]
 
 def _severity_map(pairs: list[str] | None, severity: Severity) -> dict[str, Severity]:
     return {code: severity for code in (pairs or [])}
+
+
+def _print_rules(*, as_json: bool) -> int:
+    """List every rule and what it means, from :data:`~bigfix_relevance_analyzer.lint.RULES`.
+
+    Here so that the codes in a hook's output can be looked up with the same
+    tool that produced them, rather than by reading this package's source. The
+    aligned columns are built from the widest code present, so adding a rule
+    does not leave the table crooked.
+    """
+    listed = rules()
+    if as_json:
+        json.dump([rule.to_dict() for rule in listed], sys.stdout, indent=2)
+        print()
+        return 0
+
+    width = max(len(rule.code) for rule in listed)
+    for rule in listed:
+        gate = f" (needs --{rule.threshold.replace('_', '-')})" if rule.threshold else ""
+        print(f"{rule.code:<{width}}  {rule.default_severity.value:<7}  {rule.summary}{gate}")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -101,12 +125,25 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--quiet", action="store_true", help="print nothing; exit code still set")
     parser.add_argument(
+        "--json",
+        action="store_true",
+        help="emit findings as one JSON object instead of one line each",
+    )
+    parser.add_argument(
         "--dialect",
         choices=[Dialect.CLIENT.value, Dialect.SESSION.value],
         help="force the dialect instead of trusting extraction",
     )
     parser.add_argument("--platform", help="narrow client lookups to one platform, e.g. windows")
+    parser.add_argument(
+        "--list-rules",
+        action="store_true",
+        help="print every rule, its default severity and what it means, then exit",
+    )
     args = parser.parse_args(argv)
+
+    if args.list_rules:
+        return _print_rules(as_json=args.json)
 
     severities: dict[str, Severity] = {}
     severities.update(_severity_map(args.warn, Severity.WARNING))
@@ -128,12 +165,30 @@ def main(argv: list[str] | None = None) -> int:
         findings = lint_directory(".", config, max_depth=args.max_depth)
         scope = "the current directory"
 
-    if not args.quiet:
-        for finding in findings:
-            print(finding)
+    # One tally, from `lint.counts`, feeding the summary, the exit status and
+    # the JSON payload alike -- rather than each recounting the findings and
+    # risking three answers to one question.
+    tallies = counts(findings)
+    errors = tallies[Severity.ERROR.value]
+    warnings = tallies[Severity.WARNING.value]
 
-    errors = sum(1 for f in findings if f.severity is Severity.ERROR)
-    warnings = sum(1 for f in findings if f.severity is Severity.WARNING)
+    if not args.quiet:
+        if args.json:
+            json.dump(
+                {
+                    "findings": [finding.to_dict() for finding in findings],
+                    "counts": dict(tallies),
+                    "ok": errors == 0,
+                    "scope": scope,
+                },
+                sys.stdout,
+                indent=2,
+            )
+            print()
+        else:
+            for finding in findings:
+                print(finding)
+
     print(_summary(errors, warnings, scope), file=sys.stderr)
 
     if errors or (args.fail_on_warning and warnings):

@@ -37,6 +37,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 from bigfix_relevance_analyzer import inspectors
+from bigfix_relevance_analyzer._serialize import _span
 from bigfix_relevance_analyzer.binding import ItBinding, resolve_it_bindings
 from bigfix_relevance_analyzer.breakdown import Level, ProbeKind, breakdown_probes
 from bigfix_relevance_analyzer.complexity import (
@@ -415,30 +416,18 @@ class RelevanceAnalysis:
             },
             "parse": {
                 "ok": self.parsed,
-                "error": (
-                    None
-                    if self.parse_error is None
-                    else {
-                        "message": self.parse_error.message,
-                        "line": self.parse_error.line,
-                        "column": self.parse_error.column,
-                        "offset": self.parse_error.offset,
-                    }
-                ),
+                "error": None if self.parse_error is None else self.parse_error.to_dict(),
                 "sexpr": self.sexpr,
                 **({"mermaid": self.mermaid} if mermaid else {}),
                 "node_count": len(self.nodes),
                 "tree_depth": self.tree_depth,
                 "node_kinds": self.node_kinds,
             },
+            # `cost_rules` is grafted on here rather than living on
+            # `RelevanceComplexity`, because a rule's cost depends on the
+            # dialect being evaluated and only this object knows one.
             "complexity": {
-                "score": self.complexity.score,
-                "evaluation_cost": self.complexity.evaluation_cost,
-                "costly_inspectors": list(self.complexity.costly_inspectors),
-                "metrics": {
-                    field.name: getattr(self.complexity, field.name)
-                    for field in dataclasses.fields(self.complexity)
-                },
+                **self.complexity.to_dict(),
                 "cost_rules": [
                     {
                         "label": rule.label,
@@ -450,23 +439,7 @@ class RelevanceAnalysis:
             },
         }
         if self.check is not None:
-            report["types"] = {
-                "types": (
-                    None if self.check.value.types is None else sorted(self.check.value.types)
-                ),
-                "plurality": self.check.value.plurality.value,
-                "known": self.check.value.known,
-                "ok": self.check.ok,
-                "diagnostics": [
-                    {
-                        "code": diagnostic.code,
-                        "message": diagnostic.message,
-                        "line": diagnostic.span.line,
-                        "column": diagnostic.span.column,
-                    }
-                    for diagnostic in self.check.diagnostics
-                ],
-            }
+            report["types"] = self.check.to_dict()
         report["platforms"] = {
             "viable": sorted(self.platforms),
             "universe": sorted(self.environment.universe),
@@ -475,8 +448,7 @@ class RelevanceAnalysis:
         report["references"] = [
             {
                 "phrase": report_entry.phrase,
-                "line": report_entry.reference.span.line,
-                "column": report_entry.reference.span.column,
+                **_span(report_entry.reference.span),
                 "known": report_entry.known,
                 "visible_here": bool(report_entry.visible),
                 "signatures": sorted({entry.signature for entry in report_entry.resolved}),
@@ -486,6 +458,9 @@ class RelevanceAnalysis:
             for report_entry in self.references
         ]
         report["unknown_references"] = list(self.unknown_references)
+        # Inline, and staying that way: rendering a binding's `context` needs
+        # the source text, which an `ItBinding` does not own. A
+        # `to_dict(text=...)` would be a worse API than none at all.
         report["it_bindings"] = [
             {
                 "line": entry.it.span.line,
@@ -500,17 +475,27 @@ class RelevanceAnalysis:
             }
             for entry in self.it_bindings
         ]
-        report["levels"] = [
-            {
-                "label": level.label,
-                "line": level.span.line,
-                "column": level.span.column,
-                "probe": level.probe.relevance,
-                "unfiltered_probe": level.unfiltered.relevance if level.unfiltered else None,
-            }
-            for level in self.levels
-        ]
+        report["levels"] = [level.to_dict() for level in self.levels]
         return report
+
+
+def analyze_to_dict(
+    text: str,
+    dialect: Dialect | None = None,
+    platform: str | None = None,
+    *,
+    probe_kind: ProbeKind = ProbeKind.COUNT,
+    mermaid: bool = False,
+) -> dict[str, Any]:
+    """:func:`analyze` then :meth:`RelevanceAnalysis.to_dict`, in one call.
+
+    For a caller that only ever wanted the payload -- an MCP tool body, a
+    report writer -- and would otherwise write the same two-step every time.
+    Nothing is added and nothing is withheld; see :meth:`RelevanceAnalysis.to_dict`
+    for what the keys mean and :mod:`bigfix_relevance_analyzer._serialize` for
+    the conventions they follow.
+    """
+    return analyze(text, dialect, platform, probe_kind=probe_kind).to_dict(mermaid=mermaid)
 
 
 def analyze(

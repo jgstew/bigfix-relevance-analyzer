@@ -8,11 +8,13 @@ read ``capsys``, no subprocess.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
 from bigfix_relevance_analyzer._lint_cli import main
+from bigfix_relevance_analyzer.lint import RULES, rules
 
 CLIENT = 'exists file "C:\\foo.txt" whose (size of it > 100)'
 BROKEN = 'exists file "unterminated'
@@ -188,3 +190,113 @@ def test_multiple_paths_all_get_linted(tmp_path: Path, capsys: pytest.CaptureFix
     out = capsys.readouterr().out
     assert str(clean) not in out
     assert str(broken) in out
+
+
+def test_json_emits_one_object_with_findings_counts_and_verdict(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``--json`` replaces the line-per-finding output with one parseable object.
+
+    This is the mode CI and an MCP server read, so the whole point is that it
+    parses -- a stray print alongside it would break the parse, not just look
+    untidy.
+    """
+    broken = tmp_path / "broken.rel"
+    broken.write_text(BROKEN)
+
+    assert main(["--json", str(broken)]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is False
+    # An unterminated literal is two findings, not one: the parser stops, and
+    # the tokenizer separately could not lex the rest.
+    assert payload["counts"] == {"error": 2, "warning": 0}
+    assert {finding["code"] for finding in payload["findings"]} == {"parse-error", "error-token"}
+    assert payload["findings"][0]["site"]["kind"] == "plain-text"
+
+
+def test_json_and_the_line_output_report_the_same_findings(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Every finding's ``text`` is the line the default mode would have printed.
+
+    The two modes are renderings of one result, not two code paths that happen
+    to agree today.
+    """
+    broken = tmp_path / "broken.rel"
+    broken.write_text(BROKEN)
+
+    main([str(broken)])
+    lines = [line for line in capsys.readouterr().out.splitlines() if line]
+    main(["--json", str(broken)])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert [finding["text"] for finding in payload["findings"]] == lines
+
+
+def test_json_stays_clean_when_nothing_was_found(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A clean run is an empty findings list, not empty output.
+
+    The default mode prints nothing at all, which a JSON consumer cannot tell
+    from a crash; ``--json`` always emits the envelope.
+    """
+    clean = tmp_path / "clean.rel"
+    clean.write_text(CLIENT)
+
+    assert main(["--json", str(clean)]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == {
+        "findings": [],
+        "counts": {"error": 0, "warning": 0},
+        "ok": True,
+        "scope": "1 file(s)",
+    }
+
+
+def test_quiet_beats_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--quiet`` means print nothing, including no JSON. Exit code still set."""
+    broken = tmp_path / "broken.rel"
+    broken.write_text(BROKEN)
+
+    assert main(["--json", "--quiet", str(broken)]) == 1
+    assert capsys.readouterr().out == ""
+
+
+def test_list_rules_prints_every_rule_and_exits_zero(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """``--list-rules`` is how a hook's codes get looked up with the hook's own tool.
+
+    Exits zero and lints nothing: it is a question about the tool, not a run.
+    """
+    assert main(["--list-rules"]) == 0
+    out = capsys.readouterr().out
+    for code in RULES:
+        assert code in out
+    assert "needs --max-score" in out, "a gated rule must say what switches it on"
+
+
+def test_list_rules_json_is_the_catalog_verbatim(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """With ``--json`` the same listing is machine-readable, for a server to serve."""
+    assert main(["--list-rules", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == [rule.to_dict() for rule in rules()]
+
+
+def test_list_rules_ignores_paths_rather_than_linting_them(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A broken file alongside ``--list-rules`` does not turn it into a lint run.
+
+    Otherwise asking what the rules are could exit non-zero, which a script
+    checking the tool's capabilities would read as a failure.
+    """
+    broken = tmp_path / "broken.rel"
+    broken.write_text(BROKEN)
+
+    assert main(["--list-rules", str(broken)]) == 0
+    out = capsys.readouterr().out
+    assert str(broken) not in out

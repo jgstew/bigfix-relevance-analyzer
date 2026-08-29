@@ -61,20 +61,29 @@ import os
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
+from typing import Any
 
+from bigfix_relevance_analyzer._serialize import _path
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis, analyze
 from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 from bigfix_relevance_analyzer.extract import RelevanceSite, extract_relevance_from_file
 
 __all__ = [
     "DEFAULT_MAX_DEPTH",
+    "DEFAULT_SEVERITIES",
+    "RULES",
     "Finding",
     "LintConfig",
+    "LintRule",
     "Severity",
+    "counts",
     "lint_analysis",
     "lint_directory",
     "lint_file",
     "lint_paths",
+    "lint_paths_to_dict",
+    "rules",
 ]
 
 DEFAULT_MAX_DEPTH = 6
@@ -106,17 +115,167 @@ class Severity(enum.Enum):
     """Configured off. A finding at this severity is dropped, not emitted."""
 
 
+@dataclass(frozen=True, slots=True)
+class LintRule:
+    """One rule, with the wording every consumer should explain it in.
+
+    The rules were always documented -- in this module's docstring, in prose, for
+    a human reading the source. This is the same explanation in a form a hook,
+    a CI log, an editor hover, or an MCP server can serve, so that a finding
+    means the same thing wherever it surfaces instead of each consumer
+    inventing a description from the code alone.
+
+    A :class:`Finding` carries only its :attr:`~Finding.code`; a consumer joins
+    on it. That keeps the prose out of every finding, where it would repeat
+    verbatim and dominate the payload of a large run.
+    """
+
+    code: str
+    """Matches :attr:`Finding.code`, and this rule's key in :data:`RULES`."""
+
+    default_severity: Severity
+    """What it reports at when :attr:`LintConfig.severities` overrides nothing."""
+
+    summary: str
+    """One line: what fired. Sized for a table cell or a hover, so no trailing period."""
+
+    rationale: str
+    """Why the rule exists, and why it defaults the way it does. Full sentences."""
+
+    gated: bool
+    """Whether the rule is silent until a threshold is configured.
+
+    Deliberately not called ``configurable``: *every* rule's severity is
+    configurable through :attr:`LintConfig.severities`, so that name would be
+    true of all of them and distinguish nothing. What these two have that the
+    others do not is that they report nothing at all by default.
+    """
+
+    threshold: str | None = None
+    """The :class:`LintConfig` field that switches a :attr:`gated` rule on.
+
+    ``None`` for every rule that is always on, so a consumer can render "set
+    ``max_score`` to enable this" without a lookup table of its own.
+    """
+
+    def to_dict(self) -> dict[str, Any]:
+        """This rule as JSON-serializable plain data."""
+        return {
+            "code": self.code,
+            "default_severity": self.default_severity.value,
+            "summary": self.summary,
+            "rationale": self.rationale,
+            "gated": self.gated,
+            "threshold": self.threshold,
+        }
+
+
+def _rule(
+    code: str,
+    default_severity: Severity,
+    summary: str,
+    rationale: str,
+    *,
+    threshold: str | None = None,
+) -> tuple[str, LintRule]:
+    return code, LintRule(
+        code=code,
+        default_severity=default_severity,
+        summary=summary,
+        rationale=rationale,
+        gated=threshold is not None,
+        threshold=threshold,
+    )
+
+
+#: Every rule this module can report. The rationales are the module docstring's
+#: own seven-rule list, moved here so there is one copy rather than a prose one
+#: for humans and an implicit one for consumers.
+RULES: Mapping[str, LintRule] = MappingProxyType(
+    dict(
+        (
+            _rule(
+                "parse-error",
+                Severity.ERROR,
+                "the statement could not be parsed",
+                "The statement is broken, so nothing further can be concluded about it. "
+                "Always an error, with nothing to configure.",
+            ),
+            _rule(
+                "error-token",
+                Severity.ERROR,
+                "the statement contains text that could not be lexed",
+                "Text the tokenizer could not read at all, which means the statement is "
+                "broken even where it parsed around it. Always an error, with nothing to "
+                "configure.",
+            ),
+            _rule(
+                "unbound-it",
+                Severity.ERROR,
+                "`it` is used where there is no context to bind it to",
+                "An unbound `it` is meaningless to the engine, not merely unusual, so this "
+                "is always an error. Note that `of` binds `it` as well as `whose` does -- "
+                "the runtime's own message claims otherwise and is wrong.",
+            ),
+            _rule(
+                "unknown-inspector",
+                Severity.WARNING,
+                "a name no inspector dump defines",
+                "The most actionable single signal for a typo, but not proof of one: the "
+                "dumps do not cover every platform or product version, so a name absent "
+                "from them is a lead rather than a fault. Always a warning, never an error "
+                "by default.",
+            ),
+            _rule(
+                "complexity",
+                Severity.ERROR,
+                "the complexity score is above the configured ceiling",
+                "Silent until `max_score` is set, because a baked-in number would fail "
+                "every existing content repo on day one. The ceiling is the adopting "
+                "repo's ratchet to set, not this package's to assume.",
+                threshold="max_score",
+            ),
+            _rule(
+                "evaluation-cost",
+                Severity.ERROR,
+                "the evaluation cost is above the configured ceiling",
+                "Silent until `max_evaluation_cost` is set, for the same reason as the "
+                "complexity ceiling: what counts as too expensive depends on the estate "
+                "the content runs on.",
+                threshold="max_evaluation_cost",
+            ),
+            _rule(
+                "max-depth-exceeded",
+                Severity.ERROR,
+                "a directory tree was deeper than the walk's limit, so it was not fully scanned",
+                "Reported only by :func:`lint_directory`. Always an error, because a limit "
+                "this generous being reached at all deserves a human's attention, and a "
+                "silently truncated walk would look identical to a clean, complete one.",
+            ),
+        )
+    )
+)
+
+
+def rules() -> tuple[LintRule, ...]:
+    """Every rule, in the order a rule list should render them.
+
+    Errors before warnings, because the question a reader brings to a rule list
+    is what will block a commit; alphabetical within a severity, so the order
+    never depends on where an entry happens to sit in :data:`RULES`.
+    """
+    ranked = {Severity.ERROR: 0, Severity.WARNING: 1, Severity.IGNORE: 2}
+    return tuple(
+        sorted(RULES.values(), key=lambda rule: (ranked[rule.default_severity], rule.code))
+    )
+
+
 #: Severity a rule reports at when :attr:`LintConfig.severities` says nothing
-#: about it. Keyed by :attr:`Finding.code`.
-DEFAULT_SEVERITIES: Mapping[str, Severity] = {
-    "parse-error": Severity.ERROR,
-    "error-token": Severity.ERROR,
-    "unbound-it": Severity.ERROR,
-    "unknown-inspector": Severity.WARNING,
-    "complexity": Severity.ERROR,
-    "evaluation-cost": Severity.ERROR,
-    "max-depth-exceeded": Severity.ERROR,
-}
+#: about it. Keyed by :attr:`Finding.code`. Derived from :data:`RULES` so the
+#: two cannot disagree -- this was a second hand-maintained literal once.
+DEFAULT_SEVERITIES: Mapping[str, Severity] = MappingProxyType(
+    {code: rule.default_severity for code, rule in RULES.items()}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,6 +303,29 @@ class Finding:
         where = f"{self.path}:{self.line}" if self.path is not None else f"line {self.line}"
         return f"{where}: {self.severity.value} [{self.code}] {self.message}"
 
+    def to_dict(self) -> dict[str, Any]:
+        """This finding as JSON-serializable plain data.
+
+        ``text`` is ``str(self)`` -- the one-line, grep-able rendering both CLIs
+        print. It is included because every consumer wants it and none should
+        have to reproduce the format, which is a real API despite looking like
+        a detail: a hook's output is diffed and parsed downstream.
+
+        Deliberately absent: the rule's ``summary`` and ``rationale``. Those
+        live once in :data:`RULES`, keyed by :attr:`code`, and a consumer joins
+        on it. Inlining two sentences into every finding would multiply the size
+        of a lint payload over a large repo for text that repeats verbatim.
+        """
+        return {
+            "code": self.code,
+            "severity": self.severity.value,
+            "message": self.message,
+            "path": _path(self.path),
+            "line": self.line,
+            "site": None if self.site is None else self.site.to_dict(),
+            "text": str(self),
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class LintConfig:
@@ -161,6 +343,26 @@ class LintConfig:
 
     def severity_for(self, code: str) -> Severity:
         return self.severities.get(code, DEFAULT_SEVERITIES.get(code, Severity.WARNING))
+
+
+def counts(findings: Iterable[Finding]) -> Mapping[str, int]:
+    """How many findings at each reportable severity, zeros included.
+
+    The one piece of arithmetic every consumer of this module repeats, and the
+    piece they must agree on: whether a run passed is
+    ``counts(findings)["error"] == 0``, and both CLIs here decide it that way.
+    A caller with a stricter policy -- ``--fail-on-warning`` -- layers it on top
+    of these numbers rather than recounting them.
+
+    :attr:`Severity.IGNORE` gets no key. A finding at that severity is dropped
+    before it is ever built, so a key for it would read zero forever and imply
+    the linter had looked for something and found none of it.
+    """
+    tallies = {Severity.ERROR.value: 0, Severity.WARNING.value: 0}
+    for finding in findings:
+        if finding.severity is not Severity.IGNORE:
+            tallies[finding.severity.value] += 1
+    return tallies
 
 
 def _complexity_detail(report: RelevanceAnalysis, limit: int = 3) -> str:
@@ -285,6 +487,31 @@ def lint_paths(
     for path in paths:
         findings.extend(lint_file(path, config))
     return tuple(findings)
+
+
+def lint_paths_to_dict(
+    paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfig
+) -> dict[str, Any]:
+    """:func:`lint_paths` as JSON-serializable plain data, with the verdict.
+
+    The envelope, not just the list: ``counts`` and ``ok`` are the pass/fail
+    arithmetic every consumer would otherwise redo, and ``ok`` is the same
+    verdict both CLIs in this package exit on. A caller wanting a stricter
+    policy still has the numbers -- ``ok`` answers "did anything error", which
+    is the default gate, and ``counts["warning"]`` is there for a repo that
+    treats warnings as failures too.
+
+    Findings keep :func:`lint_paths`'s order -- per path, then per site within
+    it -- because that is the order a human reads a file in, and sorting by
+    severity instead would scatter one file's findings across the report.
+    """
+    findings = lint_paths(paths, config)
+    tallies = counts(findings)
+    return {
+        "findings": [finding.to_dict() for finding in findings],
+        "counts": dict(tallies),
+        "ok": tallies[Severity.ERROR.value] == 0,
+    }
 
 
 def _walk(root: Path, max_depth: int) -> tuple[tuple[Path, ...], tuple[Path, ...]]:

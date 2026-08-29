@@ -44,8 +44,9 @@ from __future__ import annotations
 import enum
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import assert_never
+from typing import Any, assert_never
 
+from bigfix_relevance_analyzer._serialize import _span
 from bigfix_relevance_analyzer.binding import resolve_it_bindings
 from bigfix_relevance_analyzer.nodes import (
     Bar,
@@ -131,6 +132,20 @@ class Probe:
     context: str | None
     """The context expression, or ``None`` for the contextless root form."""
 
+    def to_dict(self) -> dict[str, Any]:
+        """This probe as JSON-serializable plain data.
+
+        ``relevance`` is the field that matters to a consumer: it is ready to
+        hand to an evaluator as-is. The other three are what it was built from,
+        kept so a report can explain a probe rather than just quote it.
+        """
+        return {
+            "relevance": self.relevance,
+            "kind": self.kind.value,
+            "measured": self.measured,
+            "context": self.context,
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class Level:
@@ -153,6 +168,23 @@ class Level:
     makes it visible: in the reference example the pair answers 21 and 25.
     ``None`` on every level that is not filtered.
     """
+
+    def to_dict(self) -> dict[str, Any]:
+        """This level as JSON-serializable plain data.
+
+        ``probe`` and ``unfiltered_probe`` are the probe *text* rather than
+        nested probe objects, matching what this payload has always emitted:
+        the two extra fields on a :class:`Probe` are the same ``kind`` for every
+        level and the ``context``, which the label already conveys. A consumer
+        wanting the full objects has :attr:`probe` itself.
+        """
+        return {
+            "label": self.label,
+            **_span(self.span),
+            "probe": self.probe.relevance,
+            "unfiltered_probe": None if self.unfiltered is None else self.unfiltered.relevance,
+            "probe_kind": self.probe.kind.value,
+        }
 
 
 class Outcome(enum.Enum):
@@ -187,6 +219,16 @@ class ProbeOutcome:
     count: int | None
     """The number of objects, or ``None`` when :attr:`outcome` is
     :attr:`Outcome.NOT_EVALUABLE`."""
+
+    def to_dict(self) -> dict[str, Any]:
+        """This outcome as JSON-serializable plain data.
+
+        ``count`` stays ``None`` rather than becoming ``0`` when the level was
+        not evaluable: zero is a real answer here and
+        :attr:`Outcome.EMPTY_OR_ERROR` already means it, so collapsing the two
+        would destroy the one distinction this type exists to carry.
+        """
+        return {"outcome": self.outcome.value, "count": self.count}
 
 
 @dataclass(frozen=True, slots=True)

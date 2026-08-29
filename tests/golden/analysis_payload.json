@@ -1,0 +1,966 @@
+{
+  "client": {
+    "complexity": {
+      "contributions": [
+        {
+          "metric": "token_count",
+          "weighted": 9.0
+        },
+        {
+          "metric": "boolean_operators",
+          "weighted": 4.0
+        },
+        {
+          "metric": "unique_identifiers",
+          "weighted": 4.0
+        },
+        {
+          "metric": "max_of_chain",
+          "weighted": 2.0
+        },
+        {
+          "metric": "of_count",
+          "weighted": 1.0
+        },
+        {
+          "metric": "string_literals",
+          "weighted": 0.5
+        }
+      ],
+      "cost_rules": [],
+      "costly_inspectors": [],
+      "evaluation_cost": 0.0,
+      "metrics": {
+        "boolean_operators": 2,
+        "conditional_branches": 0,
+        "conditional_parens": 0,
+        "costly_inspectors": [],
+        "error_tokens": 0,
+        "evaluation_cost": 0.0,
+        "iteration_keywords": 0,
+        "max_conditional_depth": 0,
+        "max_of_chain": 1,
+        "max_paren_depth": 0,
+        "max_unfiltered_tuple_commas": 0,
+        "of_count": 1,
+        "semicolon_clauses": 0,
+        "string_literals": 1,
+        "token_count": 9,
+        "tuple_commas": 0,
+        "unfiltered_tuple_commas": 0,
+        "unique_identifiers": 4,
+        "whose_clauses": 0
+      },
+      "score": 20.5
+    },
+    "dialect": {
+      "assumed": false,
+      "classified": "client",
+      "effective": "client",
+      "requested": "client",
+      "resolved": "client"
+    },
+    "it_bindings": [],
+    "levels": [
+      {
+        "column": 1,
+        "label": "windows of operating system AND not exists files \"C:\\Windows\\Temp\\EventLogBackupSecurity.evt\"",
+        "line": 1,
+        "probe": "(if exists true whose (exists number of (windows of operating system AND not exists files \"C:\\Windows\\Temp\\EventLogBackupSecurity.evt\")) then number of (windows of operating system AND not exists files \"C:\\Windows\\Temp\\EventLogBackupSecurity.evt\") else -1)",
+        "probe_kind": "count",
+        "unfiltered_probe": null
+      },
+      {
+        "column": 1,
+        "label": "windows of operating system",
+        "line": 1,
+        "probe": "(if exists it whose (exists number of (windows of it)) then number of (windows of it) else -1) of operating system",
+        "probe_kind": "count",
+        "unfiltered_probe": null
+      }
+    ],
+    "lexing": {
+      "by_kind": {
+        "string": 1,
+        "whitespace": 8,
+        "word": 8
+      },
+      "code_tokens": 9,
+      "errors": [],
+      "tokens": 17
+    },
+    "parse": {
+      "error": null,
+      "node_count": 7,
+      "node_kinds": {
+        "Binary": 1,
+        "Exists": 1,
+        "Of": 1,
+        "Reference": 3,
+        "StringLiteral": 1
+      },
+      "ok": true,
+      "sexpr": "(bin \"and\" (of (ref \"windows\") (ref \"operating system\")) (not-exists (ref \"files\" (str \"C:\\\\Windows\\\\Temp\\\\EventLogBackupSecurity.evt\"))))",
+      "tree_depth": 4
+    },
+    "platforms": {
+      "missing": [],
+      "universe": [
+        "debian",
+        "macos",
+        "rhel",
+        "ubuntu",
+        "windows"
+      ],
+      "viable": [
+        "debian",
+        "macos",
+        "rhel",
+        "ubuntu",
+        "windows"
+      ]
+    },
+    "references": [
+      {
+        "column": 44,
+        "known": true,
+        "line": 1,
+        "phrase": "files",
+        "platforms": [
+          "debian",
+          "macos",
+          "rhel",
+          "ubuntu",
+          "windows"
+        ],
+        "return_types": [
+          "file"
+        ],
+        "signatures": [
+          "file <binary_string>",
+          "file <binary_string> of <encoding>",
+          "file <binary_string> of <folder>",
+          "file <string>",
+          "file <string> of <encoding>",
+          "file <string> of <folder>",
+          "file <symlink>",
+          "file of <service>",
+          "files of <folder>"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 12,
+        "known": true,
+        "line": 1,
+        "phrase": "operating system",
+        "platforms": [
+          "debian",
+          "macos",
+          "rhel",
+          "ubuntu",
+          "windows"
+        ],
+        "return_types": [
+          "operating system"
+        ],
+        "signatures": [
+          "operating system"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 1,
+        "known": true,
+        "line": 1,
+        "phrase": "windows",
+        "platforms": [
+          "debian",
+          "macos",
+          "rhel",
+          "ubuntu",
+          "windows"
+        ],
+        "return_types": [
+          "boolean",
+          "integer"
+        ],
+        "signatures": [
+          "window of <route>",
+          "windows of <operating system>"
+        ],
+        "visible_here": true
+      }
+    ],
+    "text": "windows of operating system AND not exists files \"C:\\Windows\\Temp\\EventLogBackupSecurity.evt\"",
+    "types": {
+      "diagnostics": [],
+      "known": true,
+      "ok": true,
+      "plurality": "singular",
+      "types": [
+        "boolean"
+      ]
+    },
+    "unknown_references": []
+  },
+  "client_with_mermaid": {
+    "complexity": {
+      "contributions": [
+        {
+          "metric": "token_count",
+          "weighted": 18.0
+        },
+        {
+          "metric": "max_of_chain",
+          "weighted": 4.0
+        },
+        {
+          "metric": "unique_identifiers",
+          "weighted": 4.0
+        },
+        {
+          "metric": "max_paren_depth",
+          "weighted": 3.0
+        },
+        {
+          "metric": "iteration_keywords",
+          "weighted": 2.0
+        },
+        {
+          "metric": "of_count",
+          "weighted": 2.0
+        },
+        {
+          "metric": "whose_clauses",
+          "weighted": 1.5
+        },
+        {
+          "metric": "string_literals",
+          "weighted": 1.0
+        }
+      ],
+      "cost_rules": [],
+      "costly_inspectors": [],
+      "evaluation_cost": 0.0,
+      "metrics": {
+        "boolean_operators": 0,
+        "conditional_branches": 0,
+        "conditional_parens": 0,
+        "costly_inspectors": [],
+        "error_tokens": 0,
+        "evaluation_cost": 0.0,
+        "iteration_keywords": 2,
+        "max_conditional_depth": 0,
+        "max_of_chain": 2,
+        "max_paren_depth": 1,
+        "max_unfiltered_tuple_commas": 0,
+        "of_count": 2,
+        "semicolon_clauses": 0,
+        "string_literals": 2,
+        "token_count": 18,
+        "tuple_commas": 0,
+        "unfiltered_tuple_commas": 0,
+        "unique_identifiers": 4,
+        "whose_clauses": 1
+      },
+      "score": 35.5
+    },
+    "dialect": {
+      "assumed": false,
+      "classified": null,
+      "effective": "client",
+      "requested": "client",
+      "resolved": "client"
+    },
+    "it_bindings": [
+      {
+        "binder": "of",
+        "bound": true,
+        "column": 9,
+        "context": "values \"SearchList\" of registries",
+        "line": 1
+      },
+      {
+        "binder": "whose",
+        "bound": true,
+        "column": 37,
+        "context": "(it as trimmed string)",
+        "line": 1
+      }
+    ],
+    "levels": [
+      {
+        "column": 1,
+        "label": "exists (it as trimmed string) whose(it != \"\") of values \"SearchList\" of registries",
+        "line": 1,
+        "probe": "(if exists true whose (exists number of (exists (it as trimmed string) whose(it != \"\") of values \"SearchList\" of registries)) then number of (exists (it as trimmed string) whose(it != \"\") of values \"SearchList\" of registries) else -1)",
+        "probe_kind": "count",
+        "unfiltered_probe": null
+      },
+      {
+        "column": 50,
+        "label": "values \"SearchList\" of registries",
+        "line": 1,
+        "probe": "(if exists it whose (exists number of (values \"SearchList\" of it)) then number of (values \"SearchList\" of it) else -1) of registries",
+        "probe_kind": "count",
+        "unfiltered_probe": null
+      },
+      {
+        "column": 8,
+        "label": "(it as trimmed string) whose(it != \"\") of values \"SearchList\" of registries",
+        "line": 1,
+        "probe": "(if exists it whose (exists number of ((it as trimmed string) whose(it != \"\") of it)) then number of ((it as trimmed string) whose(it != \"\") of it) else -1) of values \"SearchList\" of registries",
+        "probe_kind": "count",
+        "unfiltered_probe": "(if exists it whose (exists number of ((it as trimmed string) of it)) then number of ((it as trimmed string) of it) else -1) of values \"SearchList\" of registries"
+      }
+    ],
+    "lexing": {
+      "by_kind": {
+        "punct": 5,
+        "string": 2,
+        "whitespace": 12,
+        "word": 11
+      },
+      "code_tokens": 18,
+      "errors": [],
+      "tokens": 30
+    },
+    "parse": {
+      "error": null,
+      "mermaid": "flowchart TD\n    n0{{\"exists\"}}\n    n1{\"whose\"}\n    n2{{\"as trimmed string\"}}\n    n3(\"it\")\n    n3 --> n2\n    n2 -- \"collection\" --> n1\n    n4{{\"!=\"}}\n    n5(\"it\")\n    n5 --> n4\n    n6([\"#34;#34;\"])\n    n6 --> n4\n    n4 -- \"predicate\" --> n1\n    n7[\"values #34;SearchList#34;\"]\n    n8[\"registries\"]\n    n8 -- \"of\" --> n7\n    n7 -- \"of\" --> n2\n    n1 --> n0",
+      "node_count": 12,
+      "node_kinds": {
+        "Binary": 1,
+        "Cast": 1,
+        "Exists": 1,
+        "It": 2,
+        "Of": 2,
+        "Reference": 2,
+        "StringLiteral": 2,
+        "Whose": 1
+      },
+      "ok": true,
+      "sexpr": "(exists (of (whose (cast it \"trimmed string\") (bin \"!=\" it (str \"\"))) (of (ref \"values\" (str \"SearchList\")) (ref \"registries\"))))",
+      "tree_depth": 5
+    },
+    "platforms": {
+      "missing": [],
+      "universe": [
+        "debian",
+        "macos",
+        "rhel",
+        "ubuntu",
+        "windows"
+      ],
+      "viable": [
+        "debian",
+        "macos",
+        "rhel",
+        "ubuntu",
+        "windows"
+      ]
+    },
+    "references": [
+      {
+        "column": 73,
+        "known": true,
+        "line": 1,
+        "phrase": "registries",
+        "platforms": [
+          "macos",
+          "windows"
+        ],
+        "return_types": [
+          "dummy type",
+          "registry"
+        ],
+        "signatures": [
+          "registry"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 50,
+        "known": true,
+        "line": 1,
+        "phrase": "values",
+        "platforms": [
+          "debian",
+          "macos",
+          "rhel",
+          "ubuntu",
+          "windows"
+        ],
+        "return_types": [
+          "integer",
+          "json value",
+          "metabase value",
+          "osxvalue",
+          "registry key value",
+          "smbios value",
+          "string",
+          "yaml value"
+        ],
+        "signatures": [
+          "value <string> of <file version block>",
+          "value <string> of <registry key>",
+          "value of <dictionaryentry>",
+          "value of <distinguished name component>",
+          "value of <environment variable>",
+          "value of <fixlet_header>",
+          "value of <json key>",
+          "value of <plugin store key>",
+          "value of <runlevel>",
+          "value of <setting>",
+          "value of <site profile variable>",
+          "value of <symlink>",
+          "value of <task named value pair>",
+          "value of <user attribute>",
+          "value of <winrt enumeration>",
+          "value of <yaml key>",
+          "values <string> of <smbios structure>",
+          "values of <array>",
+          "values of <metabase key>",
+          "values of <registry key>",
+          "values of <smbios structure>"
+        ],
+        "visible_here": true
+      }
+    ],
+    "text": "exists (it as trimmed string) whose(it != \"\") of values \"SearchList\" of registries",
+    "types": {
+      "diagnostics": [],
+      "known": true,
+      "ok": true,
+      "plurality": "singular",
+      "types": [
+        "boolean"
+      ]
+    },
+    "unknown_references": []
+  },
+  "session": {
+    "complexity": {
+      "contributions": [
+        {
+          "metric": "token_count",
+          "weighted": 46.0
+        },
+        {
+          "metric": "unique_identifiers",
+          "weighted": 12.0
+        },
+        {
+          "metric": "max_paren_depth",
+          "weighted": 8.485281374238571
+        },
+        {
+          "metric": "of_count",
+          "weighted": 8.0
+        },
+        {
+          "metric": "semicolon_clauses",
+          "weighted": 6.0
+        },
+        {
+          "metric": "iteration_keywords",
+          "weighted": 4.0
+        },
+        {
+          "metric": "max_of_chain",
+          "weighted": 4.0
+        },
+        {
+          "metric": "whose_clauses",
+          "weighted": 1.5
+        }
+      ],
+      "cost_rules": [],
+      "costly_inspectors": [],
+      "evaluation_cost": 0.0,
+      "metrics": {
+        "boolean_operators": 0,
+        "conditional_branches": 0,
+        "conditional_parens": 0,
+        "costly_inspectors": [],
+        "error_tokens": 0,
+        "evaluation_cost": 0.0,
+        "iteration_keywords": 4,
+        "max_conditional_depth": 0,
+        "max_of_chain": 2,
+        "max_paren_depth": 2,
+        "max_unfiltered_tuple_commas": 0,
+        "of_count": 8,
+        "semicolon_clauses": 3,
+        "string_literals": 0,
+        "token_count": 46,
+        "tuple_commas": 2,
+        "unfiltered_tuple_commas": 0,
+        "unique_identifiers": 12,
+        "whose_clauses": 1
+      },
+      "score": 89.98528137423857
+    },
+    "dialect": {
+      "assumed": false,
+      "classified": "session",
+      "effective": "session",
+      "requested": "session",
+      "resolved": "session"
+    },
+    "it_bindings": [
+      {
+        "binder": "of",
+        "bound": true,
+        "column": 16,
+        "context": "fixlets of bes sites whose(id of it is contained by set of (2;78;80))",
+        "line": 1
+      },
+      {
+        "binder": "of",
+        "bound": true,
+        "column": 30,
+        "context": "fixlets of bes sites whose(id of it is contained by set of (2;78;80))",
+        "line": 1
+      },
+      {
+        "binder": "of",
+        "bound": true,
+        "column": 67,
+        "context": "fixlets of bes sites whose(id of it is contained by set of (2;78;80))",
+        "line": 1
+      },
+      {
+        "binder": "whose",
+        "bound": true,
+        "column": 111,
+        "context": "bes sites",
+        "line": 1
+      }
+    ],
+    "levels": [
+      {
+        "column": 1,
+        "label": "(id of site of it | 0, id of it | 0, applicable computer count of it | 0) of fixlets of bes sites whose(id of it is contained by set of (2;78;80))",
+        "line": 1,
+        "probe": "(if exists true whose (exists number of ((id of site of it | 0, id of it | 0, applicable computer count of it | 0) of fixlets of bes sites whose(id of it is contained by set of (2;78;80)))) then number of ((id of site of it | 0, id of it | 0, applicable computer count of it | 0) of fixlets of bes sites whose(id of it is contained by set of (2;78;80))) else -1)",
+        "probe_kind": "count",
+        "unfiltered_probe": null
+      },
+      {
+        "column": 105,
+        "label": "id of it",
+        "line": 1,
+        "probe": "(if exists it whose (exists number of (id of it)) then number of (id of it) else -1) of bes sites",
+        "probe_kind": "count",
+        "unfiltered_probe": null
+      },
+      {
+        "column": 130,
+        "label": "set of (2;78;80)",
+        "line": 1,
+        "probe": "(if exists it whose (exists number of (set of it)) then number of (set of it) else -1) of (2;78;80)",
+        "probe_kind": "count",
+        "unfiltered_probe": null
+      },
+      {
+        "column": 78,
+        "label": "fixlets of bes sites whose(id of it is contained by set of (2;78;80))",
+        "line": 1,
+        "probe": "(if exists it whose (exists number of (fixlets of it)) then number of (fixlets of it) else -1) of bes sites whose(id of it is contained by set of (2;78;80))",
+        "probe_kind": "count",
+        "unfiltered_probe": null
+      },
+      {
+        "column": 1,
+        "label": "(id of site of it | 0, id of it | 0, applicable computer count of it | 0) of fixlets of bes sites whose(id of it is contained by set of (2;78;80))",
+        "line": 1,
+        "probe": "(if exists it whose (exists number of ((id of site of it | 0, id of it | 0, applicable computer count of it | 0) of it)) then number of ((id of site of it | 0, id of it | 0, applicable computer count of it | 0) of it) else -1) of fixlets of bes sites whose(id of it is contained by set of (2;78;80))",
+        "probe_kind": "count",
+        "unfiltered_probe": null
+      },
+      {
+        "column": 8,
+        "label": "site of it",
+        "line": 1,
+        "probe": "(if exists it whose (exists number of (site of it)) then number of (site of it) else -1) of fixlets of bes sites whose(id of it is contained by set of (2;78;80))",
+        "probe_kind": "count",
+        "unfiltered_probe": null
+      },
+      {
+        "column": 2,
+        "label": "id of site of it",
+        "line": 1,
+        "probe": "(if exists it whose (exists number of (id of it)) then number of (id of it) else -1) of site of fixlets of bes sites whose(id of it is contained by set of (2;78;80))",
+        "probe_kind": "count",
+        "unfiltered_probe": null
+      },
+      {
+        "column": 24,
+        "label": "id of it",
+        "line": 1,
+        "probe": "(if exists it whose (exists number of (id of it)) then number of (id of it) else -1) of fixlets of bes sites whose(id of it is contained by set of (2;78;80))",
+        "probe_kind": "count",
+        "unfiltered_probe": null
+      },
+      {
+        "column": 38,
+        "label": "applicable computer count of it",
+        "line": 1,
+        "probe": "(if exists it whose (exists number of (applicable computer count of it)) then number of (applicable computer count of it) else -1) of fixlets of bes sites whose(id of it is contained by set of (2;78;80))",
+        "probe_kind": "count",
+        "unfiltered_probe": null
+      }
+    ],
+    "lexing": {
+      "by_kind": {
+        "number": 6,
+        "punct": 13,
+        "whitespace": 32,
+        "word": 27
+      },
+      "code_tokens": 46,
+      "errors": [],
+      "tokens": 78
+    },
+    "parse": {
+      "error": null,
+      "node_count": 33,
+      "node_kinds": {
+        "Bar": 3,
+        "Binary": 1,
+        "Collection": 1,
+        "It": 4,
+        "NumberLiteral": 6,
+        "Of": 8,
+        "Reference": 8,
+        "TupleExpr": 1,
+        "Whose": 1
+      },
+      "ok": true,
+      "sexpr": "(of (tuple (bar (of (ref \"id\") (of (ref \"site\") it)) (num \"0\")) (bar (of (ref \"id\") it) (num \"0\")) (bar (of (ref \"applicable computer count\") it) (num \"0\"))) (of (ref \"fixlets\") (whose (ref \"bes sites\") (bin \"is contained by\" (of (ref \"id\") it) (of (ref \"set\") (coll (num \"2\") (num \"78\") (num \"80\")))))))",
+      "tree_depth": 7
+    },
+    "platforms": {
+      "missing": [],
+      "universe": [],
+      "viable": []
+    },
+    "references": [
+      {
+        "column": 130,
+        "known": true,
+        "line": 1,
+        "phrase": "set",
+        "platforms": [],
+        "return_types": [
+          "bes action set",
+          "bes computer group set",
+          "bes computer set",
+          "bes domain set",
+          "bes filter set",
+          "bes fixlet set",
+          "bes idp directory set",
+          "bes ldap directory set",
+          "bes property set",
+          "bes role set",
+          "bes site file set",
+          "bes site set",
+          "bes unmanagedasset set",
+          "bes user set",
+          "bes webui app set",
+          "bes wizard set",
+          "integer set",
+          "string set"
+        ],
+        "signatures": [
+          "sets of <bes action>",
+          "sets of <bes computer group>",
+          "sets of <bes computer>",
+          "sets of <bes domain>",
+          "sets of <bes filter>",
+          "sets of <bes fixlet>",
+          "sets of <bes idp directory>",
+          "sets of <bes ldap directory>",
+          "sets of <bes property>",
+          "sets of <bes role>",
+          "sets of <bes site file>",
+          "sets of <bes site>",
+          "sets of <bes unmanagedasset>",
+          "sets of <bes user>",
+          "sets of <bes webui app>",
+          "sets of <bes wizard>",
+          "sets of <integer>",
+          "sets of <string>"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 105,
+        "known": true,
+        "line": 1,
+        "phrase": "id",
+        "platforms": [],
+        "return_types": [
+          "( integer, integer, integer )",
+          "integer",
+          "string",
+          "uinteger"
+        ],
+        "signatures": [
+          "id of <bes action>",
+          "id of <bes activation>",
+          "id of <bes baseline component>",
+          "id of <bes computer group>",
+          "id of <bes computer>",
+          "id of <bes domain>",
+          "id of <bes filter>",
+          "id of <bes fixlet>",
+          "id of <bes idp directory>",
+          "id of <bes ldap directory>",
+          "id of <bes property>",
+          "id of <bes role>",
+          "id of <bes site file>",
+          "id of <bes site>",
+          "id of <bes tag>",
+          "id of <bes unmanagedasset>",
+          "id of <bes user>"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 89,
+        "known": true,
+        "line": 1,
+        "phrase": "bes sites",
+        "platforms": [],
+        "return_types": [
+          "bes site"
+        ],
+        "signatures": [
+          "bes sites"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 78,
+        "known": true,
+        "line": 1,
+        "phrase": "fixlets",
+        "platforms": [],
+        "return_types": [
+          "bes fixlet"
+        ],
+        "signatures": [
+          "fixlet <integer> of <bes site>",
+          "fixlet of <bes fixlet result>",
+          "fixlets of <bes site>"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 38,
+        "known": true,
+        "line": 1,
+        "phrase": "applicable computer count",
+        "platforms": [],
+        "return_types": [
+          "integer"
+        ],
+        "signatures": [
+          "applicable computer count of <bes baseline component>",
+          "applicable computer count of <bes fixlet>"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 24,
+        "known": true,
+        "line": 1,
+        "phrase": "id",
+        "platforms": [],
+        "return_types": [
+          "( integer, integer, integer )",
+          "integer",
+          "string",
+          "uinteger"
+        ],
+        "signatures": [
+          "id of <bes action>",
+          "id of <bes activation>",
+          "id of <bes baseline component>",
+          "id of <bes computer group>",
+          "id of <bes computer>",
+          "id of <bes domain>",
+          "id of <bes filter>",
+          "id of <bes fixlet>",
+          "id of <bes idp directory>",
+          "id of <bes ldap directory>",
+          "id of <bes property>",
+          "id of <bes role>",
+          "id of <bes site file>",
+          "id of <bes site>",
+          "id of <bes tag>",
+          "id of <bes unmanagedasset>",
+          "id of <bes user>"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 8,
+        "known": true,
+        "line": 1,
+        "phrase": "site",
+        "platforms": [],
+        "return_types": [
+          "bes site"
+        ],
+        "signatures": [
+          "site of <bes computer group>",
+          "site of <bes fixlet>",
+          "site of <bes peer download>",
+          "site of <bes wizard>"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 2,
+        "known": true,
+        "line": 1,
+        "phrase": "id",
+        "platforms": [],
+        "return_types": [
+          "( integer, integer, integer )",
+          "integer",
+          "string",
+          "uinteger"
+        ],
+        "signatures": [
+          "id of <bes action>",
+          "id of <bes activation>",
+          "id of <bes baseline component>",
+          "id of <bes computer group>",
+          "id of <bes computer>",
+          "id of <bes domain>",
+          "id of <bes filter>",
+          "id of <bes fixlet>",
+          "id of <bes idp directory>",
+          "id of <bes ldap directory>",
+          "id of <bes property>",
+          "id of <bes role>",
+          "id of <bes site file>",
+          "id of <bes site>",
+          "id of <bes tag>",
+          "id of <bes unmanagedasset>",
+          "id of <bes user>"
+        ],
+        "visible_here": true
+      }
+    ],
+    "text": "(id of site of it | 0, id of it | 0, applicable computer count of it | 0) of fixlets of bes sites whose(id of it is contained by set of (2;78;80))",
+    "types": {
+      "diagnostics": [],
+      "known": false,
+      "ok": true,
+      "plurality": "unknown",
+      "types": null
+    },
+    "unknown_references": []
+  },
+  "unparsable": {
+    "complexity": {
+      "contributions": [
+        {
+          "metric": "max_paren_depth",
+          "weighted": 3.0
+        },
+        {
+          "metric": "token_count",
+          "weighted": 3.0
+        },
+        {
+          "metric": "unique_identifiers",
+          "weighted": 1.0
+        }
+      ],
+      "cost_rules": [],
+      "costly_inspectors": [],
+      "evaluation_cost": 0.0,
+      "metrics": {
+        "boolean_operators": 0,
+        "conditional_branches": 0,
+        "conditional_parens": 0,
+        "costly_inspectors": [],
+        "error_tokens": 0,
+        "evaluation_cost": 0.0,
+        "iteration_keywords": 0,
+        "max_conditional_depth": 0,
+        "max_of_chain": 0,
+        "max_paren_depth": 1,
+        "max_unfiltered_tuple_commas": 0,
+        "of_count": 0,
+        "semicolon_clauses": 0,
+        "string_literals": 0,
+        "token_count": 3,
+        "tuple_commas": 0,
+        "unfiltered_tuple_commas": 0,
+        "unique_identifiers": 1,
+        "whose_clauses": 0
+      },
+      "score": 7.0
+    },
+    "dialect": {
+      "assumed": true,
+      "classified": null,
+      "effective": "client",
+      "requested": null,
+      "resolved": null
+    },
+    "it_bindings": [],
+    "levels": [],
+    "lexing": {
+      "by_kind": {
+        "punct": 1,
+        "whitespace": 2,
+        "word": 2
+      },
+      "code_tokens": 3,
+      "errors": [],
+      "tokens": 5
+    },
+    "parse": {
+      "error": {
+        "column": 15,
+        "line": 1,
+        "message": "expected an expression, found end of input",
+        "offset": 14
+      },
+      "node_count": 0,
+      "node_kinds": {},
+      "ok": false,
+      "sexpr": null,
+      "tree_depth": 0
+    },
+    "platforms": {
+      "missing": [
+        "debian",
+        "macos",
+        "rhel",
+        "ubuntu",
+        "windows"
+      ],
+      "universe": [
+        "debian",
+        "macos",
+        "rhel",
+        "ubuntu",
+        "windows"
+      ],
+      "viable": []
+    },
+    "references": [],
+    "text": "exists files (",
+    "unknown_references": []
+  }
+}

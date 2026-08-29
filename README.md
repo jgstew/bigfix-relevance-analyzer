@@ -373,6 +373,22 @@ MyTask.bes:88: error [complexity] score 412 > 350 (whose_clauses=6, max_of_chain
 MyDashboard.ojo:12: warning [unknown-inspector] no dump defines `bes computer group`
 ```
 
+Every rule, its default severity, and what switches it on. This table is
+generated from `lint.RULES`, which is also what `bigfix-relevance-lint
+--list-rules` prints and what a consumer should join a finding's `code`
+against - so a hook, a CI log and an MCP server all explain a finding the
+same way instead of each inventing a description:
+
+| Code | Default | Fires when | Needs |
+| --- | --- | --- | --- |
+| `complexity` | error | the complexity score is above the configured ceiling | `max_score` |
+| `error-token` | error | the statement contains text that could not be lexed | always on |
+| `evaluation-cost` | error | the evaluation cost is above the configured ceiling | `max_evaluation_cost` |
+| `max-depth-exceeded` | error | a directory tree was deeper than the walk's limit, so it was not fully scanned | always on |
+| `parse-error` | error | the statement could not be parsed | always on |
+| `unbound-it` | error | `it` is used where there is no context to bind it to | always on |
+| `unknown-inspector` | warning | a name no inspector dump defines | always on |
+
 The same rules are reachable two other ways: `python -m bigfix_relevance_analyzer
 --check --max-score=350 file1.bes file2.bes` for a one-off run, or the
 `bigfix-relevance-lint` console script this package installs, which is what a
@@ -420,6 +436,114 @@ Not gated by any of the three entry points: `RelevanceAnalysis.missing_platforms
 type layer has more mileage). Read `RelevanceComplexity` or `RelevanceAnalysis`
 directly for those - `lint.py` has no monopoly on the facts, only an opinion
 about which of them should fail a commit by default.
+
+## Serving this from an MCP server
+
+This package is meant to be wrapped, and more than one server wraps it. What
+follows is the part that exists so those servers do not each invent their own
+answer to the same question.
+
+**No server ships here, and there is no `mcp` dependency - not even an optional
+one.** `dependencies = []` is the promise this README opens with, and the
+pre-commit hooks and `besapi` must not inherit an MCP SDK to get relevance
+analysis. There are no tool names, descriptions or JSON schemas here either:
+two servers with different transports, auth models and resource URI schemes
+need different tool shapes, and a schema baked in here would be either ignored
+or in the way. What genuinely has to agree between them is the *value* schema -
+the key names in a payload, and the words used to explain a finding - and that
+is what is provided.
+
+### Every result type serializes
+
+`RelevanceAnalysis.to_dict()` was always the wire format. Now every type a
+public function can hand back has one, with the same conventions: enums become
+their `.value`, an unknown fact is `null` and is never omitted (`null` means *no
+evidence*, which is not `false`), sets and tuples become sorted lists so a
+payload is byte-stable and survives a round trip, and positions are
+`line`/`column` (plus `offset` where the source carries one).
+
+```python
+from bigfix_relevance_analyzer import analyze_relevance_to_dict, lint_paths_to_dict, LintConfig
+
+analyze_relevance_to_dict('exists files of folder "/tmp"')  # the full analysis
+lint_paths_to_dict(changed_paths, LintConfig(max_score=350))
+```
+
+`Finding`, `RelevanceSite`, `ParseError`, `RelevanceComplexity`, `CheckResult`,
+`Probe`, `Level`, `ProbeOutcome`, `Inspector`, `RelevanceType` and `Diagnostic`
+all have `to_dict()`. `Inspector` and `RelevanceType` include the decoded
+`dialects` and `platforms` so no consumer parses `"client:windows"` for itself;
+`Finding` nests its `site` and carries a `text` key holding the same grep-able
+line the CLIs print.
+
+`json.dumps(payload)` works with no `default=`. There is deliberately no
+`to_json()`: the encoder is the server's choice.
+
+Two convenience wrappers only, and both earn it - `analyze_relevance_to_dict`
+replaces a two-step every caller would write, and `lint_paths_to_dict` returns
+`{"findings", "counts", "ok"}`, where `ok` is the same pass/fail verdict both
+CLIs here exit on. There is no `extract_to_dict`, because
+`[site.to_dict() for site in sites]` has no shared decision in it.
+
+### Findings explain themselves once
+
+`lint.RULES` maps each code to a `LintRule` with a one-line `summary`, a
+`rationale`, its `default_severity`, and whether it is `gated` behind a
+threshold. `DEFAULT_SEVERITIES` is derived from it, so the two cannot disagree.
+
+A `Finding` carries only its `code`; serve the catalog once and join on it,
+rather than repeating two sentences of prose on every finding. Both CLIs can
+print it: `python -m bigfix_relevance_analyzer --rules` and
+`bigfix-relevance-lint --list-rules` (add `--json` to either).
+
+### Language reference resources
+
+`bigfix_relevance_analyzer.reference` serves three Markdown documents a server
+can register as MCP resources: `dialects` (client versus session - serve this
+first), `client-relevance`, and `session-relevance`.
+
+```python
+from bigfix_relevance_analyzer import reference
+
+for document in reference.documents():
+    register(document.slug, document.title, document.summary, document.read)
+
+reference.client_relevance_reference()  # ~6k tokens
+reference.session_relevance_reference(detail=reference.Detail.BRIEF)  # prose only
+```
+
+Each is a hybrid, which is the point: the prose is authored (in
+`docs/reference/*.md`, embedded into a module by
+`tools/generate_reference_prose.py` because the wheel packages `src/` only),
+while the tables are generated **at call time** from `grammar.py`,
+`inspectors.py`, `COST_RULES` and `DIAGNOSTICS`. So the operator/precedence
+table, the type sketch, the per-dialect cost table and the type-checker
+vocabulary cannot drift from the snapshot the analyzer itself uses - and there
+is no second thing to guard.
+
+`documents()` returns `ReferenceDocument`s carrying `title` and `summary`
+because an MCP `list_resources` needs a name and a description for each
+resource; a bare `-> str` would make every server invent those. There is no
+`uri` field - that namespace is the server's, and `slug` is enough to build one
+from.
+
+`Detail.STANDARD` is around 6k tokens, `Detail.BRIEF` around 2.5k, and a test
+pins a character ceiling so a generated section cannot grow into a manual. The
+full inspector table is not served: 6,000 rows is a search index, not a
+reference, so `lookup()` plus `Inspector.to_dict()` is how a consumer answers a
+question about one name.
+
+Importing the package does **not** import `reference`, and importing
+`reference` does not build any document - the prose and table modules are
+imported inside function bodies and every renderer is cached. A stdio server
+that never serves a document pays nothing, which is checked by a test that runs
+in a subprocess.
+
+Try them from the command line:
+
+```bash
+python -m bigfix_relevance_analyzer --reference session
+```
 
 ## What `it` refers to
 

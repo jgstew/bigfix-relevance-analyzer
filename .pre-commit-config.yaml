@@ -227,6 +227,12 @@ repos:
         pass_filenames: false
         files: ^(tests/examples/relevance_inspectors/|tools/generate_inspector_data\.py|src/bigfix_relevance_analyzer/_inspector_data\.py)
         entry: uv run python tools/generate_inspector_data.py --check
+      - id: reference-prose
+        name: embedded reference prose matches docs/reference
+        language: system
+        pass_filenames: false
+        files: ^(docs/reference/|tools/generate_reference_prose\.py|src/bigfix_relevance_analyzer/reference/_prose\.py)
+        entry: uv run python tools/generate_reference_prose.py --check
       - id: pytest
         name: pytest (see config in pyproject.toml)
         language: system

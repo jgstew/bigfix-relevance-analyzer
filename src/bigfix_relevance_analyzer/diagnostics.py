@@ -48,7 +48,9 @@ import enum
 import string
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Final
+from typing import Any, Final
+
+from bigfix_relevance_analyzer._serialize import _names
 
 __all__ = [
     "DIAGNOSTICS",
@@ -136,6 +138,21 @@ class Diagnostic:
     def format(self, **fields: object) -> str:
         """Render the message."""
         return self.template.format(**fields)
+
+    def to_dict(self) -> dict[str, Any]:
+        """This entry as JSON-serializable plain data.
+
+        The unrendered ``template`` and its ``fields``, not a formatted
+        message: this is a catalog entry, and what a consumer serving the
+        catalog needs is the shape of the message plus the names it expects.
+        Rendering needs values only the caller has.
+        """
+        return {
+            "code": self.code,
+            "origin": self.origin.value,
+            "template": self.template,
+            "fields": _names(self.fields),
+        }
 
 
 def _entry(code: str, origin: Origin, template: str) -> tuple[str, Diagnostic]:

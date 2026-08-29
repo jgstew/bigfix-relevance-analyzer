@@ -42,8 +42,10 @@ import enum
 import functools
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from bigfix_relevance_analyzer import _inspector_data
+from bigfix_relevance_analyzer._serialize import _enums, _names
 from bigfix_relevance_analyzer.dialect import Dialect
 
 __all__ = [
@@ -209,6 +211,40 @@ class Inspector(_Sourced):
     conceptually different fields upstream (``symbol of <binary operator>``).
     """
 
+    def to_dict(self) -> dict[str, Any]:
+        """This inspector as JSON-serializable plain data.
+
+        Every field, plus the three derived facts a consumer would otherwise
+        have to rebuild: :func:`written_forms` (the spellings this is actually
+        written as), and :attr:`dialects` / :attr:`platforms`, which mean
+        re-parsing ``"client:windows"`` strings by hand if they are not here.
+        ``sources`` stays too -- it is the evidence those two are derived from,
+        and a consumer auditing a surprising answer wants it.
+
+        The ``None``-valued fields are emitted, not dropped. ``multivalued`` is
+        why: ``None`` there means the dump that defined this row predates the
+        capture that reports plurality, which is a different statement from
+        ``false``. See :mod:`bigfix_relevance_analyzer._serialize`.
+        """
+        return {
+            "kind": self.kind.value,
+            "signature": self.signature,
+            "name": self.name,
+            "return_type": self.return_type,
+            "index_type": self.index_type,
+            "operands": list(self.operands),
+            "singular_name": self.singular_name,
+            "plural_name": self.plural_name,
+            "usual_name": self.usual_name,
+            "multivalued": self.multivalued,
+            "written_name": self.written_name,
+            "symbol": self.symbol,
+            "written_forms": list(written_forms(self)),
+            "sources": _names(self.sources),
+            "dialects": _enums(self.dialects),
+            "platforms": _names(self.platforms),
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class RelevanceType(_Sourced):
@@ -229,6 +265,23 @@ class RelevanceType(_Sourced):
 
     size: int | None = None
     """This type's internal size, in bytes, when the engine reports one."""
+
+    def to_dict(self) -> dict[str, Any]:
+        """This type as JSON-serializable plain data.
+
+        ``ancestors`` is the walk up to the root, resolved here via
+        :func:`ancestors` so a consumer does not have to follow :attr:`parent`
+        one lookup at a time across a wire.
+        """
+        return {
+            "name": self.name,
+            "parent": self.parent,
+            "size": self.size,
+            "ancestors": list(ancestors(self.name)),
+            "sources": _names(self.sources),
+            "dialects": _enums(self.dialects),
+            "platforms": _names(self.platforms),
+        }
 
 
 # ---------------------------------------------------------------------------

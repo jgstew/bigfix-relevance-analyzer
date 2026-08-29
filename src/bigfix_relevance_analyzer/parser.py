@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
-from typing import Final
+from typing import Any, Final
 
 from bigfix_relevance_analyzer import grammar
 from bigfix_relevance_analyzer.diagnostics import DIAGNOSTICS
@@ -94,6 +94,20 @@ class ParseError(ValueError):
         self.offset = offset
         self.line = line
         self.column = column
+
+    def to_dict(self) -> dict[str, Any]:
+        """This error as JSON-serializable plain data.
+
+        ``message`` is the bare message, not the ``str(self)`` form that
+        prefixes it with the position: the position is already here as its own
+        keys, and a consumer rendering both would print it twice.
+        """
+        return {
+            "message": self.message,
+            "line": self.line,
+            "column": self.column,
+            "offset": self.offset,
+        }
 
 
 @dataclass(frozen=True, slots=True)

@@ -8,12 +8,17 @@ caller renders or exits on the result.
 
 from __future__ import annotations
 
+import dataclasses
+import json
+import re
 from pathlib import Path
 
 from bigfix_relevance_analyzer.analyzer import analyze
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
+    DEFAULT_SEVERITIES,
+    RULES,
     Finding,
     LintConfig,
     Severity,
@@ -21,6 +26,7 @@ from bigfix_relevance_analyzer.lint import (
     lint_directory,
     lint_file,
     lint_paths,
+    rules,
 )
 
 CLIENT = 'exists file "C:\\foo.txt" whose (size of it > 100)'
@@ -28,6 +34,9 @@ BROKEN = 'exists file "unterminated'
 UNBOUND_IT = "size of it"  # `it` with nothing to bind to
 UNKNOWN_INSPECTOR = "totally bogus made up inspector"
 BES_EXAMPLE = Path("tests/examples/mixed_context/task_with_client_and_session_relevance.bes")
+# Non-zero evaluation cost, so the `evaluation-cost` ceiling has something to
+# exceed: hashing a file is the `COST_EXTREME` tier on the client.
+COSTLY = 'sha1 of file "/tmp/x" = "abc"'
 
 
 def codes(findings: tuple[Finding, ...]) -> set[str]:
@@ -245,3 +254,203 @@ def test_lint_directory_max_depth_override_reaches_deeper_content(tmp_path: Path
     findings = lint_directory(tmp_path, LintConfig(), max_depth=DEFAULT_MAX_DEPTH + 2)
     assert "max-depth-exceeded" not in codes(findings)
     assert "parse-error" in codes(findings)
+
+
+# ---------------------------------------------------------------------------
+# The rule catalog
+# ---------------------------------------------------------------------------
+# `RULES` exists so that every consumer -- a hook, a CI log, an MCP server,
+# an editor hover -- explains a finding with the same words, instead of each
+# inventing its own. These tests are what keep it honest: a catalog nothing
+# holds to the code it describes is documentation, and drifts like it.
+
+
+def test_the_catalog_and_the_default_severities_cannot_disagree() -> None:
+    """``DEFAULT_SEVERITIES`` is derived from ``RULES``, so it cannot drift.
+
+    Kept as an assertion rather than trusted from the implementation, because
+    the derivation is one line that a future edit could quietly replace with a
+    second hand-maintained literal -- which is exactly the state this replaced.
+    """
+    assert set(DEFAULT_SEVERITIES) == set(RULES)
+    for code, rule in RULES.items():
+        assert DEFAULT_SEVERITIES[code] is rule.default_severity
+
+
+def _every_emitted_code() -> set[str]:
+    """Drive every rule and collect the codes that actually come out.
+
+    Deliberately exercises the rules through :func:`lint_analysis` and
+    :func:`lint_directory` rather than reading a list, so a rule that stopped
+    firing counts as missing.
+    """
+    emitted: set[str] = set()
+    thresholds = LintConfig(max_score=0.0, max_evaluation_cost=0.0)
+    for text in (BROKEN, UNBOUND_IT, UNKNOWN_INSPECTOR, CLIENT, COSTLY):
+        for config in (LintConfig(), thresholds):
+            emitted.update(finding.code for finding in lint_analysis(analyze(text), config))
+    return emitted
+
+
+def test_every_rule_in_the_catalog_is_a_rule_that_fires(tmp_path: Path) -> None:
+    """The catalog names exactly the codes the linter can emit -- no more, no less.
+
+    Both directions matter and they catch opposite mistakes: an extra catalog
+    entry is a rule that was removed without the docs following, and a missing
+    one is a new rule whose explanation nobody wrote. Either way a consumer
+    joining a finding to :data:`RULES` gets a ``KeyError`` or a stale answer.
+    """
+    emitted = _every_emitted_code()
+
+    # `max-depth-exceeded` only comes from the directory walk, so it needs its
+    # own trigger: a tree deeper than the limit it is reporting on.
+    deep = tmp_path
+    for level in range(3):
+        deep = deep / f"level{level}"
+    deep.mkdir(parents=True)
+    (deep / "x.rel").write_text(CLIENT)
+    emitted.update(finding.code for finding in lint_directory(tmp_path, LintConfig(), max_depth=1))
+
+    assert emitted == set(RULES)
+
+
+def test_a_gated_rule_is_silent_until_its_threshold_is_set() -> None:
+    """``gated`` marks the rules that report nothing until configured.
+
+    Named ``gated`` rather than ``configurable`` on purpose: *every* rule's
+    severity is configurable via :attr:`LintConfig.severities`, so
+    ``configurable`` would read as true of all seven. What distinguishes these
+    two is that they are switched off entirely by default -- a baked-in ceiling
+    would fail every existing content repo on day one.
+    """
+    gated = {code for code, rule in RULES.items() if rule.gated}
+    assert gated == {"complexity", "evaluation-cost"}
+
+    silent = {finding.code for finding in lint_analysis(analyze(CLIENT), LintConfig())}
+    assert not silent & gated
+
+    # `COSTLY` rather than `CLIENT`: both ceilings are `>` comparisons, so a
+    # statement whose evaluation cost is genuinely 0.0 cannot exceed 0.0 and
+    # the second rule would look broken when it is only unexercised.
+    loud = {
+        finding.code
+        for finding in lint_analysis(
+            analyze(COSTLY), LintConfig(max_score=0.0, max_evaluation_cost=0.0)
+        )
+    }
+    assert loud >= gated
+
+
+def test_a_gated_rule_names_the_config_field_that_switches_it_on() -> None:
+    """``threshold`` is a real :class:`LintConfig` field, and only gated rules have one.
+
+    A consumer showing "set ``max_score`` to enable this" must be naming a
+    field that exists, so the name is checked against the dataclass rather
+    than trusted as a string.
+    """
+    fields = {field.name for field in dataclasses.fields(LintConfig)}
+    for code, rule in RULES.items():
+        if rule.gated:
+            assert rule.threshold in fields, code
+        else:
+            assert rule.threshold is None, code
+
+
+def test_every_rule_explains_itself_in_a_usable_shape() -> None:
+    """``summary`` fits one line of a rule list; ``rationale`` is prose.
+
+    The length and punctuation rules are not fussiness: ``summary`` goes in a
+    table cell and an editor hover, so a paragraph there wraps badly and a
+    trailing period reads wrong mid-row. ``rationale`` is the opposite -- full
+    sentences, because it answers "why does this default this way".
+    """
+    for code, rule in RULES.items():
+        assert rule.code == code, "a rule's key and its code must agree"
+        assert rule.summary and "\n" not in rule.summary, code
+        assert len(rule.summary) <= 100, code
+        assert not rule.summary.endswith("."), code
+        assert rule.rationale.endswith("."), code
+        assert len(rule.rationale) > len(rule.summary), code
+
+
+def test_the_catalog_serializes_to_plain_json() -> None:
+    """A server serves this catalog once and joins findings to it by code."""
+    payload = [rule.to_dict() for rule in rules()]
+    assert payload == json.loads(json.dumps(payload))
+    assert [entry["code"] for entry in payload] == [rule.code for rule in rules()]
+
+
+def test_the_catalog_is_ordered_errors_first() -> None:
+    """``rules()`` is a stable order a consumer can render without sorting.
+
+    Errors before warnings, because a rule list is read to find out what will
+    block a commit; alphabetical within a severity so the order never depends
+    on dict insertion.
+    """
+    listed = rules()
+    assert len(listed) == len(RULES)
+    errors = [rule.code for rule in listed if rule.default_severity is Severity.ERROR]
+    warnings = [rule.code for rule in listed if rule.default_severity is Severity.WARNING]
+    assert [rule.code for rule in listed] == errors + warnings
+    assert errors == sorted(errors)
+    assert warnings == sorted(warnings)
+
+
+def test_a_finding_does_not_repeat_the_catalog() -> None:
+    """A finding carries its ``code``, not the rule's prose.
+
+    The prose is identical on every finding of a kind, so inlining it would
+    multiply a large repo's payload for no added information -- the join on
+    ``code`` is what :data:`RULES` is for.
+    """
+    finding = lint_analysis(analyze(BROKEN), LintConfig())[0]
+    payload = finding.to_dict()
+    assert payload["code"] in RULES
+    assert "summary" not in payload
+    assert "rationale" not in payload
+
+
+README = Path(__file__).parent.parent / "README.md"
+#: The README's generated rule table: `| \`code\` | severity | ... |` rows only,
+#: so prose and fenced example output cannot be mistaken for entries.
+_README_RULE_ROW = re.compile(r"^\|\s*`([a-z-]+)`\s*\|\s*(error|warning)\s*\|", re.MULTILINE)
+
+
+def test_the_readme_rule_table_matches_the_catalog() -> None:
+    """Every rule is in the README's table, with the severity it actually has.
+
+    The README is where an adopting repo decides which rules to ratchet on, so a
+    table that has drifted from the code is worse than no table: it is a
+    confident wrong answer. This happened once already with the dump README,
+    which is why :mod:`test_inspector_data` checks the same way.
+    """
+    documented = dict(_README_RULE_ROW.findall(README.read_text(encoding="utf-8")))
+
+    assert documented, "the README's rule table is missing or its shape changed"
+    assert set(documented) == set(RULES), (
+        "README rule table and lint.RULES disagree: "
+        f"only in README {sorted(set(documented) - set(RULES))}, "
+        f"only in code {sorted(set(RULES) - set(documented))}"
+    )
+    for code, severity in documented.items():
+        assert severity == RULES[code].default_severity.value, code
+
+
+def test_the_readme_rule_table_says_which_rules_are_gated() -> None:
+    """A gated rule's row names its threshold; an always-on rule's says so.
+
+    Which rules are off by default is the single most consequential thing on
+    that table for someone adopting the hook -- get it wrong and they configure
+    a ceiling that was already failing, or trust one that was never on.
+    """
+    text = README.read_text(encoding="utf-8")
+    for row in text.splitlines():
+        match = _README_RULE_ROW.match(row)
+        if match is None:
+            continue
+        rule = RULES[match.group(1)]
+        if rule.gated:
+            assert rule.threshold is not None
+            assert f"`{rule.threshold}`" in row, rule.code
+        else:
+            assert "always on" in row, rule.code

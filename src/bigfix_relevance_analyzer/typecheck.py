@@ -47,9 +47,10 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, field
-from typing import assert_never
+from typing import Any, assert_never
 
 from bigfix_relevance_analyzer import grammar, inspectors
+from bigfix_relevance_analyzer._serialize import _span
 from bigfix_relevance_analyzer.diagnostics import DIAGNOSTICS
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.nodes import (
@@ -133,6 +134,10 @@ class TypeDiagnostic:
     message: str
     span: Span
 
+    def to_dict(self) -> dict[str, Any]:
+        """This diagnostic as JSON-serializable plain data."""
+        return {"code": self.code, "message": self.message, **_span(self.span)}
+
 
 @dataclass(frozen=True, slots=True)
 class CheckResult:
@@ -149,6 +154,24 @@ class CheckResult:
     def platforms(self) -> frozenset[str]:
         """Where the statement as a whole can run."""
         return self.value.platforms
+
+    def to_dict(self) -> dict[str, Any]:
+        """This result as JSON-serializable plain data.
+
+        The :class:`RelevanceValue` is flattened in rather than nested: a
+        consumer wants "what type is this, and is it singular" as one answer,
+        and the extra level of nesting bought nothing. ``platforms`` is not
+        here either -- it belongs to the analysis, which knows the platform
+        universe this was narrowed against and can therefore also say which
+        platforms are *missing*.
+        """
+        return {
+            "types": None if self.value.types is None else sorted(self.value.types),
+            "plurality": self.value.plurality.value,
+            "known": self.value.known,
+            "ok": self.ok,
+            "diagnostics": [diagnostic.to_dict() for diagnostic in self.diagnostics],
+        }
 
 
 @dataclass(frozen=True, slots=True)

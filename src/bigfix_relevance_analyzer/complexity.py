@@ -107,9 +107,11 @@ server side, so they cover the constructs whose expansion the dumps make plain
 
 from __future__ import annotations
 
+import dataclasses
 import math
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 from bigfix_relevance_analyzer.tokenizer import GRAMMAR_WORDS, TokenKind, code_tokens
@@ -815,6 +817,37 @@ class RelevanceComplexity:
                 key=lambda term: (-term[1], term[0]),
             )
         )
+
+    def to_dict(self) -> dict[str, Any]:
+        """These metrics as JSON-serializable plain data.
+
+        ``metrics`` is every declared field, so a consumer gets the raw counts
+        without having to know their names in advance; ``contributions`` is the
+        same numbers already weighted and ranked, which is what a report shows.
+        Both are included because a caller either wants to render the score's
+        reasoning (contributions) or to threshold on one specific count
+        (metrics), and deriving either from the other needs the weight table.
+
+        Note what is *not* here: the per-rule evaluation-cost breakdown. A
+        rule's cost depends on the dialect being evaluated
+        (:meth:`CostRule.cost_for`) and this object does not know one, so that
+        breakdown belongs to the analysis that does -- see
+        :meth:`~bigfix_relevance_analyzer.analyzer.RelevanceAnalysis.to_dict`.
+        """
+        return {
+            "score": self.score,
+            "evaluation_cost": self.evaluation_cost,
+            "costly_inspectors": list(self.costly_inspectors),
+            "metrics": {
+                field.name: (
+                    list(value) if isinstance(value := getattr(self, field.name), tuple) else value
+                )
+                for field in dataclasses.fields(self)
+            },
+            "contributions": [
+                {"metric": name, "weighted": weighted} for name, weighted in self.contributions
+            ],
+        }
 
     @property
     def score(self) -> float:
