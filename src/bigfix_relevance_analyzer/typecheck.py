@@ -281,6 +281,38 @@ def _ruled_out(value: RelevanceValue) -> bool:
     return value.types is not None and not value.types
 
 
+UNTYPED: Final = "undefined"
+"""The type the tables record when there is no value to have a type.
+
+Exactly three rows return it -- `nil`, `null` and `error` -- which between
+them are written `nothing`, `nothings`, `null value` and `error`: the
+idiomatic "no result" constructs, not a type anything conflicts with. `if
+windows of operating system then (x64 variables ("X") of it) else nothings`
+is ordinary, shipped content, and the evaluator accepts it: the `nothings`
+branch contributes no value rather than a value of the wrong type.
+
+So `undefined` is an *absence* of type information, and every comparison in
+this module treats it as matching whatever it is held against -- see
+:func:`_types_compatible` and :func:`_accepts`. Left to compare as an
+ordinary type name it unifies with nothing, which is what made
+:meth:`_Checker.combine_bar`, :meth:`_Checker.combine_if`,
+:meth:`_Checker.combine_binary`, :meth:`_Checker.combine_unary` and
+:func:`resolve_property` all report on valid relevance -- 41 of the 46
+type errors over a 1,108-file corpus of real content were this one bug.
+"""
+
+
+def _accepts(declared: str, candidate: str) -> bool:
+    """Whether a row declaring operand type ``declared`` takes a ``candidate`` value.
+
+    The is-a walk every lookup site in this module already did inline, plus
+    :data:`UNTYPED`, which no row declares but any row accepts: a `nothing`
+    handed to a cast, an operator or a property propagates rather than
+    failing to resolve.
+    """
+    return candidate == UNTYPED or declared in inspectors.ancestors(candidate)
+
+
 def _types_compatible(left: frozenset[str], right: frozenset[str]) -> bool:
     """Whether any type on one side shares a common ancestor with any type on
     the other -- the same is-a relationship every other type comparison in
@@ -298,7 +330,12 @@ def _types_compatible(left: frozenset[str], right: frozenset[str]) -> bool:
     made :meth:`_Checker.combine_bar` and :meth:`_Checker.combine_if` report
     ``operand-types-incompatible`` / ``if-branch-types-incompatible`` on
     perfectly valid content -- see the regression tests this fixes.
+
+    :data:`UNTYPED` short-circuits to compatible on either side, for the
+    reason given there: it is the absence of a type, not one that conflicts.
     """
+    if UNTYPED in left or UNTYPED in right:
+        return True
     left_ancestors = {ancestor for name in left for ancestor in inspectors.ancestors(name)}
     right_ancestors = {ancestor for name in right for ancestor in inspectors.ancestors(name)}
     return bool(left_ancestors & right_ancestors)
@@ -421,9 +458,7 @@ def resolve_property(
             entry
             for entry in rows
             if any(
-                operand in inspectors.ancestors(candidate)
-                for candidate in subject
-                for operand in entry.operands
+                _accepts(operand, candidate) for candidate in subject for operand in entry.operands
             )
         ]
 
@@ -949,7 +984,7 @@ class _Checker:
             )
             if entry.name == node.target
             and any(
-                source in inspectors.ancestors(candidate)
+                _accepts(source, candidate)
                 for candidate in operand.types
                 for source in entry.operands
             )
@@ -1003,8 +1038,8 @@ class _Checker:
                 inspectors.lookup(form.operator, kind=inspectors.InspectorKind.BINARY_OPERATOR)
             )
             if len(entry.operands) == 2
-            and any(entry.operands[0] in inspectors.ancestors(t) for t in lhs.types or frozenset())
-            and any(entry.operands[1] in inspectors.ancestors(t) for t in rhs.types or frozenset())
+            and any(_accepts(entry.operands[0], t) for t in lhs.types or frozenset())
+            and any(_accepts(entry.operands[1], t) for t in rhs.types or frozenset())
         ]
         if not rows:
             self.report(
@@ -1039,7 +1074,7 @@ class _Checker:
             for entry in self.rows(
                 inspectors.lookup(node.op, kind=inspectors.InspectorKind.UNARY_OPERATOR)
             )
-            if any(o in inspectors.ancestors(t) for t in operand.types for o in entry.operands)
+            if any(_accepts(o, t) for t in operand.types for o in entry.operands)
         ]
         if not rows:
             self.report(

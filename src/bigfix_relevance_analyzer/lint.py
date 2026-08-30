@@ -57,6 +57,12 @@ absence from the dumps is not proof of lack of support, so it stays a fact a
 caller can read off the analysis directly rather than a finding this module
 asserts an opinion about.
 
+The keys of :data:`RULES` are a downstream vocabulary, not an internal one:
+`pre-commit-bigfix`'s hook maps each to one of its own ``E6xx``/``W6xx`` codes,
+and a repo's config disables rules by name. Adding, renaming or removing a code
+is therefore a minor-version event with a consumer to update, not a detail --
+that hook has a test that fails when a code here has no mapping there.
+
 :func:`lint_paths` and :func:`lint_file` never expand a directory argument --
 a path is taken literally, exactly like the extractor they wrap. Only
 :func:`lint_directory` recurses, and only when a caller asks it to (both CLIs

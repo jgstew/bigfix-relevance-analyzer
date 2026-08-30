@@ -795,6 +795,54 @@ def test_a_ruled_out_value_does_not_cascade(env: TypeEnvironment) -> None:
     assert not result.ok
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        pytest.param('if true then "a" else nothing', id="if-branch"),
+        pytest.param(
+            'if windows of operating system then "a" else nothings', id="if-branch-plural"
+        ),
+        pytest.param("(1) | nothing", id="bar"),
+        pytest.param("nothing as string", id="cast"),
+    ],
+)
+def test_nothing_is_compatible_with_whatever_it_is_held_against(
+    source: str, env: TypeEnvironment
+) -> None:
+    """`undefined` is an absence of type information, not a type that conflicts.
+
+    The tables give it to `nil`, `null` and `error` -- written `nothing`,
+    `nothings`, `null value` and `error` -- and `if X then Y else nothings` is
+    ordinary shipped content the evaluator accepts. Compared as an ordinary
+    type name it unified with nothing, which accounted for 41 of the 46 type
+    errors over a 1,108-file corpus of real content.
+    """
+    assert [d.code for d in check(parse(source), env).diagnostics] == []
+
+
+def test_plurality_still_answers_for_itself_over_an_undefined_value(
+    env: TypeEnvironment,
+) -> None:
+    """Type and plurality are separate axes, and only the type one is widened here.
+
+    `nothing` is recorded plural, so `-nothing` keeps reporting that its
+    argument is not singular -- the operator lookup it used to fail first is
+    what stopped.
+    """
+    assert [d.code for d in check(parse("-nothing"), env).diagnostics] == ["argument-not-singular"]
+
+
+def test_an_undefined_operand_does_not_silence_a_real_mismatch(env: TypeEnvironment) -> None:
+    """The short-circuit is per-comparison, not a blanket amnesty: only the side
+    actually typed `undefined` stops counting."""
+    assert [d.code for d in check(parse('if true then 1 else "a"'), env).diagnostics] == [
+        "if-branch-types-incompatible"
+    ]
+    assert [d.code for d in check(parse('"a" | 42'), env).diagnostics] == [
+        "operand-types-incompatible"
+    ]
+
+
 def test_branches_no_single_platform_shares_may_differ_in_type(env: TypeEnvironment) -> None:
     """The type axis answers to the platform axis.
 
