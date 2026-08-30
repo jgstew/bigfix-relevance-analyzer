@@ -371,6 +371,9 @@ class _Parser:
                         f"the engine cannot parse '|' after an unparenthesized "
                         f"'{left.op}' expression; parenthesize the left side",
                     )
+                if self.chained_comparison(op, left):
+                    assert isinstance(left, Binary)
+                    raise self.error_at(token, _chained_comparison_message(op, left))
                 self.advance()
                 right = self.parse_expression(self.right_bp(op))
                 if op.canonical == "|":
@@ -416,6 +419,9 @@ class _Parser:
             if matched is not None:
                 op, consumed = matched
                 if op.lbp > min_bp:
+                    if self.chained_comparison(op, left):
+                        assert isinstance(left, Binary)
+                        raise self.error_at(token, _chained_comparison_message(op, left))
                     self.at += consumed
                     right = self.parse_expression(self.right_bp(op))
                     return _binary(op.canonical, left, right)
@@ -437,6 +443,19 @@ class _Parser:
             isinstance(node, Binary)
             and node.op in grammar.PIPE_UNMIXABLE
             and id(node) not in self.grouped
+        )
+
+    def chained_comparison(self, op: grammar.InfixOp, left: Node) -> bool:
+        """Whether ``op`` would be a second comparison on an unparenthesized
+        first one -- the shape the engine refuses outright (`1 = 1 = true` and
+        `1 is 1 is true` are parse errors; `(1 = 1) = true` is True, confirmed
+        live). Parentheses are what make the difference, hence the identity
+        check against ``self.grouped``, as in ``bare_product``."""
+        return (
+            op.canonical in grammar.RELATIONAL
+            and isinstance(left, Binary)
+            and left.op in grammar.RELATIONAL
+            and id(left) not in self.grouped
         )
 
     def phrase_ends_here(self) -> bool:
@@ -578,6 +597,13 @@ def _prefix_span(op_token: Token, operand: Node) -> Span:
         end=operand.span.end,
         line=op_token.line,
         column=op_token.column,
+    )
+
+
+def _chained_comparison_message(op: grammar.InfixOp, left: Binary) -> str:
+    return (
+        f"the engine cannot parse '{op.canonical}' after an unparenthesized "
+        f"'{left.op}' comparison; parenthesize the left side"
     )
 
 

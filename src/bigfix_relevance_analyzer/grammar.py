@@ -22,6 +22,7 @@ __all__ = [
     "OPERATOR_FIRST_WORDS",
     "PIPE_UNMIXABLE",
     "PUNCT_INFIX",
+    "RELATIONAL",
     "STRUCTURAL_WORDS",
     "WORD_INFIX",
     "WORD_INFIX_TRIE",
@@ -265,6 +266,19 @@ without parentheses (`2 * 3 | 5` is a parse error; `(2 * 3) | 5` is not).
 Derived from the ``rbp`` markers so the two halves of the rule -- keep `|`
 out of these operators' right side, refuse it after their result -- cannot
 drift apart."""
+
+
+RELATIONAL: frozenset[str] = frozenset(
+    op.canonical for op in (*PUNCT_INFIX.values(), *WORD_INFIX.values()) if op.lbp == BP_RELATIONAL
+)
+"""The comparison operators, which the engine makes **non-associative**.
+
+A second comparison on the result of a first is a parse error -- `1 = 1 = true`,
+`1 < 2 < 3` and `1 is 1 is true` all fail, while `(1 = 1) = true` and
+`(1 is 1) is true` evaluate to True (confirmed live, 2026-08-30). Spelling does
+not enter into it: `"a" contains "a" = true` is refused the same way, so the
+rule is about the level, not about matching operators. Derived from ``lbp`` so
+adding a comparison to the tables above brings it under the rule automatically."""
 
 
 GRAMMAR_LEVEL_BINARY: frozenset[str] = frozenset({"and", "or", "|"})

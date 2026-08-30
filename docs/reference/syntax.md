@@ -187,6 +187,13 @@ This matters when reading an error: a type error names the **canonical**
 operator, not what you wrote. Writing `>` and being told about `<` is not a
 bug.
 
+## Comparisons do not chain
+
+Two comparisons cannot meet without parentheses. `1 = 1 = true`, `1 < 2 < 3`
+and `1 is 1 is true` are all parse errors, and mixing spellings does not help -
+`"a" contains "a" = true` is refused too. Parenthesize the first comparison and
+the second one is fine: `(1 = 1) = true` is `True`.
+
 ## What a static analyzer can and cannot tell you
 
 This package's inspector tables are a *snapshot* captured from real engines.
