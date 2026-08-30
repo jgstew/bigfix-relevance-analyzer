@@ -10,8 +10,11 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
 import re
 from pathlib import Path
+
+import pytest
 
 from bigfix_relevance_analyzer.analyzer import analyze
 from bigfix_relevance_analyzer.dialect import Dialect
@@ -313,10 +316,48 @@ def test_lint_paths_aggregates_across_files(tmp_path: Path) -> None:
     assert all(f.path == broken for f in findings)
 
 
-def test_lint_paths_skips_missing_or_unreadable_paths_gracefully(tmp_path: Path) -> None:
+def test_a_path_that_does_not_exist_is_reported_as_an_error(tmp_path: Path) -> None:
+    """A missing path is a finding, not a silent pass.
+
+    Nothing else distinguishes a typo'd path from a clean file: both produce no
+    sites. A hook whose argument was misspelled would otherwise report success
+    over content it never read.
+    """
     missing = tmp_path / "does-not-exist.rel"
     findings = lint_paths([missing], LintConfig())
-    assert findings == ()
+    assert len(findings) == 1
+    finding = findings[0]
+    assert finding.code == "file-error"
+    assert finding.severity is Severity.ERROR
+    assert finding.path == missing
+    assert finding.line == 1
+    assert finding.site is None
+
+
+def test_a_missing_path_is_reported_whatever_its_suffix(tmp_path: Path) -> None:
+    # A suffix the extractor does not recognize never reaches the filesystem at
+    # all, so the "does it exist" question has to be asked before extraction --
+    # otherwise a typo'd `notes.txt` is indistinguishable from a real one.
+    missing = tmp_path / "does-not-exist.txt"
+    assert codes(lint_file(missing, LintConfig())) == {"file-error"}
+
+
+def test_an_unreadable_file_is_reported_as_an_error(tmp_path: Path) -> None:
+    path = tmp_path / "unreadable.rel"
+    path.write_text(CLIENT)
+    path.chmod(0o000)
+    try:
+        if os.access(path, os.R_OK):  # root ignores the mode; nothing to test
+            pytest.skip("running as a user that can read a mode-000 file")
+        assert codes(lint_file(path, LintConfig())) == {"file-error"}
+    finally:
+        path.chmod(0o600)
+
+
+def test_the_file_error_rule_can_be_silenced(tmp_path: Path) -> None:
+    missing = tmp_path / "does-not-exist.rel"
+    config = LintConfig(severities={"file-error": Severity.IGNORE})
+    assert lint_paths([missing], config) == ()
 
 
 def test_lint_paths_never_expands_a_directory_argument(tmp_path: Path) -> None:
@@ -458,6 +499,12 @@ def test_every_rule_in_the_catalog_is_a_rule_that_fires(tmp_path: Path) -> None:
     deep.mkdir(parents=True)
     (deep / "x.rel").write_text(CLIENT)
     emitted.update(finding.code for finding in lint_directory(tmp_path, LintConfig(), max_depth=1))
+
+    # `file-error` is about the path rather than its content, so no statement
+    # can trigger it -- it needs a path that is not there.
+    emitted.update(
+        finding.code for finding in lint_file(tmp_path / "does-not-exist.rel", LintConfig())
+    )
 
     assert emitted == set(RULES)
 

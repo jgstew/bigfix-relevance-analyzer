@@ -94,6 +94,28 @@ def test_ignore_flag_silences_a_rule(tmp_path: Path, capsys: pytest.CaptureFixtu
     assert main(["--ignore=unbound-it", str(path)]) == 0
 
 
+def test_a_path_that_does_not_exist_fails_the_run(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # The hook's own argument being wrong is the case this catches: without it,
+    # a typo'd path lints nothing and reports success.
+    missing = tmp_path / "does-not-exist.bes"
+
+    assert main([str(missing)]) == 1
+    captured = capsys.readouterr()
+    assert f"{missing}:1: error [file-error]" in captured.out
+    assert "1 error(s)" in captured.err
+
+
+def test_the_file_error_rule_can_be_ignored(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    missing = tmp_path / "does-not-exist.bes"
+
+    assert main(["--ignore=file-error", str(missing)]) == 0
+    assert capsys.readouterr().out == ""
+
+
 def test_error_flag_promotes_a_default_warning(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

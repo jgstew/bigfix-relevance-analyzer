@@ -463,6 +463,30 @@ def test_cli_check_explicit_dot_is_not_walked(
     assert out == ""
 
 
+def test_cli_check_fails_on_a_path_that_does_not_exist(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # A typo'd path in a pre-commit hook must not pass CI by finding nothing.
+    missing = tmp_path / "does-not-exist.bes"
+
+    assert main(["--check", str(missing)]) == 1
+    out = capsys.readouterr().out
+    assert f"{missing}:1: error [file-error]" in out
+
+
+def test_cli_check_still_lints_the_paths_that_do_exist(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    clean = tmp_path / "clean.rel"
+    clean.write_text(CLIENT)
+    missing = tmp_path / "does-not-exist.rel"
+
+    assert main(["--check", str(clean), str(missing)]) == 1
+    out = capsys.readouterr().out
+    assert f"{missing}:1: error [file-error]" in out
+    assert str(clean) not in out
+
+
 def test_cli_check_wires_max_score_flag(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     path = tmp_path / "client.rel"
     path.write_text(CLIENT)

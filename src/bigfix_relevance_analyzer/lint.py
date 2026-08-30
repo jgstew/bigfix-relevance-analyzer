@@ -19,7 +19,7 @@ itself something to report, not something to crash over.
     if any(f.severity is Severity.ERROR for f in findings):
         raise SystemExit(1)
 
-Nine rules, seven of them always on and two tunable:
+Ten rules, eight of them always on and two tunable:
 
 - ``parse-error`` / ``error-token`` -- the statement is broken. Always an
   error; nothing to configure.
@@ -57,6 +57,11 @@ Nine rules, seven of them always on and two tunable:
   :attr:`LintConfig.max_score` / ``.max_evaluation_cost`` rather than stay
   silent about it. Pass ``None`` for either (via the library API; there is no
   CLI spelling for it) to disable the rule entirely.
+- ``file-error`` -- a path given to :func:`lint_file` / :func:`lint_paths` that
+  does not exist or could not be read. Always an error: it yields no sites, so
+  left unreported it is indistinguishable from a clean file, and a typo'd path
+  in a hook would pass CI having linted nothing. An existing directory is
+  exempt -- a path is taken literally and only :func:`lint_directory` recurses.
 - ``max-depth-exceeded`` -- only from :func:`lint_directory`: a directory tree
   deeper than its ``max_depth`` was not fully walked. Always an error, because
   a limit this generous (6 levels, by default) being hit at all is itself
@@ -340,6 +345,18 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "than stay silent about it; pass `None` via the library API to disable the "
                 "rule entirely.",
                 threshold="max_evaluation_cost",
+            ),
+            _rule(
+                "file-error",
+                Severity.ERROR,
+                "a path given to the linter does not exist or could not be read",
+                "A path that is not there yields no sites, which reads exactly like a clean "
+                "file unless it is reported -- so a misspelled path in a pre-commit hook would "
+                "otherwise pass CI having linted nothing. Always an error: the caller named "
+                "this file, so failing to read it is a fault in the run rather than an opinion "
+                "about content. An existing *directory* is not a file error; it is skipped, "
+                "because a path here is taken literally and only :func:`lint_directory` "
+                "recurses.",
             ),
             _rule(
                 "max-depth-exceeded",
@@ -644,18 +661,48 @@ def lint_analysis(
     return tuple(findings)
 
 
+def _file_error(path: Path, detail: str, config: LintConfig) -> tuple[Finding, ...]:
+    """One ``file-error`` finding about ``path`` itself, honouring its severity."""
+    severity = config.severity_for("file-error")
+    if severity is Severity.IGNORE:
+        return ()
+    return (
+        Finding(
+            code="file-error",
+            severity=severity,
+            message=f"cannot lint: {detail}",
+            path=path,
+            line=1,
+        ),
+    )
+
+
 def lint_file(path: str | bytes | os.PathLike[str], config: LintConfig) -> tuple[Finding, ...]:
     """Extract and judge every relevance site in one file.
 
     A file type :func:`~bigfix_relevance_analyzer.extract.extract_relevance_from_file`
     does not recognize yields no sites and, therefore, no findings -- the same
     "unknown, skip" policy the extractor itself uses.
+
+    A path that is not a readable file is reported rather than skipped, under
+    ``file-error`` -- a missing file yields no sites either, and the two must
+    not look alike. The one path that stays silent is an existing directory:
+    only :func:`lint_directory` descends, so a directory argument is a no-op
+    here by design rather than a failure to read something.
     """
     file_path = Path(os.fsdecode(path))
+    # Asked before extraction, not instead of it: a suffix the extractor does
+    # not recognize never touches the filesystem, so a missing `notes.txt`
+    # would otherwise raise nothing to notice.
+    if not file_path.is_file():
+        if file_path.is_dir():
+            return ()
+        return _file_error(file_path, "no such file", config)
+
     try:
         sites = extract_relevance_from_file(file_path)
-    except OSError:
-        return ()
+    except OSError as error:
+        return _file_error(file_path, error.strerror or str(error), config)
 
     findings: list[Finding] = []
     for site in sites:
@@ -670,7 +717,10 @@ def lint_file(path: str | bytes | os.PathLike[str], config: LintConfig) -> tuple
 def lint_paths(
     paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfig
 ) -> tuple[Finding, ...]:
-    """:func:`lint_file` over many paths, in order, skipping ones that error out.
+    """:func:`lint_file` over many paths, in order, reporting ones that error out.
+
+    A path that could not be read does not stop the run: it becomes a
+    ``file-error`` finding and the remaining paths are linted as usual.
 
     Each path is taken literally -- a directory here is not descended into; use
     :func:`lint_directory` for that.

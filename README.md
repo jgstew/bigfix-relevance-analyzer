@@ -363,9 +363,10 @@ same input always lexes the same way, regardless of which dumps happen to exist.
 ## Linting content
 
 `bigfix_relevance_analyzer.lint` turns the analyses above into pre-commit-shaped
-verdicts. Six of the eight rules are always on: parse failures, an `it` with
-nothing to bind to, and any other type-check diagnostic are always errors; an
-inspector no dump defines is always a warning. The other two - complexity
+verdicts. Eight of the ten rules are always on: parse failures, an `it` with
+nothing to bind to, any other type-check diagnostic, and a path that could not
+be read at all are always errors; an inspector no dump defines is always a
+warning. The other two - complexity
 score and evaluation cost - are *also* on by default, at a generous built-in
 ceiling (`DEFAULT_MAX_SCORE = 550`, `DEFAULT_MAX_EVALUATION_COST = 50`) chosen
 to sit well above ordinary content and catch only the genuinely extreme;
@@ -398,6 +399,7 @@ same way instead of each inventing a description:
 | `complexity` | error | the complexity score is above the ceiling | `max_score` (default 500) |
 | `error-token` | error | the statement contains text that could not be lexed | always on |
 | `evaluation-cost` | error | the evaluation cost is above the ceiling | `max_evaluation_cost` (default 50) |
+| `file-error` | error | a path given to the linter does not exist or could not be read | always on |
 | `max-depth-exceeded` | error | a directory tree was deeper than the walk's limit, so it was not fully scanned | always on |
 | `parse-error` | error | the statement could not be parsed | always on |
 | `type-error` | error | the type checker reported a problem beyond an unbound `it` | always on |
