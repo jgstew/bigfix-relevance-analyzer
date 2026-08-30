@@ -115,7 +115,10 @@ def test_a_singular_form_over_a_plural_object_is_a_warning_not_an_error() -> Non
     assert "type-error" not in codes(findings)
     risk = next(f for f in findings if f.code == "non-unique-risk")
     assert risk.severity is Severity.WARNING
-    assert "Singular expression refers to non-unique object." in risk.message
+    # Not the engine's error text: nothing has errored, and quoting it would
+    # read as if something had.
+    assert "Singular expression refers to" not in risk.message
+    assert risk.message.endswith("may be plural, and errors at evaluation if it is")
 
 
 def test_the_non_unique_risk_rule_can_be_silenced() -> None:

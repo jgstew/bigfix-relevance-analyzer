@@ -281,10 +281,13 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "property settles that, so the static singularity rule does not apply. What "
                 "remains is a runtime complaint about the *object*: `Singular expression "
                 "refers to non-unique object.` if it holds several, `... to nonexistent "
-                "object.` if it holds none. A warning rather than an error, because the "
-                "author may know it holds exactly one -- shipped content typically pairs "
-                "this with an error fallback (`... | 0`) -- and because the deliberate "
-                "`unique value of <plural>` and `set of (...)` idioms trip it too.",
+                "object.` if it holds none. Collapsing a plural is often the whole point, "
+                "so three cases are exempt: an aggregate (`unique value of`, `concatenation "
+                "of`, `maximum of` ...), a value flowing into a position that requires a "
+                "singular, and anything under an `|` error fallback, where the author has "
+                "already answered for it. What is left is a collapse nothing guards, and it "
+                "is a warning rather than an error because the author may still know the "
+                "object holds exactly one.",
             ),
             _rule(
                 "complexity",

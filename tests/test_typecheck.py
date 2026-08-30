@@ -185,23 +185,24 @@ def test_no_example_site_is_reported_broken(env: TypeEnvironment) -> None:
 
 
 def test_the_corpus_takes_the_non_unique_risk_deliberately(env: TypeEnvironment) -> None:
-    """The risk rule, held to the shipped content it fires on.
+    """What survives all three exemptions, over every statement in the corpus.
 
-    Every one of these is a singular form over a plural object, and the corpus
-    shows two ways of meaning it: `free space of drives of system folders | 0`
-    hedges with an error fallback, and `unique value of ...` / `set of (...)`
-    are the idioms for asserting a collection collapses to one. The rule stays
-    a warning because of this, and it is pinned here so that its reach over
-    real content is a decision rather than a surprise.
+    Shipped content collapses plurals constantly, and almost always says so:
+    `free space of drives of system folders | 0` hedges with a fallback, the
+    dashboards wrap a whole chain in `... | "<link ... />"`, `unique value of`
+    and `set of` are the idioms for asserting a collection is one, and the rest
+    feed an operator that required a singular anyway. Twenty-four of the
+    twenty-six sites this rule once reported are one of those.
+
+    These two are not. Both are a bare `pathname of <plural>` with nothing
+    guarding it, which is exactly what the rule is for -- so this pins the
+    rule's reach as a decision, and would catch a future exemption that
+    over-reached and silenced it entirely.
     """
     risks = {(name, line) for name, line, code, _ in _corpus_diagnostics(env)}
     assert risks == {
-        ("clientui_dashboard_client_relevance_substitution.html", 68),
-        ("clientui_dashboard_client_relevance_substitution.html", 69),
-        ("fixlet_registry_and_active_directory_relevance.bes", 9),
         ("task_time_based_relevance.bes", 28),
         ("fixlet_description_relevance_via_javascript.bes", 114),
-        ("session_relevance_plain_text.bsr", 1),
     }
 
 
@@ -544,7 +545,13 @@ def test_a_singular_form_over_a_plural_object_is_reported_as_a_risk() -> None:
         d for d in check(parse(source), env).diagnostics if d.code == "singular-over-plural-object"
     ]
     assert len(found) == 1
-    assert "Singular expression refers to non-unique object." in found[0].message
+    # The engine's own `Singular expression refers to non-unique object.` is
+    # deliberately *not* quoted here: this is a risk, and leading with the
+    # error text reads as a report that it already happened.
+    assert found[0].message == (
+        "'value' is written singular over an object that may be plural, "
+        "and errors at evaluation if it is"
+    )
 
 
 def test_a_runtime_risk_does_not_make_the_statement_fail_to_type_check() -> None:
@@ -557,6 +564,91 @@ def test_a_runtime_risk_does_not_make_the_statement_fail_to_type_check() -> None
 
     broken = check(parse('1 + "a"'), TypeEnvironment.create(Dialect.CLIENT))
     assert not broken.ok
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'unique value of ("a";"b")',
+        'concatenation of ("a";"b")',
+        "maximum of (1;2)",
+        "minimum of (1;2)",
+        "sum of (1;2)",
+        "set of (1;2)",
+    ],
+)
+def test_an_aggregate_is_not_a_non_unique_risk(source: str, env: TypeEnvironment) -> None:
+    """Consuming a collection is what these are *for*.
+
+    `unique value of X` is the point most sharply: it dedups first, so it
+    succeeds where a bare singular form over the same object would not. Warning
+    that an aggregate was handed a plural is warning that it was used.
+    """
+    codes = [d.code for d in check(parse(source), env).diagnostics]
+    assert "singular-over-plural-object" not in codes
+
+
+def test_every_aggregate_name_is_a_name_the_tables_define(env: TypeEnvironment) -> None:
+    """The exemption set is curated, so it can rot; this is what notices.
+
+    It cannot be inferred: the tables record an aggregate's operand as the
+    *element* type (`unique values of <bes action>`), never as the collection,
+    so "takes a plural by declaration" is not a question the data answers. The
+    nearest type-shape predicate -- return type equal to the operand type, or
+    to it with multiplicity, or to a set of it -- matches 70 names, among them
+    `parent`, `first child` and `absolute value`, which genuinely distribute
+    and must keep warning.
+    """
+    for name in typecheck.AGGREGATES:
+        rows = inspectors.lookup(name, kind=inspectors.InspectorKind.PROPERTY)
+        assert rows, f"{name!r} matches no property row"
+        assert all(entry.multivalued for entry in rows), f"{name!r} is not multivalued"
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        pytest.param('"a" & (name of files of folder "c:\\")', id="binary-right"),
+        pytest.param('(name of files of folder "c:\\") = "x"', id="binary-left"),
+        pytest.param("-(free space of drives)", id="unary-argument"),
+        # The shape the reported webreport had: the collapse is two levels down
+        # inside the operand, and still the reason the operand is legal.
+        pytest.param(
+            '"a" & ((it as trimmed string) of name of files of folder "c:\\")',
+            id="nested-under-a-cast",
+        ),
+    ],
+)
+def test_a_collapse_that_an_operator_required_is_not_a_risk(
+    source: str, env: TypeEnvironment
+) -> None:
+    """An operator demands a singular, so the collapse is what makes the
+    expression legal at all. Reporting it says the author should have written
+    something they had no way to write."""
+    codes = [d.code for d in check(parse(source), env).diagnostics]
+    assert "singular-over-plural-object" not in codes
+
+
+def test_a_collapse_under_an_error_fallback_is_not_a_risk(env: TypeEnvironment) -> None:
+    """`a | b` yields `b` when `a` errored, so this exact failure is handled.
+
+    The corpus writes it that way deliberately -- `free space of drives of
+    system folders | 0` is one of its own statements, and the dashboards wrap a
+    whole collapsing chain in `... | "<link ... />"`. An author who wrote the
+    fallback has answered the question the rule asks.
+    """
+    codes = [
+        d.code for d in check(parse("free space of drives of system folders | 0"), env).diagnostics
+    ]
+    assert "singular-over-plural-object" not in codes
+
+
+def test_a_collapse_nothing_asked_for_is_still_a_risk(env: TypeEnvironment) -> None:
+    """The other half, and the more important one: the same collapse standing
+    on its own, demanded by nothing, still reports."""
+    for source in ('name of files of folder "c:\\"', "free space of drives of system folders"):
+        codes = [d.code for d in check(parse(source), env).diagnostics]
+        assert codes == ["singular-over-plural-object"], source
 
 
 def test_a_singular_form_over_a_singular_object_is_silent() -> None:

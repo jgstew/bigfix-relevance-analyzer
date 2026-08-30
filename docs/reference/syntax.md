@@ -71,9 +71,13 @@ Four other constructs turn a plural into something singular:
 - `number of <plural>` - an integer count.
 - `item N of (...)` - the N-th value, **0-based**, where N must be an integer
   literal.
-- `unique value of <plural>`, `set of <plural>` - the singular spelling of an
-  aggregate. `unique value of ("a";"a")` is `a`; `unique value of ("a";"b")`
-  answers `a` and then errors, for the reason above.
+- the singular spelling of an **aggregate** - a property whose job is to
+  consume a collection: `unique value of`, `concatenation of` (and its `html`,
+  `local encoding`, `fxf encoding` variants), `maximum of`, `minimum of`,
+  `set of`, `sum of`, `union of`, `intersection of`, `conjunction of`,
+  `disjunction of`. `unique value of ("a";"a")` is `a`; `unique value of
+  ("a";"b")` answers `a` and then errors, for the reason above - which makes it
+  the *safer* way to assert singularity, since it dedups first.
 
 ## `whose` filters, and `it` refers to the context
 

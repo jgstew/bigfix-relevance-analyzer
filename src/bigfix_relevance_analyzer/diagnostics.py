@@ -200,15 +200,20 @@ _TYPE_CHECK: Final = [
         # The runtime's, not the type checker's: writing the singular form is
         # legal and types cleanly, and the engine only objects once the object
         # turns out not to hold exactly one value -- `name of files of folders
-        # "/"` answers with a name *and* an error. The message leads with the
-        # engine's own wording for the several case, which is the common one;
-        # an object holding *none* fails the same assertion under a different
-        # message, `nonexistent-object`, and the rule's own explanation in
-        # `lint` says so. Naming the property is this package's addition, which
-        # neither runtime message does.
+        # "/"` answers with a name *and* an error.
+        #
+        # Alone in this catalog, the wording here is entirely this package's
+        # own: every other `Origin.RUNTIME` entry quotes what the evaluator
+        # prints, and the two that apply -- `non-unique-object` and
+        # `nonexistent-object` -- are carried verbatim on their own entries
+        # below. Quoting one of them *here* would state as fact something that
+        # has not happened and may never: this is a risk, reported statically,
+        # about an evaluation nobody has run. The origin still says runtime,
+        # because that is what would raise it, and `CheckResult.ok` reads the
+        # origin to keep a risk from failing a type check.
         Origin.RUNTIME,
-        "Singular expression refers to non-unique object.: '{phrase}' is written singular "
-        "over an object that may be plural",
+        "'{phrase}' is written singular over an object that may be plural, "
+        "and errors at evaluation if it is",
     ),
     # Operators and casts.
     _entry(

@@ -59,7 +59,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, field
-from typing import Any, assert_never
+from typing import Any, Final, assert_never
 
 from bigfix_relevance_analyzer import grammar, inspectors
 from bigfix_relevance_analyzer._serialize import _span
@@ -304,6 +304,48 @@ def _types_compatible(left: frozenset[str], right: frozenset[str]) -> bool:
     return bool(left_ancestors & right_ancestors)
 
 
+AGGREGATES: Final = frozenset(
+    {
+        "concatenations",
+        "conjunctions",
+        "disjunctions",
+        "fxf encoding concatenations",
+        "html concatenations",
+        "intersections",
+        "local encoding concatenations",
+        "maxima",
+        "minima",
+        "sets",
+        "sums",
+        "unions",
+        "unique values",
+    }
+)
+"""Properties whose whole job is to consume a collection.
+
+Spelled as the tables spell them, which is the plural form; both written forms
+resolve to it. Handing one of these a plural object is what it is *for*, so
+`singular-over-plural-object` stays quiet over them -- `unique value of X` most
+sharply of all, since it dedups before asserting singularity and so succeeds
+where a bare singular form over the same object would not.
+
+Curated rather than inferred, because the tables cannot answer it. An
+aggregate's operand is recorded as the *element* type -- `unique values of <bes
+action>` -- never as the collection, so "declared to take a plural" is not
+something the data says. The nearest type-shape predicate (return type equal to
+the operand type, or to it with multiplicity, or to a set of it) matches 70
+names, `parent`, `first child`, `next sibling` and `absolute value` among them:
+all of which distribute, and must keep warning.
+"""
+
+
+def _is_aggregate(phrase: str) -> bool:
+    return any(
+        entry.name in AGGREGATES
+        for entry in inspectors.lookup(phrase, kind=inspectors.InspectorKind.PROPERTY)
+    )
+
+
 def _widen(*pluralities: Plurality) -> Plurality:
     """Plural anywhere in a chain makes the chain plural; unknown poisons."""
     if Plurality.PLURAL in pluralities:
@@ -523,10 +565,43 @@ class _Checker:
     def rows(self, entries: tuple[inspectors.Inspector, ...]) -> list[inspectors.Inspector]:
         return [entry for entry in entries if self.env.visible(entry)]
 
+    def accept_collapse(self, span: Span) -> None:
+        """Withdraw the collapse risks inside ``span``: something needed them.
+
+        `singular-over-plural-object` says a singular form was written over an
+        object that may hold several. Where the value flows into a position
+        that *requires* a singular, that collapse is what makes the expression
+        legal at all, and reporting it would say the author should have written
+        something they had no way to write.
+
+        Retraction rather than a check up front, because the walk is an
+        iterative work queue: `combine_of` cannot see the parent that will
+        consume it, but every site that demands a singular already calls
+        :meth:`require_singular` or :meth:`require_singular_boolean` with the
+        operand's span. Containment then identifies the risks that operand
+        raised, however deep -- the reported webreport put one two levels down,
+        under a cast.
+
+        The list is edited in place and only above ``span``, which is what
+        keeps the `_BeginBranch` marks in :attr:`marks` valid: a risk inside
+        this operand was appended after any mark that is still open, so no
+        index below one ever moves.
+        """
+        self.diagnostics[:] = [
+            diagnostic
+            for diagnostic in self.diagnostics
+            if not (
+                diagnostic.code == "singular-over-plural-object"
+                and span.start <= diagnostic.span.start
+                and diagnostic.span.end <= span.end
+            )
+        ]
+
     def require_singular_boolean(
         self, value: RelevanceValue, span: Span, code: str, **fields: object
     ) -> None:
         """Only complain on positive evidence: an unknown type is not a finding."""
+        self.accept_collapse(span)
         if value.types is None or _ruled_out(value):
             return
         if "boolean" not in value.types or value.plurality is Plurality.PLURAL:
@@ -542,6 +617,7 @@ class _Checker:
         Positive evidence only, the same as :meth:`require_singular_boolean`:
         `Plurality.UNKNOWN` is not a finding.
         """
+        self.accept_collapse(span)
         if value.plurality is Plurality.PLURAL:
             self.report(code, span, **fields)
 
@@ -789,7 +865,11 @@ class _Checker:
         plurality: Plurality
         if isinstance(node.prop, Reference) and prop.plurality is not Plurality.UNKNOWN:
             plurality = prop.plurality
-            if plurality is Plurality.SINGULAR and obj.plurality is Plurality.PLURAL:
+            if (
+                plurality is Plurality.SINGULAR
+                and obj.plurality is Plurality.PLURAL
+                and not _is_aggregate(node.prop.phrase)
+            ):
                 self.report("singular-over-plural-object", node.span, phrase=node.prop.phrase)
         else:
             plurality = _widen(prop.plurality, obj.plurality)
@@ -976,6 +1056,11 @@ class _Checker:
         )
 
     def combine_bar(self, node: Bar, left: RelevanceValue, right: RelevanceValue) -> RelevanceValue:
+        # `a | b` yields `b` when `a` errored, so a collapse risk inside `a` is
+        # a risk the author has already answered -- this is what the corpus's
+        # `free space of drives of system folders | 0` is for.
+        self.accept_collapse(node.left.span)
+
         # The evaluator's own message for this is the terse "Incompatible types."
         # -- qna/the debugger don't say what was actually mismatched. The
         # template leads with that confirmed string verbatim and appends the
