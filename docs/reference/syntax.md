@@ -132,6 +132,13 @@ flattened to "produced nothing", which is why `number of (1/0)` is `0` while
 indistinguishable from the outside - the engine does not separate them, so
 neither can any tool.
 
+## An unprintable result is not an error
+
+A result with no `as string` cast draws `E: The operator "string" is not
+defined.` - not a true error: the expression evaluated, only printing it
+failed. Verify with `number of (...)` that results flow through. A truly
+undefined phrase names itself: `The operator "attr lists" is not defined.`
+
 ## String literals
 
 Delimited by `"`. A literal **cannot contain a raw double quote**: one is

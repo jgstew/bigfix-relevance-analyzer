@@ -967,13 +967,21 @@ class _Checker:
         types: frozenset[str] = frozenset()
         for value in values:
             types |= value.types or frozenset()
+        if isinstance(node, TupleExpr):
+            tuple_types = _tuple_spellings(values)
+        else:
+            # Only `,` builds a tuple -- `(a; b)` is two values of one type,
+            # not one value of a pair type -- so `;` mints no spelling of its
+            # own. But pooling does not strip the items of theirs: each
+            # element of `(("a", it); ("b", "c"))` is still a `( string,
+            # string )`, so the items' spellings ride along. Verified in qna
+            # 11.0.6.137: `attr lists of (("onclick", "x"); ("href", "y"))`
+            # evaluates -- aggregating every pair into one attribute list.
+            tuple_types = frozenset().union(*(value.tuple_types for value in values))
         return RelevanceValue(
             types=types,
             plurality=Plurality.PLURAL if isinstance(node, Collection) else Plurality.SINGULAR,
-            # Only `,` builds a tuple. `;` pools values into a collection --
-            # `(a; b)` is two values of one type, not one value of a pair type
-            # -- so it gets no tuple spelling.
-            tuple_types=_tuple_spellings(values) if isinstance(node, TupleExpr) else frozenset(),
+            tuple_types=tuple_types,
             platforms=self.env.universe,
         )
 

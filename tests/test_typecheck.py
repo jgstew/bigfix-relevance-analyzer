@@ -977,6 +977,21 @@ def test_a_semicolon_collection_is_not_given_a_tuple_spelling(
     assert [d.code for d in result.diagnostics] == ["property-not-defined"]
 
 
+def test_a_collection_of_tuples_pools_the_items_spellings(
+    env: TypeEnvironment,
+) -> None:
+    """The reported false positive, one hop out: `;` mints no spelling of its
+    own, but each element of `(("a", it); ("b", "c"))` is still a `( string,
+    string )`, and the row matches. Verified in qna 11.0.6.137: the engine
+    evaluates this, aggregating every pair into one attribute list -- the
+    Dashboard Variables dashboard builds its `attr lists` exactly this way."""
+    value = check(parse('(("onclick", "x"); ("href", "y"))'), env).value
+    assert value.tuple_types == frozenset({"( string, string )"})
+    result = check(parse('attr lists of (("onclick", "x"); ("href", "y"))'), env)
+    assert result.diagnostics == ()
+    assert result.value.types == frozenset({"html attribute list"})
+
+
 def test_the_flattened_reading_survives_beside_the_tuple_spelling(
     env: TypeEnvironment,
 ) -> None:
