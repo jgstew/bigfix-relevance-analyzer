@@ -43,10 +43,35 @@
 ----
 (bin "<=" (num "1") (num "2"))
 
-==== [unverified] comparisons chain left, resolving at type checking
+==== comparisons do not chain (qna: 1 = 1 = true is a parse error)
 1 = 2 = 3
 ----
+ERROR line 1 column 7
+
+==== a parenthesized comparison is a legal left side (qna: (1 = 1) = true is True)
+(1 = 2) = 3
+----
 (bin "=" (bin "=" (num "1") (num "2")) (num "3"))
+
+==== ordering comparisons do not chain either (qna: 1 < 2 < 3 is a parse error)
+1 < 2 < 3
+----
+ERROR line 1 column 7
+
+==== word-form comparisons do not chain (qna: 1 is 1 is true is a parse error)
+1 is 2 is 3
+----
+ERROR line 1 column 8
+
+==== a parenthesized word comparison is a legal left side (qna: (1 is 1) is true is True)
+(1 is 2) is 3
+----
+(bin "is" (bin "is" (num "1") (num "2")) (num "3"))
+
+==== word and symbol comparisons cannot mix either (qna: "a" contains "a" = true is a parse error)
+"a" contains "b" = true
+----
+ERROR line 1 column 18
 
 ==== and binds tighter than or
 1 and 2 or 3

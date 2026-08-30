@@ -16,6 +16,7 @@ from bigfix_relevance_analyzer.nodes import (
     MAX_INTEGER,
     MAX_LARGE_INTEGER,
     Bar,
+    Binary,
     It,
     ItemOf,
     NumberKind,
@@ -546,6 +547,35 @@ def test_a_bare_product_before_a_fallback_says_why_and_suggests_parens() -> None
     assert info.value.column == 7
     assert "parenthes" in info.value.message
     assert "'*'" in info.value.message
+
+
+def test_a_chained_comparison_says_why_and_suggests_parens() -> None:
+    """The comparison level is non-associative in the engine: `1 = 1 = true` is
+    "This expression could not be parsed" while `(1 = 1) = true` is True
+    (confirmed live). Ours points at the second operator and names the fix."""
+    with pytest.raises(ParseError) as info:
+        parse("1 = 2 = 3")
+    assert info.value.column == 7
+    assert "parenthes" in info.value.message
+    assert "'='" in info.value.message
+
+
+def test_word_form_comparisons_refuse_to_chain_the_same_way() -> None:
+    """`1 is 1 is true` is a parse error live too, and so is the mixed
+    `"a" contains "a" = true` -- the refusal is about the level, not spelling."""
+    for source, column in (("1 is 2 is 3", 8), ('"a" contains "b" = true', 18)):
+        with pytest.raises(ParseError) as info:
+            parse(source)
+        assert info.value.column == column, source
+        assert "parenthes" in info.value.message, source
+
+
+def test_a_parenthesized_comparison_may_still_be_compared() -> None:
+    node = parse("(1 = 2) = 3")
+    assert isinstance(node, Binary)
+    assert node.op == "="
+    assert isinstance(node.left, Binary)
+    assert node.left.op == "="
 
 
 def test_the_specialised_forms_keep_the_span_of_the_whole_expression() -> None:
