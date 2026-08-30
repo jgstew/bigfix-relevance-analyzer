@@ -797,6 +797,31 @@ def test_a_property_used_on_the_wrong_direct_object_is_a_finding(env: TypeEnviro
     assert result.value.types == frozenset()
 
 
+def test_a_world_reference_known_only_with_a_direct_object_is_the_softer_finding(
+    env: TypeEnvironment,
+) -> None:
+    """The reported false positive: `devices` is a top-level plural in the
+    proxy agent context the dumps do not cover, and the name collides with the
+    captured `device of <grub file location>`. A bare world reference the
+    dumps know only with a direct object is the same epistemic state as a name
+    no dump defines, so it gets its own diagnostic -- which `lint` demotes to
+    `unknown-inspector` -- and the value carries on as unknown rather than
+    ruled out, so nothing downstream cascades."""
+    result = check(parse("devices"), env)
+    assert [d.code for d in result.diagnostics] == ["world-property-not-defined"]
+    assert (
+        result.diagnostics[0].message
+        == "no dump defines the property 'devices' without a direct object"
+    )
+    assert result.value.types is None
+    assert result.ok
+
+    # The shipped MDM Devices group relevance, whole: the unknown `devices`
+    # must not earn `management statuses` a second finding on top of it.
+    whole = check(parse("(in proxy agent context) AND exists management statuses of devices"), env)
+    assert [d.code for d in whole.diagnostics] == ["world-property-not-defined"]
+
+
 def test_the_property_message_names_the_index_it_was_given(env: TypeEnvironment) -> None:
     result = check(parse('key "a" of "b"'), env)
     assert result.diagnostics[0].message == (

@@ -106,6 +106,35 @@ def test_unknown_inspector_is_reported_as_warning() -> None:
     assert unknown.severity is Severity.WARNING
 
 
+def test_a_world_name_known_only_with_a_direct_object_is_a_warning_not_an_error() -> None:
+    """The MDM Devices false positive, end to end. `devices` and `management
+    statuses` are proxy agent inspectors no dump covers; `devices` also
+    collides with the captured grub `device of <grub file location>`, so it
+    used to fall through the unknown-name net into a hard `type-error`. Both
+    now land on `unknown-inspector`, each by its own route."""
+    report = analyze(
+        "(in proxy agent context) AND exists management statuses of devices", Dialect.CLIENT
+    )
+    findings = lint_analysis(report, LintConfig())
+    assert codes(findings) == {"unknown-inspector"}
+    assert all(f.severity is Severity.WARNING for f in findings)
+    messages = sorted(f.message for f in findings)
+    assert messages == [
+        "no dump defines `management statuses`",
+        "no dump defines the property 'devices' without a direct object",
+    ]
+
+
+def test_statement_level_findings_land_on_the_statement_first_line() -> None:
+    """`unknown-inspector` (and the two ceilings) carry no span, so they land
+    on relative line 1, which `emit` offsets by `base_line`. Passing
+    `base_line` itself there double-counted the offset for extracted sites --
+    a finding at line 15 of an 11-line .bes file."""
+    report = analyze(UNKNOWN_INSPECTOR, Dialect.CLIENT)
+    findings = lint_analysis(report, LintConfig(), base_line=8)
+    assert [(f.code, f.line) for f in findings] == [("unknown-inspector", 8)]
+
+
 def test_a_singular_form_over_a_plural_object_is_a_warning_not_an_error() -> None:
     """`value of results` is a singular expression, so the static singularity
     rule does not apply -- but the object may still be non-unique, which the

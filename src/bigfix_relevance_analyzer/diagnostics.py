@@ -346,6 +346,19 @@ _TYPE_CHECK: Final = [
         Origin.TYPE_CHECK,
         "the property '{phrase}{index}{direct_object}' is not defined",
     ),
+    # The world-scope sibling, in this catalog's own words rather than the
+    # engine's. The engine would print the `property-not-defined` text here
+    # too, but this case is a weaker claim: the dumps know the name, just
+    # never without a direct object, and the dumps do not cover every
+    # evaluation context -- proxy agent inspectors define top-level names
+    # (`devices`) that collide with captured operand-taking ones (`device of
+    # <grub file location>`). `lint` maps this to `unknown-inspector`, so the
+    # message is phrased like that rule's, not like an engine error.
+    _entry(
+        "world-property-not-defined",
+        Origin.TYPE_CHECK,
+        "no dump defines the property '{phrase}{index}' without a direct object",
+    ),
 ]
 
 _LEXICAL: Final = [

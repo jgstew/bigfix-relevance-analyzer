@@ -35,9 +35,14 @@ Nine rules, seven of them always on and two tunable:
   own independent detection of the same unbound ``it`` the ``unbound-it``
   rule above already reports, and including both would report one root cause
   twice.
-- ``unknown-inspector`` -- a name no dump defines. Always a warning, never an
-  error by default, because the dumps do not cover every platform or product
-  version -- a name absent from them is a lead, not proof of a typo.
+- ``unknown-inspector`` -- a name no dump defines, or a bare world reference
+  the dumps know only with a direct object (the checker's
+  ``world-property-not-defined``). Always a warning, never an error by
+  default, because the dumps do not cover every platform, product version, or
+  evaluation context -- a name absent from them, or absent from the position
+  it was written in, is a lead, not proof of a typo. Proxy agent inspectors
+  are the standing example: ``devices`` is a top-level plural there, and the
+  dumps record only the grub ``device of <grub file location>``.
 - ``non-unique-risk`` -- a property written singular where more than one value
   may come back, either over an object that may be plural
   (``singular-over-plural-object``) or because the tables record the property
@@ -279,11 +284,15 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
             _rule(
                 "unknown-inspector",
                 Severity.WARNING,
-                "a name no inspector dump defines",
+                "a name no inspector dump defines, at all or in the position it was written",
                 "The most actionable single signal for a typo, but not proof of one: the "
-                "dumps do not cover every platform or product version, so a name absent "
-                "from them is a lead rather than a fault. Always a warning, never an error "
-                "by default.",
+                "dumps do not cover every platform, product version, or evaluation "
+                "context, so a name absent from them is a lead rather than a fault. Two "
+                "checker findings land here: a name in no dump at all, and a bare world "
+                "reference the dumps know only with a direct object (proxy agent "
+                "inspectors define top-level names like `devices` that the dumps record "
+                "only as grub's `device of <grub file location>`). Always a warning, "
+                "never an error by default.",
             ),
             _rule(
                 "non-unique-risk",
@@ -510,6 +519,13 @@ def _site_dialect(site: RelevanceSite, forced: Dialect | None) -> Dialect | None
 _CHECK_RULES: Final = {
     "singular-over-plural-object": "non-unique-risk",
     "singular-of-multivalued-property": "non-unique-risk",
+    # A bare world reference the dumps know only with a direct object -- the
+    # same epistemic state as a name no dump defines (the snapshot has no row
+    # for *this position*, and the snapshot is known-incomplete), so it lands
+    # on the same rule. Proxy agent inspectors are the motivating case:
+    # `devices` is a top-level plural there, and collides with the captured
+    # `device of <grub file location>`.
+    "world-property-not-defined": "unknown-inspector",
 }
 
 
@@ -597,7 +613,11 @@ def lint_analysis(
                     quoted[0] if len(quoted) == 1 else f"{', '.join(quoted[:-1])} or {quoted[-1]}"
                 )
                 message = f"{message} -- did you mean {offered}?"
-        emit("unknown-inspector", message, base_line, leads)
+        # Statement-level findings carry no span, so they land on the
+        # statement's first line -- relative line 1, which `emit` offsets by
+        # `base_line`. Passing `base_line` itself here double-counted the
+        # offset for extracted sites (line 15 of an 11-line file).
+        emit("unknown-inspector", message, 1, leads)
 
     if config.max_score is not None and report.complexity.score > config.max_score:
         detail = _complexity_detail(report)
@@ -605,7 +625,7 @@ def lint_analysis(
         emit(
             "complexity",
             f"score {report.complexity.score:.3g} > {config.max_score:.3g}{suffix}",
-            base_line,
+            1,
         )
 
     if (
@@ -618,7 +638,7 @@ def lint_analysis(
             "evaluation-cost",
             f"cost {report.complexity.evaluation_cost:.3g} > "
             f"{config.max_evaluation_cost:.3g}{suffix}",
-            base_line,
+            1,
         )
 
     return tuple(findings)

@@ -196,9 +196,16 @@ class CheckResult:
         consumer asking "does this type-check" is not asking "is this without
         risk". `Origin` is what separates them, so a new advisory entry needs
         no change here.
+
+        `world-property-not-defined` is the one advisory that carries the
+        type-check origin -- the dumps knowing a name only with a direct
+        object does not prove it has no top-level definition in a context the
+        dumps do not cover (proxy agent inspectors) -- so it is excluded by
+        code rather than by origin.
         """
         return not any(
             DIAGNOSTICS[diagnostic.code].origin is Origin.TYPE_CHECK
+            and diagnostic.code != "world-property-not-defined"
             for diagnostic in self.diagnostics
         )
 
@@ -1015,6 +1022,26 @@ class _Checker:
             if world.types:
                 return world
         if value.types is not None and not value.types:
+            if subject is None:
+                # A bare world reference whose name the dumps know only with a
+                # direct object. That is not proof of a mistake: the dumps do
+                # not cover every evaluation context, and proxy agent
+                # inspectors define top-level names (`devices`) that collide
+                # with captured operand-taking ones (`device of <grub file
+                # location>`). Report the softer finding -- `lint` demotes it
+                # to `unknown-inspector` -- and carry on as if the name were
+                # not in the snapshot at all, so nothing downstream cascades.
+                self.report(
+                    "world-property-not-defined",
+                    node.span,
+                    phrase=node.phrase,
+                    index=(
+                        ""
+                        if index is None
+                        else PROPERTY_INDEX_FRAGMENT.format(name=_render(index.types))
+                    ),
+                )
+                return self.unknown()
             self.report(
                 "property-not-defined",
                 node.span,
