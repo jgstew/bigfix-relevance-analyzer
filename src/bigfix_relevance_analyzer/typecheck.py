@@ -58,6 +58,8 @@ Findings and message wording come from
 from __future__ import annotations
 
 import enum
+import itertools
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Final, assert_never
 
@@ -128,6 +130,25 @@ class RelevanceValue:
     candidate was ruled out."""
 
     plurality: Plurality = Plurality.UNKNOWN
+
+    tuple_types: frozenset[str] = frozenset()
+    """Tuple spellings this value also answers to, when it is a tuple.
+
+    A tuple is two things at once as far as the tables are concerned. Its
+    elements have types -- which is what `item 2 of (...)` and the operators
+    read -- but the tables also name the tuple *itself*, as `( string, string
+    )`, and a handful of rows take one in that form: `attr lists of <( string,
+    string )>`, `substring <( integer, integer )> of <string>`. Flattening the
+    elements into :attr:`types` loses that name and the row stops matching,
+    which is the whole reason this field exists.
+
+    It is kept beside :attr:`types` rather than replacing it because only the
+    property lookup is known to want the tuple name. The operator tables carry
+    no tuple rows at all, so a value that answered *only* to `( string, string
+    )` would make `("a", "b") = ("a", "b")` a fresh false positive -- trading
+    one for another. Additive, the lookup gains a candidate and nothing loses
+    one. See :func:`_subject`.
+    """
 
     platforms: frozenset[str] = frozenset()
     """Client platforms on which this reading is viable.
@@ -266,6 +287,56 @@ def _render(types: frozenset[str] | None) -> str:
     if not types:
         return "none"
     return " or ".join(sorted(types))
+
+
+MAX_TUPLE_SPELLINGS: Final = 8
+"""How many tuple spellings one tuple may be given before none is.
+
+An element whose type is a union multiplies the spellings out: `("a", it)`
+with `it` a `boolean or string` is both `( string, boolean )` and `( string,
+string )`. The product is one or two in every real expression, and the cap is
+only a guard against a pathological one. Exceeding it falls back to the
+element-flattened reading, which is what this file did before tuple spellings
+existed -- a lost match, never a wrong one.
+"""
+
+
+def _tuple_spellings(values: Sequence[RelevanceValue]) -> frozenset[str]:
+    """The tables' own names for a tuple built from ``values``, in order.
+
+    The tables write a tuple type `( string, string )` -- one space inside each
+    bracket, `, ` between -- and that spelling is what the rows are keyed by,
+    so it is reproduced exactly rather than approximated. Order is significant:
+    `attr lists of <( string, string )>` and the two `administrator <( bes
+    computer, bes user )>` / `<( bes user, bes computer )>` rows are separate
+    entries precisely because the engine distinguishes them.
+
+    Empty when any element is untyped, or when the product would exceed
+    :data:`MAX_TUPLE_SPELLINGS`.
+    """
+    if not values or any(not value.types for value in values):
+        return frozenset()
+    total = 1
+    for value in values:
+        total *= len(value.types or ())
+        if total > MAX_TUPLE_SPELLINGS:
+            return frozenset()
+    return frozenset(
+        "( " + ", ".join(combination) + " )"
+        for combination in itertools.product(*(sorted(value.types or ()) for value in values))
+    )
+
+
+def _subject(value: RelevanceValue) -> frozenset[str] | None:
+    """The candidate direct-object types ``value`` offers a property lookup.
+
+    Both readings of a tuple at once -- see
+    :attr:`RelevanceValue.tuple_types`. ``None`` propagates: an object whose
+    own type is undetermined determines nothing about a property of it.
+    """
+    if value.types is None:
+        return None
+    return value.types | value.tuple_types
 
 
 def _ruled_out(value: RelevanceValue) -> bool:
@@ -899,6 +970,10 @@ class _Checker:
         return RelevanceValue(
             types=types,
             plurality=Plurality.PLURAL if isinstance(node, Collection) else Plurality.SINGULAR,
+            # Only `,` builds a tuple. `;` pools values into a collection --
+            # `(a; b)` is two values of one type, not one value of a pair type
+            # -- so it gets no tuple spelling.
+            tuple_types=_tuple_spellings(values) if isinstance(node, TupleExpr) else frozenset(),
             platforms=self.env.universe,
         )
 
@@ -921,7 +996,7 @@ class _Checker:
             return self.unknown()
         if self.contexts and _ruled_out(self.contexts[-1]):
             return self.contexts[-1]
-        subject = self.contexts[-1].types if self.contexts else None
+        subject = _subject(self.contexts[-1]) if self.contexts else None
         if self.contexts and subject is None:
             # The context itself is unresolved, so nothing can be concluded
             # about a property of it.
@@ -944,7 +1019,14 @@ class _Checker:
                 direct_object=(
                     ""
                     if subject is None
-                    else PROPERTY_DIRECT_OBJECT_FRAGMENT.format(name=_render(subject))
+                    else PROPERTY_DIRECT_OBJECT_FRAGMENT.format(
+                        # A tuple names itself. Listing the flattened elements
+                        # beside the spelling -- `<( string, string ) or
+                        # string>` -- would describe an object the source does
+                        # not contain; the tuple spelling alone is what the
+                        # tables call it, and how they write it.
+                        name=_render(self.contexts[-1].tuple_types or subject)
+                    )
                 ),
             )
         return value
@@ -992,7 +1074,7 @@ class _Checker:
                 and (
                     alternative := _plural_alternative(
                         node.prop.phrase,
-                        obj.types,
+                        _subject(obj),
                         self.env,
                         indexed=node.prop.index is not None,
                     )
@@ -1018,6 +1100,13 @@ class _Checker:
         return RelevanceValue(
             types=prop.types,
             plurality=plurality,
+            # `of` is right-associative, so the tuple in `attr lists of
+            # ("title", it) of <computer>` is not the object of the outer `of`
+            # -- it is the *property* of an inner one, evaluated in the
+            # computer's context. Applying a context does not stop a tuple
+            # being a tuple, so the spelling rides along; without this the
+            # outer lookup sees only the flattened elements again.
+            tuple_types=prop.tuple_types,
             # A chain intersects: every step has to hold at once.
             platforms=prop.platforms & obj.platforms,
         )

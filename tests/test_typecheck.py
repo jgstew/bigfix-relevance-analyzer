@@ -891,6 +891,99 @@ def test_a_tuple_index_must_be_an_integer_literal(env: TypeEnvironment) -> None:
     assert result.diagnostics[0].message == "the tuple index '\"a\"' is not an integer literal"
 
 
+# ---------------------------------------------------------------------------
+# Tuple types
+# ---------------------------------------------------------------------------
+
+
+def test_a_tuple_resolves_a_property_declared_on_the_tuple_type(
+    env: TypeEnvironment,
+) -> None:
+    """The reported false positive. `attr lists of <( string, string )>` is the
+    only row in either dialect whose direct object is a tuple, and flattening
+    the pair to its element type made the lookup ask for `attr lists of
+    <string>`, which nothing defines."""
+    result = check(parse('attr lists of ("title", "Locked")'), env)
+    assert result.diagnostics == ()
+    assert result.value.types == frozenset({"html attribute list"})
+
+
+def test_a_tuple_keeps_its_spelling_through_an_applied_context(
+    env: TypeEnvironment,
+) -> None:
+    """`of` is right-associative, so in the webreport that reported this the
+    tuple is the *property* of an inner `of`, not the object of the outer one:
+    `attr lists of (("title", it) of <string>)`. The spelling has to survive
+    that hop or the outer lookup flattens again."""
+    result = check(parse('attr lists of ("title", it) of "Desktop"'), env)
+    assert result.diagnostics == ()
+    assert result.value.types == frozenset({"html attribute list"})
+
+
+def test_a_tuple_element_of_the_wrong_type_is_still_a_finding(
+    env: TypeEnvironment,
+) -> None:
+    """The spelling is built from the elements, so a boolean second element
+    asks for `( string, boolean )` -- which no row declares. The fix removes a
+    wrong message, not the check."""
+    result = check(parse('attr lists of ("title", it) of true'), env)
+    assert [d.code for d in result.diagnostics] == ["property-not-defined"]
+    assert (
+        result.diagnostics[0].message
+        == "the property 'attr lists of <( string, boolean )>' is not defined"
+    )
+
+
+def test_a_tuple_spelling_multiplies_out_over_a_union_element(
+    env: TypeEnvironment,
+) -> None:
+    """An element whose own type is a union offers every combination, so the
+    reading that matches a row is found even when a sibling reading does not.
+    An `if` whose branches disagree is the cheapest way to build one."""
+    value = check(parse('("a", (if true then "b" else 1))'), env).value
+    assert value.tuple_types == frozenset({"( string, string )", "( string, integer )"})
+    # One of the two readings matches the row, so the lookup succeeds -- the
+    # only finding left is the incompatible `if`, which is its own rule.
+    result = check(parse('attr lists of ("a", (if true then "b" else 1))'), env)
+    assert [d.code for d in result.diagnostics] == ["if-branch-types-incompatible"]
+    assert result.value.types == frozenset({"html attribute list"})
+
+
+def test_a_semicolon_collection_is_not_given_a_tuple_spelling(
+    env: TypeEnvironment,
+) -> None:
+    """`;` pools values -- `(a; b)` is two values of one type, not one value of
+    a pair type -- so it must not resolve a tuple-typed row."""
+    assert check(parse('("title"; "Locked")'), env).value.tuple_types == frozenset()
+    result = check(parse('attr lists of ("title"; "Locked")'), env)
+    assert [d.code for d in result.diagnostics] == ["property-not-defined"]
+
+
+def test_the_flattened_reading_survives_beside_the_tuple_spelling(
+    env: TypeEnvironment,
+) -> None:
+    """The spelling is additive. The operator tables carry no tuple rows at
+    all, so a value that answered only to `( string, string )` would turn a
+    working comparison into a fresh false positive."""
+    assert check(parse('("a", "b") = ("c", "d")'), env).diagnostics == ()
+
+
+def test_an_untyped_tuple_element_yields_no_spelling(env: TypeEnvironment) -> None:
+    """`None` is "the tables said nothing", and a spelling built around a guess
+    would be exactly the fabrication the rest of this module refuses."""
+    assert check(parse('("a", bogusproperty)'), env).value.tuple_types == frozenset()
+
+
+def test_a_tuple_wider_than_the_cap_falls_back_to_the_flattened_reading(
+    env: TypeEnvironment,
+) -> None:
+    """The guard degrades to what this module did before spellings existed --
+    a lost match, never a wrong one."""
+    element = '(if true then "a" else 1)'
+    source = "(" + ", ".join([element] * 4) + ")"
+    assert check(parse(source), env).value.tuple_types == frozenset()
+
+
 def test_unknown_operands_do_not_produce_findings(env: TypeEnvironment) -> None:
     """Half-known is not enough to complain about."""
     assert check(parse('bogusproperty of file "x" + "a"'), env).diagnostics == ()

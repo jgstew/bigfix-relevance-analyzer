@@ -187,6 +187,10 @@ jobs:
           fi
           {
             printf '\n## SHA-256\n\n'
+            # The backticks here are Markdown, not a command substitution: this
+            # string is release-note body text, and single quotes are what keep
+            # it literal. SC2016 cannot tell the two apart.
+            # shellcheck disable=SC2016
             printf 'Verify with `sha256sum -c SHA256SUMS.txt`:\n\n'
             printf '```\n'
             cat dist/SHA256SUMS.txt
