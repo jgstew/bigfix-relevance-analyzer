@@ -421,6 +421,18 @@ pre-commit hook's `entry:` calls:
     - id: bigfix-relevance-lint
 ```
 
+Until that pre-commit hook is published, the least-friction way to lint a
+content repo is to let `uvx` fetch and run the console script without
+installing anything:
+
+```bash
+uvx --from bigfix-relevance-analyzer bigfix-relevance-lint
+```
+
+That walks the current directory with the default rules; every flag below works
+the same way after the script name, e.g. `uvx --from bigfix-relevance-analyzer
+bigfix-relevance-lint --max-score=800 path/to/content`.
+
 `bigfix-relevance-lint` adds `--error CODE` / `--warn CODE` / `--ignore CODE`
 (each repeatable) to override a rule's default severity per repo, and
 `--fail-on-warning` for a repo that wants zero tolerance even for an unknown
