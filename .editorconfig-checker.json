@@ -1,0 +1,32 @@
+{
+  "$comment": [
+    "Config for the editorconfig-checker hook in .pre-commit-config.yaml.",
+    "Run locally: `uvx --from editorconfig-checker ec`.",
+    "Scoping lives in .editorconfig itself wherever it can (see the",
+    "[tests/examples/**] sections there) so that the rules and their",
+    "exceptions stay in one place. Only what EditorConfig cannot express",
+    "belongs here."
+  ],
+  "Exclude": [
+    "_inspector_data\\.py$"
+  ],
+  "$comment_Exclude": [
+    "Generated from tests/examples/relevance_inspectors/ by",
+    "tools/generate_inspector_data.py: the same verbatim BigFix inspector",
+    "lines, trailing data-carrying tabs and all, relocated into src/ so the",
+    "library can read them at runtime. It lives outside tests/examples/, so",
+    "the .editorconfig exceptions there do not reach it. Same exclusion the",
+    "trailing-whitespace, typos and codespell hooks carry."
+  ],
+  "Disable": {
+    "IndentSize": true
+  },
+  "$comment_Disable": [
+    "IndentSize checks that left-padding is a multiple of indent_size, which",
+    "flags ruff-format's own docstring prose continuations (e.g. the 2-space",
+    "bullet continuations in dialect.py). ruff-format already fully governs",
+    "Python indentation, so this check has nothing to add and 36 false",
+    "positives to contribute. indent_style, end_of_line, trailing whitespace",
+    "and final newline all stay on."
+  ]
+}

@@ -19,3 +19,23 @@ indent_size = 3
 
 [*.{bat,cmd}]
 end_of_line = crlf
+
+# tests/examples/ is third-party BigFix content copied verbatim from
+# https://github.com/jgstew/bigfix-content, plus BigFix's own introspection
+# dumps -- see the READMEs in there. Its indentation is whatever upstream
+# shipped, and reindenting it would misrepresent what was actually copied, so
+# don't hold it to this file's indentation rules. Everything else still
+# applies: end_of_line (the [*.bes] crlf rule above is what BigFix requires
+# inside `actionscript` text) and insert_final_newline are still enforced here.
+#
+# Listed last on purpose: EditorConfig gives later sections precedence, so this
+# has to come after [*.bes] to unset that section's indent_style.
+[tests/examples/**]
+indent_style = unset
+indent_size = unset
+
+# The inspector dumps end a row with an empty tab column where a type is
+# absent -- that trailing tab is data, not stray whitespace. Matches the
+# `trailing-whitespace` hook's exclude in .pre-commit-config.yaml.
+[tests/examples/relevance_inspectors/*.txt]
+trim_trailing_whitespace = unset

@@ -1,0 +1,20 @@
+# .editorconfig asks for CRLF in .bes files - BigFix requires CRLF inside
+# `actionscript` element text - but nothing enforced that at the git layer: a
+# contributor with core.autocrlf=input could convert them on checkout and
+# commit them back as LF, and no hook would notice (mixed-line-ending only
+# fires on files that mix both endings).
+#
+# `-text` freezes the bytes: git never converts these in either direction, on
+# any platform, so what is committed is what BigFix needs. `diff` keeps them
+# diffable as text despite `-text` (which would otherwise mark them binary).
+# The complementary `text eol=crlf` was rejected: it stores LF in the index and
+# converts on checkout, which is the stronger guarantee but renormalizes all 11
+# existing blobs for no worktree change. The CRLF *rule* is enforced by the
+# editorconfig-checker hook instead, which reads .editorconfig directly.
+*.bes -text diff
+*.bes.mustache -text diff
+
+# The relevance inspector dumps are BigFix's own introspection output, kept
+# byte-for-byte (see tests/examples/relevance_inspectors/README.md) - including
+# the trailing tabs that carry meaning. Same reasoning.
+tests/examples/relevance_inspectors/*.txt -text diff

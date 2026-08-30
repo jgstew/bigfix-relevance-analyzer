@@ -12,6 +12,7 @@ repos:
     hooks:
       - id: check-yaml
       - id: check-toml
+      - id: check-json
       - id: check-added-large-files
         args: ["--maxkb=500"]
       - id: check-ast
@@ -27,11 +28,51 @@ repos:
         exclude: ^(tests/examples/relevance_inspectors/(session|client)_relevance_properties_(rest_api|ubuntu|debian|rhel|windows|macos)\.txt|src/bigfix_relevance_analyzer/_inspector_data\.py)$
       - id: mixed-line-ending
       - id: detect-private-key
+      # Leftover breakpoint()/pdb.set_trace() in a commit.
+      - id: debug-statements
+      # check-docstring-first is deliberately NOT here: it reports "multiple
+      # module docstrings" for the PEP 258 attribute-docstring idiom this
+      # codebase uses throughout (a string literal documenting the assignment
+      # above it, e.g. MAX_EXPR_DEPTH in diagnostics.py). Sphinx, pdoc, mypy
+      # and pyright all understand that form; the hook's AST check does not.
+      # Structural guards. None of these have anything to catch today - no
+      # submodules, symlinks or executable files are tracked - which is the
+      # point: they keep it that way rather than clean up a backlog.
+      - id: forbid-submodules
+      # check-symlinks is deliberately NOT here: it matches only `type:
+      # symlink` files, and with none tracked the meta `check-hooks-apply` hook
+      # below (correctly) rejects it as a hook that can never fire.
+      # destroyed-symlinks matches every file, so it applies regardless.
+      - id: destroyed-symlinks
+      - id: check-shebang-scripts-are-executable
+      # This project is about Windows-targeted content and carries a
+      # filename-heavy example corpus, so a name that cannot be checked out on
+      # Windows (CON, PRN, a trailing dot) is a real hazard, not a hypothetical.
+      - id: check-illegal-windows-names
+      # Comments throughout this repo cite GitHub URLs; a link to a branch
+      # rather than a commit rots silently.
+      - id: check-vcs-permalinks
+      # Every file under tests/ already follows test_*.py; this keeps a new one
+      # from being silently skipped by pytest's collection.
+      - id: name-tests-test
+        args: ["--pytest-test-first"]
       # Block direct commits to the integration branches; work on a feature
       # branch and open a PR instead. Bypass for a deliberate exception with
       # `git commit --no-verify`.
       # - id: no-commit-to-branch
       #   args: ["--branch=main", "--branch=master"]
+
+  # Broader than `detect-private-key` above, which only matches PEM headers:
+  # this catches cloud keys, tokens and connection strings too. The repo is
+  # public and the example corpus is copied from elsewhere, so a credential
+  # arriving with borrowed content is the realistic case. Deferred to pre-push
+  # rather than every commit - it scans the whole staged content, not just the
+  # diff. Clean on the tree today.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e # v8.30.1
+    hooks:
+      - id: gitleaks
+        stages: [pre-push, manual]
 
   - repo: https://github.com/jgstew/pre-commit-jgstew
     rev: a04f4ccc5f9af2d1cda1dd5c519bb3888439648b # v2.3.0
@@ -65,12 +106,8 @@ repos:
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 7ff8d35ae36a7d2b968f2f90b4c723e292e594ee # v2.3.1
-    hooks:
-      - id: mypy
-        files: ^src/
-        additional_dependencies: []
+  # mypy is a `local` hook in the repo block near the bottom of this file, not
+  # the pre-commit/mirrors-mypy repo hook. See the comment above it for why.
 
   # Security-focused AST linter for common Python mistakes (hardcoded
   # passwords, shell=True, insecure deserialization, etc.). -lll restricts
@@ -119,6 +156,17 @@ repos:
     hooks:
       - id: codespell
 
+  # Enforces .editorconfig itself, which until now nothing checked - notably
+  # the `end_of_line = crlf` rule for .bes files, which BigFix requires inside
+  # `actionscript` element text. `mixed-line-ending` above only fires on a file
+  # that mixes both endings, so a wholly-LF .bes would have gone through.
+  # Config in .editorconfig-checker.json; the exceptions for the verbatim
+  # tests/examples/ corpus live in .editorconfig itself.
+  - repo: https://github.com/editorconfig-checker/editorconfig-checker.python
+    rev: e8b4e28241a9ae8296ba6e4a491b5da4eda73283 # 3.11.1
+    hooks:
+      - id: editorconfig-checker
+
   - repo: https://github.com/adrienverge/yamllint.git
     rev: cba56bcde1fdd01c1deb3f945e69764c291a6530 # v1.38.0
     hooks:
@@ -135,17 +183,16 @@ repos:
 
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: 3a6eb0fadf60b3cccfd80bad9dbb6fae7e47b316 # v1.10.0
+    # Pure regex greps, milliseconds to run, so there is nothing to gain from
+    # deferring them: at `stages: [manual]` a developer only heard about a
+    # blanket `# type: ignore` once CI ran, which is the wrong end of the loop
+    # for a one-character fix.
     hooks:
       - id: python-check-blanket-noqa
-        stages: [manual]
       - id: python-no-log-warn
-        stages: [manual]
       - id: python-use-type-annotations
-        stages: [manual]
       - id: python-no-eval
-        stages: [manual]
       - id: python-check-blanket-type-ignore
-        stages: [manual]
 
   - repo: https://github.com/abravalheri/validate-pyproject
     rev: 4b2e70d08cb2ccd26d1fba73588de41c7a5d50b7 # v0.25
@@ -161,6 +208,24 @@ repos:
         stages: [manual]
       - id: check-dependabot
         stages: [manual]
+
+  # The third leg of the workflow-checking stool, and the one that was missing:
+  # check-github-workflows (above) validates the schema, zizmor (below) audits
+  # security, and neither looks at what the workflows actually *do* - the
+  # `${{ }}` expressions, the step/job references, the action input names, and
+  # the shell in `run:` blocks (this repo's workflows carry a sizeable
+  # hand-written awk program in one). Clean on the tree today.
+  #
+  # actionlint delegates `run:` block linting to shellcheck and silently skips
+  # it when shellcheck is not on PATH - so a developer without it still gets
+  # the expression and reference checks, while CI (GitHub runners ship
+  # shellcheck) gets the shell checks too. `brew install shellcheck` to get the
+  # full check locally.
+  - repo: https://github.com/rhysd/actionlint
+    rev: 914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
+    hooks:
+      - id: actionlint
+        stages: [pre-push, manual]
 
   - repo: https://github.com/woodruffw/zizmor-pre-commit
     # Find security issues in GitHub Actions CI/CD setups.
@@ -233,13 +298,18 @@ repos:
         pass_filenames: false
         files: ^(docs/reference/|tools/generate_reference_prose\.py|src/bigfix_relevance_analyzer/reference/_prose\.py)
         entry: uv run python tools/generate_reference_prose.py --check
+      # pytest-cov and [tool.coverage.run] were already configured but nothing
+      # enforced a number. The tree measures 98%; the floor is set at 95 so it
+      # is a ratchet against a real regression rather than a wall that fails on
+      # a single uncovered branch - same headroom convention as the
+      # bigfix-relevance-lint-examples thresholds below.
       - id: pytest
         name: pytest (see config in pyproject.toml)
         language: system
         pass_filenames: false
         always_run: true
         stages: [pre-push, manual]
-        entry: uv run --frozen pytest
+        entry: uv run --frozen pytest --cov --cov-fail-under=95
       # Dogfoods lint.py against the package's own example corpus. Scoped to
       # tests/examples/ and to the suffixes extract_relevance_from_file()
       # actually recognizes, minus markdown: the .md examples are documentation
@@ -258,6 +328,31 @@ repos:
         files: ^tests/examples/.*\.(bes|bes\.xml|ojo|besrpt|beswrpt|webreport|bsr|rel|html?)$
         stages: [pre-push, manual]
         entry: uv run python -m bigfix_relevance_analyzer --check --max-score=550 --max-evaluation-cost=20
+      # Run via `uv run` rather than the pre-commit/mirrors-mypy repo hook, for
+      # three reasons that all made that hook weaker than it looked:
+      #   * mirrors-mypy's own .pre-commit-hooks.yaml sets
+      #     `args: [--ignore-missing-imports, --scripts-are-modules]`. Setting
+      #     `args` here would replace that list, but not setting it inherits
+      #     it - and with missing imports ignored, the `lxml.etree` types in
+      #     extract.py degrade to Any and every strict check on that code path
+      #     is vacuous.
+      #   * its environment is a dependency-less venv, so lxml-stubs (a dev
+      #     dependency here) isn't there to ignore in the first place: a
+      #     freshly-built one fails on extract.py's `from lxml import etree`.
+      #   * it passed filenames, which overrides `files = ["src", "tests"]` in
+      #     [tool.mypy] - so tests/ went unchecked, by mypy here and by CI
+      #     everywhere (.github/workflows/test.yaml runs pytest and the build,
+      #     not mypy).
+      # `pass_filenames: false` + `always_run: true` keeps the file set coming
+      # from pyproject.toml rather than from whatever happens to be staged.
+      # Unlike pyright below, this stays on every commit: the incremental run
+      # is about a second.
+      - id: mypy
+        name: mypy --strict (see config in pyproject.toml)
+        language: system
+        pass_filenames: false
+        always_run: true
+        entry: uv run --frozen mypy
       # A second, differently-implemented type checker (same config the editor
       # uses via pyrightconfig.json) as a cross-check on mypy - not a
       # replacement. Deferred to pre-push/CI rather than every commit: it's
