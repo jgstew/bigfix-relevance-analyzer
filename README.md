@@ -402,7 +402,7 @@ same way instead of each inventing a description:
 | `parse-error` | error | the statement could not be parsed | always on |
 | `type-error` | error | the type checker reported a problem beyond an unbound `it` | always on |
 | `unbound-it` | error | `it` is used where there is no context to bind it to | always on |
-| `non-unique-risk` | warning | a property written singular over an object that may be plural | always on |
+| `non-unique-risk` | warning | a property written singular where more than one value may come back | always on |
 | `unknown-inspector` | warning | a name no inspector dump defines | always on |
 
 There is no CLI spelling to disable `complexity`/`evaluation-cost` entirely -

@@ -549,8 +549,8 @@ def test_a_singular_form_over_a_plural_object_is_reported_as_a_risk() -> None:
     # deliberately *not* quoted here: this is a risk, and leading with the
     # error text reads as a report that it already happened.
     assert found[0].message == (
-        "'value' is written singular over an object that may be plural, "
-        "and errors at evaluation if it is"
+        "'value' is written singular over an object that may be plural; "
+        "a singular context errors at evaluation if it is"
     )
 
 
@@ -655,6 +655,120 @@ def test_a_singular_form_over_a_singular_object_is_silent() -> None:
     assert (
         check(parse('name of file "x"'), TypeEnvironment.create(Dialect.CLIENT)).diagnostics == ()
     )
+
+
+# ---------------------------------------------------------------------------
+# The sibling risk: singular form of a multivalued property
+# ---------------------------------------------------------------------------
+
+
+def test_a_singular_form_of_a_multivalued_property_is_a_risk(env: TypeEnvironment) -> None:
+    """`file of folder "c:\\"` is `Singular expression refers to non-unique
+    object.` the moment a second file exists -- the object is singular, and
+    the *property* is what may answer with several. The message names the
+    plural spelling, because that is the fix."""
+    result = check(parse('file of folder "c:\\"'), env)
+    assert [d.code for d in result.diagnostics] == ["singular-of-multivalued-property"]
+    assert result.diagnostics[0].message == (
+        "'file' can hold several values; a singular context errors at "
+        "evaluation when it does -- the plural 'files' is preferred"
+    )
+    # A risk, not a type error: the expression types cleanly.
+    assert result.ok
+    assert result.value.plurality is Plurality.SINGULAR
+
+
+def test_a_single_valued_property_written_singular_is_not_a_risk(env: TypeEnvironment) -> None:
+    """The gate is the tables' own `multivalued` flag, not the existence of a
+    plural spelling -- `name of operating system` has the plural form `names`
+    yet answers exactly one value, and warning there would put a style note on
+    most of the relevance ever written."""
+    assert check(parse("name of operating system"), env).diagnostics == ()
+
+
+def test_the_two_collapse_risks_do_not_double_fire(env: TypeEnvironment) -> None:
+    """A plural object hands the finding to `singular-over-plural-object`;
+    this rule speaks only where the object is singular."""
+    codes = [d.code for d in check(parse('file of folders of folder "c:\\"'), env).diagnostics]
+    assert codes == ["singular-over-plural-object"]
+
+
+def test_a_multivalued_singular_inside_a_whose_predicate_is_not_a_risk(
+    env: TypeEnvironment,
+) -> None:
+    """Inside the predicate the collection is handled one element at a time,
+    so the singular form is the natural spelling there -- the maintainer's
+    stated exemption. `boolean value of it` is multivalued and would report
+    anywhere else; no comparison or `exists` is involved, so this isolates the
+    `whose` retraction itself."""
+    source = '(wmi select "x") whose (boolean value of it)'
+    assert check(parse(source), env).diagnostics == ()
+
+
+def test_the_collection_side_of_a_whose_still_reports(env: TypeEnvironment) -> None:
+    """Only the predicate is exempt: a collapse in the collection being
+    filtered happened before `whose` ever saw an element."""
+    codes = [d.code for d in check(parse('(file of folder "c:\\") whose (true)'), env).diagnostics]
+    assert codes == ["singular-of-multivalued-property"]
+
+
+def test_a_multivalued_singular_under_exists_is_not_a_risk(env: TypeEnvironment) -> None:
+    """Under `exists` the non-unique error never fires -- confirmed live in
+    qna, over a singular and a plural object alike: `exists file of folder
+    "/"` and `exists file of folders "/"` both answer `True`, no error,
+    however many files exist. Not ideal relevance, but not the error this
+    rule warns about, so it cannot stand here."""
+    assert check(parse('exists file of folder "c:\\"'), env).diagnostics == ()
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        pytest.param('(file of folder "c:\\" as string) = "x"', id="binary-left"),
+        pytest.param('"a" & (file of folder "c:\\" as string)', id="binary-right"),
+        pytest.param('if (exists file of folder "c:\\") then 1 else 2', id="if-condition"),
+    ],
+)
+def test_a_multivalued_collapse_something_required_is_not_a_risk(
+    source: str, env: TypeEnvironment
+) -> None:
+    """The same retraction `singular-over-plural-object` gets: where a
+    singular is required, the collapse is the only way to write it."""
+    codes = [d.code for d in check(parse(source), env).diagnostics]
+    assert "singular-of-multivalued-property" not in codes
+
+
+def test_a_multivalued_collapse_under_an_error_fallback_is_not_a_risk(
+    env: TypeEnvironment,
+) -> None:
+    """`a | b` yields `b` when `a` errored, so the author has answered for the
+    non-unique case already."""
+    codes = [d.code for d in check(parse('file of folder "c:\\" | "none"'), env).diagnostics]
+    assert "singular-of-multivalued-property" not in codes
+
+
+def test_a_multivalued_singular_in_a_tuple_element_is_not_a_risk(env: TypeEnvironment) -> None:
+    """A tuple element's plurality is load-bearing -- plural items multiply
+    the tuples out -- so suggesting the plural would change what the
+    expression means. A `;` collection element is the same statement said
+    safely, so there the risk stands."""
+    tupled = check(parse('(file of folder "c:\\" as string, 1)'), env)
+    assert tupled.diagnostics == ()
+    pooled = check(parse('(file of folder "c:\\" as string; "x")'), env)
+    assert [d.code for d in pooled.diagnostics] == ["singular-of-multivalued-property"]
+
+
+def test_no_multivalued_risk_survives_in_the_corpus(env: TypeEnvironment) -> None:
+    """The noise report, pinned: shipped content spells these plural, feeds
+    them to `exists`, or guards them, so today the rule reports nothing there.
+    A future exemption change that starts flagging real content shows up here
+    first."""
+    hits = [
+        entry
+        for entry in _corpus_diagnostics(env)
+        if entry[2] == "singular-of-multivalued-property"
+    ]
+    assert hits == []
 
 
 def test_a_property_used_on_the_wrong_direct_object_is_a_finding(env: TypeEnvironment) -> None:

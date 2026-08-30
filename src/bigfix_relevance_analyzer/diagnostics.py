@@ -110,6 +110,7 @@ FIELDS: Final = frozenset(
         "name",
         "of_keyword",
         "phrase",
+        "plural_phrase",
         "plurality",
         "right_type",
         "source_type",
@@ -212,8 +213,22 @@ _TYPE_CHECK: Final = [
         # because that is what would raise it, and `CheckResult.ok` reads the
         # origin to keep a risk from failing a type check.
         Origin.RUNTIME,
-        "'{phrase}' is written singular over an object that may be plural, "
-        "and errors at evaluation if it is",
+        "'{phrase}' is written singular over an object that may be plural; "
+        "a singular context errors at evaluation if it is",
+    ),
+    _entry(
+        "singular-of-multivalued-property",
+        # The sibling of `singular-over-plural-object`, and this package's own
+        # wording for the same reason given there: it is a risk reported
+        # statically about an evaluation nobody has run. Here the object is
+        # singular and the *property* is the hazard -- the tables record it as
+        # multivalued, so the singular form raises `Singular expression refers
+        # to non-unique object.` whenever more than one value exists. The
+        # origin says runtime because that is what would raise it, which also
+        # keeps `CheckResult.ok` from failing a type check over a risk.
+        Origin.RUNTIME,
+        "'{phrase}' can hold several values; a singular context errors at "
+        "evaluation when it does -- the plural '{plural_phrase}' is preferred",
     ),
     # Operators and casts.
     _entry(

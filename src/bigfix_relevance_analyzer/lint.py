@@ -19,7 +19,7 @@ itself something to report, not something to crash over.
     if any(f.severity is Severity.ERROR for f in findings):
         raise SystemExit(1)
 
-Eight rules, six of them always on and two tunable:
+Nine rules, seven of them always on and two tunable:
 
 - ``parse-error`` / ``error-token`` -- the statement is broken. Always an
   error; nothing to configure.
@@ -38,6 +38,12 @@ Eight rules, six of them always on and two tunable:
 - ``unknown-inspector`` -- a name no dump defines. Always a warning, never an
   error by default, because the dumps do not cover every platform or product
   version -- a name absent from them is a lead, not proof of a typo.
+- ``non-unique-risk`` -- a property written singular where more than one value
+  may come back, either over an object that may be plural
+  (``singular-over-plural-object``) or because the tables record the property
+  itself as multivalued (``singular-of-multivalued-property``). A warning, not
+  an error: the expression types cleanly, and the author may know exactly one
+  value exists. See the rule's rationale in :data:`RULES` for the exemptions.
 - ``complexity`` / ``evaluation-cost`` -- :attr:`RelevanceComplexity.score`
   and ``.evaluation_cost`` past a ceiling. On by default, at a generous
   built-in ceiling (:data:`DEFAULT_MAX_SCORE`, :data:`DEFAULT_MAX_EVALUATION_COST`)
@@ -282,18 +288,27 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
             _rule(
                 "non-unique-risk",
                 Severity.WARNING,
-                "a property written singular over an object that may be plural",
-                "`value of results ...` is a singular expression -- the written form of a "
-                "property settles that, so the static singularity rule does not apply. What "
-                "remains is a runtime complaint about the *object*: `Singular expression "
-                "refers to non-unique object.` if it holds several, `... to nonexistent "
-                "object.` if it holds none. Collapsing a plural is often the whole point, "
-                "so three cases are exempt: an aggregate (`unique value of`, `concatenation "
-                "of`, `maximum of` ...), a value flowing into a position that requires a "
-                "singular, and anything under an `|` error fallback, where the author has "
-                "already answered for it. What is left is a collapse nothing guards, and it "
-                "is a warning rather than an error because the author may still know the "
-                "object holds exactly one.",
+                "a property written singular where more than one value may come back",
+                "Two sibling diagnostics land here. `value of results ...` writes the "
+                "singular form over an *object* that may be plural, and `file of folder "
+                "...` writes the singular form of a *property* the tables record as "
+                "multivalued -- either way the written form settles the expression as "
+                "singular, so the static singularity rule does not apply, and what "
+                "remains is a runtime complaint: `Singular expression refers to "
+                "non-unique object.` if several values exist, `... to nonexistent "
+                "object.` if none do. Plural relevance is the best practice where a "
+                "singular is not required. Collapsing is sometimes the point, so these "
+                "cases are exempt: an aggregate (`unique value of`, `concatenation of`, "
+                "`maximum of` ...), a value flowing into a position that requires a "
+                "singular, and anything under an `|` error fallback, where the author "
+                "has already answered for it -- and the property-side diagnostic is "
+                "additionally quiet inside a `whose` predicate (elements are handled "
+                "one at a time there), under `exists` (confirmed in qna: `exists "
+                'file of folder "/"` answers True, no error, however many files '
+                "exist), and in a tuple element, where "
+                "plurality changes the meaning. What is left is a collapse nothing "
+                "guards, and it is a warning rather than an error because the author "
+                "may still know exactly one value exists.",
             ),
             _rule(
                 "complexity",
@@ -492,7 +507,10 @@ def _site_dialect(site: RelevanceSite, forced: Dialect | None) -> Dialect | None
 # Checker diagnostics that are not `type-error`. The checker reports what the
 # engine would say; this layer decides how much it matters, and a runtime risk
 # the author may have ruled out is not the same as a static type error.
-_CHECK_RULES: Final = {"singular-over-plural-object": "non-unique-risk"}
+_CHECK_RULES: Final = {
+    "singular-over-plural-object": "non-unique-risk",
+    "singular-of-multivalued-property": "non-unique-risk",
+}
 
 
 def lint_analysis(

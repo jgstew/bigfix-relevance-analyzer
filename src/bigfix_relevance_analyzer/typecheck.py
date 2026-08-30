@@ -376,6 +376,15 @@ all of which distribute, and must keep warning.
 """
 
 
+_COLLAPSE_RISKS: Final = frozenset(
+    {"singular-over-plural-object", "singular-of-multivalued-property"}
+)
+"""The two statically-reported collapse risks; see :meth:`_Checker.accept_collapse`."""
+
+_MULTIVALUED_RISK: Final = frozenset({"singular-of-multivalued-property"})
+"""Just the property-side risk, for the sites that exempt only it."""
+
+
 def _is_aggregate(phrase: str) -> bool:
     return any(
         entry.name in AGGREGATES
@@ -395,6 +404,68 @@ def _widen(*pluralities: Plurality) -> Plurality:
 def _diagnostic(code: str, span: Span, **fields: object) -> TypeDiagnostic:
     entry = DIAGNOSTICS[code]
     return TypeDiagnostic(code=code, message=entry.format(**fields), span=span)
+
+
+def _matched_rows(
+    name: str,
+    subject: frozenset[str] | None,
+    environment: TypeEnvironment,
+    *,
+    indexed: bool | None = None,
+) -> list[inspectors.Inspector] | None:
+    """The visible property rows ``name`` resolves to against ``subject``.
+
+    ``None`` when no visible row carries the name at all -- the "not in this
+    snapshot" case :func:`resolve_property` must keep distinct from an empty
+    match, which *is* a finding. Parameters mean what they mean there.
+    """
+    rows = [
+        entry
+        for entry in inspectors.lookup(name, kind=inspectors.InspectorKind.PROPERTY)
+        if environment.visible(entry)
+    ]
+    if not rows:
+        return None
+
+    if indexed is not None:
+        rows = [entry for entry in rows if (entry.index_type is not None) is indexed]
+
+    if subject is None:
+        return [entry for entry in rows if not entry.operands]
+    return [
+        entry
+        for entry in rows
+        if any(_accepts(operand, candidate) for candidate in subject for operand in entry.operands)
+    ]
+
+
+def _plural_alternative(
+    name: str,
+    subject: frozenset[str] | None,
+    environment: TypeEnvironment,
+    *,
+    indexed: bool | None = None,
+) -> str | None:
+    """The plural spelling to suggest for a multivalued property, or ``None``.
+
+    Positive evidence only, the same policy as :func:`resolve_property`'s
+    plurality: a suggestion comes back only when every matched visible row is
+    recorded as multivalued *and* they all agree on one plural name distinct
+    from what was written. `name of <SELinux boolean>` has the plural form
+    `names` yet is not multivalued -- the two facts are independent in the
+    tables, and only the multivalued ones can raise `Singular expression
+    refers to non-unique object.`
+    """
+    matched = _matched_rows(name, subject, environment, indexed=indexed) or []
+    if not matched or not all(entry.multivalued for entry in matched):
+        return None
+    plurals = {entry.plural_name for entry in matched}
+    if len(plurals) != 1:
+        return None
+    (plural,) = plurals
+    if plural is None or plural.casefold() == name.casefold():
+        return None
+    return plural
 
 
 def resolve_property(
@@ -440,27 +511,9 @@ def resolve_property(
     declared on the base type, so ``size`` resolves for ``application`` only
     through ``application -> file``.
     """
-    rows = [
-        entry
-        for entry in inspectors.lookup(name, kind=inspectors.InspectorKind.PROPERTY)
-        if environment.visible(entry)
-    ]
-    if not rows:
+    matched = _matched_rows(name, subject, environment, indexed=indexed)
+    if matched is None:
         return RelevanceValue(types=None, platforms=environment.universe)
-
-    if indexed is not None:
-        rows = [entry for entry in rows if (entry.index_type is not None) is indexed]
-
-    if subject is None:
-        matched = [entry for entry in rows if not entry.operands]
-    else:
-        matched = [
-            entry
-            for entry in rows
-            if any(
-                _accepts(operand, candidate) for candidate in subject for operand in entry.operands
-            )
-        ]
 
     plurality = Plurality.UNKNOWN
     forms = {inspectors.written_form_of(entry, name) for entry in matched}
@@ -600,25 +653,17 @@ class _Checker:
     def rows(self, entries: tuple[inspectors.Inspector, ...]) -> list[inspectors.Inspector]:
         return [entry for entry in entries if self.env.visible(entry)]
 
-    def accept_collapse(self, span: Span) -> None:
-        """Withdraw the collapse risks inside ``span``: something needed them.
-
-        `singular-over-plural-object` says a singular form was written over an
-        object that may hold several. Where the value flows into a position
-        that *requires* a singular, that collapse is what makes the expression
-        legal at all, and reporting it would say the author should have written
-        something they had no way to write.
+    def retract(self, codes: frozenset[str], span: Span) -> None:
+        """Withdraw the already-emitted ``codes`` diagnostics inside ``span``.
 
         Retraction rather than a check up front, because the walk is an
         iterative work queue: `combine_of` cannot see the parent that will
-        consume it, but every site that demands a singular already calls
-        :meth:`require_singular` or :meth:`require_singular_boolean` with the
-        operand's span. Containment then identifies the risks that operand
-        raised, however deep -- the reported webreport put one two levels down,
-        under a cast.
+        consume it, but the consuming site knows the operand's span, and
+        containment then identifies the findings that operand raised, however
+        deep -- the reported webreport put one two levels down, under a cast.
 
         The list is edited in place and only above ``span``, which is what
-        keeps the `_BeginBranch` marks in :attr:`marks` valid: a risk inside
+        keeps the `_BeginBranch` marks in :attr:`marks` valid: a finding inside
         this operand was appended after any mark that is still open, so no
         index below one ever moves.
         """
@@ -626,11 +671,26 @@ class _Checker:
             diagnostic
             for diagnostic in self.diagnostics
             if not (
-                diagnostic.code == "singular-over-plural-object"
+                diagnostic.code in codes
                 and span.start <= diagnostic.span.start
                 and diagnostic.span.end <= span.end
             )
         ]
+
+    def accept_collapse(self, span: Span) -> None:
+        """Withdraw the collapse risks inside ``span``: something needed them.
+
+        `singular-over-plural-object` says a singular form was written over an
+        object that may hold several; `singular-of-multivalued-property` says
+        the property itself may answer with several. Where the value flows
+        into a position that *requires* a singular, that collapse is what
+        makes the expression legal at all, and reporting it would say the
+        author should have written something they had no way to write. Every
+        site that demands a singular already calls :meth:`require_singular` or
+        :meth:`require_singular_boolean` with the operand's span, and those
+        delegate here.
+        """
+        self.retract(_COLLAPSE_RISKS, span)
 
     def require_singular_boolean(
         self, value: RelevanceValue, span: Span, code: str, **fields: object
@@ -781,6 +841,17 @@ class _Checker:
                 self.values.append(self.combine_bar(node, left, right))
             case Exists():
                 self.pop(1)
+                # Under `exists` the non-unique error genuinely never fires --
+                # confirmed live in qna: `exists file of folder "/"` and
+                # `exists file of folders "/"` both answer `True`, no error,
+                # however many files exist ("Errors propagate, except where a
+                # plural flattens them" in the syntax reference). So the
+                # property-side risk is retracted here. The object side
+                # (`singular-over-plural-object`) is left standing by choice:
+                # it does not error under `exists` either, but the spelling is
+                # still not ideal relevance, and its message blames the
+                # singular context rather than promising an error.
+                self.retract(_MULTIVALUED_RISK, node.operand.span)
                 self.values.append(self.literal("boolean"))
             case NumberOf():
                 self.pop(1)
@@ -811,6 +882,15 @@ class _Checker:
                 assert_never(node)
 
     def combine_sequence(self, node: Node, values: list[RelevanceValue]) -> RelevanceValue:
+        if isinstance(node, TupleExpr):
+            # A tuple element's plurality is load-bearing: a plural item
+            # multiplies the tuples out (a cross product), a singular one
+            # asserts a single row. Suggesting the plural would change what
+            # the expression *means*, not how safely it says it, so the risk
+            # is retracted here. `;` items stay: a collection just pools
+            # values, and plural elements are the same statement said safely.
+            for item in node.items:
+                self.retract(_MULTIVALUED_RISK, item.span)
         if any(value.types is None for value in values):
             return self.unknown()
         types: frozenset[str] = frozenset()
@@ -906,6 +986,33 @@ class _Checker:
                 and not _is_aggregate(node.prop.phrase)
             ):
                 self.report("singular-over-plural-object", node.span, phrase=node.prop.phrase)
+            elif (
+                plurality is Plurality.SINGULAR
+                and obj.plurality is Plurality.SINGULAR
+                and (
+                    alternative := _plural_alternative(
+                        node.prop.phrase,
+                        obj.types,
+                        self.env,
+                        indexed=node.prop.index is not None,
+                    )
+                )
+                is not None
+            ):
+                # The object holds exactly one, but the tables say the property
+                # itself may answer with several -- `file of folder "c:\"` is
+                # `Singular expression refers to non-unique object.` the moment
+                # a second file exists. Best practice is the plural form unless
+                # a singular is required, so the sites that make the singular
+                # deliberate retract this: anything `require_singular` guards,
+                # a `whose` predicate (elements are handled one at a time
+                # there), an `exists` operand, a tuple element, a `|` fallback.
+                self.report(
+                    "singular-of-multivalued-property",
+                    node.span,
+                    phrase=node.prop.phrase,
+                    plural_phrase=alternative,
+                )
         else:
             plurality = _widen(prop.plurality, obj.plurality)
         return RelevanceValue(
@@ -958,6 +1065,12 @@ class _Checker:
         against an `if` condition. The message reproduces that: it names no
         plurality because the rule does not have one.
         """
+        # Inside the predicate the collection is handled one element at a
+        # time, so a singular form there is the natural spelling, not a risk
+        # -- `files whose (exists version of it)` has nothing to answer for.
+        # Only the property-side risk: the object-side one is about a chain
+        # the predicate wrote plural-of-plural, which `whose` does not excuse.
+        self.retract(_MULTIVALUED_RISK, node.predicate.span)
         if (
             predicate.types is not None
             and not _ruled_out(predicate)

@@ -118,13 +118,29 @@ def test_a_singular_form_over_a_plural_object_is_a_warning_not_an_error() -> Non
     # Not the engine's error text: nothing has errored, and quoting it would
     # read as if something had.
     assert "Singular expression refers to" not in risk.message
-    assert risk.message.endswith("may be plural, and errors at evaluation if it is")
+    assert risk.message.endswith("a singular context errors at evaluation if it is")
 
 
 def test_the_non_unique_risk_rule_can_be_silenced() -> None:
     report = analyze('value of results from (bes property "X") of bes computers', Dialect.SESSION)
     config = LintConfig(severities={"non-unique-risk": Severity.IGNORE})
     assert "non-unique-risk" not in codes(lint_analysis(report, config))
+
+
+def test_a_singular_form_of_a_multivalued_property_is_the_same_warning() -> None:
+    """The property-side sibling lands on the same rule: `file of folder ...`
+    risks the same `Singular expression refers to non-unique object.` as a
+    singular form over a plural object, so it is one configurable code, not a
+    second vocabulary entry downstream tools would have to map."""
+    report = analyze('file of folder "c:\\"', Dialect.CLIENT)
+    findings = lint_analysis(report, LintConfig())
+    assert "type-error" not in codes(findings)
+    risk = next(f for f in findings if f.code == "non-unique-risk")
+    assert risk.severity is Severity.WARNING
+    assert "the plural 'files' is preferred" in risk.message
+
+    config = LintConfig(severities={"non-unique-risk": Severity.IGNORE})
+    assert codes(lint_analysis(report, config)) == set()
 
 
 def test_the_webreport_example_has_no_errors() -> None:
