@@ -367,7 +367,7 @@ verdicts. Six of the eight rules are always on: parse failures, an `it` with
 nothing to bind to, and any other type-check diagnostic are always errors; an
 inspector no dump defines is always a warning. The other two - complexity
 score and evaluation cost - are *also* on by default, at a generous built-in
-ceiling (`DEFAULT_MAX_SCORE = 500`, `DEFAULT_MAX_EVALUATION_COST = 50`) chosen
+ceiling (`DEFAULT_MAX_SCORE = 550`, `DEFAULT_MAX_EVALUATION_COST = 50`) chosen
 to sit well above ordinary content and catch only the genuinely extreme;
 content that legitimately needs to be this complex or this expensive should
 raise the ceiling rather than have the rule stay silent about it:

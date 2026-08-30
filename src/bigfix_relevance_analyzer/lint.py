@@ -106,7 +106,7 @@ adds one. Chosen as a generous default rather than an unbounded walk, and
 never exceeded silently -- see the ``max-depth-exceeded`` rule above.
 """
 
-DEFAULT_MAX_SCORE = 500.0
+DEFAULT_MAX_SCORE = 550.0
 """The built-in ceiling for the ``complexity`` rule.
 
 Chosen to sit well above ordinary content -- the package's own pinned test
