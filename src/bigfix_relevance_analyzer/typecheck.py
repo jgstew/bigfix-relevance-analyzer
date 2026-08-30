@@ -267,6 +267,29 @@ def _ruled_out(value: RelevanceValue) -> bool:
     return value.types is not None and not value.types
 
 
+def _types_compatible(left: frozenset[str], right: frozenset[str]) -> bool:
+    """Whether any type on one side shares a common ancestor with any type on
+    the other -- the same is-a relationship every other type comparison in
+    this module already resolves through :func:`~bigfix_relevance_analyzer.
+    inspectors.ancestors` (:meth:`_Checker.combine_cast`,
+    :meth:`_Checker.combine_binary`, :meth:`_Checker.combine_unary`,
+    :func:`resolve_property`), rather than a literal type-name match.
+
+    Confirmed live against a real evaluator: ``<T with multiplicity>`` and
+    ``T`` are compatible (they share the ancestor ``T``), and so are two
+    unrelated *siblings* under one umbrella type -- ``file`` and ``folder``
+    both evaluate cleanly against each other because they share ``filesystem
+    object``, even though neither is a subtype of the other. A literal
+    ``left & right`` set intersection catches neither case, which is what
+    made :meth:`_Checker.combine_bar` and :meth:`_Checker.combine_if` report
+    ``operand-types-incompatible`` / ``if-branch-types-incompatible`` on
+    perfectly valid content -- see the regression tests this fixes.
+    """
+    left_ancestors = {ancestor for name in left for ancestor in inspectors.ancestors(name)}
+    right_ancestors = {ancestor for name in right for ancestor in inspectors.ancestors(name)}
+    return bool(left_ancestors & right_ancestors)
+
+
 def _collapses(name: str) -> bool:
     """Whether this name is the collapsing form of a multivalued property.
 
@@ -951,7 +974,7 @@ class _Checker:
             and right.types
             and not _ruled_out(left)
             and not _ruled_out(right)
-            and not (left.types & right.types)
+            and not _types_compatible(left.types, right.types)
             # Same tolerance as an `if`: two sides no single platform sees
             # together are alternatives, and their types differing is the point.
             and self.branches_coexist(left, right)
@@ -1019,7 +1042,7 @@ class _Checker:
         if (
             then_value.types
             and else_value.types
-            and not (then_value.types & else_value.types)
+            and not _types_compatible(then_value.types, else_value.types)
             and not (then_found or else_found)
             and self.branches_coexist(then_value, else_value)
         ):

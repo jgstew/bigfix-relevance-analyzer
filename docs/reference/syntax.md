@@ -53,14 +53,14 @@ Three constructs turn a plural into something singular:
 `<plural> whose (<boolean>)` keeps only the values for which the boolean holds.
 Inside the filter, `it` is the value being tested:
 
-```relevance
+```client_relevance
 files whose (size of it > 1000) of folder "/tmp"
 ```
 
 **`of` binds `it` as well.** In `a of b`, an `it` inside `a` refers to `b`:
 
-```relevance
-(it as trimmed string) of values "SearchList" of keys "..." of registries
+```client_relevance
+(it as string) of values "SearchList" of keys "..." of registries
 ```
 
 This matters because the BigFix runtime's own error message for a misplaced
@@ -86,8 +86,8 @@ failing is the trigger.
 
 This is the idiomatic way to give a default for something that may not exist:
 
-```relevance
-id of site of it | 0
+```session_relevance
+(name of it | "unknown") of bes computers
 ```
 
 `|` has no row in the operator table at all, because the grammar defines it
@@ -124,12 +124,12 @@ no line comment: `//` is division followed by division.
 `,` builds a tuple, `;` builds a collection. Both are ways of producing several
 values from one expression:
 
-```relevance
+```session_relevance
 (id of site of it, id of it, applicable computer count of it) of fixlets of bes sites
 ```
 
-```relevance
-(packages "docker-ce" of it; packages "docker" of it)
+```client_relevance
+(packages "docker-ce" of debianpackage; packages "docker" of rpm)
 ```
 
 ## Operator spellings collapse

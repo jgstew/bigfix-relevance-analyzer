@@ -18,7 +18,7 @@ from test_examples import corpus_files
 from bigfix_relevance_analyzer import inspectors, typecheck
 from bigfix_relevance_analyzer.binding import resolve_it_bindings
 from bigfix_relevance_analyzer.diagnostics import DIAGNOSTICS, Origin
-from bigfix_relevance_analyzer.dialect import Dialect
+from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 from bigfix_relevance_analyzer.extract import extract_relevance_from_file
 from bigfix_relevance_analyzer.nodes import If, Node
 from bigfix_relevance_analyzer.parser import parse, try_parse
@@ -170,6 +170,41 @@ def test_no_example_site_is_reported_broken(env: TypeEnvironment) -> None:
         for site in extract_relevance_from_file(path)
         if (parsed := try_parse(site.text)).ok and parsed.node is not None
         for diagnostic in check(parsed.node, env).diagnostics
+    ]
+    assert offenders == []
+
+
+def test_operand_incompatibility_holds_across_the_corpus_under_each_sites_own_dialect() -> None:
+    """The ancestor fix, checked over real content rather than isolated cases.
+
+    `test_no_example_site_is_reported_broken` checks every corpus site under a
+    single hardcoded `Dialect.CLIENT`, which is exactly why the bug this
+    guards against went unnoticed there: a session-only property resolves to
+    `None` under the wrong dialect, so `operand-types-incompatible`/
+    `if-branch-types-incompatible` never even ran on the session-only sites
+    that actually trigger it. Checking each site under its own resolved
+    dialect instead -- confirmed live in
+    `dashboard_session_relevance_html_table.ojo` and
+    `webreport_relevance_via_javascript.besrpt`, both session-only, both
+    turning a `unique value`/`unique values` result (`... with multiplicity`)
+    against a bare string literal with `|` -- is what actually exercises it.
+
+    Scoped to these two codes rather than every diagnostic, so an unrelated,
+    legitimate finding elsewhere in the corpus (there is at least one: a `&`
+    singularity error) does not make this test brittle against content this
+    fix has nothing to do with.
+    """
+    watched = {"operand-types-incompatible", "if-branch-types-incompatible"}
+    offenders = [
+        (path.name, site.line, diagnostic.code, diagnostic.message)
+        for path in corpus_files()
+        for site in extract_relevance_from_file(path)
+        if (parsed := try_parse(site.text)).ok and parsed.node is not None
+        for diagnostic in check(
+            parsed.node,
+            TypeEnvironment.create(site.dialect if is_definite(site.dialect) else Dialect.CLIENT),
+        ).diagnostics
+        if diagnostic.code in watched
     ]
     assert offenders == []
 
@@ -563,6 +598,51 @@ def test_branches_no_single_platform_shares_may_differ_in_type(env: TypeEnvironm
         "the types in 'then <integer> else <string>' are not compatible"
     )
     assert check(parse(f"({WINDOWS_ONLY}) | ({LINUX_ONLY})"), env).diagnostics == ()
+
+
+def test_bar_allows_a_type_and_its_with_multiplicity_form(env: TypeEnvironment) -> None:
+    """`<T with multiplicity>` is `T`'s own child type, not an unrelated one.
+
+    Confirmed live against a real QnA: `unique value of "a" | "b"` evaluates
+    cleanly (returning `"a"`, never reaching the fallback), so the checker
+    must not treat `string with multiplicity` and `string` as incompatible --
+    they share the ancestor `string`, the same is-a relationship
+    `combine_cast`/`combine_binary`/`combine_unary` already resolve through
+    `inspectors.ancestors`.
+    """
+    assert check(parse('unique value of "a" | "b"'), env).diagnostics == ()
+
+
+def test_if_branches_allow_a_type_and_its_with_multiplicity_form(env: TypeEnvironment) -> None:
+    """Same rule as the `|` case above, for `if`/`then`/`else`.
+
+    Confirmed live: `if true then (unique value of "a") else "b"` evaluates
+    cleanly.
+    """
+    assert check(parse('if true then (unique value of "a") else "b"'), env).diagnostics == ()
+
+
+def test_bar_allows_unrelated_siblings_under_a_common_ancestor(env: TypeEnvironment) -> None:
+    """Compatibility is "shares an ancestor", not merely "one is a subtype of
+    the other" -- `file` and `folder` are unrelated siblings, both children of
+    `filesystem object`, and share no more than that.
+
+    Confirmed live: `(file "/tmp/a") | (folder "/tmp")` evaluates cleanly (it
+    fails only at runtime, on the nonexistent path, never on type)."""
+    assert check(parse('(file "/tmp/a") | (folder "/tmp")'), env).diagnostics == ()
+
+
+def test_bar_still_rejects_types_with_no_shared_ancestor(env: TypeEnvironment) -> None:
+    """The ancestor-aware fix must not go too far the other way.
+
+    `integer` and `string` share no ancestor at all -- confirmed live, `1 |
+    "b"` really does fail with `Incompatible types.` -- so this must keep
+    firing exactly as `test_bar_message_leads_with_the_evaluators_own_wording`
+    above already pins.
+    """
+    assert [d.code for d in check(parse('1 | "b"'), env).diagnostics] == [
+        "operand-types-incompatible"
+    ]
 
 
 def test_every_type_check_diagnostic_is_reachable() -> None:

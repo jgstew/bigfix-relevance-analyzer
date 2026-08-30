@@ -198,10 +198,7 @@ EXPECTED: dict[str, Expected] = {
     "client_relevance/markdown_codeblocks/client_relevance_markdown_codeblock.md": Expected(
         sites=((MD, CLIENT, 6),),
         text_prefixes=("unique values of strings",),
-        note=(
-            "A markdown fence carries no context signal; the content classifier types it "
-            "from `iokit registries`."
-        ),
+        note="The ```client_relevance fence tag itself commits the context dialect.",
     ),
     # ---------------- session relevance: dashboards ----------------
     "session_relevance/dashboards/dashboard_session_relevance_html_table.ojo": Expected(
