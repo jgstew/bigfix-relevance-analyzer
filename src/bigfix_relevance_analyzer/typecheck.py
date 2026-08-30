@@ -60,7 +60,7 @@ from __future__ import annotations
 import enum
 import itertools
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Final, assert_never
 
 from bigfix_relevance_analyzer import grammar, inspectors
@@ -1126,7 +1126,9 @@ class _Checker:
         if not isinstance(node.obj, TupleExpr) or not isinstance(node.prop, Reference):
             return None
         index = node.prop.index
-        if node.prop.phrase != "item" or not isinstance(index, NumberLiteral | StringLiteral):
+        if node.prop.phrase not in {"item", "items"} or not isinstance(
+            index, NumberLiteral | StringLiteral
+        ):
             return None
         return index
 
@@ -1343,17 +1345,26 @@ class _Checker:
         if node.index.kind is NumberKind.LARGE_INTEGER:
             self.report("tuple-index-unreasonable", node.span, token=node.index.text)
             return RelevanceValue(types=frozenset(), platforms=frozenset())
-        if not isinstance(node.operand, TupleExpr):
+        # A `whose` filters the tuples without changing what any one position
+        # holds, so `items 1 of (a, b) whose (...)` indexes the same tuple --
+        # only plurally, since filtering yields a set of tuples.
+        subscripted = node.operand
+        while isinstance(subscripted, Whose):
+            subscripted = subscripted.collection
+        if not isinstance(subscripted, TupleExpr):
             # It may still be a tuple-valued expression; nothing is known yet.
             return self.unknown()
-        items = self.tuple_items.get(id(node.operand), ())
+        items = self.tuple_items.get(id(subscripted), ())
         index = int(node.index.text)
         if index >= len(items):  # 0-based, checked while type checking
             self.report(
                 "tuple-index-out-of-range", node.span, token=node.index.text, total=len(items)
             )
             return RelevanceValue(types=frozenset(), platforms=frozenset())
-        return items[index]
+        picked = items[index]
+        if operand.plurality is Plurality.PLURAL and picked.plurality is not Plurality.PLURAL:
+            return replace(picked, plurality=Plurality.PLURAL)
+        return picked
 
     def combine_if(
         self,

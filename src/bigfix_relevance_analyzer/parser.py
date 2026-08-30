@@ -509,7 +509,11 @@ def _of(prop: Node, obj: Node) -> Node:
         if prop.phrase == "number" and prop.index is None:
             return NumberOf(span=span, operand=obj)
         if (
-            prop.phrase == "item"
+            # Either written form subscripts a tuple: `items 1 of (a, b)` is
+            # the same indexing said plurally, and resolving it as the
+            # `item <string> of <folder>` property's plural spelling types it
+            # as a filesystem object, which it is not.
+            prop.phrase in {"item", "items"}
             and isinstance(prop.index, NumberLiteral)
             and prop.index.is_integer_literal
         ):

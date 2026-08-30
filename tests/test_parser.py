@@ -506,6 +506,15 @@ def test_an_integer_index_makes_a_tuple_subscript() -> None:
     assert node.index.text == "0"
 
 
+def test_the_plural_spelling_subscripts_a_tuple_too() -> None:
+    """`items 1 of (a, b)` is the same indexing said plurally. Left as a
+    property it resolves to the plural form of `item <string> of <folder>` and
+    types as a filesystem object, which a tuple element is not."""
+    node = parse("items 1 of (1, 2)")
+    assert isinstance(node, ItemOf)
+    assert node.index.text == "1"
+
+
 def test_a_string_index_stays_a_property_because_item_really_is_one() -> None:
     """`item <string> of <folder>` is a real inspector, so a string index
     cannot be read as a tuple subscript without knowing the object's type --

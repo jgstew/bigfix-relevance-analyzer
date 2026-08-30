@@ -403,6 +403,24 @@ def test_a_tuple_index_is_zero_based(env: TypeEnvironment) -> None:
     )
 
 
+def test_the_plural_spelling_indexes_the_same_tuple(env: TypeEnvironment) -> None:
+    """`items <integer> of` is a subscript, not the plural written form of the
+    `item <string> of <folder>` property -- which would type every element as a
+    filesystem object."""
+    assert types_of('items 1 of (1, "c")', env) == {"string"}
+
+
+def test_a_filtered_tuple_is_still_indexed_by_position(env: TypeEnvironment) -> None:
+    """A `whose` picks tuples out of the set without changing what any one
+    position holds, so the index still names an element's type -- plurally now,
+    since filtering yields a set of tuples."""
+    source = 'items 1 of (creation time of file "a", file "a") whose (exists item 1 of it)'
+    value = check(parse(source), env).value
+    assert value.types is not None
+    assert set(value.types) == {"file"}
+    assert value.plurality is Plurality.PLURAL
+
+
 def test_one_bad_if_branch_is_tolerated_but_two_are_not(env: TypeEnvironment) -> None:
     """The engine's own rule: `at most one branch of an if-statement may have
     type errors`. It is deliberate tolerance, and it is what lets a statement
