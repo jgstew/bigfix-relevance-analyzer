@@ -537,6 +537,17 @@ def test_bar_is_its_own_node_not_a_binary_operator() -> None:
     )
 
 
+def test_a_bare_product_before_a_fallback_says_why_and_suggests_parens() -> None:
+    """The engine refuses `2 * 3 | 5` outright ("This expression could not be
+    parsed", confirmed live) but its message says nothing about why. Ours
+    points at the `|` and names the fix."""
+    with pytest.raises(ParseError) as info:
+        parse("2 * 3 | 5")
+    assert info.value.column == 7
+    assert "parenthes" in info.value.message
+    assert "'*'" in info.value.message
+
+
 def test_the_specialised_forms_keep_the_span_of_the_whole_expression() -> None:
     for source in ("number of processors", "item 0 of (1, 2)", "1 | 2"):
         node = parse(source)

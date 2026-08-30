@@ -147,13 +147,12 @@ ANCHORS: Mapping[Dialect, tuple[str, ...]] = {
 #: Read off :mod:`~bigfix_relevance_analyzer.grammar`'s own constants rather
 #: than restated, so a precedence change cannot leave this table behind.
 _PRECEDENCE: Final[tuple[tuple[int, str], ...]] = (
-    (grammar.BP_PIPE, "error fallback"),
     (grammar.BP_OR, "or"),
     (grammar.BP_AND, "and"),
     (grammar.BP_RELATIONAL, "comparison"),
-    (grammar.BP_CONCAT, "concatenation"),
     (grammar.BP_ADDITIVE, "add / subtract"),
-    (grammar.BP_MULTIPLICATIVE, "multiply / divide / mod"),
+    (grammar.BP_MULTIPLICATIVE, "multiply / divide / mod / concatenate"),
+    (grammar.BP_PIPE, "error fallback"),
 )
 
 

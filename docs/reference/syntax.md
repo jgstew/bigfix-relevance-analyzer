@@ -124,6 +124,11 @@ This is the idiomatic way to give a default for something that may not exist:
 `|` has no row in the operator table at all, because the grammar defines it
 rather than the inspector layer. The same is true of `and` and `or`.
 
+It binds tighter than comparisons, `+`/`-`, `and` and `or` - `0 = x | 999`
+is `0 = (x | 999)` - but a bare `*`, `/`, `mod` or `&` result cannot meet
+`|` at all: `2 * 3 | 5` is a parse error; write `(2 * 3) | 5`. `exists`
+and `not` do not absorb a fallback: `exists x | false` is `(exists x) | false`.
+
 ## Errors propagate, except where a plural flattens them
 
 An error in a singular context is an error. In a *plural* context it is

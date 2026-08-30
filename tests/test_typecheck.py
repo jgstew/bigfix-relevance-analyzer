@@ -1155,6 +1155,20 @@ def test_bar_allows_unrelated_siblings_under_a_common_ancestor(env: TypeEnvironm
     assert check(parse('(file "/tmp/a") | (folder "/tmp")'), env).diagnostics == ()
 
 
+def test_a_fallback_after_a_comparisons_right_side_is_not_a_type_error(
+    env: TypeEnvironment,
+) -> None:
+    """`|` binds tighter than `=`, so the fallback belongs to the right
+    operand, not to the comparison's boolean result.
+
+    Confirmed live: `0 = exit code of action | 999` evaluates to `False`
+    (the fallback's 999 compared against 0), where the old parse -- `(0 =
+    exit code of action) | 999` -- would have yielded `999` and a `<boolean>
+    | <integer>` incompatibility this checker used to report falsely.
+    """
+    assert check(parse("0 = exit code of action | 999"), env).diagnostics == ()
+
+
 def test_bar_still_rejects_types_with_no_shared_ancestor(env: TypeEnvironment) -> None:
     """The ancestor-aware fix must not go too far the other way.
 

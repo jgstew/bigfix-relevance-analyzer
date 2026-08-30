@@ -18,10 +18,10 @@
 ----
 (bin "mod" (bin "/" (num "4") (num "2")) (num "3"))
 
-==== concatenation is looser than addition
+==== [unverified] concatenation sits with multiplication, tighter than addition
 1 & 2 + 3
 ----
-(bin "&" (num "1") (bin "+" (num "2") (num "3")))
+(bin "+" (bin "&" (num "1") (num "2")) (num "3"))
 
 ==== concatenation is left-associative
 "a" & "b" & "c"
@@ -68,10 +68,10 @@
 ----
 (bin "and" (bin "=" (num "1") (num "2")) (bin "=" (num "3") (num "4")))
 
-==== not swallows a comparison
+==== a comparison does not nest inside not (qna: not 1 = 1 demands a boolean of the bare 1)
 not 1 = 2
 ----
-(un "not" (bin "=" (num "1") (num "2")))
+(bin "=" (un "not" (num "1")) (num "2"))
 
 ==== not does not swallow an and
 not 1 and 2

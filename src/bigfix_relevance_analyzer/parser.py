@@ -145,6 +145,10 @@ class _Parser:
         self.tokens = list(code_tokens(text))
         self.at = 0
         self.depth = 0
+        # Nodes that came out of explicit parentheses, by identity. `|` needs
+        # this: the engine accepts `(2 * 3) | 5` but refuses `2 * 3 | 5`, and
+        # by the time the Bar is built the two lefts are the same tree shape.
+        self.grouped: set[int] = set()
 
     # -- token stream -------------------------------------------------------
 
@@ -238,7 +242,9 @@ class _Parser:
             self.advance()
             inner = self.parse_expression(0)
             closing = self.expect_punct(")", "to close the group opened here")
-            return _widen(inner, token, closing)
+            grouped = _widen(inner, token, closing)
+            self.grouped.add(id(grouped))
+            return grouped
 
         if token.kind is TokenKind.PUNCT and token.text == "-":
             self.advance()
@@ -249,6 +255,11 @@ class _Parser:
             if token.normalized == "it":
                 self.advance()
                 return It(span=_token_span(token))
+            # `exists` and `not` take a tight operand: a cast, `of` or `whose`
+            # nests, but nothing looser -- not even `=` or `|`. Confirmed
+            # live: `exists 1 + 2` fails on `exists 1`, `not 1 = 1` on
+            # `not 1`, `exists X | false` falls back on the exists itself,
+            # while `exists 5 as string` and `not 5 as boolean` cast inside.
             if token.normalized == "not":
                 self.advance()
                 quantifier = self.peek()
@@ -258,13 +269,13 @@ class _Parser:
                     and quantifier.normalized in ("exists", "exist")
                 ):
                     self.advance()
-                    operand = self.parse_expression(grammar.BP_RELATIONAL)
+                    operand = self.parse_expression(grammar.BP_PIPE)
                     return _exists(negated=True, op_token=token, operand=operand)
-                operand = self.parse_expression(grammar.BP_NOT)
+                operand = self.parse_expression(grammar.BP_PIPE)
                 return _unary("not", token, operand)
             if token.normalized in ("exists", "exist"):
                 self.advance()
-                operand = self.parse_expression(grammar.BP_RELATIONAL)
+                operand = self.parse_expression(grammar.BP_PIPE)
                 return _exists(negated=False, op_token=token, operand=operand)
             if token.normalized == "if":
                 return self.parse_conditional()
@@ -327,7 +338,9 @@ class _Parser:
             self.advance()
             inner = self.parse_expression(0)
             closing = self.expect_punct(")", "to close the argument opened here")
-            return _widen(inner, token, closing)
+            grouped = _widen(inner, token, closing)
+            self.grouped.add(id(grouped))
+            return grouped
         return None
 
     def parse_infix(self, left: Node, min_bp: int) -> Node | None:
@@ -351,8 +364,15 @@ class _Parser:
 
             op = grammar.PUNCT_INFIX.get(token.text)
             if op is not None and op.lbp > min_bp:
+                if op.canonical == "|" and self.bare_product(left):
+                    assert isinstance(left, Binary)
+                    raise self.error_at(
+                        token,
+                        f"the engine cannot parse '|' after an unparenthesized "
+                        f"'{left.op}' expression; parenthesize the left side",
+                    )
                 self.advance()
-                right = self.parse_expression(op.lbp - 1 if op.right_assoc else op.lbp)
+                right = self.parse_expression(self.right_bp(op))
                 if op.canonical == "|":
                     return Bar(span=_join_spans(left.span, right.span), left=left, right=right)
                 return _binary(op.canonical, left, right)
@@ -397,10 +417,27 @@ class _Parser:
                 op, consumed = matched
                 if op.lbp > min_bp:
                     self.at += consumed
-                    right = self.parse_expression(op.lbp - 1 if op.right_assoc else op.lbp)
+                    right = self.parse_expression(self.right_bp(op))
                     return _binary(op.canonical, left, right)
 
         return None
+
+    def right_bp(self, op: grammar.InfixOp) -> int:
+        """The minimum binding power for ``op``'s right operand."""
+        if op.rbp is not None:
+            return op.rbp
+        return op.lbp - 1 if op.right_assoc else op.lbp
+
+    def bare_product(self, node: Node) -> bool:
+        """Whether ``node`` is a `*`/`/`/`mod`/`&` result the engine refuses
+        to hand to `|` -- confirmed live: `2 * 3 | 5` is a parse error while
+        `(2 * 3) | 5` is 6. Parentheses are what make the difference, hence
+        the identity check against ``self.grouped``."""
+        return (
+            isinstance(node, Binary)
+            and node.op in grammar.PIPE_UNMIXABLE
+            and id(node) not in self.grouped
+        )
 
     def phrase_ends_here(self) -> bool:
         """Whether a name phrase must stop at the current token.

@@ -20,6 +20,7 @@ __all__ = [
     "CANONICAL_BINARY",
     "GRAMMAR_LEVEL_BINARY",
     "OPERATOR_FIRST_WORDS",
+    "PIPE_UNMIXABLE",
     "PUNCT_INFIX",
     "STRUCTURAL_WORDS",
     "WORD_INFIX",
@@ -40,23 +41,46 @@ class InfixOp:
     lbp: int
     right_assoc: bool = False
 
+    rbp: int | None = None
+    """Minimum binding power for the right operand, when it is not the
+    default ``lbp`` rule. The multiplicative class sets this to ``BP_PIPE``:
+    the engine never lets `|` nest inside a `*`/`/`/`mod`/`&` right operand
+    (`2 * 3 | 5` is a real parse error there, confirmed live), so these
+    operators must not capture one either -- the parser then rejects the
+    leftover `|` itself (see ``parse_infix``)."""
+
 
 # Binding powers, loosest first. One source of truth; parser.py never
 # hardcodes a number.
+#
+# `|` sits between the multiplicative class and `as`, not below `or` --
+# established against a real evaluator (QnA, 2026-08): `1 | 0 = 0` is False
+# (so `(1 | 0) = 0`), `1 | 2 * 3` is 3 (so `(1 | 2) * 3`), `2 + X | 5`
+# falls back inside the sum, and `X as string | "z"` casts first. The same
+# session pinned `exists` and `not` as taking their operand at this level
+# too (`exists 1 + 2` fails on `exists 1`, `not 1 = 1` on `not 1`, while a
+# cast still nests inside both) -- which is why there is no BP_NOT: the
+# engine gives `not` no looser level of its own.
 BP_SEMICOLON = 10
 BP_COMMA = 20
-BP_PIPE = 30
 BP_OR = 40
 BP_AND = 50
-BP_NOT = 55
 BP_RELATIONAL = 60
-BP_CONCAT = 70
 BP_ADDITIVE = 80
 BP_MULTIPLICATIVE = 90
+BP_PIPE = 95
 BP_CAST = 100
 BP_UNARY_MINUS = 105
 BP_OF = 110
 BP_WHOSE = 120
+
+#: `&` shares the multiplicative level rather than having one of its own.
+#: Direct proof is impossible from evaluation alone (every `&`/`+` mixed-type
+#: grouping fails at runtime with the same message), but `&` refuses to meet
+#: `|` exactly the way `*`, `/` and `mod` do (`"a" & "b" | "c"` is a real
+#: parse error) while `+` and `-` happily absorb a fallback -- the signature
+#: of one shared product level.
+BP_CONCAT = BP_MULTIPLICATIVE
 
 # Infix operators that lex as a single PUNCT token. `>`, `>=` and `!=` are
 # sugar the engine canonicalizes away, but they are written in real relevance;
@@ -69,11 +93,12 @@ PUNCT_INFIX: dict[str, InfixOp] = {
     "<=": InfixOp("<=", BP_RELATIONAL),
     ">": InfixOp(">", BP_RELATIONAL),
     ">=": InfixOp(">=", BP_RELATIONAL),
-    "&": InfixOp("&", BP_CONCAT),
+    "&": InfixOp("&", BP_CONCAT, rbp=BP_PIPE),
+    # rbp=BP_PIPE on the multiplicative class: see InfixOp.rbp.
     "+": InfixOp("+", BP_ADDITIVE),
     "-": InfixOp("-", BP_ADDITIVE),
-    "*": InfixOp("*", BP_MULTIPLICATIVE),
-    "/": InfixOp("/", BP_MULTIPLICATIVE),
+    "*": InfixOp("*", BP_MULTIPLICATIVE, rbp=BP_PIPE),
+    "/": InfixOp("/", BP_MULTIPLICATIVE, rbp=BP_PIPE),
 }
 
 # Infix operators written as words, keyed by their normalized token sequence.
@@ -83,7 +108,7 @@ PUNCT_INFIX: dict[str, InfixOp] = {
 WORD_INFIX: dict[tuple[str, ...], InfixOp] = {
     ("or",): InfixOp("or", BP_OR),
     ("and",): InfixOp("and", BP_AND),
-    ("mod",): InfixOp("mod", BP_MULTIPLICATIVE),
+    ("mod",): InfixOp("mod", BP_MULTIPLICATIVE, rbp=BP_PIPE),
     ("contains",): InfixOp("contains", BP_RELATIONAL),
     ("does", "not", "contain"): InfixOp("does not contain", BP_RELATIONAL),
     ("starts", "with"): InfixOp("starts with", BP_RELATIONAL),
@@ -231,6 +256,16 @@ CANONICAL_BINARY: dict[str, OperatorForm] = {
     "is less than or equal to": OperatorForm("<="),
     "is contained by": OperatorForm("contains", swapped=True),
 }
+
+PIPE_UNMIXABLE: frozenset[str] = frozenset(
+    op.canonical for op in (*PUNCT_INFIX.values(), *WORD_INFIX.values()) if op.rbp == BP_PIPE
+)
+"""The operators whose result the engine refuses as a `|` left operand
+without parentheses (`2 * 3 | 5` is a parse error; `(2 * 3) | 5` is not).
+Derived from the ``rbp`` markers so the two halves of the rule -- keep `|`
+out of these operators' right side, refuse it after their result -- cannot
+drift apart."""
+
 
 GRAMMAR_LEVEL_BINARY: frozenset[str] = frozenset({"and", "or", "|"})
 """Operators with no row in any table, because the grammar defines them.

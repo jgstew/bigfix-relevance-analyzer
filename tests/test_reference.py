@@ -39,10 +39,10 @@ REPO_ROOT = Path(__file__).parent.parent
 DOCS = REPO_ROOT / "docs" / "reference"
 
 #: A runaway guard with headroom, not a target. The documents sit around 23k
-#: today; a table that started dumping its whole source would blow straight
-#: past this, while adding a handful of rows will not.
+#: (12.3k brief) today; a table that started dumping its whole source would
+#: blow straight past this, while adding a handful of rows will not.
 STANDARD_LIMIT = 28_000
-BRIEF_LIMIT = 12_000
+BRIEF_LIMIT = 13_000
 
 DIALECTS = (Dialect.CLIENT, Dialect.SESSION)
 

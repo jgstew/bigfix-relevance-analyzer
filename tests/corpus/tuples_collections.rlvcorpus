@@ -28,11 +28,6 @@
 ----
 (tuple (bar (num "1") (num "0")) (bar (num "2") (num "0")))
 
-==== [unverified] the error fallback is looser than or
-1 or 2 | 3
-----
-(bar (bin "or" (num "1") (num "2")) (num "3"))
-
 ==== the error fallback is looser than an of chain
 name of it | "none"
 ----
