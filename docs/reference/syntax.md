@@ -41,12 +41,39 @@ In the type system this is spelled `X with multiplicity`, which is a child type
 of `X`. That is why plurality survives a cast and why a diagnostic can say an
 operand was not singular.
 
-Three constructs turn a plural into something singular:
+**Which name you write settles the phrase**, whatever the object's own
+plurality. `names of files of folders "/"` is plural; `name of files of folders
+"/"` is singular - and it asserts something about the object that may not hold:
+
+```
+Q: name of files of folders "/"
+A: besserverupgrad2.log
+E: Singular expression refers to non-unique object.
+```
+
+One name, not one per file. The error is raised at evaluation and is about the
+*object*, which is a different complaint from the static `A singular expression
+is required.` that a genuinely plural operand earns. Written with an object
+that does hold one value, the same phrase is clean:
+
+```
+Q: name of files "besserverupgrad2.log" of folders "/"
+A: besserverupgrad2.log
+```
+
+The object decides only where the property has no name of its own to speak
+with - a cast, a nested `of`. `(it as string) of files of folder "c:\"` is
+plural off a singular `it`.
+
+Four other constructs turn a plural into something singular:
 
 - `exists <plural>` - a boolean: did it produce anything at all.
 - `number of <plural>` - an integer count.
 - `item N of (...)` - the N-th value, **0-based**, where N must be an integer
   literal.
+- `unique value of <plural>`, `set of <plural>` - the singular spelling of an
+  aggregate. `unique value of ("a";"a")` is `a`; `unique value of ("a";"b")`
+  answers `a` and then errors, for the reason above.
 
 ## `whose` filters, and `it` refers to the context
 

@@ -43,6 +43,9 @@ TYPE_MISMATCH = '1 + "a"'
 # Non-zero evaluation cost, so the `evaluation-cost` ceiling has something to
 # exceed: hashing a file is the `COST_EXTREME` tier on the client.
 COSTLY = 'sha1 of file "/tmp/x" = "abc"'
+# A property written singular over a plural object: legal, and a runtime risk
+# rather than a type error. The corpus writes exactly this, with `| 0`.
+NON_UNIQUE_RISK = "free space of drives of system folders"
 
 
 def codes(findings: tuple[Finding, ...]) -> set[str]:
@@ -101,6 +104,36 @@ def test_unknown_inspector_is_reported_as_warning() -> None:
     assert "unknown-inspector" in codes(findings)
     unknown = next(f for f in findings if f.code == "unknown-inspector")
     assert unknown.severity is Severity.WARNING
+
+
+def test_a_singular_form_over_a_plural_object_is_a_warning_not_an_error() -> None:
+    """`value of results` is a singular expression, so the static singularity
+    rule does not apply -- but the object may still be non-unique, which the
+    engine answers at runtime. That is a warning, and configurable."""
+    report = analyze('value of results from (bes property "X") of bes computers', Dialect.SESSION)
+    findings = lint_analysis(report, LintConfig())
+    assert "type-error" not in codes(findings)
+    risk = next(f for f in findings if f.code == "non-unique-risk")
+    assert risk.severity is Severity.WARNING
+    assert "Singular expression refers to non-unique object." in risk.message
+
+
+def test_the_non_unique_risk_rule_can_be_silenced() -> None:
+    report = analyze('value of results from (bes property "X") of bes computers', Dialect.SESSION)
+    config = LintConfig(severities={"non-unique-risk": Severity.IGNORE})
+    assert "non-unique-risk" not in codes(lint_analysis(report, config))
+
+
+def test_the_webreport_example_has_no_errors() -> None:
+    """A `&` over `value of results ...` is correct relevance: the operand is
+    singular. Only the runtime non-uniqueness risk remains."""
+    findings = lint_file(
+        Path(
+            "tests/examples/session_relevance/webreports/webreport_session_relevance_basic.besrpt"
+        ),
+        LintConfig(),
+    )
+    assert [f for f in findings if f.severity is Severity.ERROR] == []
 
 
 def test_complexity_is_silent_under_the_default_ceiling() -> None:
@@ -345,7 +378,15 @@ def _every_emitted_code() -> set[str]:
     """
     emitted: set[str] = set()
     thresholds = LintConfig(max_score=0.0, max_evaluation_cost=0.0)
-    for text in (BROKEN, UNBOUND_IT, UNKNOWN_INSPECTOR, CLIENT, COSTLY, TYPE_MISMATCH):
+    for text in (
+        BROKEN,
+        UNBOUND_IT,
+        UNKNOWN_INSPECTOR,
+        CLIENT,
+        COSTLY,
+        TYPE_MISMATCH,
+        NON_UNIQUE_RISK,
+    ):
         for config in (LintConfig(), thresholds):
             emitted.update(finding.code for finding in lint_analysis(analyze(text), config))
     return emitted

@@ -867,7 +867,14 @@
     ],
     "text": "(id of site of it | 0, id of it | 0, applicable computer count of it | 0) of fixlets of bes sites whose(id of it is contained by set of (2;78;80))",
     "types": {
-      "diagnostics": [],
+      "diagnostics": [
+        {
+          "code": "singular-over-plural-object",
+          "column": 130,
+          "line": 1,
+          "message": "Singular expression refers to non-unique object.: 'set' is written singular over an object that may be plural"
+        }
+      ],
       "known": true,
       "ok": true,
       "plurality": "plural",

@@ -72,7 +72,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Final
 
 from bigfix_relevance_analyzer._serialize import _path
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis, analyze
@@ -274,6 +274,19 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "by default.",
             ),
             _rule(
+                "non-unique-risk",
+                Severity.WARNING,
+                "a property written singular over an object that may be plural",
+                "`value of results ...` is a singular expression -- the written form of a "
+                "property settles that, so the static singularity rule does not apply. What "
+                "remains is a runtime complaint about the *object*: `Singular expression "
+                "refers to non-unique object.` if it holds several, `... to nonexistent "
+                "object.` if it holds none. A warning rather than an error, because the "
+                "author may know it holds exactly one -- shipped content typically pairs "
+                "this with an error fallback (`... | 0`) -- and because the deliberate "
+                "`unique value of <plural>` and `set of (...)` idioms trip it too.",
+            ),
+            _rule(
                 "complexity",
                 Severity.ERROR,
                 "the complexity score is above the ceiling",
@@ -467,6 +480,12 @@ def _site_dialect(site: RelevanceSite, forced: Dialect | None) -> Dialect | None
     return forced if forced is not None else (site.dialect if is_definite(site.dialect) else None)
 
 
+# Checker diagnostics that are not `type-error`. The checker reports what the
+# engine would say; this layer decides how much it matters, and a runtime risk
+# the author may have ruled out is not the same as a static type error.
+_CHECK_RULES: Final = {"singular-over-plural-object": "non-unique-risk"}
+
+
 def lint_analysis(
     report: RelevanceAnalysis,
     config: LintConfig,
@@ -519,7 +538,11 @@ def lint_analysis(
             # keeps one root cause from becoming two findings.
             if diagnostic.code == "used-without-context":
                 continue
-            emit("type-error", diagnostic.message, diagnostic.span.line)
+            emit(
+                _CHECK_RULES.get(diagnostic.code, "type-error"),
+                diagnostic.message,
+                diagnostic.span.line,
+            )
 
     if report.unknown_references:
         names = ", ".join(f"`{name}`" for name in report.unknown_references)

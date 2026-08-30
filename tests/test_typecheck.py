@@ -157,21 +157,52 @@ def test_a_chain_intersects_its_platforms(env: TypeEnvironment) -> None:
     assert resolve_property("block size", drives.types, env).platforms < drives.platforms
 
 
-def test_no_example_site_is_reported_broken(env: TypeEnvironment) -> None:
-    """The false-positive guard, over every real statement in the corpus.
-
-    The corpus contains 12 `if` statements whose branches differ in platform
-    support; an intersecting model would flag them. Nothing here may report a
-    finding on shipped content.
-    """
-    offenders = [
+def _corpus_diagnostics(env: TypeEnvironment) -> list[tuple[str, int, str, str]]:
+    return [
         (path.name, site.line, diagnostic.code, diagnostic.message)
         for path in corpus_files()
         for site in extract_relevance_from_file(path)
         if (parsed := try_parse(site.text)).ok and parsed.node is not None
         for diagnostic in check(parsed.node, env).diagnostics
     ]
+
+
+def test_no_example_site_is_reported_broken(env: TypeEnvironment) -> None:
+    """The false-positive guard, over every real statement in the corpus.
+
+    The corpus contains 12 `if` statements whose branches differ in platform
+    support; an intersecting model would flag them. Nothing here may claim
+    shipped content is broken.
+
+    `singular-over-plural-object` is exempt because it does not make that
+    claim: it reports a risk the author may have ruled out, and shipped
+    content takes it on deliberately -- see the test below.
+    """
+    offenders = [
+        entry for entry in _corpus_diagnostics(env) if entry[2] != "singular-over-plural-object"
+    ]
     assert offenders == []
+
+
+def test_the_corpus_takes_the_non_unique_risk_deliberately(env: TypeEnvironment) -> None:
+    """The risk rule, held to the shipped content it fires on.
+
+    Every one of these is a singular form over a plural object, and the corpus
+    shows two ways of meaning it: `free space of drives of system folders | 0`
+    hedges with an error fallback, and `unique value of ...` / `set of (...)`
+    are the idioms for asserting a collection collapses to one. The rule stays
+    a warning because of this, and it is pinned here so that its reach over
+    real content is a decision rather than a surprise.
+    """
+    risks = {(name, line) for name, line, code, _ in _corpus_diagnostics(env)}
+    assert risks == {
+        ("clientui_dashboard_client_relevance_substitution.html", 68),
+        ("clientui_dashboard_client_relevance_substitution.html", 69),
+        ("fixlet_registry_and_active_directory_relevance.bes", 9),
+        ("task_time_based_relevance.bes", 28),
+        ("fixlet_description_relevance_via_javascript.bes", 114),
+        ("session_relevance_plain_text.bsr", 1),
+    }
 
 
 def test_operand_incompatibility_holds_across_the_corpus_under_each_sites_own_dialect() -> None:
@@ -438,15 +469,100 @@ def test_a_chain_narrows_its_platforms_as_it_resolves(env: TypeEnvironment) -> N
     [
         ('name of file "x"', Plurality.SINGULAR),
         ('names of files of folder "c:\\"', Plurality.PLURAL),
-        # Plural anywhere in the chain makes the whole chain plural.
-        ('name of files of folder "c:\\"', Plurality.PLURAL),
+        # The written form of the property settles the phrase, whatever the
+        # object's own plurality. `name of files of folders "/"` answers with
+        # one name and `E: Singular expression refers to non-unique object.`
+        # -- a *runtime* complaint about the object, not a static plurality.
+        ('name of files of folder "c:\\"', Plurality.SINGULAR),
+        ('name of files "x" of folder "c:\\"', Plurality.SINGULAR),
         ('files whose (size of it > 1) of folder "c:\\"', Plurality.PLURAL),
+        # A cast as the property has no written form of its own, so the object
+        # still decides: `it` is singular here and the phrase is not.
+        ('(it as string) of files of folder "c:\\"', Plurality.PLURAL),
     ],
 )
 def test_plurality_propagates_along_a_chain(
     source: str, expected: Plurality, env: TypeEnvironment
 ) -> None:
     assert check(parse(source), env).value.plurality is expected
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        # The reported bug: `results` is plural, `value of results` is not.
+        (
+            'value of results from (bes property "X") of bes computers',
+            Plurality.SINGULAR,
+        ),
+        (
+            'values of results from (bes property "X") of bes computers',
+            Plurality.PLURAL,
+        ),
+    ],
+)
+def test_the_written_form_settles_plurality_in_session_relevance(
+    source: str, expected: Plurality
+) -> None:
+    env = TypeEnvironment.create(Dialect.SESSION)
+    assert check(parse(source), env).value.plurality is expected
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        # `unique value of ("a";"b")` answers `a` and then errors on the
+        # non-unique object; `unique values of` the same collection answers
+        # both. The singular form is singular either way.
+        ('unique value of ("a";"b")', Plurality.SINGULAR),
+        ('unique value of ("a";"a")', Plurality.SINGULAR),
+        ('unique values of ("a";"b")', Plurality.PLURAL),
+    ],
+)
+def test_an_aggregate_written_singular_is_singular(
+    source: str, expected: Plurality, env: TypeEnvironment
+) -> None:
+    """Held by the same rule that `_collapses` used to special-case."""
+    assert check(parse(source), env).value.plurality is expected
+
+
+def test_a_singular_form_over_a_plural_object_is_not_an_operand_error() -> None:
+    """The engine's static `A singular expression is required.` does not apply:
+    `value of results` is a singular expression."""
+    env = TypeEnvironment.create(Dialect.SESSION)
+    source = '"a" & (value of results from (bes property "X") of bes computers)'
+    codes = {d.code for d in check(parse(source), env).diagnostics}
+    assert "right-operand-not-singular" not in codes
+
+
+def test_a_singular_form_over_a_plural_object_is_reported_as_a_risk() -> None:
+    """What the runtime *does* complain about, kept separate from the static
+    rule: the object may yield more than one value."""
+    env = TypeEnvironment.create(Dialect.SESSION)
+    source = 'value of results from (bes property "X") of bes computers'
+    found = [
+        d for d in check(parse(source), env).diagnostics if d.code == "singular-over-plural-object"
+    ]
+    assert len(found) == 1
+    assert "Singular expression refers to non-unique object." in found[0].message
+
+
+def test_a_runtime_risk_does_not_make_the_statement_fail_to_type_check() -> None:
+    """`ok` answers "does this type-check", not "is this without risk"."""
+    env = TypeEnvironment.create(Dialect.SESSION)
+    result = check(parse('value of results from (bes property "X") of bes computers'), env)
+    assert [d.code for d in result.diagnostics] == ["singular-over-plural-object"]
+    assert result.ok
+    assert result.to_dict()["ok"] is True
+
+    broken = check(parse('1 + "a"'), TypeEnvironment.create(Dialect.CLIENT))
+    assert not broken.ok
+
+
+def test_a_singular_form_over_a_singular_object_is_silent() -> None:
+    assert (
+        check(parse('name of file "x"'), TypeEnvironment.create(Dialect.CLIENT)).diagnostics == ()
+    )
 
 
 def test_a_property_used_on_the_wrong_direct_object_is_a_finding(env: TypeEnvironment) -> None:
@@ -483,7 +599,9 @@ def test_it_without_a_context_is_a_finding(source: str, env: TypeEnvironment) ->
 def test_it_is_singular_even_when_its_context_is_plural(env: TypeEnvironment) -> None:
     """`A of B` evaluates `A` once per element of `B`, so `it` is one element."""
     result = check(parse('name of files of folder "c:\\"'), env)
-    assert result.diagnostics == ()
+    # The chain carries a `singular-over-plural-object` risk of its own; the
+    # rule under test here is the `it` binding, which is unrelated.
+    assert [d.code for d in result.diagnostics] == ["singular-over-plural-object"]
     assert types_of('size of it of files of folder "c:\\"', env) == {"integer"}
 
 

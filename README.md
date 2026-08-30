@@ -375,7 +375,7 @@ raise the ceiling rather than have the rule stay silent about it:
 ```python
 from bigfix_relevance_analyzer import LintConfig, lint_paths
 
-findings = lint_paths(changed_paths, LintConfig())            # built-in ceilings
+findings = lint_paths(changed_paths, LintConfig())  # built-in ceilings
 findings = lint_paths(changed_paths, LintConfig(max_score=800))  # raised for this repo
 for finding in findings:
     print(finding)
@@ -402,6 +402,7 @@ same way instead of each inventing a description:
 | `parse-error` | error | the statement could not be parsed | always on |
 | `type-error` | error | the type checker reported a problem beyond an unbound `it` | always on |
 | `unbound-it` | error | `it` is used where there is no context to bind it to | always on |
+| `non-unique-risk` | warning | a property written singular over an object that may be plural | always on |
 | `unknown-inspector` | warning | a name no inspector dump defines | always on |
 
 There is no CLI spelling to disable `complexity`/`evaluation-cost` entirely -

@@ -67,6 +67,7 @@ from bigfix_relevance_analyzer.diagnostics import (
     DIAGNOSTICS,
     PROPERTY_DIRECT_OBJECT_FRAGMENT,
     PROPERTY_INDEX_FRAGMENT,
+    Origin,
 )
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.nodes import (
@@ -165,7 +166,20 @@ class CheckResult:
 
     @property
     def ok(self) -> bool:
-        return not self.diagnostics
+        """Whether the statement type-checks -- not whether it is unremarkable.
+
+        A diagnostic the *runtime* raises is a risk the statement runs with,
+        not a fault in it: `value of results ...` is a well-typed singular
+        expression that errors only if its object turns out to hold other than
+        one value. The checker reports it, and `ok` stays true, because a
+        consumer asking "does this type-check" is not asking "is this without
+        risk". `Origin` is what separates them, so a new advisory entry needs
+        no change here.
+        """
+        return not any(
+            DIAGNOSTICS[diagnostic.code].origin is Origin.TYPE_CHECK
+            for diagnostic in self.diagnostics
+        )
 
     @property
     def platforms(self) -> frozenset[str]:
@@ -288,31 +302,6 @@ def _types_compatible(left: frozenset[str], right: frozenset[str]) -> bool:
     left_ancestors = {ancestor for name in left for ancestor in inspectors.ancestors(name)}
     right_ancestors = {ancestor for name in right for ancestor in inspectors.ancestors(name)}
     return bool(left_ancestors & right_ancestors)
-
-
-def _collapses(name: str) -> bool:
-    """Whether this name is the collapsing form of a multivalued property.
-
-    ``unique value of X``, ``maximum of X``, ``minimum of X``: written in the
-    singular, over rows the tables mark ``multivalued``. These consume their
-    object's plurality rather than distributing over it -- ``unique value of
-    dns domainnames of local computers of active directories`` is one string,
-    however many domain names went in, which is why the corpus writes
-    ``it contains unique value of ...`` where ``contains`` demands a singular
-    right operand.
-
-    Contrast ``name of files of folder "c:\\"``: ``name`` is not multivalued,
-    so it distributes and the chain stays plural.
-
-    [unverified] Reasoned from the tables plus the corpus usage above; not
-    executed against an engine.
-    """
-    rows = inspectors.lookup(name, kind=inspectors.InspectorKind.PROPERTY)
-    return bool(rows) and all(
-        entry.multivalued
-        and inspectors.written_form_of(entry, name) is inspectors.WrittenForm.SINGULAR
-        for entry in rows
-    )
 
 
 def _widen(*pluralities: Plurality) -> Plurality:
@@ -770,21 +759,43 @@ class _Checker:
         return value
 
     def combine_of(self, node: Of, prop: RelevanceValue, obj: RelevanceValue) -> RelevanceValue:
-        """`A of B` -- the property's own type, over the object's plurality.
+        """`A of B` -- the property's own type, and the written form's plurality.
 
-        Plural anywhere in a chain makes the whole chain plural: `name of files
-        of folder "c:\\"` is one name per file, not one name.
+        Whichever of the property's two names was written settles the phrase,
+        whatever the object's own plurality::
+
+            Q: name of files of folders "/"
+            A: besserverupgrad2.log
+            E: Singular expression refers to non-unique object.
+
+        One name, not one per file -- and an error *about the object*, raised
+        at evaluation, not the static `A singular expression is required.` that
+        a genuinely plural operand earns. `names of files of folders "/"` is
+        the plural phrase, and `name of files "besserverupgrad2.log" of folders
+        "/"` answers cleanly because the object turned out to be unique.
+
+        The object decides only where the property has no written form of its
+        own to speak with -- a cast, a nested `of` -- which is why `(it as
+        string) of files of folder "c:\\"` is plural off a singular `it`.
         """
         index = self.bad_tuple_index(node)
         if index is not None:
             self.report("tuple-index-not-literal", node.span, token=index.text)
             return RelevanceValue(types=frozenset(), platforms=frozenset())
-        collapses = isinstance(node.prop, Reference) and _collapses(node.prop.phrase)
+
+        # `resolve_property` already read the written form; it leaves plurality
+        # `UNKNOWN` for a name it could not match, or one whose matched rows
+        # disagree, and there the object is still the best evidence there is.
+        plurality: Plurality
+        if isinstance(node.prop, Reference) and prop.plurality is not Plurality.UNKNOWN:
+            plurality = prop.plurality
+            if plurality is Plurality.SINGULAR and obj.plurality is Plurality.PLURAL:
+                self.report("singular-over-plural-object", node.span, phrase=node.prop.phrase)
+        else:
+            plurality = _widen(prop.plurality, obj.plurality)
         return RelevanceValue(
             types=prop.types,
-            # An aggregate consumes its object's plurality; everything else
-            # distributes over it.
-            plurality=prop.plurality if collapses else _widen(prop.plurality, obj.plurality),
+            plurality=plurality,
             # A chain intersects: every step has to hold at once.
             platforms=prop.platforms & obj.platforms,
         )

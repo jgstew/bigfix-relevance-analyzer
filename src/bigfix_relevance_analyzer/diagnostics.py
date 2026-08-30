@@ -195,6 +195,21 @@ _TYPE_CHECK: Final = [
     _entry(
         "argument-not-singular", Origin.TYPE_CHECK, "the argument of '{token}' must be singular"
     ),
+    _entry(
+        "singular-over-plural-object",
+        # The runtime's, not the type checker's: writing the singular form is
+        # legal and types cleanly, and the engine only objects once the object
+        # turns out not to hold exactly one value -- `name of files of folders
+        # "/"` answers with a name *and* an error. The message leads with the
+        # engine's own wording for the several case, which is the common one;
+        # an object holding *none* fails the same assertion under a different
+        # message, `nonexistent-object`, and the rule's own explanation in
+        # `lint` says so. Naming the property is this package's addition, which
+        # neither runtime message does.
+        Origin.RUNTIME,
+        "Singular expression refers to non-unique object.: '{phrase}' is written singular "
+        "over an object that may be plural",
+    ),
     # Operators and casts.
     _entry(
         "operand-types-incompatible",
