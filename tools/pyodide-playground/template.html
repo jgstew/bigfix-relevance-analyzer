@@ -10,10 +10,12 @@
 
   Fully offline once built: the Pyodide runtime (its two JS modules, the
   wasm binary, the Python stdlib zip, the package lock file) and this
-  project's own wheel are all embedded below as base64. Opening the built
-  file makes zero network requests -- see the boot() function for exactly
-  how each embedded asset is handed to Pyodide instead of being fetched.
-  Nothing you type here ever leaves the browser. See
+  project's own wheel are all embedded below as base64. No network
+  connection is needed at any point -- not even to load this page itself,
+  which works the same saved to local disk and opened directly as it does
+  served from anywhere. See the boot() function for exactly how each
+  embedded asset is handed to Pyodide instead of being fetched. Nothing you
+  type here ever leaves the browser. See
   https://github.com/jgstew/bigfix-relevance-analyzer/issues/10 for why this
   exists.
 -->
@@ -114,8 +116,9 @@
   <p class="subtitle">
     Running under <a href="https://pyodide.org/" target="_blank" rel="noopener">Pyodide</a>
     (CPython compiled to WASM), fully embedded in this one file -- no network
-    connection is used once the page has loaded, no system Python, no server.
-    Built from this repo's wheel by CI; see
+    connection needed at any point, not even to load this page: save it and
+    open it from local disk. No system Python, no server. Built from
+    bigfix-relevance-analyzer repo's wheel by CI; see
     <a href="https://github.com/jgstew/bigfix-relevance-analyzer/issues/10" target="_blank" rel="noopener">issue #10</a>.
   </p>
 
