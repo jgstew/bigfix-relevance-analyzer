@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import enum
 import itertools
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any, Final, assert_never
@@ -378,6 +379,107 @@ ordinary type name it unifies with nothing, which is what made
 :func:`resolve_property` all report on valid relevance -- 41 of the 46
 type errors over a 1,108-file corpus of real content were this one bug.
 """
+
+
+#: A *bare* string literal shaped unmistakably like a dotted version -- at least
+#: one dot, digits throughout. Deliberately strict, because nothing in the source
+#: says this string is a version: `"1.2"` and `"10.20.30"` match, while `"a.b"`,
+#: `"1"` and `"1.2-beta"` do not. `"1"` is excluded on purpose -- a bare `"1"` is
+#: far more often a number written as a string than a one-component version.
+_VERSION_SHAPED = re.compile(r"^\d+(?:\.\d+)+$")
+
+#: The same shape where the source has already *said* `version`, via
+#: `version "..."` or `... as version`. The dot becomes optional, because
+#: `version "14"` is an ordinary one-component version literal -- and it is
+#: exactly the shape that makes a truncating comparison bite hardest.
+_VERSION_LITERAL_SHAPED = re.compile(r"^\d+(?:\.\d+)*$")
+
+#: The canonical operators for which component count changes the answer. `>`
+#: and `>=` reduce to these by :data:`grammar.CANONICAL_BINARY`'s operand swap,
+#: and `!=` to `=` negated, so all six spellings land here. `contains`,
+#: `starts with` and `ends with` share the relational binding power but are not
+#: orderings, and are excluded.
+_ORDERING_OPERATORS = frozenset({"=", "<", "<="})
+
+VERSION = "version"
+"""The type name the tables use, and the pivot for the version comparison checks."""
+
+
+def _version_components(node: Node) -> int | None:
+    """How many components a *statically visible* version literal has.
+
+    ``None`` means "not visible from the source", which is the common case: a
+    property's value is only known at evaluation. Three spellings are visible,
+    and all three appear in real content:
+
+    - ``version "1.2.3"``    -- a ``Reference`` with a string literal index
+    - ``"1.2.3" as version`` -- a ``Cast`` whose target is ``version``
+    - ``"1.2.3"``            -- a bare literal, coerced by the other operand
+
+    The bar is higher for the bare form. Where the source has written
+    ``version`` the string is a version by declaration, so ``version "14"``
+    counts as one component; a bare ``"14"`` does not count at all, since
+    nothing distinguishes it from a number written as a string.
+
+    A ``pad of`` wrapper is deliberately *not* unwrapped: padding is what makes
+    the count irrelevant, and :func:`_is_padded` is what asks about it.
+    """
+    declared = False
+    if isinstance(node, Cast):
+        if node.target != VERSION:
+            return None
+        node, declared = node.operand, True
+    elif isinstance(node, Reference) and node.phrase == VERSION and node.index is not None:
+        node, declared = node.index, True
+    if not isinstance(node, StringLiteral):
+        return None
+    pattern = _VERSION_LITERAL_SHAPED if declared else _VERSION_SHAPED
+    if pattern.match(node.content):
+        return node.content.count(".") + 1
+    return None
+
+
+def _indexable_world_collection(name: str, environment: TypeEnvironment, *, indexed: bool) -> bool:
+    """Whether a bare world singular is really one of many.
+
+    True when the tables define both an unindexed row for ``name`` and an
+    *indexed* row returning the same type. The indexed row is how you pick one
+    of the collection -- `filesystem "/"`, `application "Safari.app"` -- so its
+    existence says the unindexed spelling has several to choose between, and the
+    engine agrees: `name of filesystem` answers one name and then raises
+    `Singular expression refers to non-unique object.`
+
+    The same-return-type condition is doing real work, not tidying. Month
+    constants have an indexed sibling too -- `april 2026` -- but it returns a
+    `date` where bare `april` returns a `month`, so it is a different operation
+    rather than a collection index. Bare `april` answers `April` cleanly, and
+    without this condition it would be reported. Confirmed on a live engine
+    alongside the positives (2026-08-31).
+
+    Deliberately world-level only (``subject`` is always ``None`` here). The
+    same reasoning extends to a property of an object -- `key of registry` --
+    but every case checked against an engine was world-level, and this package
+    does not report on reasoning it has not tested.
+    """
+    if indexed:
+        return False
+    bare = _matched_rows(name, None, environment, indexed=False)
+    every = _matched_rows(name, None, environment, indexed=None)
+    if not bare or not every:
+        return False
+    returns = {entry.return_type for entry in bare}
+    return any(entry.index_type is not None and entry.return_type in returns for entry in every)
+
+
+def _is_padded(node: Node) -> bool:
+    """Whether this operand is a ``pad of ...`` application.
+
+    `pad of` gives both sides the same shape, which is the documented fix for
+    the truncating comparison -- so an expression that already uses it must not
+    then be warned about. Only the immediate application counts; a `pad of`
+    buried under further arithmetic is not the idiom and is not recognised.
+    """
+    return isinstance(node, Of) and isinstance(node.prop, Reference) and node.prop.phrase == "pad"
 
 
 def _accepts(declared: str, candidate: str) -> bool:
@@ -1210,6 +1312,18 @@ class _Checker:
                     )
                 ),
             )
+        elif (
+            subject is None
+            and value.plurality is Plurality.SINGULAR
+            and not _is_aggregate(node.phrase)
+            and _indexable_world_collection(node.phrase, self.env, indexed=node.index is not None)
+        ):
+            # A bare world object the tables also define with an index: one of
+            # many, written as though it were the only one. Same diagnostic as
+            # the `of`-chain case in `combine_of`, because it is the same
+            # runtime error about the same mistake -- the object here is the
+            # world rather than a plural expression.
+            self.report("singular-over-plural-object", node.span, phrase=node.phrase)
         return value
 
     def combine_of(self, node: Of, prop: RelevanceValue, obj: RelevanceValue) -> RelevanceValue:
@@ -1485,6 +1599,9 @@ class _Checker:
         if form is None or left.types is None or right.types is None:
             return self.unknown()
 
+        if form.operator in _ORDERING_OPERATORS:
+            self.check_version_comparison(node, form, left.types, right.types)
+
         lhs, rhs = (right, left) if form.swapped else (left, right)
         rows = [
             entry
@@ -1511,6 +1628,97 @@ class _Checker:
             plurality=Plurality.SINGULAR,
             platforms=self.env.platforms_of(rows) or (left.platforms & right.platforms),
         )
+
+    def check_version_comparison(
+        self,
+        node: Binary,
+        form: grammar.OperatorForm,
+        left_types: frozenset[str],
+        right_types: frozenset[str],
+    ) -> None:
+        """The two version-comparison advisories, both about a *wrong answer*.
+
+        Neither is a type error: the engine accepts these and answers them, so
+        nothing here changes the value this operator returns. They are reported
+        because the answer is not the one the author asked for, which no other
+        check in this module can say.
+
+        Ordering matters between the two branches. A comparison with a version
+        anywhere in it *is* a version comparison -- one `as version` coerces the
+        other operand, confirmed on both engines -- so the truncation branch has
+        to be considered first, and the string-compare branch only applies when
+        neither side is a version at all.
+
+        **Not every truncating comparison is wrong**, which is what keeps this
+        rule quiet enough to be worth having. Truncation makes the engine treat
+        `1.2.3` and `1.2` as *equal*, so it only changes the answer for the
+        operators that turn on equality in the direction of the discarded tail.
+        Confirmed exhaustively on a live engine (2026-08-31):
+
+        =============  ===============  ===============
+        operator       left is longer   right is longer
+        =============  ===============  ===============
+        ``>``          **wrong**        safe
+        ``>=``         safe             **wrong**
+        ``<``          safe             **wrong**
+        ``<=``         **wrong**        safe
+        ``=`` / ``!=`` **wrong**        **wrong**
+        =============  ===============  ===============
+
+        The dropped tail can only make its side *larger*, so the side that loses
+        it is under-valued, and only a comparison that would flip at equality is
+        affected. This is why `version of operating system >= version "5.1"` --
+        the shape most real content uses, and three of this repo's own example
+        files -- is left alone, while the verified defect
+        `version of operating system > version "14"` (`False` on a 14.6.1 host)
+        is reported.
+        """
+        left_count = _version_components(node.left)
+        right_count = _version_components(node.right)
+
+        if VERSION in left_types or VERSION in right_types:
+            # `pad of` on both sides is the documented fix; having taken it,
+            # the author is owed silence.
+            if _is_padded(node.left) and _is_padded(node.right):
+                return
+            # With no literal on either side there is nothing to anchor the
+            # claim to: two properties may well hold the same shape, and
+            # warning on every such comparison would be noise rather than
+            # evidence.
+            if left_count is None and right_count is None:
+                return
+            if left_count == right_count:
+                return  # nothing is truncated away
+
+            # Which side loses its tail. An unknown count is taken to be the
+            # longer one: it is a property, and a real version carries more
+            # components than the threshold literal it is tested against.
+            if left_count is None:
+                left_loses = True
+            elif right_count is None:
+                left_loses = False
+            else:
+                left_loses = left_count > right_count
+
+            # `=` and `!=` are wrong whichever side is longer: the engine calls
+            # unequal versions equal. `form.operator` is `=` for both, since a
+            # negation keeps the canonical operator.
+            if form.operator == "=":
+                self.report("version-truncating-compare", node.span, token=node.op)
+                return
+
+            # `form.swapped` is what separates `>` from `<` and `>=` from `<=`,
+            # since `>` has no row of its own and reduces to a swapped `<`.
+            strict = form.operator == "<"
+            broken = (strict == form.swapped) if left_loses else (strict != form.swapped)
+            if broken:
+                self.report("version-truncating-compare", node.span, token=node.op)
+            return
+
+        # No version anywhere, and both sides are dotted-numeric literals: the
+        # engine compares them as strings, so `"2.10.1" < "2.3.3"`.
+        if left_count is not None and right_count is not None:
+            self.report("version-like-string-compare", node.span, token=node.op)
 
     def combine_unary(self, node: Unary, operand: RelevanceValue) -> RelevanceValue:
         if node.op == "not":

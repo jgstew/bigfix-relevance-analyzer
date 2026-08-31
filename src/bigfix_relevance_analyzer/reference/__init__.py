@@ -152,6 +152,24 @@ def _dialects(detail: Detail) -> str:
 
 
 @functools.cache
+def _universal(detail: Detail) -> str:
+    """The core-language semantics, shared by both dialects.
+
+    Its own document rather than more shared syntax prose, for two reasons. The
+    dialect references fold :data:`_prose.SYNTAX` in wholesale, so anything
+    added there is paid for twice and competes with the generated tables for a
+    context budget this document does not touch. And the material is a
+    different kind of thing: `syntax.md` says what parses, this says what the
+    evaluator then does with it -- confirmed against a live client engine and a
+    live session engine, which is a claim the grammar sections cannot make.
+    """
+    from bigfix_relevance_analyzer.reference import _prose
+
+    del detail  # BRIEF and STANDARD are the same here: this document is all prose.
+    return _prose.UNIVERSAL_RELEVANCE
+
+
+@functools.cache
 def _dialect_document(dialect: Dialect, detail: Detail) -> str:
     """One dialect's document: its prose, the shared syntax, then the tables."""
     from bigfix_relevance_analyzer.reference import _prose, _tables
@@ -192,8 +210,10 @@ def _session(detail: Detail) -> str:
 def documents() -> tuple[ReferenceDocument, ...]:
     """Every servable document, in the order a consumer should offer them.
 
-    The shared explainer first: it is the prerequisite for the other two, and a
-    consumer registering them in listing order gets that for free.
+    The two shared documents first -- which dialect you are in, then what the
+    evaluator does either way. Both are prerequisites for the dialect
+    references, and a consumer registering them in listing order gets that
+    ordering for free.
 
     Enumerable on purpose. A server can loop over this and register everything
     without naming a document in its own source, which is what makes adding a
@@ -210,6 +230,17 @@ def documents() -> tuple[ReferenceDocument, ...]:
             ),
             dialect=None,
             _render=_dialects,
+        ),
+        ReferenceDocument(
+            slug="universal-relevance",
+            title="BigFix relevance: what the evaluator does",
+            summary=(
+                "Core-language semantics true of both dialects, confirmed on live "
+                "engines: version comparison, short-circuit order, and how errors "
+                "propagate."
+            ),
+            dialect=None,
+            _render=_universal,
         ),
         ReferenceDocument(
             slug="client-relevance",

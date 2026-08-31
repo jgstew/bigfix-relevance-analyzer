@@ -52,13 +52,23 @@ DIALECTS = (Dialect.CLIENT, Dialect.SESSION)
 # ---------------------------------------------------------------------------
 
 
-def test_the_three_documents_are_discoverable_and_distinct() -> None:
+def test_the_four_documents_are_discoverable_and_distinct() -> None:
     """``documents()`` is the registry a server enumerates instead of hardcoding names."""
     listed = reference.documents()
     slugs = [document.slug for document in listed]
-    assert slugs == ["dialects", "client-relevance", "session-relevance"]
+    assert slugs == [
+        "dialects",
+        "universal-relevance",
+        "client-relevance",
+        "session-relevance",
+    ]
     assert len(set(slugs)) == len(slugs)
-    assert [document.dialect for document in listed] == [None, Dialect.CLIENT, Dialect.SESSION]
+    assert [document.dialect for document in listed] == [
+        None,
+        None,
+        Dialect.CLIENT,
+        Dialect.SESSION,
+    ]
 
 
 def test_the_explainer_is_listed_first() -> None:
@@ -317,6 +327,50 @@ def test_every_authored_document_is_actually_embedded() -> None:
     assert on_disk, "docs/reference/ has no Markdown at all"
 
 
+def test_the_universal_prose_states_the_version_comparison_traps() -> None:
+    """A guard on the two version traps, both confirmed on live client and session engines.
+
+    These are the highest-consequence facts in the language: each produces a
+    *wrong answer* rather than an error, so nothing downstream notices. A
+    consumer's model that has not been told will write the broken form, because
+    the broken form is what every other language it has seen would accept.
+
+    The expansive source, with the engine transcripts, is
+    ``docs/universal_relevance.md``.
+    """
+    from bigfix_relevance_analyzer.reference import _prose
+
+    universal = _prose.UNIVERSAL_RELEVANCE
+    assert "pad of" in universal, "the fix for truncating comparison is missing"
+    assert "truncate" in universal.lower(), "the truncation rule is missing"
+    assert "as version" in universal, "the one-sided coercion rule is missing"
+    assert "left to right" in universal, "the short-circuit direction is missing"
+
+
+def test_the_universal_prose_states_the_whose_scoping_rule() -> None:
+    """A bare name inside `whose` is a world reference, not a property of the item.
+
+    Guarded because it is the kind of rule a model fills in from analogy with
+    other languages -- `whose` binds `it`, so surely everything inside is scoped
+    to `it` -- and gets exactly backwards. Both halves were confirmed on a live
+    client engine and a live session engine: `files whose (exists properties)`
+    answers, and `files whose (exists properties of it)` is refused.
+
+    Its practical value is the error-reading advice: an `is not defined` inside a
+    `whose` is as often a spurious `of it` as it is a misspelling.
+    """
+    from bigfix_relevance_analyzer.reference import _prose
+
+    universal = _prose.UNIVERSAL_RELEVANCE
+    # Phrases distinctive to this rule's section, checked to survive nothing
+    # else: bare "world", "whose" and "of it" all occur elsewhere in the
+    # document, so asserting on those would be a guard that cannot fail.
+    assert "is a world reference" in universal, "the world-reference rule is missing"
+    assert "resolves against the **world**" in universal, "the resolution rule is missing"
+    assert "properties of it" in universal, "the refused `of it` example is missing"
+    assert "Dropping `of it`" in universal, "the error-reading advice is missing"
+
+
 def test_the_syntax_prose_states_the_rules_that_are_easiest_to_get_wrong() -> None:
     """A guard on the few facts a model reliably invents wrongly if unstated.
 
@@ -386,6 +440,9 @@ def test_the_cli_prints_a_reference(capsys: pytest.CaptureFixture[str]) -> None:
 
     assert main(["--reference", "dialects"]) == 0
     assert capsys.readouterr().out == reference.get_document("dialects").read()
+
+    assert main(["--reference", "universal"]) == 0
+    assert capsys.readouterr().out == reference.get_document("universal-relevance").read()
 
 
 def test_the_cli_reference_honours_brief_and_json(

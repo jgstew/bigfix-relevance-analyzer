@@ -514,9 +514,11 @@ def _run_reference(slug: str, *, brief: bool, as_json: bool) -> int:
     ``--reference client`` is spelled the way the ``--dialect`` flag is rather
     than as the document's own slug, because a caller already knows the dialect
     names from every other flag here; the slug is translated rather than made
-    the user's problem. Imported inside the function for the same reason the
-    package does not import :mod:`~bigfix_relevance_analyzer.reference` at all:
-    nothing pays for a document it did not ask for.
+    the user's problem. ``universal`` translates the same way, to
+    ``universal-relevance``; only ``dialects`` is already its own slug.
+    Imported inside the function for the same reason the package does not import
+    :mod:`~bigfix_relevance_analyzer.reference` at all: nothing pays for a
+    document it did not ask for.
     """
     from bigfix_relevance_analyzer import reference
 
@@ -626,7 +628,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--reference",
-        choices=["client", "session", "dialects"],
+        choices=["client", "session", "dialects", "universal"],
         help=(
             "print a relevance language reference and exit -- the same Markdown "
             "an MCP server would serve as a resource"

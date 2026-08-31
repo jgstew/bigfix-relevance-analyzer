@@ -1,0 +1,50 @@
+==== a version literal is a reference with a string index
+version "1.2.3"
+----
+(ref "version" (str "1.2.3"))
+
+==== a one-component version literal is the same shape
+version "14"
+----
+(ref "version" (str "14"))
+
+==== a string cast to version is a cast, not a reference
+"1.2.3" as version
+----
+(cast (str "1.2.3") "version")
+
+==== version as a property of an object is an of chain
+version of operating system
+----
+(of (ref "version") (ref "operating system"))
+
+==== pad of wraps the version literal, not the comparison
+pad of version "1.2"
+----
+(of (ref "pad") (ref "version" (str "1.2")))
+
+==== a padded comparison keeps pad on each side
+pad of version "1.2" > pad of version "1.2.3"
+----
+(bin ">" (of (ref "pad") (ref "version" (str "1.2")))
+         (of (ref "pad") (ref "version" (str "1.2.3"))))
+
+==== a version literal compared against a bare string
+version "2.10.1" > "2.3.3"
+----
+(bin ">" (ref "version" (str "2.10.1")) (str "2.3.3"))
+
+==== a cast binds tighter than the comparison it sits in
+"2.10.1" > "2.3.3" as version
+----
+(bin ">" (str "2.10.1") (cast (str "2.3.3") "version"))
+
+==== the operator spelling is kept as written, not canonicalized
+version of operating system >= version "14"
+----
+(bin ">=" (of (ref "version") (ref "operating system")) (ref "version" (str "14")))
+
+==== strverscmp version is a distinct multi-word cast target
+"1.2.3" as strverscmp version
+----
+(cast (str "1.2.3") "strverscmp version")

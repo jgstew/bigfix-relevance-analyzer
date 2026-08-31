@@ -1,5 +1,10 @@
 # Session relevance
 
+> **Expansive layer.** This document is the source of truth; the tighter
+> MCP-served summary distilled from it is
+> [`reference/session_relevance.md`](reference/session_relevance.md), which may omit anything
+> here but must never contradict it. See [`README.md`](README.md).
+
 Evaluated **on the server** - by the root server, or a console, WebUI or Web
 Reports session - against the BigFix database. It answers questions about the
 *deployment*: which computers exist, which fixlets are relevant where, what
@@ -83,13 +88,40 @@ of fixlets of bes sites
 - **Unbounded cross products.** See the cost table below before shipping a
   query that joins fixlets to computers.
 
-## Bare singular `bes` objects are non-unique
-
-`operating system of bes computer` errors past the first computer -- an indexed
-`bes computer <id>` row exists, which is what says there are several. Write the
-plural, or index to one; a `whose` filter does not rescue it.
-
 ## Where to read more
 
 The full inspector reference is at
 <https://developer.bigfix.com/relevance/reference/>.
+
+## Bare singular `bes` objects are non-unique in any real deployment
+
+A singular `bes` spelling with no index and no filter asserts there is exactly
+one such object. On a deployment with more than one computer, that is false:
+
+```
+Q: operating system of bes computer
+E: Singular expression refers to non-unique object.
+```
+
+Verified against a server with two computers reporting; it fails on any
+deployment past the first. The correct forms:
+
+```
+operating systems of bes computers                     -- the plural
+operating system of bes computer <id>                  -- indexed to one
+```
+
+This is not special to `bes computer`. The captured inspector tables show the
+shape: alongside the unindexed row that makes the bare spelling type-check,
+there is an **indexed** `bes computer <id>` row returning the same type. That
+indexed row is how you pick one, so its existence is what says there are several
+to pick from.
+
+Note that a `whose` filter does not rescue it - narrowing the candidates is not
+the same as asserting there is one. The general treatment, with the client-side
+equivalents, is in
+[`universal_relevance.md`](universal_relevance.md#singular-spellings-over-multi-valued-objects-fail-at-evaluation).
+
+Because session relevance is nearly always asking about the estate rather than
+one machine, the plural is almost always what was meant here - more so than in
+client relevance, where a singular genuinely is the common case.

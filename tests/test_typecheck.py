@@ -1435,3 +1435,167 @@ def test_a_wide_expression_does_not_exhaust_the_python_stack(env: TypeEnvironmen
     """
     assert check(parse("1" + " + 1" * 5000), env).value.types == frozenset({"integer"})
     assert check(parse("true" + " or true" * 5000), env).value.types == frozenset({"boolean"})
+
+
+# ---------------------------------------------------------------------------
+# Version comparison
+# ---------------------------------------------------------------------------
+#
+# Both rules below encode behaviour confirmed against a live client engine and
+# a live session engine (2026-08-30), recorded with the transcripts in
+# `docs/universal_relevance.md`. They are the only checks here that fire on
+# relevance the engine accepts and answers: the statement is well-typed, and the
+# answer is simply wrong. That is why they are worth a warning at all.
+
+
+@pytest.mark.parametrize(
+    ("source", "code"),
+    [
+        # No version anywhere: the engine compares these as strings, and
+        # `"2.10.1" < "2.3.3"` because `'1' < '3'` at the third character.
+        pytest.param('"2.10.1" > "2.3.3"', "version-like-string-compare", id="bare-strings"),
+        pytest.param('"1.9" < "1.10"', "version-like-string-compare", id="bare-strings-crossing"),
+        pytest.param('"1.2" = "1.2.3"', "version-like-string-compare", id="bare-strings-equality"),
+        # Truncation makes the engine call unequal versions equal, so only the
+        # operators that flip at equality in the direction of the dropped tail
+        # are wrong. Every expectation below was read off a live engine.
+        # Left side longer -- `>` and `<=` break.
+        pytest.param(
+            'version "1.2.3" > version "1.2"',
+            "version-truncating-compare",
+            id="left-longer-gt",
+        ),
+        pytest.param(
+            'version "1.2.3" <= version "1.2"',
+            "version-truncating-compare",
+            id="left-longer-le",
+        ),
+        # Right side longer -- `>=` and `<` break.
+        pytest.param(
+            'version "1.2" >= version "1.2.3"',
+            "version-truncating-compare",
+            id="right-longer-ge",
+        ),
+        pytest.param(
+            'version "1.2" < version "1.2.3"',
+            "version-truncating-compare",
+            id="right-longer-lt",
+        ),
+        # Equality is wrong whichever side is longer.
+        pytest.param(
+            'version "1.2.3" = version "1.2"',
+            "version-truncating-compare",
+            id="equality",
+        ),
+        pytest.param(
+            'version "1.2.3" != version "1.2"',
+            "version-truncating-compare",
+            id="inequality",
+        ),
+        # The verified real-world defect: `False` on a 14.6.1 host, where the
+        # author asked for "newer than 14". The property's count is unknown and
+        # is taken to be the longer side.
+        pytest.param(
+            'version of operating system > version "14"',
+            "version-truncating-compare",
+            id="property-against-shorter-literal",
+        ),
+        pytest.param(
+            '"1.2.3" as version <= version "1.2"',
+            "version-truncating-compare",
+            id="cast-form",
+        ),
+    ],
+)
+def test_version_comparison_findings(source: str, code: str, env: TypeEnvironment) -> None:
+    codes = [d.code for d in check(parse(source), env).diagnostics]
+    assert code in codes, codes
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        # `pad of` on both sides is the fix, and must not then be nagged about.
+        pytest.param('pad of version "1.2" > pad of version "1.2.3"', id="both-padded"),
+        pytest.param(
+            'pad of version of operating system > pad of version "14"',
+            id="both-padded-property",
+        ),
+        # Same component count on both sides: nothing is truncated away.
+        pytest.param('version "1.2.3" > version "1.2.4"', id="equal-counts"),
+        pytest.param('"2.10.1" > "2.3.3" as version', id="coerced-equal-counts"),
+        # Truncating, but in the direction that does not change the answer --
+        # the safe half of the table, and the shape most real content uses.
+        pytest.param('version "1.2.3" >= version "1.2"', id="left-longer-ge-safe"),
+        pytest.param('version "1.2.3" < version "1.2"', id="left-longer-lt-safe"),
+        pytest.param('version "1.2" > version "1.2.3"', id="right-longer-gt-safe"),
+        pytest.param('version "1.2" <= version "1.2.3"', id="right-longer-le-safe"),
+        # The three shapes this repo's own example content uses.
+        pytest.param('version of operating system >= "5.1"', id="corpus-os-ge"),
+        pytest.param('version of client >= "9.0" as version', id="corpus-client-ge"),
+        pytest.param('version of client < "8.0"', id="corpus-client-lt"),
+        # Two properties: no literal to anchor a claim about shape.
+        pytest.param("version of operating system > version of client", id="two-properties"),
+        # Not version-shaped, so not a version-comparison mistake.
+        pytest.param('"a.b" > "c.d"', id="dotted-but-not-numeric"),
+        pytest.param('"abc" > "abz"', id="plain-strings"),
+        pytest.param('"1" > "2"', id="single-components-no-dots"),
+        # Not an ordering comparison at all.
+        pytest.param('"1.2.3" contains "1.2"', id="contains-is-not-ordering"),
+    ],
+)
+def test_version_comparison_stays_quiet(source: str, env: TypeEnvironment) -> None:
+    codes = {d.code for d in check(parse(source), env).diagnostics}
+    assert not (codes & {"version-like-string-compare", "version-truncating-compare"}), codes
+
+
+# ---------------------------------------------------------------------------
+# Bare singular world objects
+# ---------------------------------------------------------------------------
+#
+# A world object written singular with no index, where the tables also define an
+# *indexed* row returning the same type, is one of many -- and the engine says
+# so. Every expectation here was read off a live engine (2026-08-31); the
+# transcripts are in `docs/universal_relevance.md`.
+#
+# The same-return-type condition is what keeps month constants out: `april` has
+# an indexed sibling (`april 2026`), but it returns a `date` rather than a
+# `month`, so it is a different operation and not a collection index. Confirmed:
+# bare `april` answers `April` cleanly.
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        pytest.param("name of filesystem", id="filesystem"),
+        pytest.param("name of application", id="application"),
+        pytest.param("family name of processor", id="processor"),
+        pytest.param("name of cast", id="introspection-cast"),
+    ],
+)
+def test_a_bare_indexable_world_object_is_a_non_unique_risk(
+    source: str, env: TypeEnvironment
+) -> None:
+    codes = [d.code for d in check(parse(source), env).diagnostics]
+    assert "singular-over-plural-object" in codes, codes
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        # Genuine world singletons: no indexed row at all.
+        pytest.param("name of operating system", id="operating-system"),
+        pytest.param("computer name", id="computer-name"),
+        pytest.param("current date", id="current-date"),
+        # An indexed sibling that returns a *different* type is a different
+        # operation, not a way of picking one of many.
+        pytest.param("april", id="month-constant"),
+        pytest.param("december", id="month-constant-december"),
+        # Already unambiguous: an index was supplied, or the plural was written.
+        pytest.param('name of filesystem "/"', id="indexed"),
+        pytest.param("names of filesystems", id="plural"),
+    ],
+)
+def test_an_unambiguous_world_object_is_left_alone(source: str, env: TypeEnvironment) -> None:
+    codes = [d.code for d in check(parse(source), env).diagnostics]
+    assert "singular-over-plural-object" not in codes, codes

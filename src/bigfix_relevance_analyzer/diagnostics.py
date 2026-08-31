@@ -303,6 +303,23 @@ _TYPE_CHECK: Final = [
         "the operator '{token}' is not defined for the types "
         "'<{left_type}> {token} <{right_type}>'",
     ),
+    # Version comparison. Both are advisories with the runtime origin, for the
+    # same reason `singular-over-plural-object` has it: the statement type-checks
+    # and the engine answers it. What is wrong is the *answer*, so nothing here
+    # may fail a type check. Confirmed on a live client engine and a live session
+    # engine (2026-08-30); `docs/universal_relevance.md` carries the transcripts.
+    _entry(
+        "version-like-string-compare",
+        Origin.RUNTIME,
+        "'{token}' compares these as strings, not versions -- "
+        "'2.10.1' sorts below '2.3.3'; add 'as version' to one side",
+    ),
+    _entry(
+        "version-truncating-compare",
+        Origin.RUNTIME,
+        "'{token}' compares only as many components as the shorter version has, "
+        "so 'version \"1.2.3\"' equals 'version \"1.2\"' -- use 'pad of' on both sides",
+    ),
     _entry(
         "unary-operator-not-defined",
         Origin.TYPE_CHECK,

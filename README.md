@@ -406,6 +406,8 @@ same way instead of each inventing a description:
 | `unbound-it` | error | `it` is used where there is no context to bind it to | always on |
 | `non-unique-risk` | warning | a property written singular where more than one value may come back | always on |
 | `plural-preferred` | warning | a `whose` filter written on a singular spelling, where the plural reads safer | always on |
+| `version-truncating-compare` | warning | a version comparison that truncates to the shorter operand's components | always on |
+| `version-like-string-compare` | warning | two version-looking strings compared as strings, not as versions | always on |
 | `unknown-inspector` | warning | a name no inspector dump defines | always on |
 
 There is no CLI spelling to disable `complexity`/`evaluation-cost` entirely -
@@ -604,9 +606,19 @@ python -m bigfix_relevance_analyzer --search "registry keys"
 
 ### Language reference resources
 
-`bigfix_relevance_analyzer.reference` serves three Markdown documents a server
+`bigfix_relevance_analyzer.reference` serves four Markdown documents a server
 can register as MCP resources: `dialects` (client versus session - serve this
-first), `client-relevance`, and `session-relevance`.
+first), `universal-relevance` (what the evaluator does either way), then
+`client-relevance` and `session-relevance`.
+
+The two shared documents come first because both are prerequisites for the
+dialect references. `universal-relevance` is its own document rather than more
+shared syntax prose for two reasons: the dialect references fold the syntax
+prose in wholesale, so anything added there is paid for twice and competes with
+the generated tables for a context budget, and the material is a different kind
+of claim - `syntax` says what parses, `universal-relevance` says what the
+evaluator then does with it, confirmed against a live client engine and a live
+session engine.
 
 ```python
 from bigfix_relevance_analyzer import reference

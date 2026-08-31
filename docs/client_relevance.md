@@ -1,5 +1,10 @@
 # Client relevance
 
+> **Expansive layer.** This document is the source of truth; the tighter
+> MCP-served summary distilled from it is
+> [`reference/client_relevance.md`](reference/client_relevance.md), which may omit anything
+> here but must never contradict it. See [`README.md`](README.md).
+
 Evaluated **on the endpoint**, by the BES Client (the agent), against the
 machine it is running on. It answers questions about *this computer*: what
 operating system it runs, which files and registry keys exist, what is
@@ -67,21 +72,65 @@ Three inspectors that look session-only but are macOS **client** inspectors:
   recursion in a `<Relevance>` element are the classic causes of client CPU
   complaints - see the cost table below.
 
-## `pad of` compares safely; its string form does not travel
-
-`pad of` is how you avoid the version-truncation trap - see the
-`universal-relevance` reference, which also covers why an untyped comparison of
-two version-looking strings answers backwards. Its *ordering* is correct on
-every platform; its text is not. macOS renders `pad of version "1.2"` as
-`1.2.00` where Windows and the server give `1.2.0.0`, so compare with it
-freely, but never compare `pad of X as string` or substring-match a padded
-version.
-
-Note also that the platform-guard idiom above depends on left-to-right
-evaluation: reversed, `(exists regapps "x") and (windows of operating system)`
-runs a Windows-only inspector on every endpoint.
-
 ## Where to read more
 
 The full inspector reference is at
 <https://developer.bigfix.com/relevance/reference/>.
+
+## `pad of` compares correctly everywhere, but its string form is platform-dependent
+
+`pad of` is the fix for the version-truncation trap documented in
+[`universal_relevance.md`](universal_relevance.md) - and it is the one place
+where a *core-language* operator has been observed to differ by platform.
+
+The **ordering** it produces is correct on every platform. The **string it
+renders** is not the same. On macOS 14.6.1:
+
+```
+Q: pad of version "1"          A: 1.0.00
+Q: pad of version "1.2"        A: 1.2.00
+Q: pad of version "1.2.3"      A: 1.2.30
+Q: pad of version "1.2.3.4"    A: 1.2.3.4
+Q: pad of version "10.20.30"   A: 10.20.300
+```
+
+The session engine, and Windows clients, pad to four components instead:
+
+```
+pad of version "1"          ->  1.0.0.0
+pad of version "1.2"        ->  1.2.0.0
+pad of version "1.2.3"      ->  1.2.3.0
+pad of version "10.20.30"   ->  10.20.30.0
+```
+
+*(macOS and session verified directly, 2026-08-30. The Windows/session
+correspondence is reported rather than measured here - macOS is the outlier.)*
+
+Two practical consequences:
+
+- **Comparing is safe.** `pad of a > pad of b` and `pad of a = pad of b` behave
+  as intended on every platform. Spot-checked on macOS across boundary cases
+  (`1.2.3` vs `1.2.10`, `2` vs `1.9`, `1.2.3.4` vs `1.2.4`), all correct.
+- **Rendering is not portable.** Never compare `pad of X as string`, never
+  substring-match a padded version, and never store one expecting another
+  platform to reproduce it. If you need the text of a version, take the
+  unpadded `as string`.
+
+`pad of` is defined in all captured sources, so guarding its *availability* by
+platform is unnecessary. It is only the output text that varies.
+
+## Put the platform guard on the left
+
+The portability idiom above works because `and`, `or` and `if` evaluate left to
+right, so the cheap always-safe test runs first and the platform-specific part
+is never reached on the wrong platform:
+
+```
+if (windows of operating system) then (exists regapps "x") else false
+```
+
+Written the other way round the guard does nothing - `(exists regapps "x") and
+(windows of operating system)` evaluates the Windows-only inspector on every
+endpoint. `if`/`then`/`else` is the strongest form, since only the taken branch
+is evaluated at all. See
+[`universal_relevance.md`](universal_relevance.md#and-and-or-short-circuit-strictly-left-to-right).

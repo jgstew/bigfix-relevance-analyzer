@@ -352,6 +352,36 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "the collapses that error on several rather than on none.",
             ),
             _rule(
+                "version-truncating-compare",
+                Severity.WARNING,
+                "a version comparison that truncates to the shorter operand's components",
+                "A version comparison only compares as many components as the *shorter* "
+                'side has, so the engine calls `version "1.2.3"` and `version "1.2"` '
+                "equal. That is harmless for half the operators and silently wrong for "
+                "the other half: on a 14.6.1 host, `version of operating system > version "
+                '"14"` answers `False`, so a fixlet gating on "newer than 14" excludes '
+                "exactly the machines it was written for -- without erroring, which is "
+                "why nothing downstream notices. Only the operators that flip at "
+                "equality in the direction of the dropped tail are reported, so the "
+                'common and correct `>= version "5.1"` idiom is left alone. The fix is '
+                "`pad of` on both sides, which is defined in every captured source. A "
+                "warning rather than an error because the statement is well-formed and "
+                "the author may have meant a prefix match.",
+            ),
+            _rule(
+                "version-like-string-compare",
+                Severity.WARNING,
+                "two version-looking strings compared as strings, not as versions",
+                "With no `version` on either side the engine compares string literals "
+                'lexicographically, so `"2.10.1" > "2.3.3"` is `False` -- the opposite '
+                "of what anyone writing it intends. It needs only one component to cross "
+                "a digit-width boundary, which `1.9` to `1.10` does, and that is exactly "
+                "where a version comparison matters. Adding `as version` to either side "
+                "is enough: one typed operand coerces the other. Reported only for "
+                "dotted-numeric literals on both sides, so ordinary string comparisons "
+                "are untouched.",
+            ),
+            _rule(
                 "complexity",
                 Severity.ERROR,
                 "the complexity score is above the ceiling",
@@ -570,6 +600,12 @@ _CHECK_RULES: Final = {
     # about hazards, and so a repo that does not want the style note can
     # silence it without silencing the errors-at-evaluation ones.
     "filtered-singular-spelling": "plural-preferred",
+    # Version comparison. Their own rules rather than `type-error`, because the
+    # statement type-checks: the engine answers it, and the answer is wrong.
+    # Separate from each other so a repo can silence the stylistic prefix-match
+    # reading of `=` without also silencing the string-compare defect.
+    "version-truncating-compare": "version-truncating-compare",
+    "version-like-string-compare": "version-like-string-compare",
     # A bare world reference the dumps know only with a direct object -- the
     # same epistemic state as a name no dump defines (the snapshot has no row
     # for *this position*, and the snapshot is known-incomplete), so it lands
