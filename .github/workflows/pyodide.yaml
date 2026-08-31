@@ -102,6 +102,16 @@ jobs:
         working-directory: tools/pyodide-smoke
         run: node smoke.mjs ../../dist/*.whl | tee -a "$GITHUB_STEP_SUMMARY"
 
+      # Precompiles the wheel's .py files to .pyc using this exact Pyodide
+      # build's own CPython, rather than the runner's host Python -- see the
+      # script's header for why that distinction matters (magic-number drift
+      # between this workflow's pinned Python and whatever Pyodide bundles).
+      # A real compile failure here fails this job instead of surfacing as a
+      # confusing runtime failure for someone using the playground.
+      - name: precompile the wheel's .pyc with Pyodide's own CPython
+        working-directory: tools/pyodide-smoke
+        run: node precompile_wheel.mjs --wheel ../../dist/*.whl --out ../../dist/precompiled.zip
+
       # tools/pyodide-smoke's npm ci above already fetched the exact Pyodide
       # release this repo pins, as the "pyodide" npm package -- that package
       # ships its own runtime assets (the wasm binary, stdlib zip, etc.) for
@@ -118,7 +128,7 @@ jobs:
       - name: build the standalone playground page
         run: |
           python3 tools/pyodide-playground/build_playground.py \
-            --wheel dist/*.whl \
+            --wheel dist/precompiled.zip \
             --pyodide-dir tools/pyodide-smoke/node_modules/pyodide \
             --out playground/bigfix-relevance-analyzer-playground.html
 
