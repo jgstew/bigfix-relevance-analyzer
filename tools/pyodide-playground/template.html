@@ -216,6 +216,16 @@ function renderPayload(payload) {
     ? `${payload.parse.node_count} nodes, depth ${payload.parse.tree_depth}`
     : `${payload.parse.error.message} (line ${payload.parse.error.line}, column ${payload.parse.error.column})`;
 
+  // `types.ok === true` only means "the checker didn't error" -- an
+  // unresolved identifier (e.g. a typo, or a real inspector this catalog
+  // doesn't know) is still `ok`, but `types.types` is `null` rather than a
+  // list in that case. Confirmed against analyze_relevance_to_dict('asdfdffds').
+  const resultTypeCell = !payload.types
+    ? "--"
+    : Array.isArray(payload.types.types)
+      ? `${payload.types.types.join(", ")} (${payload.types.plurality})`
+      : `unknown (${payload.types.plurality})`;
+
   outputEl.appendChild(
     factsTable([
       ["dialect (effective)", `${payload.dialect.effective}${payload.dialect.assumed ? " (assumed)" : ""}`],
@@ -223,14 +233,63 @@ function renderPayload(payload) {
       ["parse", parseCell],
       ["complexity score", payload.complexity.score],
       ["evaluation cost", payload.complexity.evaluation_cost],
-      ["result type", typesOk ? `${payload.types.types.join(", ")} (${payload.types.plurality})` : "--"],
+      ["result type", resultTypeCell],
       ["platforms viable", payload.platforms.viable.join(", ") || "(none)"],
     ])
   );
 
+  // Sections below are ordered by how likely they are to be what someone
+  // actually wants next, most useful first: ready-to-run probes, then the
+  // parse tree, then the (usually empty) it-binding detail, then the
+  // reference lookup table, with the raw payload last as a catch-all.
+
+  if (payload.levels?.length) {
+    outputEl.appendChild(el("h2", { text: "probes" }));
+    outputEl.appendChild(
+      el("p", { class: "hint" }, [
+        document.createTextNode(
+          "One ready-to-run relevance statement per level of the expression -- paste into the Fixlet Debugger or QnA to count matches at that level."
+        ),
+      ])
+    );
+    for (const level of payload.levels) {
+      outputEl.appendChild(
+        el("p", { class: "hint" }, [
+          document.createTextNode(`${level.label} `),
+          el("span", { text: `(line ${level.line}, column ${level.column})` }),
+        ])
+      );
+      outputEl.appendChild(el("pre", { text: level.probe }));
+    }
+  }
+
   if (payload.parse.ok) {
     outputEl.appendChild(el("h2", { text: "s-expression" }));
     outputEl.appendChild(el("pre", { text: payload.parse.sexpr }));
+  }
+
+  if (payload.it_bindings?.length) {
+    outputEl.appendChild(el("h2", { text: "it bindings" }));
+    const table = el("table");
+    table.appendChild(
+      el("tr", null, [
+        el("th", { text: "binder" }),
+        el("th", { text: "context" }),
+        el("th", { text: "bound" }),
+        el("th", { text: "position" }),
+      ])
+    );
+    for (const binding of payload.it_bindings) {
+      table.appendChild(
+        el("tr", null, [
+          el("td", { text: binding.binder }),
+          el("td", { text: binding.context }),
+          el("td", { text: String(binding.bound) }),
+          el("td", { text: `line ${binding.line}, column ${binding.column}` }),
+        ])
+      );
+    }
+    outputEl.appendChild(table);
   }
 
   if (payload.references.length) {
