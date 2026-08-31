@@ -272,9 +272,96 @@ A: 7
 E: Singular expression refers to nonexistent object.
 ```
 
+**Absorption is direct-operand only.** `exists` forgives an erroring operand,
+but not an error one construct further down -- a single cast between the
+`exists` and the erroring expression and the error propagates again. Both
+engines:
+
+```
+Q: exists ("abc" whose (length of it = 999))
+A: False
+Q: exists (("abc" whose (length of it = 999)) as string)
+E: Singular expression refers to nonexistent object.
+```
+
+The operand of the `exists` in the second query is the *cast*, and the cast is
+a singular context: the error reaches it, and an erroring cast is an erroring
+operand `exists` never gets the chance to flatten. The same boundary holds for
+the non-unique error (client, a file of 34 matching lines):
+
+```
+Q: exists (line whose (it contains "e") of file "<f>")
+A: True
+Q: exists ((line whose (it contains "e") of file "<f>") as string)
+E: Singular expression refers to non-unique object.
+```
+
 For a deliberate default, use the error-fallback operator `|`, documented in
 [`syntax.md`](syntax.md). `exists`/`number of` absorbing an error is a
-byproduct of plural flattening; `|` is the construct that means it.
+byproduct of plural flattening; `|` is the construct that means it -- but note
+`|` rescues fewer errors than it appears to; see the next section.
+
+## The empty case: a singular that finds nothing, and what rescues it
+
+The complement of the non-unique finding below: where a singular spelling over
+*several* values errors with `non-unique object`, a singular spelling over
+*none* errors with `nonexistent object` -- and the plural spelling of the same
+question does not error at all, it answers 0 values. Both engines:
+
+```
+Q: "abc" whose (length of it = 999)
+E: Singular expression refers to nonexistent object.
+Q: number of (names whose (length of it = 999) of files "hosts" of folder "/etc")
+A: 0
+```
+
+(The session engine agrees on both, via `bes computers` in place of files.)
+
+Three constructs meet this error, and they treat it differently:
+
+- **`exists`, directly over it**, flattens it to `False` -- but only directly;
+  one cast in between and the error is back (see the boundary transcripts in
+  the section above). `exists name whose (length of it = 12) of it` inside a
+  `whose` filter is therefore the ordinary idiom for testing a singular
+  property against a predicate, and is clean however the filter turns out.
+
+- **`|` runs on it.** The fallback operator *requires* singular operands --
+  a plural spelling on either side is refused before evaluation with
+  `A singular expression is required.`, on both engines -- and the
+  `nonexistent` error is precisely the trigger that makes the default idiom
+  work:
+
+  ```
+  Q: ("abc" whose (length of it = 999)) | "fallback"
+  A: fallback
+  Q: (names whose (length of it = 999) of files "hosts" of folder "/etc") | "fallback"
+  E: A singular expression is required.
+  ```
+
+  So a fallback chain is *correctly* written singular: the plural spelling
+  cannot be written there, and its "found nothing answers 0" behaviour is the
+  opposite of what the idiom needs.
+
+- **`|` does not rescue `non-unique`.** A singular over several values has
+  already produced its first value when uniqueness is violated; the error
+  arrives after an answer, and the fallback never runs:
+
+  ```
+  Q: (name of files of folder "/etc") | "fallback"
+  A: afpovertcp.cfg
+  E: Singular expression refers to non-unique object.
+  ```
+
+  Session answers the bare error for the same shape (`(name of bes computers)
+  | "fallback"`). Either way, the fallback is unused: `|` rescues an error
+  that arrives *instead of* a value, not one that arrives after the first.
+
+The practice that falls out of all three: **stay plural for as long as the
+chain runs, and collapse once at the end** -- with `unique value of` where a
+singular is actually required, since it dedups before asserting. The two
+places a mid-chain singular is right rather than a habit are exactly the two
+rescues above: the left side of a `|` (required, and the error is the
+trigger) and directly under an `exists` (the predicate-testing idiom).
 
 ## Runtime error wording is shared - a recorded non-finding
 
@@ -368,6 +455,10 @@ the indexed sibling is the signal.)*
 See [`syntax.md`](syntax.md) for the four constructs that turn a plural into a
 singular safely, and note that the aggregate spellings (`unique value of` and
 friends) are the safest, since they dedup before asserting.
+
+This section is the *several* half; the *empty* half -- a singular spelling
+that finds nothing, which errors differently and is rescued differently -- is
+[its own finding above](#the-empty-case-a-singular-that-finds-nothing-and-what-rescues-it).
 
 ## Each dialect rejects the other's vocabulary outright
 

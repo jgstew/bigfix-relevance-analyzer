@@ -134,6 +134,30 @@ This is the idiomatic way to give a default for something that may not exist:
 (name of it | "unknown") of bes computers
 ```
 
+**Both operands must be singular.** A plural spelling on either side is
+refused before evaluation, on both engines:
+
+```
+Q: (names whose (length of it = 999) of files "hosts" of folder "/etc") | "fallback"
+E: A singular expression is required.
+```
+
+That requirement is why the default idiom is inherently a *singular* idiom,
+and it is load-bearing: the "value is missing" case must arrive as an
+**error** -- a singular spelling that finds nothing raises `Singular
+expression refers to nonexistent object.`, and that error is what trips the
+fallback. A plural finding nothing answers 0 values, which is not an error --
+so even if a plural were accepted here, the fallback would never run. A
+`setting "X" whose (value of it = "1") of client | ERROR "disabled"` is
+therefore *correctly* singular, however plural-preferring the rest of the
+chain is; see the empty-case findings in
+[`universal_relevance.md`](universal_relevance.md#the-empty-case-a-singular-that-finds-nothing-and-what-rescues-it).
+
+**Not every error is rescued.** `nonexistent` trips the fallback;
+`non-unique` does not -- a singular over several values has already answered
+its first value when uniqueness is violated, and the expression still errors
+with the fallback unused. Transcripts in the same section.
+
 `|` has no row in the operator table at all, because the grammar defines it
 rather than the inspector layer. The same is true of `and` and `or`.
 

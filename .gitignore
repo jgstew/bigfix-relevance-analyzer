@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Node (tools/pyodide-smoke/ only -- the project itself has no JS runtime deps;
+# this one directory exists purely to drive Pyodide from CI, see
+# .github/workflows/pyodide.yaml)
+node_modules/

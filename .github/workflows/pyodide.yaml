@@ -1,0 +1,92 @@
+---
+name: pyodide
+
+# Proves this package's wheel installs and runs under Pyodide (CPython
+# compiled to WASM) inside Node -- with no system Python in the loop at all.
+# That's the constraint a VS Code extension bundling this package would ship
+# under (see issue #10: "could a VS Code extension use the python code
+# directly rather than porting to Rust?"). This workflow answers only the
+# build/runtime half of that question -- it does not implement or exercise
+# any LSP surface, just import-and-run-one-example under the real target
+# runtime. tools/pyodide-smoke/smoke.mjs is the script; see its header for
+# what it checks and why.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pyodide-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pyodide:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Same pin as .github/workflows/test.yaml -- only used here to build
+      # the wheel that gets handed to Pyodide, not to run the package.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      # Same awk-from-.pre-commit-config.yaml trick as test.yaml, so this
+      # workflow doesn't carry a second, driftable uv version pin.
+      - name: read uv version from .pre-commit-config.yaml
+        run: |
+          UV_VERSION="$(awk '
+            /^[[:space:]]*-[[:space:]]*repo:.*astral-sh\/uv-pre-commit[[:space:]]*$/ { found = 1; next }
+            found && $1 == "rev:" {
+              if (match($0, /#[ \t]*(frozen:[ \t]*)?[vV]?[0-9]+(\.[0-9]+)*/)) {
+                ver = substr($0, RSTART, RLENGTH)
+                sub(/^#[ \t]*(frozen:[ \t]*)?[vV]?/, "", ver)
+              } else {
+                ver = $2
+                gsub(/["'\'']/, "", ver)
+                sub(/^[vV]/, "", ver)
+              }
+              print ver
+              exit
+            }
+          ' .pre-commit-config.yaml)"
+          if [ -z "$UV_VERSION" ]; then
+            echo "::error::could not read the astral-sh/uv-pre-commit version from .pre-commit-config.yaml"
+            exit 1
+          fi
+          echo "UV_VERSION=$UV_VERSION" >> "$GITHUB_ENV"
+          echo "uv version: $UV_VERSION"
+
+      - name: install uv
+        run: python -m pip install "uv==${UV_VERSION}"
+
+      # Only the wheel this step produces is what Pyodide gets -- not the
+      # source tree -- so this exercises the same artifact a release ships,
+      # same as the "install the built wheel" step in test.yaml.
+      - name: uv build (wheel)
+        run: uv build --wheel
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tools/pyodide-smoke/package-lock.json
+
+      - name: npm ci
+        working-directory: tools/pyodide-smoke
+        run: npm ci
+
+      # The version this checks against __version__ comes from the wheel's
+      # own package metadata, same as the "smoke-import" step in test.yaml --
+      # nothing here can drift from what was actually built.
+      - name: run the analyzer under Pyodide in Node
+        working-directory: tools/pyodide-smoke
+        run: node smoke.mjs ../../dist/*.whl
