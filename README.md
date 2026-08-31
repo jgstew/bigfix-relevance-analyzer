@@ -384,7 +384,7 @@ for finding in findings:
 
 ```
 MyFixlet.bes:41: error [parse-error] col 18: expected ')'
-MyTask.bes:88: error [complexity] score 640 > 500 (whose_clauses=9, max_of_chain=7, tokens=340)
+MyTask.bes:88: error [complexity] score 640 > 550 (whose_clauses=9, max_of_chain=7, tokens=340)
 MyDashboard.ojo:12: warning [unknown-inspector] no dump defines `bes computer group`
 ```
 
@@ -396,7 +396,7 @@ same way instead of each inventing a description:
 
 | Code | Default | Fires when | Ceiling |
 | --- | --- | --- | --- |
-| `complexity` | error | the complexity score is above the ceiling | `max_score` (default 500) |
+| `complexity` | error | the complexity score is above the ceiling | `max_score` (default 550) |
 | `error-token` | error | the statement contains text that could not be lexed | always on |
 | `evaluation-cost` | error | the evaluation cost is above the ceiling | `max_evaluation_cost` (default 50) |
 | `file-error` | error | a path given to the linter does not exist or could not be read | always on |

@@ -656,6 +656,15 @@ def test_the_readme_rule_table_says_which_rules_are_gated() -> None:
         if rule.gated:
             assert rule.threshold is not None
             assert f"`{rule.threshold}`" in row, rule.code
+            default = getattr(LintConfig(), rule.threshold)
+            # Defaults are floats (e.g. 550.0) but the README writes them as
+            # plain ints (550) -- format the same way so the two can't drift
+            # apart on trailing ".0" while the assertion still catches a real
+            # value change.
+            rendered = (
+                int(default) if isinstance(default, float) and default.is_integer() else default
+            )
+            assert f"default {rendered}" in row, rule.code
         else:
             assert "always on" in row, rule.code
 
