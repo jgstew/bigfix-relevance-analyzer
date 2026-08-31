@@ -327,6 +327,18 @@ function renderError(err) {
 let analyze = null;
 
 async function boot() {
+  // Timed by phase so a real load-time question ("is this slow, and if so
+  // where") has an actual answer instead of a guess -- printed as a table
+  // once boot() finishes. performance.now() is monotonic and unaffected by
+  // wall-clock changes, unlike Date.now().
+  const timings = [];
+  let lastMark = performance.now();
+  const mark = (label) => {
+    const now = performance.now();
+    timings.push({ phase: label, ms: Math.round(now - lastMark) });
+    lastMark = now;
+  };
+
   // pyodide.mjs's own loader (getInstantiateWasmFunc) always builds the wasm
   // fetch as `${indexURL}pyodide.asm.wasm`, unconditionally, regardless of
   // any of the embed-friendly options used below -- it's the one asset with
@@ -350,6 +362,7 @@ async function boot() {
     }
     return realFetch(input, init);
   };
+  mark("decode base64 + install fetch intercept");
 
   // Both are real ES modules; importing them from a data: URL runs them
   // exactly as importing the files would, with no fetch involved.
@@ -357,6 +370,7 @@ async function boot() {
     "data:text/javascript;base64," + PYODIDE_ASM_MJS_BASE64
   );
   const { loadPyodide } = await import("data:text/javascript;base64," + PYODIDE_MJS_BASE64);
+  mark("import pyodide.mjs + pyodide.asm.mjs");
 
   const pyodide = await loadPyodide({
     indexURL: "./",
@@ -368,6 +382,7 @@ async function boot() {
     // Passing this directly is what skips fetching pyodide-lock.json.
     lockFileContents: JSON.parse(textFromBase64(PYODIDE_LOCK_JSON_BASE64)),
   });
+  mark("loadPyodide() -- wasm instantiate + stdlib unpack + interpreter init");
 
   // No micropip: the wheel is pure Python with no dependencies (see
   // pyproject.toml's `dependencies = []`), so extracting it with the
@@ -384,6 +399,7 @@ sys.path.insert(0, "/tmp/site-packages")
 import json
 from bigfix_relevance_analyzer import __version__, analyze_relevance_to_dict
 `);
+  mark("extract wheel + import bigfix_relevance_analyzer");
 
   analyze = (text) => {
     pyodide.globals.set("_playground_input", text);
@@ -391,7 +407,12 @@ from bigfix_relevance_analyzer import __version__, analyze_relevance_to_dict
     return JSON.parse(resultJson);
   };
 
-  return pyodide.globals.get("__version__");
+  const totalMs = Math.round(timings.reduce((sum, t) => sum + t.ms, 0));
+  console.table(timings);
+  console.log(`bigfix-relevance-analyzer playground: boot() took ${totalMs}ms total`);
+  window.__bootTimings = { timings, totalMs };
+
+  return { version: pyodide.globals.get("__version__"), totalMs };
 }
 
 async function run() {
@@ -473,8 +494,8 @@ if (wasmProblem) {
       "real failure there looks like from here -- check the browser console " +
       "for that warning to confirm."
   )
-    .then((version) => {
-      setStatus(`Ready -- bigfix_relevance_analyzer ${version}.`);
+    .then(({ version, totalMs }) => {
+      setStatus(`Ready -- bigfix_relevance_analyzer ${version} (loaded in ${(totalMs / 1000).toFixed(1)}s).`);
       runEl.disabled = false;
       run();
     })
