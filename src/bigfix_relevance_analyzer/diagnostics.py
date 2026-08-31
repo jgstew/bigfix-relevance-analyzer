@@ -100,6 +100,7 @@ FIELDS: Final = frozenset(
         "argument_type",
         "cast_name",
         "direct_object",
+        "fix",
         "if_false_type",
         "if_true_type",
         "index",
@@ -318,7 +319,7 @@ _TYPE_CHECK: Final = [
         "version-truncating-compare",
         Origin.RUNTIME,
         "'{token}' compares only as many components as the shorter version has, "
-        "so 'version \"1.2.3\"' equals 'version \"1.2\"' -- use 'pad of' on both sides",
+        "so 'version \"1.2.3\"' equals 'version \"1.2\"' -- {fix}",
     ),
     _entry(
         "unary-operator-not-defined",

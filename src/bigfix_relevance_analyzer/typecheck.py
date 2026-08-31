@@ -1702,9 +1702,15 @@ class _Checker:
 
             # `=` and `!=` are wrong whichever side is longer: the engine calls
             # unequal versions equal. `form.operator` is `=` for both, since a
-            # negation keeps the canonical operator.
+            # negation keeps the canonical operator. `pad of` is the only fix
+            # here -- there is no single other operator that would do instead.
             if form.operator == "=":
-                self.report("version-truncating-compare", node.span, token=node.op)
+                self.report(
+                    "version-truncating-compare",
+                    node.span,
+                    token=node.op,
+                    fix="use 'pad of' on both sides",
+                )
                 return
 
             # `form.swapped` is what separates `>` from `<` and `>=` from `<=`,
@@ -1712,7 +1718,18 @@ class _Checker:
             strict = form.operator == "<"
             broken = (strict == form.swapped) if left_loses else (strict != form.swapped)
             if broken:
-                self.report("version-truncating-compare", node.span, token=node.op)
+                # `>` (and its word form `is greater than`) is `form.operator ==
+                # "<"` with `swapped` set -- the one case in this branch with an
+                # obvious, more-common one-operator fix than `pad of`: the
+                # author almost always meant `>=`, the idiom the safe half of
+                # this same table uses. The other three broken spellings
+                # (`>=`, `<`, `<=`) keep the general `pad of` suggestion.
+                fix = (
+                    "did you mean '>='?"
+                    if strict and form.swapped
+                    else "use 'pad of' on both sides"
+                )
+                self.report("version-truncating-compare", node.span, token=node.op, fix=fix)
             return
 
         # No version anywhere, and both sides are dotted-numeric literals: the
