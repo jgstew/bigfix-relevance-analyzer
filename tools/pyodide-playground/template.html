@@ -416,16 +416,73 @@ inputEl.addEventListener("keydown", (event) => {
 });
 runEl.addEventListener("click", run);
 
-boot()
-  .then((version) => {
-    setStatus(`Ready -- bigfix_relevance_analyzer ${version}.`);
-    runEl.disabled = false;
-    run();
-  })
-  .catch((err) => {
-    setStatus("Failed to load Pyodide or the analyzer -- see below.", true);
-    renderError(err);
+function checkWasmSupport() {
+  if (typeof WebAssembly !== "object" || typeof WebAssembly.instantiate !== "function") {
+    return "This browser has no WebAssembly support at all.";
+  }
+  try {
+    // The smallest possible valid module: just the magic number and version,
+    // no sections. If a browser claims to have WebAssembly but rejects this,
+    // something is broken in the implementation itself (or a policy is
+    // blocking it) -- treat that the same as no WASM, rather than letting it
+    // fail confusingly later, mid-boot.
+    const minimalModule = new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
+    if (!WebAssembly.validate(minimalModule)) {
+      return "WebAssembly.validate() rejected a minimal, definitely-valid module.";
+    }
+  } catch (err) {
+    return `WebAssembly is present but throws when used: ${err}`;
+  }
+  return null;
+}
+
+function withTimeout(promise, ms, message) {
+  let timer;
+  const timeout = new Promise((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
   });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+const wasmProblem = checkWasmSupport();
+if (wasmProblem) {
+  // Caught before calling boot() at all -- no point decoding ~17 MiB of
+  // embedded assets for a browser that was never going to run them.
+  setStatus("This browser can't run this page.", true);
+  renderError(
+    new Error(
+      `${wasmProblem}\n\n` +
+        "bigfix-relevance-analyzer needs WebAssembly to run Pyodide (CPython " +
+        "compiled to WASM) here. Try a current version of a major browser " +
+        "(Chrome, Firefox, Safari, Edge), and check whether an extension or " +
+        "an administrator policy has disabled WebAssembly."
+    )
+  );
+} else {
+  // See the comment on getInstantiateWasmFunc's try/catch above (in boot()):
+  // a real WebAssembly failure inside Pyodide's own loader is caught there,
+  // logged as a console warning, and never surfaces as a rejection -- boot()
+  // would otherwise hang forever with no error at all. This timeout is the
+  // only thing that turns that into a visible failure.
+  withTimeout(
+    boot(),
+    90000,
+    "Pyodide did not finish loading within 90 seconds. A failed WebAssembly " +
+      'instantiation inside Pyodide\'s own loader logs a "wasm instantiation ' +
+      'failed!" console warning but never raises an error, so this is what a ' +
+      "real failure there looks like from here -- check the browser console " +
+      "for that warning to confirm."
+  )
+    .then((version) => {
+      setStatus(`Ready -- bigfix_relevance_analyzer ${version}.`);
+      runEl.disabled = false;
+      run();
+    })
+    .catch((err) => {
+      setStatus("Failed to load Pyodide or the analyzer -- see below.", true);
+      renderError(err);
+    });
+}
 </script>
 </body>
 </html>
