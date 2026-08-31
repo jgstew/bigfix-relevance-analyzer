@@ -119,7 +119,7 @@
     <button id="run" disabled>Analyze</button>
     <span class="hint">Enter to analyze &middot; Shift+Enter for a new line</span>
   </div>
-  <p id="status">Loading Pyodide&hellip;</p>
+  <p id="status">Loading HTML&hellip; ( ~ 20 seconds, depends on your connection )</p>
 
   <div id="output"></div>
 </main>
@@ -145,6 +145,8 @@ function checkWasmSupport() {
   return null;
 }
 
+document.getElementById("status").textContent = "Checking WebAssembly... ( ~ 1 second )";
+
 window.__wasmProblem = checkWasmSupport();
 if (window.__wasmProblem) {
   const earlyStatusEl = document.getElementById("status");
@@ -160,6 +162,8 @@ if (window.__wasmProblem) {
   document.getElementById("output").replaceChildren(earlyErrorEl);
   // No point downloading the rest of this page now.
   window.stop();
+} else {
+  document.getElementById("status").textContent = "WebAssembly OK, loading Pyodide... ( ~ 1 second )";
 }
 </script>
 
@@ -369,6 +373,7 @@ async function boot() {
     return realFetch(input, init);
   };
   mark("decode base64 + install fetch intercept");
+  setStatus("Loading Pyodide runtime... ( ~ 1 second )");
 
   // Real ES modules; data: URL import runs them with no fetch involved.
   const { default: createPyodideModule } = await import(
@@ -376,6 +381,7 @@ async function boot() {
   );
   const { loadPyodide } = await import("data:text/javascript;base64," + PYODIDE_MJS_BASE64);
   mark("import pyodide.mjs + pyodide.asm.mjs");
+  setStatus("Loading WebAssembly + starting Python interpreter... ( ~ 10 seconds )");
 
   const pyodide = await loadPyodide({
     indexURL: "./",
@@ -384,6 +390,7 @@ async function boot() {
     lockFileContents: JSON.parse(textFromBase64(PYODIDE_LOCK_JSON_BASE64)), // skips fetching pyodide-lock.json
   });
   mark("loadPyodide() -- wasm instantiate + stdlib unpack + interpreter init");
+  setStatus("Loading bigfix_relevance_analyzer... ( ~ 1 second )");
 
   // No micropip, no extraction: zipimport reads modules straight from the
   // wheel, same as Pyodide's own stdlib loading does for python_stdlib.zip.
