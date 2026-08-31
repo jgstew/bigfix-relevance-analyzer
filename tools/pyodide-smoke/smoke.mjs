@@ -73,29 +73,40 @@ if (payload.dialect?.classified !== "client") {
 if (payload.parse?.ok !== true) fail(`expected parse.ok === true, got ${JSON.stringify(payload.parse)}`);
 if (payload.types?.ok !== true) fail(`expected types.ok === true, got ${JSON.stringify(payload.types)}`);
 
-console.log(`bigfix_relevance_analyzer ${version} imported and ran under Pyodide in Node\n`);
-console.log(`input:  ${payload.text}\n`);
+// Plain Markdown on stdout, nothing CI-specific -- this script has no idea
+// whether it's running in a GitHub Action, a terminal, or anything else, and
+// it stays that way on purpose: where this output *goes* (a log, a step
+// summary, both) is a decision for whatever invokes it, not for this script.
+// See .github/workflows/pyodide.yaml for how the workflow uses it.
+const referenceRows = payload.references
+  .map((ref) => `| \`${ref.phrase}\` | ${ref.known} | ${ref.return_types.join(", ")} |`)
+  .join("\n");
 
-console.log("dialect:");
-console.log(`  classified: ${payload.dialect.classified}  (effective: ${payload.dialect.effective}, assumed: ${payload.dialect.assumed})`);
+console.log(`\
+## bigfix-relevance-analyzer under Pyodide (Node)
 
-console.log("\nlexing:");
-console.log(`  ${payload.lexing.tokens} tokens (${payload.lexing.code_tokens} code) -- ${JSON.stringify(payload.lexing.by_kind)}`);
+\`bigfix_relevance_analyzer\` ${version}, built as a wheel this run and installed into Pyodide (WASM CPython) via micropip -- no system Python involved. See [issue #10](https://github.com/jgstew/bigfix-relevance-analyzer/issues/10).
 
-console.log("\nparse:");
-console.log(`  ok, ${payload.parse.node_count} nodes, tree depth ${payload.parse.tree_depth}`);
-console.log(`  s-expression: ${payload.parse.sexpr}`);
+**Input:** \`${payload.text}\`
 
-console.log("\ncomplexity:");
-console.log(`  score: ${payload.complexity.score}  evaluation cost: ${payload.complexity.evaluation_cost}`);
+| | |
+| --- | --- |
+| dialect | ${payload.dialect.classified} (effective: ${payload.dialect.effective}, assumed: ${payload.dialect.assumed}) |
+| tokens | ${payload.lexing.tokens} (${payload.lexing.code_tokens} code) |
+| parse | ok, ${payload.parse.node_count} nodes, depth ${payload.parse.tree_depth} |
+| complexity score | ${payload.complexity.score} |
+| evaluation cost | ${payload.complexity.evaluation_cost} |
+| result type | ${payload.types.types.join(", ")} (${payload.types.plurality}) |
+| platforms viable | ${payload.platforms.viable.join(", ")} |
 
-console.log("\ntypes:");
-console.log(`  result type(s): ${payload.types.types.join(", ")} (${payload.types.plurality})`);
+**S-expression**
 
-console.log("\nplatforms viable:");
-console.log(`  ${payload.platforms.viable.join(", ")}`);
+\`\`\`
+${payload.parse.sexpr}
+\`\`\`
 
-console.log("\nreferences:");
-for (const ref of payload.references) {
-  console.log(`  ${ref.phrase} -- known: ${ref.known}, return type(s): ${ref.return_types.join(", ")}`);
-}
+**References**
+
+| phrase | known | return type(s) |
+| --- | --- | --- |
+${referenceRows}`);
