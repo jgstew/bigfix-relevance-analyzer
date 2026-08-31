@@ -482,6 +482,22 @@ containing it. `|` does not rescue it either -- `((line whose (it contains
 the error, not the fallback.
 """
 
+_FILTERED_SPELLING: Final = frozenset({"filtered-singular-spelling"})
+"""The shape rule, which the left operand of a `|` retracts.
+
+The shape rule names two things against an indexed filtered singular: the
+mid-chain habit, and the *nonexistent* error where the filter matches nothing.
+Left of a `|`, that error is not a hazard -- it is the trigger the fallback is
+built on: `setting "X" whose (value of it = "1") of client | ERROR "disabled"`
+reaches the fallback *because* the empty case errors. The plural spelling
+would answer 0 rows without erroring, the fallback would never run, and the
+whole expression would answer nothing -- so here the plural rewrite changes
+what the expression means, and the singular is required, not a habit.
+
+Only this code: `singular-of-filtered-collection` stays, because the
+non-unique error is one `|` genuinely does not rescue (see above).
+"""
+
 
 def _written_reference(prop: Node) -> Reference | None:
     """The reference whose written form settles an `of`'s plurality, if any.
@@ -1512,6 +1528,10 @@ class _Checker:
         # a risk the author has already answered -- this is what the corpus's
         # `free space of drives of system folders | 0` is for.
         self.accept_collapse(node.left.span)
+        # The shape rule too: left of a `|`, the empty case erroring is the
+        # mechanism the fallback runs on, and the suggested plural spelling
+        # would answer 0 rows without tripping it (see `_FILTERED_SPELLING`).
+        self.retract(_FILTERED_SPELLING, node.left.span)
 
         # The evaluator's own message for this is the terse "Incompatible types."
         # -- qna/the debugger don't say what was actually mismatched. The

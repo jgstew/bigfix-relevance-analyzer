@@ -925,11 +925,37 @@ def test_an_indexed_singular_with_a_filter_is_the_other_rule(env: TypeEnvironmen
     result = check(parse(source), env)
     assert [d.code for d in result.diagnostics] == ["filtered-singular-spelling"]
     assert result.diagnostics[0].message == (
-        "'file whose (...)' collapses to a singular mid-chain; prefer "
-        "'files whose (...)' and, where a singular is required, 'unique value "
-        "of' at the end of the chain"
+        "'file whose (...)' writes a filter on a singular spelling and errors "
+        "when the filter matches nothing; prefer 'files whose (...)' and, "
+        "where a singular is required, 'unique value of' at the end of the chain"
     )
     assert result.ok
+
+
+def test_the_shape_rule_is_withdrawn_left_of_a_pipe(env: TypeEnvironment) -> None:
+    """The reported false positive, verbatim from BES Client Info - Universal.
+
+    Left of a `|`, the empty case erroring is the point: the fallback runs
+    *because* `setting "..." whose (value of it = "1") of client` raises
+    `Singular expression refers to nonexistent object.` when the filter
+    matches nothing. The suggested plural spelling would answer 0 rows without
+    erroring, the `ERROR "command polling disabled"` arm would never run, and
+    the expression would answer nothing at all -- so the singular here is
+    required, and the shape rule is retracted (see `_FILTERED_SPELLING`).
+
+    Only the shape rule, and only on the left: the same form as the right
+    operand keeps firing, since nothing there needs the error.
+    """
+    source = (
+        '(value of setting "_BESClient_Comm_CommandPollIntervalSeconds" of client'
+        ' | "not set - default 900")'
+        ' of setting "_BESClient_Comm_CommandPollEnable" whose (value of it = "1")'
+        ' of client | ERROR "command polling disabled"'
+    )
+    assert [d.code for d in check(parse(source), env).diagnostics] == []
+
+    right = '"x" | pathname of file "x.bes" whose (size of it > 1) of folder "c:\\"'
+    assert [d.code for d in check(parse(right), env).diagnostics] == ["filtered-singular-spelling"]
 
 
 def test_a_property_used_on_the_wrong_direct_object_is_a_finding(env: TypeEnvironment) -> None:

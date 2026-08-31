@@ -340,7 +340,7 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "The sibling of `non-unique-risk`, reported where that hazard cannot "
                 'fire. `pathname of file "x.bes" whose (...) of folder "c:\\\\"` cannot '
                 "match twice -- a folder holds one file of a given name -- but it "
-                "collapses to a singular in the middle of a chain, which is the habit "
+                "writes a filter on a singular spelling mid-chain, which is the habit "
                 "that makes the same shape raise wherever the name is dropped, and it "
                 "still raises `Singular expression refers to nonexistent object.` when "
                 "the filter matches nothing, where the plural spelling answers 0. "

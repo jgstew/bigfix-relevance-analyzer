@@ -263,8 +263,9 @@ _TYPE_CHECK: Final = [
         "filtered-singular-spelling",
         # The shape, where the *non-unique* hazard above cannot fire: an index
         # means `pathname of file "x.bes" whose (...) of folder "c:\\"` never
-        # matches twice. It is still a singular collapsed in the middle of a
-        # chain rather than at the end of one, which is the habit the two
+        # matches twice. The chain may even be singular throughout -- nothing
+        # need collapse -- but the filter sits on a singular spelling in the
+        # middle of it rather than at the end, which is the habit the two
         # entries above are the consequence of -- and the empty case is a
         # hazard of its own, since a filter that matches nothing has nothing
         # to be singular about. Confirmed in qna::
@@ -278,7 +279,8 @@ _TYPE_CHECK: Final = [
         # stay plural for as long as possible and collapse once, at the end,
         # with `unique value of` where a singular is actually required.
         Origin.RUNTIME,
-        "'{phrase} whose (...)' collapses to a singular mid-chain; prefer "
+        "'{phrase} whose (...)' writes a filter on a singular spelling and "
+        "errors when the filter matches nothing; prefer "
         "'{plural_phrase} whose (...)' and, where a singular is required, "
         "'unique value of' at the end of the chain",
     ),
