@@ -195,14 +195,18 @@ def test_the_corpus_takes_the_non_unique_risk_deliberately(env: TypeEnvironment)
     feed an operator that required a singular anyway. Nearly every site this
     rule could fire on is one of those.
 
-    These three are not, and they are two different findings. The first is a
+    These two are not, and they are two different findings. The first is a
     bare `pathname of <plural>` with nothing guarding it, which is exactly
-    what the risk rule is for. The other two -- `pathname of file
-    "UninstallMSI_Tasks.bes" whose (...) of folder ...` and the `key
-    "HKEY_LOCAL_MACHINE\\HARDWARE\\...\\BIOS" whose (...) of registry` --
-    cannot match twice, since the index makes each unique, and land on the
-    shape rule instead. That is the distinction worth pinning: one shape,
-    sorted by whether it can actually collapse several into one.
+    what the risk rule is for. The second -- `pathname of file
+    "UninstallMSI_Tasks.bes" whose (...) of folder ...` -- cannot match
+    twice, since the index makes it unique, and lands on the shape rule
+    instead. That is the distinction worth pinning: one shape, sorted by
+    whether it can actually collapse several into one.
+
+    The corpus's `exists key "HKEY_LOCAL_MACHINE\\HARDWARE\\...\\BIOS" whose
+    (...) of registry` used to be pinned here too, and stopped firing when
+    the shape rule learned that a direct `exists` answers `False` where the
+    empty case would have erred (see `_FILTERED_SPELLING`).
     """
     risks = {(name, line, code) for name, line, code, _ in _corpus_diagnostics(env)}
     assert risks == {
@@ -212,7 +216,6 @@ def test_the_corpus_takes_the_non_unique_risk_deliberately(env: TypeEnvironment)
             114,
             "filtered-singular-spelling",
         ),
-        ("task_power_management_sleep_when_idle.bes", 12, "filtered-singular-spelling"),
     }
 
 
@@ -956,6 +959,30 @@ def test_the_shape_rule_is_withdrawn_left_of_a_pipe(env: TypeEnvironment) -> Non
 
     right = '"x" | pathname of file "x.bes" whose (size of it > 1) of folder "c:\\"'
     assert [d.code for d in check(parse(right), env).diagnostics] == ["filtered-singular-spelling"]
+
+
+def test_the_shape_rule_is_withdrawn_under_a_direct_exists(env: TypeEnvironment) -> None:
+    """The reported false positive: `exists name whose (length of it = 12 AND
+    it as lowercase ends with ".log") of it` inside a `files whose (...)`
+    predicate, from BES Client Info - Universal. Under a direct `exists`
+    neither thing the shape rule names holds -- the empty case answers `False`
+    rather than erroring, and `exists <singular> whose (P) of it` is the idiom
+    for testing a singular against a predicate. Confirmed live in qna::
+
+        Q: exists name whose (length of it = 99) of file "/etc/hosts"
+        A: False
+
+    Exact-span, the same boundary `_FILTERED_RISK` walks: one cast between
+    the `exists` and the filtered form and the nonexistent error is back::
+
+        Q: exists ((name whose (length of it = 99) of file "/etc/hosts") as string)
+        E: Singular expression refers to nonexistent object.
+    """
+    direct = 'exists name whose (length of it = 12) of file "x" of folder "c:\\"'
+    assert [d.code for d in check(parse(direct), env).diagnostics] == []
+
+    cast = 'exists ((name whose (length of it = 12) of file "x" of folder "c:\\") as string)'
+    assert [d.code for d in check(parse(cast), env).diagnostics] == ["filtered-singular-spelling"]
 
 
 def test_a_property_used_on_the_wrong_direct_object_is_a_finding(env: TypeEnvironment) -> None:

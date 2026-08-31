@@ -483,7 +483,7 @@ the error, not the fallback.
 """
 
 _FILTERED_SPELLING: Final = frozenset({"filtered-singular-spelling"})
-"""The shape rule, which the left operand of a `|` retracts.
+"""The shape rule, retracted left of a `|` and under a direct `exists`.
 
 The shape rule names two things against an indexed filtered singular: the
 mid-chain habit, and the *nonexistent* error where the filter matches nothing.
@@ -494,8 +494,24 @@ would answer 0 rows without erroring, the fallback would never run, and the
 whole expression would answer nothing -- so here the plural rewrite changes
 what the expression means, and the singular is required, not a habit.
 
-Only this code: `singular-of-filtered-collection` stays, because the
-non-unique error is one `|` genuinely does not rescue (see above).
+Under a direct `exists` neither thing holds either: the empty case answers
+`False` rather than erroring, and `exists name whose (length of it = 12) of
+it` is the idiom for testing a singular against a predicate, not a mid-chain
+collapse. Confirmed live in qna, and only *directly* -- one cast in between
+and the error is back, the same boundary `_FILTERED_RISK` walks::
+
+    Q: exists name whose (length of it = 99) of file "/etc/hosts"
+    A: False
+    Q: (name whose (length of it = 99) of file "/etc/hosts") as string
+    E: Singular expression refers to nonexistent object.
+    Q: exists ((name whose (length of it = 99) of file "/etc/hosts") as string)
+    E: Singular expression refers to nonexistent object.
+
+so `exists` uses :meth:`_Checker.retract_exact` where `|` may use containment
+(everything left of a `|` is forgiven an error -- that is what `|` is for).
+
+Only this code: `singular-of-filtered-collection` stays under `|`, because
+the non-unique error is one `|` genuinely does not rescue (see above).
 """
 
 
@@ -1055,6 +1071,11 @@ class _Checker:
                 # `exists (line whose (...) of file "<f>")` is clean, and the
                 # same form under one cast raises the non-unique error again.
                 self.retract_exact(_FILTERED_RISK, node.operand.span)
+                # The shape rule at the same boundary: a direct `exists`
+                # answers `False` where the empty case would have erred, and
+                # `exists name whose (...) of it` is the predicate-testing
+                # idiom, not a mid-chain collapse (see `_FILTERED_SPELLING`).
+                self.retract_exact(_FILTERED_SPELLING, node.operand.span)
                 self.values.append(self.literal("boolean"))
             case NumberOf():
                 self.pop(1)
