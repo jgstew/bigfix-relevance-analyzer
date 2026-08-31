@@ -10,6 +10,10 @@ name: pyodide
 # any LSP surface, just import-and-run-one-example under the real target
 # runtime. tools/pyodide-smoke/smoke.mjs is the script; see its header for
 # what it checks and why.
+#
+# It also builds a standalone HTML playground (tools/pyodide-playground/)
+# with the same analyzer embedded for interactive use in a browser, and
+# uploads it as this run's "pyodide-playground" artifact.
 
 on:
   pull_request:
@@ -97,3 +101,29 @@ jobs:
       - name: run the analyzer under Pyodide in Node
         working-directory: tools/pyodide-smoke
         run: node smoke.mjs ../../dist/*.whl | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # tools/pyodide-smoke's npm ci above already fetched the exact Pyodide
+      # release this repo pins, as the "pyodide" npm package -- that package
+      # ships its own runtime assets (the wasm binary, stdlib zip, etc.) for
+      # its own offline/Node use, so this reads them from there instead of
+      # fetching Pyodide's release a second time. build_playground.py checks
+      # its own version pin against tools/pyodide-smoke/package.json's, so
+      # the two can't silently drift apart.
+      #
+      # The built page is fully self-contained: everything Pyodide and this
+      # package need is embedded as base64, so opening it makes no network
+      # requests at all -- see template.html's boot() for how. That's also
+      # why this step is the slow one: encoding ~13 MiB of runtime assets as
+      # base64 is real work, not just a wheel copy.
+      - name: build the standalone playground page
+        run: |
+          python3 tools/pyodide-playground/build_playground.py \
+            --wheel dist/*.whl \
+            --pyodide-dir tools/pyodide-smoke/node_modules/pyodide \
+            --out playground/index.html
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pyodide-playground
+          path: playground/index.html
+          if-no-files-found: error
