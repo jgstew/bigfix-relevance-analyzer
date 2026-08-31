@@ -136,6 +136,61 @@
 <script>
 "use strict";
 
+// Split out from the rest of this page's script (below) specifically so it
+// can run -- and, if WebAssembly isn't usable, bail out -- before waiting
+// for the ~17 MiB of embedded Pyodide/wheel data that follows in the next
+// script block. That data can't be split up the same way: loadPyodide()
+// needs the stdlib zip and the lock file as already-resolved values (its own
+// code reads `lockFileContents` synchronously, not as a promise), so nearly
+// everything below has to have arrived before loadPyodide() can even be
+// called -- there's no meaningful way to overlap compute with download for
+// a browser that *can* run this page. For one that can't, though, this saves
+// the entire remaining transfer, not just some of it: window.stop() below
+// cancels the rest of this document's download outright once we know for
+// certain the rest of it is going to be wasted bytes.
+function checkWasmSupport() {
+  if (typeof WebAssembly !== "object" || typeof WebAssembly.instantiate !== "function") {
+    return "This browser has no WebAssembly support at all.";
+  }
+  try {
+    // The smallest possible valid module: just the magic number and version,
+    // no sections. If a browser claims to have WebAssembly but rejects this,
+    // something is broken in the implementation itself (or a policy is
+    // blocking it) -- treat that the same as no WASM, rather than letting it
+    // fail confusingly later, mid-boot.
+    const minimalModule = new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
+    if (!WebAssembly.validate(minimalModule)) {
+      return "WebAssembly.validate() rejected a minimal, definitely-valid module.";
+    }
+  } catch (err) {
+    return `WebAssembly is present but throws when used: ${err}`;
+  }
+  return null;
+}
+
+window.__wasmProblem = checkWasmSupport();
+if (window.__wasmProblem) {
+  const earlyStatusEl = document.getElementById("status");
+  earlyStatusEl.textContent = "This browser can't run this page.";
+  earlyStatusEl.classList.add("error");
+  const earlyErrorEl = document.createElement("pre");
+  earlyErrorEl.textContent =
+    `${window.__wasmProblem}\n\n` +
+    "bigfix-relevance-analyzer needs WebAssembly to run Pyodide (CPython " +
+    "compiled to WASM) here. Try a current version of a major browser " +
+    "(Chrome, Firefox, Safari, Edge), and check whether an extension or " +
+    "an administrator policy has disabled WebAssembly.";
+  document.getElementById("output").replaceChildren(earlyErrorEl);
+  // Stops the browser from continuing to download the rest of this
+  // document -- there is no reason to pull in the remaining ~17 MiB of
+  // embedded data for a page that has already been determined can't run.
+  window.stop();
+}
+</script>
+
+<script>
+"use strict";
+
 // Each of these is the base64 of a real file from the pinned Pyodide
 // release (see build_playground.py's PYODIDE_VERSION) plus this project's
 // own wheel. Nothing here is fetched at runtime -- see boot() below.
@@ -437,26 +492,6 @@ inputEl.addEventListener("keydown", (event) => {
 });
 runEl.addEventListener("click", run);
 
-function checkWasmSupport() {
-  if (typeof WebAssembly !== "object" || typeof WebAssembly.instantiate !== "function") {
-    return "This browser has no WebAssembly support at all.";
-  }
-  try {
-    // The smallest possible valid module: just the magic number and version,
-    // no sections. If a browser claims to have WebAssembly but rejects this,
-    // something is broken in the implementation itself (or a policy is
-    // blocking it) -- treat that the same as no WASM, rather than letting it
-    // fail confusingly later, mid-boot.
-    const minimalModule = new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
-    if (!WebAssembly.validate(minimalModule)) {
-      return "WebAssembly.validate() rejected a minimal, definitely-valid module.";
-    }
-  } catch (err) {
-    return `WebAssembly is present but throws when used: ${err}`;
-  }
-  return null;
-}
-
 function withTimeout(promise, ms, message) {
   let timer;
   const timeout = new Promise((_resolve, reject) => {
@@ -465,21 +500,13 @@ function withTimeout(promise, ms, message) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-const wasmProblem = checkWasmSupport();
-if (wasmProblem) {
-  // Caught before calling boot() at all -- no point decoding ~17 MiB of
-  // embedded assets for a browser that was never going to run them.
-  setStatus("This browser can't run this page.", true);
-  renderError(
-    new Error(
-      `${wasmProblem}\n\n` +
-        "bigfix-relevance-analyzer needs WebAssembly to run Pyodide (CPython " +
-        "compiled to WASM) here. Try a current version of a major browser " +
-        "(Chrome, Firefox, Safari, Edge), and check whether an extension or " +
-        "an administrator policy has disabled WebAssembly."
-    )
-  );
-} else {
+// window.__wasmProblem and its error rendering already happened in the
+// earlier, much smaller script block above (including calling
+// window.stop()) -- checked here only so this script doesn't also try to
+// boot Pyodide on top of that in the (impossible in practice, since
+// window.stop() already halted this document's load, but cheap to guard
+// anyway) case execution reaches this far regardless.
+if (!window.__wasmProblem) {
   // See the comment on getInstantiateWasmFunc's try/catch above (in boot()):
   // a real WebAssembly failure inside Pyodide's own loader is caught there,
   // logged as a console warning, and never surfaces as a rejection -- boot()
