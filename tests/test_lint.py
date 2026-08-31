@@ -49,6 +49,9 @@ COSTLY = 'sha1 of file "/tmp/x" = "abc"'
 # A property written singular over a plural object: legal, and a runtime risk
 # rather than a type error. The corpus writes exactly this, with `| 0`.
 NON_UNIQUE_RISK = "free space of drives of system folders"
+# A `whose` on a singular spelling that cannot collapse -- the index makes it
+# unique -- so only the style rule has anything to say about it.
+PLURAL_PREFERRED = 'pathname of file "x.bes" whose (size of it > 1) of folder "c:\\"'
 
 
 def codes(findings: tuple[Finding, ...]) -> set[str]:
@@ -475,6 +478,7 @@ def _every_emitted_code() -> set[str]:
         COSTLY,
         TYPE_MISMATCH,
         NON_UNIQUE_RISK,
+        PLURAL_PREFERRED,
     ):
         for config in (LintConfig(), thresholds):
             emitted.update(finding.code for finding in lint_analysis(analyze(text), config))

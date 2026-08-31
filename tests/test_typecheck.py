@@ -177,10 +177,11 @@ def test_no_example_site_is_reported_broken(env: TypeEnvironment) -> None:
     `singular-over-plural-object` is exempt because it does not make that
     claim: it reports a risk the author may have ruled out, and shipped
     content takes it on deliberately -- see the test below.
+    `filtered-singular-spelling` is exempt for a stronger reason: it does not
+    even claim a risk, only that a plural spelling would read better.
     """
-    offenders = [
-        entry for entry in _corpus_diagnostics(env) if entry[2] != "singular-over-plural-object"
-    ]
+    allowed = {"singular-over-plural-object", "filtered-singular-spelling"}
+    offenders = [entry for entry in _corpus_diagnostics(env) if entry[2] not in allowed]
     assert offenders == []
 
 
@@ -191,18 +192,27 @@ def test_the_corpus_takes_the_non_unique_risk_deliberately(env: TypeEnvironment)
     `free space of drives of system folders | 0` hedges with a fallback, the
     dashboards wrap a whole chain in `... | "<link ... />"`, `unique value of`
     and `set of` are the idioms for asserting a collection is one, and the rest
-    feed an operator that required a singular anyway. Twenty-four of the
-    twenty-six sites this rule once reported are one of those.
+    feed an operator that required a singular anyway. Nearly every site this
+    rule could fire on is one of those.
 
-    These two are not. Both are a bare `pathname of <plural>` with nothing
-    guarding it, which is exactly what the rule is for -- so this pins the
-    rule's reach as a decision, and would catch a future exemption that
-    over-reached and silenced it entirely.
+    These three are not, and they are two different findings. The first is a
+    bare `pathname of <plural>` with nothing guarding it, which is exactly
+    what the risk rule is for. The other two -- `pathname of file
+    "UninstallMSI_Tasks.bes" whose (...) of folder ...` and the `key
+    "HKEY_LOCAL_MACHINE\\HARDWARE\\...\\BIOS" whose (...) of registry` --
+    cannot match twice, since the index makes each unique, and land on the
+    shape rule instead. That is the distinction worth pinning: one shape,
+    sorted by whether it can actually collapse several into one.
     """
-    risks = {(name, line) for name, line, code, _ in _corpus_diagnostics(env)}
+    risks = {(name, line, code) for name, line, code, _ in _corpus_diagnostics(env)}
     assert risks == {
-        ("task_time_based_relevance.bes", 28),
-        ("fixlet_description_relevance_via_javascript.bes", 114),
+        ("task_time_based_relevance.bes", 28, "singular-over-plural-object"),
+        (
+            "fixlet_description_relevance_via_javascript.bes",
+            114,
+            "filtered-singular-spelling",
+        ),
+        ("task_power_management_sleep_when_idle.bes", 12, "filtered-singular-spelling"),
     }
 
 
@@ -789,6 +799,139 @@ def test_no_multivalued_risk_survives_in_the_corpus(env: TypeEnvironment) -> Non
     assert hits == []
 
 
+# ---------------------------------------------------------------------------
+# The filtered risk: a singular spelling with a `whose` on it
+# ---------------------------------------------------------------------------
+
+
+def test_a_filter_does_not_make_a_singular_spelling_plural(env: TypeEnvironment) -> None:
+    """The engine settles `X whose (P)` by the spelling that was written, the
+    same rule `of` follows -- confirmed live in qna, filtering one file::
+
+        Q: (line whose (it contains "<text on one line>") of file "<f>") as string contains "text"
+        A: True
+
+    and the same filter over 34 matching lines answers, then raises
+    `Singular expression refers to non-unique object.` So it is singular, and
+    at risk -- not the static `A singular expression is required.` that
+    calling it plural would claim."""
+    result = check(parse('file whose (size of it > 1) of folder "c:\\"'), env)
+    assert result.value.plurality is Plurality.SINGULAR
+    assert [d.code for d in result.diagnostics] == ["singular-of-filtered-collection"]
+    assert result.diagnostics[0].message == (
+        "'file whose (...)' asserts the filter matches exactly one; a singular "
+        "context errors at evaluation when more than one does -- filter the "
+        "plural 'files' instead"
+    )
+    # A risk, not a type error.
+    assert result.ok
+
+
+def test_a_filter_over_a_plural_spelling_is_still_plural(env: TypeEnvironment) -> None:
+    """The other half of the same rule, and why the singular case cannot just
+    be waved through: the plural spelling in a singular position *is* the
+    static error, in qna as here -- `(lines whose (...) of file "<f>") as
+    string contains "text"` answers `E: A singular expression is required.`"""
+    filtered = check(parse('files whose (size of it > 1) of folder "c:\\"'), env)
+    assert filtered.value.plurality is Plurality.PLURAL
+    codes = [
+        d.code
+        for d in check(
+            parse('(files whose (size of it > 1) of folder "c:\\") as string = "x"'), env
+        ).diagnostics
+    ]
+    assert codes == ["left-operand-not-singular"]
+
+
+def test_the_filtered_risk_survives_a_singular_context(env: TypeEnvironment) -> None:
+    """Unlike its two siblings, which `accept_collapse` withdraws here. The
+    author of a filter always had a safe spelling available -- `exists files
+    whose (... and ...)` -- and the collapse is silent when it happens, so the
+    singular context does not excuse it. This is the shape that made the whole
+    rule matter: 611 sites across one shipped content site were reported as
+    type errors the engine does not raise."""
+    source = '(file whose (size of it > 1) of folder "c:\\" as string) = "x"'
+    result = check(parse(source), env)
+    assert [d.code for d in result.diagnostics] == ["singular-of-filtered-collection"]
+    assert result.ok
+
+
+def test_the_filtered_risk_is_exempt_directly_under_exists_and_only_there(
+    env: TypeEnvironment,
+) -> None:
+    """`exists` flattens the collapse it sits directly on, and nothing
+    further. One cast in between and the error is back -- qna, over a filter
+    matching 34 lines::
+
+        Q: exists (line whose (it contains "e") of file "<f>")
+        A: True
+        Q: exists ((line whose (it contains "e") of file "<f>") as string)
+        E: Singular expression refers to non-unique object.
+
+    which is why the retraction matches the operand's span exactly instead of
+    containing it."""
+    direct = check(parse('exists (file whose (size of it > 1) of folder "c:\\")'), env)
+    assert direct.diagnostics == ()
+    wrapped = check(parse('exists (file whose (size of it > 1) of folder "c:\\" as string)'), env)
+    assert [d.code for d in wrapped.diagnostics] == ["singular-of-filtered-collection"]
+
+
+def test_the_filtered_risk_stands_under_an_error_fallback(env: TypeEnvironment) -> None:
+    """`|` rescues the two sibling risks but not this one: qna answers the
+    first line *and* the non-unique error for `((line whose (it contains "e")
+    of file "<f>") as string) | "fallback"`, so the fallback never runs."""
+    source = '(file whose (size of it > 1) of folder "c:\\" as string) | "none"'
+    codes = [d.code for d in check(parse(source), env).diagnostics]
+    assert codes == ["singular-of-filtered-collection"]
+
+
+def test_a_filter_over_a_plural_object_is_the_same_risk_unfiltered_is(
+    env: TypeEnvironment,
+) -> None:
+    """`key whose (P) of <plural keys>` carries exactly what `key of <plural
+    keys>` does, and qna agrees, filtering 49 folders::
+
+        Q: names of (file whose (name of it contains "READ") of folders of folder "<d>")
+        A: <one name>
+        E: Singular expression refers to non-unique object.
+
+    `exists key whose (...) of (keys "A" of it; keys "B" of it) of registry`
+    is a shipped idiom -- one content site holds 45,000 -- and the `exists`
+    does flatten the error, which is why this warns rather than errors. Take
+    the `exists` off, or let a second key appear, and it is the real thing."""
+    source = 'exists key whose (name of it = "x") of (keys "A" of it; keys "B" of it) of registry'
+    codes = [d.code for d in check(parse(source), env).diagnostics]
+    assert codes == ["singular-over-plural-object"]
+
+
+def test_an_indexed_singular_with_a_filter_is_the_other_rule(env: TypeEnvironment) -> None:
+    """The index is what makes it unique, and a filter cannot make a folder
+    hold two files of one name -- so the *non-unique* hazard cannot fire, and
+    this lands on the shape rule instead, naming what the maintainer prefers:
+    stay plural, and collapse once at the end with `unique value of`. This is
+    the corpus's own `pathname of file "UninstallMSI_Tasks.bes" whose (...) of
+    folder ...`.
+
+    Not hazard-free, which is the other half of why it is worth saying -- a
+    filter that matches nothing has nothing to be singular about, and qna
+    raises for it where the plural spelling answers 0::
+
+        Q: (file "README.md" whose (size of it > 99999999) of folder "<d>") as string
+        E: Singular expression refers to nonexistent object.
+        Q: number of (files "README.md" whose (size of it > 99999999) of folder "<d>")
+        A: 0
+    """
+    source = 'pathname of file "x.bes" whose (size of it > 1) of folder "c:\\"'
+    result = check(parse(source), env)
+    assert [d.code for d in result.diagnostics] == ["filtered-singular-spelling"]
+    assert result.diagnostics[0].message == (
+        "'file whose (...)' collapses to a singular mid-chain; prefer "
+        "'files whose (...)' and, where a singular is required, 'unique value "
+        "of' at the end of the chain"
+    )
+    assert result.ok
+
+
 def test_a_property_used_on_the_wrong_direct_object_is_a_finding(env: TypeEnvironment) -> None:
     """`size` is real and `string` is a real type; no row joins them."""
     result = check(parse('size of "a"'), env)
@@ -1134,6 +1277,34 @@ def test_bar_allows_a_type_and_its_with_multiplicity_form(env: TypeEnvironment) 
     `inspectors.ancestors`.
     """
     assert check(parse('unique value of "a" | "b"'), env).diagnostics == ()
+
+
+def test_a_risk_in_both_if_branches_is_not_a_type_error(env: TypeEnvironment) -> None:
+    """ "At most one branch may have *type errors*" means what it says, and a
+    runtime risk is not one -- the line `CheckResult.ok` draws by origin.
+
+    Counting risks here turned an ordinary platform-guarded statement into a
+    reported type error: 164 sites in one shipped content site, every one of
+    them an `if (x64 of operating system) then (...) else (...)` whose two
+    branches say the same risky thing about the 32- and 64-bit registry."""
+    source = (
+        'if (x64 of operating system) then (exists key whose (name of it = "a") of keys "A" of it '
+        'of registry) else (exists key whose (name of it = "b") of keys "B" of it of registry)'
+    )
+    result = check(parse(source), env)
+    assert [d.code for d in result.diagnostics] == ["singular-over-plural-object"] * 2
+    assert result.ok
+
+
+def test_a_branches_risks_survive_it_even_though_its_errors_do_not(env: TypeEnvironment) -> None:
+    """The tolerance is for *errors*: one branch may fail to type because it is
+    the branch this platform never runs. A risk is about the code as written,
+    so it is not swallowed with them -- two of this repo's own corpus sites
+    only surfaced once it stopped being."""
+    source = 'if true then (file of folder "c:\\" as string) else "b"'
+    assert [d.code for d in check(parse(source), env).diagnostics] == [
+        "singular-of-multivalued-property"
+    ]
 
 
 def test_if_branches_allow_a_type_and_its_with_multiplicity_form(env: TypeEnvironment) -> None:

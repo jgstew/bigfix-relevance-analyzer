@@ -230,6 +230,58 @@ _TYPE_CHECK: Final = [
         "'{phrase}' can hold several values; a singular context errors at "
         "evaluation when it does -- the plural '{plural_phrase}' is preferred",
     ),
+    _entry(
+        "singular-of-filtered-collection",
+        # The `whose`-filtered sibling of `singular-of-multivalued-property`,
+        # split out because it is *not* retracted where a singular is
+        # required. The generous reading behind `accept_collapse` -- that the
+        # singular context is what forces the singular spelling, and the
+        # author had no way to write anything else -- does not hold once a
+        # filter is involved: `exists values whose (name of it contains "X"
+        # and it as string contains "Y") of <key>` says the same thing and
+        # cannot collapse. And what the collapse costs is not an error the
+        # author would see. Confirmed live in qna, filtering 49 folders that
+        # 47 satisfy:
+        #
+        #     Q: number of folders whose (exists file whose
+        #          (name of it contains "e") of it) of folder "<d>"
+        #     A: 47
+        #     Q: number of folders whose (name of file whose
+        #          (name of it contains "e") of it contains "z") of folder "<d>"
+        #     A: 0
+        #
+        # Every element raised `Singular expression refers to non-unique
+        # object.` inside the filter and was dropped, silently: the answer is
+        # wrong, not absent. The origin still says runtime -- it is a risk
+        # about an evaluation nobody has run, as on the two entries above.
+        Origin.RUNTIME,
+        "'{phrase} whose (...)' asserts the filter matches exactly one; a singular "
+        "context errors at evaluation when more than one does -- filter the plural "
+        "'{plural_phrase}' instead",
+    ),
+    _entry(
+        "filtered-singular-spelling",
+        # The shape, where the *non-unique* hazard above cannot fire: an index
+        # means `pathname of file "x.bes" whose (...) of folder "c:\\"` never
+        # matches twice. It is still a singular collapsed in the middle of a
+        # chain rather than at the end of one, which is the habit the two
+        # entries above are the consequence of -- and the empty case is a
+        # hazard of its own, since a filter that matches nothing has nothing
+        # to be singular about. Confirmed in qna::
+        #
+        #     Q: (file "README.md" whose (size of it > 99999999) of folder "<d>") as string
+        #     E: Singular expression refers to nonexistent object.
+        #     Q: number of (files "README.md" whose (size of it > 99999999) of folder "<d>")
+        #     A: 0
+        #
+        # The maintainer's rule, and the reason this is worth saying out loud:
+        # stay plural for as long as possible and collapse once, at the end,
+        # with `unique value of` where a singular is actually required.
+        Origin.RUNTIME,
+        "'{phrase} whose (...)' collapses to a singular mid-chain; prefer "
+        "'{plural_phrase} whose (...)' and, where a singular is required, "
+        "'unique value of' at the end of the chain",
+    ),
     # Operators and casts.
     _entry(
         "operand-types-incompatible",

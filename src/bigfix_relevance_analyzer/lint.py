@@ -44,11 +44,13 @@ Ten rules, eight of them always on and two tunable:
   are the standing example: ``devices`` is a top-level plural there, and the
   dumps record only the grub ``device of <grub file location>``.
 - ``non-unique-risk`` -- a property written singular where more than one value
-  may come back, either over an object that may be plural
-  (``singular-over-plural-object``) or because the tables record the property
-  itself as multivalued (``singular-of-multivalued-property``). A warning, not
-  an error: the expression types cleanly, and the author may know exactly one
-  value exists. See the rule's rationale in :data:`RULES` for the exemptions.
+  may come back: over an object that may be plural
+  (``singular-over-plural-object``), because the tables record the property
+  itself as multivalued (``singular-of-multivalued-property``), or because a
+  ``whose`` filter was asserted to match exactly one
+  (``singular-of-filtered-collection``). A warning, not an error: the
+  expression types cleanly, and the author may know exactly one value exists.
+  See the rule's rationale in :data:`RULES` for the exemptions.
 - ``complexity`` / ``evaluation-cost`` -- :attr:`RelevanceComplexity.score`
   and ``.evaluation_cost`` past a ceiling. On by default, at a generous
   built-in ceiling (:data:`DEFAULT_MAX_SCORE`, :data:`DEFAULT_MAX_EVALUATION_COST`)
@@ -303,7 +305,7 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "non-unique-risk",
                 Severity.WARNING,
                 "a property written singular where more than one value may come back",
-                "Two sibling diagnostics land here. `value of results ...` writes the "
+                "Three sibling diagnostics land here. `value of results ...` writes the "
                 "singular form over an *object* that may be plural, and `file of folder "
                 "...` writes the singular form of a *property* the tables record as "
                 "multivalued -- either way the written form settles the expression as "
@@ -322,7 +324,32 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "exist), and in a tuple element, where "
                 "plurality changes the meaning. What is left is a collapse nothing "
                 "guards, and it is a warning rather than an error because the author "
-                "may still know exactly one value exists.",
+                "may still know exactly one value exists. The third diagnostic, "
+                "`value whose (...) of <key>` asserting that a *filter* matches one, "
+                "is exempt only under a direct `exists`: it survives a singular "
+                "context, where the other two are forgiven, because a filter always "
+                "had a safe spelling available (`exists values whose (... and ...) of "
+                "<key>`) and because the collapse is silent -- confirmed in qna, a "
+                "filter over 49 folders that 47 satisfy answers 0 once a singular "
+                "spelling inside it collapses, dropping every element that raised.",
+            ),
+            _rule(
+                "plural-preferred",
+                Severity.WARNING,
+                "a `whose` filter written on a singular spelling, where the plural reads safer",
+                "The sibling of `non-unique-risk`, reported where that hazard cannot "
+                'fire. `pathname of file "x.bes" whose (...) of folder "c:\\\\"` cannot '
+                "match twice -- a folder holds one file of a given name -- but it "
+                "collapses to a singular in the middle of a chain, which is the habit "
+                "that makes the same shape raise wherever the name is dropped, and it "
+                "still raises `Singular expression refers to nonexistent object.` when "
+                "the filter matches nothing, where the plural spelling answers 0. "
+                "Best practice is to stay plural for as long as the chain runs and "
+                "collapse once at the end, with `unique value of` where a singular is "
+                'actually required: `unique value of pathnames of files "x.bes" whose '
+                '(...) of folders "c:\\\\"`. A warning, and a separate rule from '
+                "`non-unique-risk` so that silencing this shape does not also silence "
+                "the collapses that error on several rather than on none.",
             ),
             _rule(
                 "complexity",
@@ -536,6 +563,13 @@ def _site_dialect(site: RelevanceSite, forced: Dialect | None) -> Dialect | None
 _CHECK_RULES: Final = {
     "singular-over-plural-object": "non-unique-risk",
     "singular-of-multivalued-property": "non-unique-risk",
+    # Same warning, and the one the checker keeps standing under a singular
+    # context, because a `whose` filter had a safe spelling available.
+    "singular-of-filtered-collection": "non-unique-risk",
+    # Not a risk at all -- a shape. Its own rule so that the hazard rule stays
+    # about hazards, and so a repo that does not want the style note can
+    # silence it without silencing the errors-at-evaluation ones.
+    "filtered-singular-spelling": "plural-preferred",
     # A bare world reference the dumps know only with a direct object -- the
     # same epistemic state as a name no dump defines (the snapshot has no row
     # for *this position*, and the snapshot is known-incomplete), so it lands

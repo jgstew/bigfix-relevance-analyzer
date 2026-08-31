@@ -405,6 +405,7 @@ same way instead of each inventing a description:
 | `type-error` | error | the type checker reported a problem beyond an unbound `it` | always on |
 | `unbound-it` | error | `it` is used where there is no context to bind it to | always on |
 | `non-unique-risk` | warning | a property written singular where more than one value may come back | always on |
+| `plural-preferred` | warning | a `whose` filter written on a singular spelling, where the plural reads safer | always on |
 | `unknown-inspector` | warning | a name no inspector dump defines | always on |
 
 There is no CLI spelling to disable `complexity`/`evaluation-cost` entirely -

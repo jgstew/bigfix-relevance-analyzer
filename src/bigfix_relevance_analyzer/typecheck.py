@@ -462,6 +462,66 @@ _COLLAPSE_RISKS: Final = frozenset(
 _MULTIVALUED_RISK: Final = frozenset({"singular-of-multivalued-property"})
 """Just the property-side risk, for the sites that exempt only it."""
 
+_FILTERED_RISK: Final = frozenset({"singular-of-filtered-collection"})
+"""The `whose`-filtered risk, which only a direct `exists` operand exempts.
+
+Deliberately outside :data:`_COLLAPSE_RISKS` and :data:`_MULTIVALUED_RISK`:
+this one survives a singular context, a `whose` predicate, a `|` fallback and
+a tuple element, because the engine does not forgive it in any of them. Only
+`exists` immediately over the filtered form flattens it away, and only
+immediately -- one cast in between and the error is back::
+
+    Q: exists (line whose (it contains "e") of file "<f>")
+    A: True
+    Q: exists ((line whose (it contains "e") of file "<f>") as string)
+    E: Singular expression refers to non-unique object.
+
+which is why :meth:`_Checker.retract_exact` matches the span rather than
+containing it. `|` does not rescue it either -- `((line whose (it contains
+"e") of file "<f>") as string) | "fallback"` answers with the first line *and*
+the error, not the fallback.
+"""
+
+
+def _written_reference(prop: Node) -> Reference | None:
+    """The reference whose written form settles an `of`'s plurality, if any.
+
+    `X whose (P)` speaks with `X`'s own name. A filter does not make a
+    singular spelling plural -- the engine settles the phrase by what was
+    written and leaves the rest to evaluation, confirmed live in qna::
+
+        Q: (line whose (it contains "<text on one line>") of file "<f>") as string contains "text"
+        A: True
+        Q: (line whose (it contains "<text on 34 lines>") of file "<f>") as string contains "z"
+        A: True
+        E: Singular expression refers to non-unique object.
+        Q: (lines whose (it contains "<text on one line>") of file "<f>") as string contains "text"
+        E: A singular expression is required.
+
+    The singular spelling answers, and only *evaluation* objects, and only
+    once the filter has actually matched more than one; the plural spelling is
+    rejected statically in the same singular position. So a `whose` is
+    transparent here, and its collection is the written form
+    :meth:`_Checker.combine_of` must read.
+    """
+    match prop:
+        case Reference():
+            return prop
+        case Whose(collection=Reference() as collection):
+            return collection
+        case _:
+            return None
+
+
+def _is_type_error(diagnostic: TypeDiagnostic) -> bool:
+    """Whether a diagnostic is a fault rather than a risk, by its origin.
+
+    The same line :attr:`CheckResult.ok` draws, and for the same reason: a
+    runtime risk is something the statement runs *with*, not something wrong
+    with it.
+    """
+    return DIAGNOSTICS[diagnostic.code].origin is Origin.TYPE_CHECK
+
 
 def _is_aggregate(phrase: str) -> bool:
     return any(
@@ -536,6 +596,34 @@ def _plural_alternative(
     """
     matched = _matched_rows(name, subject, environment, indexed=indexed) or []
     if not matched or not all(entry.multivalued for entry in matched):
+        return None
+    plurals = {entry.plural_name for entry in matched}
+    if len(plurals) != 1:
+        return None
+    (plural,) = plurals
+    if plural is None or plural.casefold() == name.casefold():
+        return None
+    return plural
+
+
+def _plural_spelling(
+    name: str,
+    subject: frozenset[str] | None,
+    environment: TypeEnvironment,
+    *,
+    indexed: bool | None = None,
+) -> str | None:
+    """The plural name for ``name``, whether or not the tables call it multivalued.
+
+    :func:`_plural_alternative` gates on `multivalued` because it is naming
+    the fix for something that *can* raise `Singular expression refers to
+    non-unique object.`, and a property that answers exactly one value never
+    will. This one names the plural spelling for a filtered form, where the
+    hazard is not the question: `file "x" whose (...)` cannot collapse, and
+    `files "x" whose (...)` is still the better shape.
+    """
+    matched = _matched_rows(name, subject, environment, indexed=indexed) or []
+    if not matched:
         return None
     plurals = {entry.plural_name for entry in matched}
     if len(plurals) != 1:
@@ -755,6 +843,23 @@ class _Checker:
             )
         ]
 
+    def retract_exact(self, codes: frozenset[str], span: Span) -> None:
+        """Withdraw ``codes`` reported on ``span`` itself, not merely inside it.
+
+        The containment :meth:`retract` uses is right for a site that forgives
+        everything under it; `exists` is not one, forgiving only the collapse
+        it flattens directly (see :data:`_FILTERED_RISK`).
+        """
+        self.diagnostics[:] = [
+            diagnostic
+            for diagnostic in self.diagnostics
+            if not (
+                diagnostic.code in codes
+                and diagnostic.span.start == span.start
+                and diagnostic.span.end == span.end
+            )
+        ]
+
     def accept_collapse(self, span: Span) -> None:
         """Withdraw the collapse risks inside ``span``: something needed them.
 
@@ -930,6 +1035,10 @@ class _Checker:
                 # still not ideal relevance, and its message blames the
                 # singular context rather than promising an error.
                 self.retract(_MULTIVALUED_RISK, node.operand.span)
+                # The filtered risk only where `exists` sits directly over it:
+                # `exists (line whose (...) of file "<f>")` is clean, and the
+                # same form under one cast raises the non-unique error again.
+                self.retract_exact(_FILTERED_RISK, node.operand.span)
                 self.values.append(self.literal("boolean"))
             case NumberOf():
                 self.pop(1)
@@ -1095,23 +1204,43 @@ class _Checker:
         # `UNKNOWN` for a name it could not match, or one whose matched rows
         # disagree, and there the object is still the best evidence there is.
         plurality: Plurality
-        if isinstance(node.prop, Reference) and prop.plurality is not Plurality.UNKNOWN:
+        # A `whose` is transparent to the written form (`_written_reference`),
+        # so `value whose (...) of it` is read here exactly as `value of it`
+        # is: same plurality, same risk, same suggested plural spelling.
+        written = _written_reference(node.prop)
+        filtered = written is not None and written is not node.prop
+        if written is not None and prop.plurality is not Plurality.UNKNOWN:
             plurality = prop.plurality
             if (
                 plurality is Plurality.SINGULAR
                 and obj.plurality is Plurality.PLURAL
-                and not _is_aggregate(node.prop.phrase)
+                # The filtered form included: `key whose (...) of <plural
+                # keys>` carries exactly the risk `key of <plural keys>` does,
+                # and qna raises `Singular expression refers to non-unique
+                # object.` for both. `exists key whose (...) of (keys "A" of
+                # it; keys "B" of it) of registry` is a shipped idiom -- one
+                # content site holds 45,000 of them -- and the `exists` does
+                # flatten the error away, but only for as long as the `exists`
+                # is there and only by luck about how many keys exist today.
+                and not _is_aggregate(written.phrase)
             ):
-                self.report("singular-over-plural-object", node.span, phrase=node.prop.phrase)
+                self.report("singular-over-plural-object", node.span, phrase=written.phrase)
             elif (
                 plurality is Plurality.SINGULAR
                 and obj.plurality is Plurality.SINGULAR
+                # An aggregate is exempt over a singular object for the same
+                # reason it is over a plural one: `unique value of X` dedups
+                # before asserting singularity, so it succeeds exactly where a
+                # bare singular form would not. Latent until now -- an `if`
+                # branch swallowed its own risks, and `if true then (unique
+                # value of "a") else "b"` was the case that hid here.
+                and not _is_aggregate(written.phrase)
                 and (
                     alternative := _plural_alternative(
-                        node.prop.phrase,
+                        written.phrase,
                         _subject(obj),
                         self.env,
-                        indexed=node.prop.index is not None,
+                        indexed=written.index is not None,
                     )
                 )
                 is not None
@@ -1124,11 +1253,43 @@ class _Checker:
                 # deliberate retract this: anything `require_singular` guards,
                 # a `whose` predicate (elements are handled one at a time
                 # there), an `exists` operand, a tuple element, a `|` fallback.
+                # A filter asks for a set and then asserts it holds one, which
+                # is a sharper claim than a bare singular property makes, and
+                # one the author could have written safely -- so it reports as
+                # its own code, which `accept_collapse` does not withdraw.
                 self.report(
-                    "singular-of-multivalued-property",
+                    "singular-of-filtered-collection"
+                    if filtered
+                    else "singular-of-multivalued-property",
                     node.span,
-                    phrase=node.prop.phrase,
+                    phrase=written.phrase,
                     plural_phrase=alternative,
+                )
+            elif (
+                filtered
+                and not _is_aggregate(written.phrase)
+                and (
+                    spelling := _plural_spelling(
+                        written.phrase,
+                        _subject(obj),
+                        self.env,
+                        indexed=written.index is not None,
+                    )
+                )
+            ):
+                # The non-unique error cannot fire here: an index makes `file
+                # "x.bes" whose (...) of folder "c:\"` unique whatever the
+                # filter says. What is left is the shape -- a singular in the
+                # middle of a chain, the habit the two risks above are the
+                # consequence of -- plus the empty case, which qna raises as
+                # `Singular expression refers to nonexistent object.` where
+                # the plural spelling answers 0. Its own rule, since the
+                # hazard it names is not the one above.
+                self.report(
+                    "filtered-singular-spelling",
+                    node.span,
+                    phrase=written.phrase,
+                    plural_phrase=spelling,
                 )
         else:
             plurality = _widen(prop.plurality, obj.plurality)
@@ -1207,7 +1368,24 @@ class _Checker:
             )
         return RelevanceValue(
             types=collection.types,
-            plurality=Plurality.PLURAL,
+            # A *named* collection keeps its own spelling rather than becoming
+            # `PLURAL`: see `_written_reference` for the qna transcript.
+            # Filtering a singular spelling leaves it singular and merely
+            # *risky*, which `combine_of` reports as the runtime non-unique
+            # risk it is -- calling it plural here would instead fail every
+            # `value whose (...) of it as string contains "..."` in the wild
+            # with the static `A singular expression is required.`, which the
+            # engine does not raise.
+            #
+            # Anything else -- a tuple or `;` collection literal, a cast, a
+            # chain -- has no name to be read off, and there filtering is what
+            # it looks like: a set of the rows that passed, plural however
+            # singular the thing filtered was.
+            plurality=(
+                collection.plurality
+                if _written_reference(node.collection) is not None
+                else Plurality.PLURAL
+            ),
             platforms=collection.platforms & predicate.platforms,
         )
 
@@ -1413,16 +1591,32 @@ class _Checker:
         )
         else_found = self.branches.pop()
         then_found = self.branches.pop()
-        if then_found and else_found:
+        # "at most one branch may have *type errors*" is what the rule says,
+        # and a runtime risk is not one -- `CheckResult.ok` draws the same
+        # line by origin. Counting risks here made a statement whose branches
+        # each hold a `singular-over-plural-object` warning report a type
+        # error, which is the opposite of what either diagnostic means: 164
+        # sites in one shipped content site failed that way.
+        then_errors = [entry for entry in then_found if _is_type_error(entry)]
+        else_errors = [entry for entry in else_found if _is_type_error(entry)]
+        if then_errors and else_errors:
             self.report("both-if-branches-have-type-errors", node.span)
             self.diagnostics.extend(then_found)
             self.diagnostics.extend(else_found)
+        else:
+            # A branch's *errors* are tolerated -- one branch is allowed not
+            # to type, because it may be the one that never runs on this platform
+            # -- but its risks are about the code as written, whichever branch
+            # runs, so they are not swallowed with them.
+            self.diagnostics.extend(
+                entry for entry in then_found + else_found if not _is_type_error(entry)
+            )
 
         if (
             then_value.types
             and else_value.types
             and not _types_compatible(then_value.types, else_value.types)
-            and not (then_found or else_found)
+            and not (then_errors or else_errors)
             and self.branches_coexist(then_value, else_value)
         ):
             # Both branches typed cleanly and share nothing: the statement has
