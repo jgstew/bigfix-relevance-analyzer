@@ -12,8 +12,10 @@ name: pyodide
 # what it checks and why.
 #
 # It also builds a standalone HTML playground (tools/pyodide-playground/)
-# with the same analyzer embedded for interactive use in a browser, and
-# uploads it as this run's "pyodide-playground" artifact.
+# with the same analyzer embedded for interactive use in a browser, uploads
+# it as this run's artifact, then tests that built page in a real headless
+# browser (tools/pyodide-playground-test/) -- placed after the upload so a
+# test failure doesn't delay or block the artifact being available.
 
 on:
   pull_request:
@@ -82,7 +84,9 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: tools/pyodide-smoke/package-lock.json
+          cache-dependency-path: |
+            tools/pyodide-smoke/package-lock.json
+            tools/pyodide-playground-test/package-lock.json
 
       - name: npm ci
         working-directory: tools/pyodide-smoke
@@ -137,3 +141,20 @@ jobs:
           name: bigfix-relevance-analyzer-html-playground
           path: playground/bigfix-relevance-analyzer-playground.html
           if-no-files-found: error
+
+      # Everything from here on tests the built page itself in a real
+      # browser (not Node's Pyodide, which takes a different internal code
+      # path -- see the test script's header) -- placed after the artifact
+      # upload above so a failure here still leaves the page downloadable
+      # and doesn't add browser-install time to getting it.
+      - name: npm ci (playground browser test)
+        working-directory: tools/pyodide-playground-test
+        run: npm ci
+
+      - name: install headless Chromium for the playground test
+        working-directory: tools/pyodide-playground-test
+        run: npx playwright install --with-deps chromium
+
+      - name: test the playground page in a real browser
+        working-directory: tools/pyodide-playground-test
+        run: node test_playground.mjs ../../playground/bigfix-relevance-analyzer-playground.html
