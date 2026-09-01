@@ -314,6 +314,86 @@ def test_lint_file_on_real_bes_example_is_clean() -> None:
     assert codes(findings) <= {"unknown-inspector"}  # dumps may not cover everything
 
 
+def _fixlet(relevance: str, action: str = "// nothing") -> str:
+    """The smallest .bes the extractor recognises, for site-kind tests."""
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        "<BES><Fixlet>\n"
+        "<Title>t</Title>\n"
+        f"<Relevance>{relevance}</Relevance>\n"
+        f"<DefaultAction><ActionScript>{action}</ActionScript></DefaultAction>\n"
+        "</Fixlet></BES>\n"
+    )
+
+
+def test_a_relevance_element_that_is_not_a_boolean_is_a_finding(tmp_path: Path) -> None:
+    """`<Relevance>` decides applicability, so it has to answer true or false.
+
+    A clause that types as a string is not a subtle risk -- the fixlet can
+    never be applicable on any endpoint. Nothing caught this before because
+    `lint_analysis` took the `RelevanceSite` only to label findings with, and
+    never asked whether the value fits the slot it came out of.
+    """
+    path = tmp_path / "stringy.bes"
+    path.write_text(_fixlet("name of operating system"))
+    assert "site-type-mismatch" in codes(lint_file(path, LintConfig()))
+
+
+def test_a_boolean_relevance_element_is_silent(tmp_path: Path) -> None:
+    """The negative that sizes the rule: 50,901 shipped clauses are this shape."""
+    path = tmp_path / "fine.bes"
+    path.write_text(_fixlet('exists file "/etc/hosts"'))
+    assert "site-type-mismatch" not in codes(lint_file(path, LintConfig()))
+
+
+def test_a_plural_actionscript_substitution_is_a_finding(tmp_path: Path) -> None:
+    """A `{...}` substitution has one hole to fill, so it needs one value."""
+    path = tmp_path / "plural.bes"
+    path.write_text(_fixlet("true", action='run {names of files of folder "/tmp"}'))
+    assert "site-type-mismatch" in codes(lint_file(path, LintConfig()))
+
+
+def test_a_boolean_actionscript_substitution_is_silent(tmp_path: Path) -> None:
+    """Booleans coerce to a string in a substitution, and content relies on it:
+    50,513 substitutions in one shipped content site are exactly this."""
+    path = tmp_path / "boolsub.bes"
+    path.write_text(_fixlet("true", action='run {exists file "/etc/hosts"}'))
+    assert "site-type-mismatch" not in codes(lint_file(path, LintConfig()))
+
+
+def test_a_plural_substitution_is_reported_even_when_its_type_is_unknown(
+    tmp_path: Path,
+) -> None:
+    """Plurality and type are separate evidence, and this is the case that proves it.
+
+    The one real instance in a 160,249-site content corpus is a
+    `concatenation " & " of (...) of (...)` over a filtered key set: the
+    checker cannot name its type, but it is quite certain the value is plural,
+    because the written spelling says so. Gating the plurality check on the
+    type being known lost exactly the finding the rule exists for.
+    """
+    path = tmp_path / "unknown_plural.bes"
+    path.write_text(
+        _fixlet("true", action='run {concatenation ", " of (bogus of it) of ("a";"b")}')
+    )
+    analysis = analyze('concatenation ", " of (bogus of it) of ("a";"b")')
+    assert analysis.check is not None
+    assert analysis.check.value.types is None, "fixture no longer exercises the unknown-type path"
+    assert "site-type-mismatch" in codes(lint_file(path, LintConfig()))
+
+
+def test_a_statement_with_no_site_is_not_judged_against_a_slot(tmp_path: Path) -> None:
+    """The bare-statement path has no slot to conform to.
+
+    `lint_analysis` is public and is called without a `RelevanceSite` by every
+    consumer that has only text -- an editor hover, the MCP server. Judging
+    those against a slot they were never in would report a finding about
+    nothing.
+    """
+    findings = lint_analysis(analyze("name of operating system"), LintConfig())
+    assert "site-type-mismatch" not in codes(findings)
+
+
 def test_lint_paths_aggregates_across_files(tmp_path: Path) -> None:
     clean = tmp_path / "clean.rel"
     clean.write_text(CLIENT)
@@ -516,6 +596,13 @@ def test_every_rule_in_the_catalog_is_a_rule_that_fires(tmp_path: Path) -> None:
     emitted.update(
         finding.code for finding in lint_file(tmp_path / "does-not-exist.rel", LintConfig())
     )
+
+    # `site-type-mismatch` is about the slot rather than the statement, so it
+    # needs a file too: `_every_emitted_code` lints bare text, which has no
+    # site, and that silence is itself a rule (see the test above).
+    slotted = tmp_path / "slotted.bes"
+    slotted.write_text(_fixlet("name of operating system"))
+    emitted.update(finding.code for finding in lint_file(slotted, LintConfig()))
 
     assert emitted == set(RULES)
 

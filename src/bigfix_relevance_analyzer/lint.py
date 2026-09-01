@@ -102,6 +102,7 @@ from bigfix_relevance_analyzer._serialize import _path
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis, analyze
 from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 from bigfix_relevance_analyzer.extract import RelevanceSite, extract_relevance_from_file
+from bigfix_relevance_analyzer.typecheck import Plurality
 
 __all__ = [
     "DEFAULT_MAX_DEPTH",
@@ -287,6 +288,26 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "checking the parsed tree against the real inspector tables, not a "
                 "heuristic, so a genuine type error is as concrete a defect as a parse "
                 "error. Always an error, with nothing to configure.",
+            ),
+            _rule(
+                "site-type-mismatch",
+                Severity.ERROR,
+                "the value does not fit the kind of site it was extracted from",
+                "Only extraction knows this: the same expression is correct in one slot "
+                "and broken in another, so this is the one rule that reads the "
+                "`RelevanceSite` rather than the statement alone -- and it is silent for "
+                "a caller that lints bare text, which has no slot. Two slots constrain "
+                "their value and are checked. A `<Relevance>` element decides "
+                "applicability, so a clause that is not a boolean makes the content "
+                "unable to apply anywhere. An ActionScript `{...}` substitution has one "
+                "hole to fill, so a plural value has no single answer to put in it; a "
+                "boolean is fine there and coerces to a string, which shipped content "
+                "relies on heavily. An error, not a warning, because neither is a risk "
+                "the author may have ruled out -- the content cannot work. Positive "
+                "evidence only, as everywhere else: an undetermined type or plurality is "
+                "not a finding, and neither is a value some other rule already faulted. "
+                "Analysis properties are deliberately unlisted, being legitimately "
+                "plural and of any renderable type.",
             ),
             _rule(
                 "unknown-inspector",
@@ -616,6 +637,54 @@ _CHECK_RULES: Final = {
 }
 
 
+# What each kind of site requires of the value it holds. Only the two slots the
+# engine genuinely constrains are listed: an applicability clause decides yes or
+# no, and an ActionScript substitution has one hole to fill. An analysis
+# property may legitimately be plural and may be any renderable type, a
+# `.rel` file or a markdown block is not a slot at all, and the remaining
+# contexts have not been confirmed -- an unlisted kind is judged on nothing.
+_SLOT_REQUIREMENTS: Final = {
+    "relevance": ("singular", "boolean"),
+    "actionscript-substitution": ("singular", None),
+}
+
+
+def _slot_mismatch(site: RelevanceSite | None, report: RelevanceAnalysis) -> str | None:
+    """How ``report``'s value fails the slot ``site`` came out of, if it does.
+
+    Positive evidence only, the discipline the checker follows everywhere --
+    but *per axis*, because plurality and type are established separately. A
+    value the checker could not type may still be one it is certain is plural,
+    since plurality is settled by the written spelling: `concatenation ", " of
+    (...) of (<plural>)` answers once per element whatever those elements turn
+    out to be. Gating the plurality check on the type being known lost the only
+    real instance in a 160,249-site corpus.
+
+    A value already ruled out -- an empty type set, meaning every candidate was
+    eliminated -- is skipped on both axes, because some other rule has already
+    faulted it and this would be one problem told twice.
+    """
+    if site is None or report.check is None:
+        return None
+    requirement = _SLOT_REQUIREMENTS.get(site.kind)
+    if requirement is None:
+        return None
+    plurality, required_type = requirement
+    value = report.check.value
+    if value.types is not None and not value.types:
+        return None
+
+    if plurality == "singular" and value.plurality is Plurality.PLURAL:
+        return (
+            f"{site.context} takes one value; this is plural -- "
+            "an aggregate such as `unique value of` collapses it"
+        )
+    if required_type is not None and value.types is not None and required_type not in value.types:
+        rendered = " or ".join(f"`{name}`" for name in sorted(value.types))
+        return f"{site.context} must be a `{required_type}`; this is {rendered}"
+    return None
+
+
 def lint_analysis(
     report: RelevanceAnalysis,
     config: LintConfig,
@@ -673,6 +742,13 @@ def lint_analysis(
                 diagnostic.message,
                 diagnostic.span.line,
             )
+
+    # Statement-level, like `unknown-inspector` below: the mismatch is between
+    # the value as a whole and the slot, so it has no span of its own and lands
+    # on the statement's first line.
+    mismatch = _slot_mismatch(site, report)
+    if mismatch is not None:
+        emit("site-type-mismatch", mismatch, 1)
 
     if report.unknown_references:
         names = ", ".join(f"`{name}`" for name in report.unknown_references)

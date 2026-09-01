@@ -371,6 +371,76 @@ def test_the_universal_prose_states_the_whose_scoping_rule() -> None:
     assert "Dropping `of it`" in universal, "the error-reading advice is missing"
 
 
+def test_the_universal_prose_states_when_an_undefined_name_is_absorbed() -> None:
+    """An undefined name raises wherever it appears -- bar one place.
+
+    Guarded because every surrounding fact points the other way and a model
+    will generalise from them: `and` and `or` short-circuit left to right, and
+    `exists`, `number of` and `|` all absorb an error. Each of those is true of
+    an *evaluation* error and false of an undefined name. Confirmed on both
+    engines -- `false and (exists keys "x" of registry)` is `The operator
+    "registry" is not defined.` on a macOS client and on a live session engine
+    alike, while `false and (1/0 = 1)` answers `False` on both.
+
+    Guarded in the other direction too. An untaken `if` branch *does* absorb
+    it, chosen at runtime rather than folded from a literal, and the exception
+    is the whole practical point: the fix is not "put the guard on the left",
+    since no operand order works, it is `if`/`then`/`else`.
+    """
+    from bigfix_relevance_analyzer.reference import _prose
+
+    universal = _prose.UNIVERSAL_RELEVANCE
+    # Phrases distinctive to this rule's section. "and", "guard" and "error"
+    # are all over this document, so asserting on those would be a guard that
+    # cannot fail; these cannot survive the section being removed.
+    assert "wherever it appears" in universal, "the raises-everywhere rule is missing"
+    assert "untaken" in universal, "the `if` exception is missing"
+
+    # Both of these were written here once, and both are wrong: `if` absorbs an
+    # undefined name, and nothing establishes *when* the name is resolved -- an
+    # untaken branch is chosen at runtime and still does not raise. Asserted
+    # negatively because a claim that has been made once tends to come back.
+    assert "nothing absorbs it" not in universal, "the overclaimed heading is back"
+    assert "before evaluation" not in universal, "the unsupported mechanism claim is back"
+
+    # The platform application stays on the client document, since only client
+    # relevance has a platform axis for a name to be missing from.
+    client = _prose.CLIENT_RELEVANCE
+    assert "guard" in client, "the platform-guard application is missing"
+    assert "registry" in client, "the example that actually shows the rule is missing"
+
+    # The evidence stays expansive-only, which is the split `docs/README.md`
+    # describes: transcripts and near-misses are exactly what the distilled
+    # layer's budget squeezes out first, and `regapps` is a near-miss -- it
+    # exists on macOS, so the obvious example proves nothing about the rule.
+    expansive = (REPO_ROOT / "docs" / "client_relevance.md").read_text(encoding="utf-8")
+    assert "regapps" in expansive, "the near-miss worth not re-investigating is missing"
+    assert "The operator" in expansive, "the engine transcript is missing"
+
+
+def test_the_qna_guide_points_at_a_tool_that_is_actually_installable() -> None:
+    """`docs/qna.md` names the multi-client evaluator, and it is a dev dependency.
+
+    The local `QnA` pipe answers only for the machine it runs on, while this
+    package's tables are per-platform, per-version snapshots -- so the guide
+    has to point somewhere that can evaluate across containers, endpoints and
+    client versions. The failure mode being guarded is not a wrong claim but a
+    dead one: a document recommending a tool nobody has, which reads as advice
+    and is really a missing dependency.
+
+    `qna.md` has no distilled counterpart (see `docs/README.md`), so there is
+    no prose budget to check here -- only that the two halves agree.
+    """
+    guide = (REPO_ROOT / "docs" / "qna.md").read_text(encoding="utf-8")
+    packaging = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert "bigfix-remote-client-relevance" in guide, "the multi-client evaluator is unnamed"
+    dev_group = packaging.split("[dependency-groups]", 1)[-1].split("\n[", 1)[0]
+    assert "bigfix-remote-client-relevance" in dev_group, (
+        "docs/qna.md recommends a tool that is not a dev dependency"
+    )
+
+
 def test_the_syntax_prose_states_the_rules_that_are_easiest_to_get_wrong() -> None:
     """A guard on the few facts a model reliably invents wrongly if unstated.
 

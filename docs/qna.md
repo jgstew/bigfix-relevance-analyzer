@@ -303,6 +303,41 @@ rest, at the cost of paying start-up each time. For a large batch, feed every
 expression to a single invocation instead and split the output on blank lines --
 but remember the first statement absorbs the warm-up.
 
+## One machine answers one machine's question
+
+The script above only ever reports what *this* endpoint's client thinks, and
+this project's tables are per-platform, per-version snapshots. Whenever the
+answer might depend on *which* client -- a name that exists on one platform and
+not another, or behaviour that changed between client versions -- reach for
+[`bigfix-remote-client-relevance`](https://pypi.org/project/bigfix-remote-client-relevance/)
+instead. It evaluates across Docker containers, SSH endpoints and the local
+agent, and across several pinned `qna` versions in one call. It is a dev
+dependency of this project. The first container run pays a slow warm-up while
+the image and the `qna` build are fetched; afterwards it is fast.
+
+```python
+from bigfix_remote_client_relevance import Target, evaluate_client_relevance_stream
+
+async for result in evaluate_client_relevance_stream(
+    expression, targets, qna_version=["11.0", "10.0"]
+):
+    ...  # result.answers, result.answer_types, result.error, result.error_kind
+```
+
+- `evaluate_client_relevance` returns the whole fan-out in target-then-version
+  order; the `_stream` variant yields in completion order, so a slow SSH host
+  never holds up a container that has already answered.
+- It runs `qna -t -showtypes`, so `result.answer_types` carries the `I:` line
+  described in [`-showtypes` is the type oracle](#-showtypes-is-the-type-oracle)
+  -- the engine's own name for the result type, per answer.
+- Failures arrive *inside* results rather than raised: `error_kind` separates a
+  real relevance `E:` from transport and provisioning trouble, so one
+  unreachable host does not end a sweep.
+- One expression per call. `client_relevance` is a single string and `answers`
+  is a flat list, so feeding it N expressions loses the boundary between them.
+  For a few hundred expressions on one machine, the batch script above is still
+  the right tool; use the package when the answer depends on which machine.
+
 ## Asking the engine what exists
 
 QnA can be asked about the language itself, not just about this machine. The
@@ -378,3 +413,37 @@ For **session** relevance the equivalent authority is a server-side relevance
 query, not QnA -- QnA has no access to the deployment, and asking it a `bes`
 question returns `The operator "bes computers" is not defined.` See
 [`dialects.md`](dialects.md).
+
+### Differential testing: is the checker calibrated?
+
+Beyond settling individual questions, QnA can be run against the type checker
+in bulk: analyse an expression, evaluate it, and compare the verdicts. Three
+axes, in increasing order of what they prove:
+
+1. **Rejection.** The analyzer rejecting what the engine accepts is a false
+   positive. The analyzer accepting what the engine rejects with a *type* error
+   is a miss -- but only a type error: `nonexistent object`, `non-unique
+   object` and `No inspector context.` are runtime or environment facts, and
+   `The operator "string" is not defined.` is usually the display artifact
+   above, not a finding.
+2. **Type inference.** Compare `I:` against the type the checker inferred. This
+   tests what the checker computes, not merely what it refuses, and it needs
+   `-showtypes`.
+3. **Platform and version.** The same probe on several clients and `qna`
+   versions tests the snapshot the tables encode, which is what the
+   multi-client evaluator above is for.
+
+Last run over 134 expressions -- this repo's client-dialect corpus sites that a
+Mac can evaluate, plus every `parse("...")` literal in
+`tests/test_typecheck.py` -- against macOS client 11.0.6:
+
+| | count |
+| --- | --- |
+| analyzer rejects, engine accepts (**false positives**) | **0** |
+| analyzer rejects, engine rejects (agreement, matching message) | 23 |
+| analyzer accepts, engine reports a type error | 15 |
+
+All 15 are deliberate: an `unknown-inspector` warning leaves `ok` true on
+purpose, one bad `if` branch is tolerated on purpose, and the rest are the
+unprintable-result artifact. Re-run this after changing the checker; the
+false-positive column is the one that must stay at zero.

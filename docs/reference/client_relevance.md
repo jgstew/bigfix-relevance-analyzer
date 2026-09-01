@@ -39,14 +39,9 @@ different things: `drives` is `drive` on Windows, `filesystem` on Debian, RHEL
 and Ubuntu, and `volume` on macOS.
 
 Portable client relevance either sticks to inspectors present everywhere or
-guards platform-specific parts explicitly:
-
-```
-if (windows of operating system) then (exists regapps "x") else false
-```
-
-`windows of operating system`, `mac of operating system`, `unix of operating
-system` are the usual guards.
+guards platform-specific parts explicitly, with `if` - see below, because the
+guard has to be an `if`. `windows of operating system`, `mac of operating
+system` and `unix of operating system` are the usual tests.
 
 Three inspectors that look session-only but are macOS **client** inspectors:
 `rate`, `linear projection`, `exponential projection`.
@@ -77,9 +72,18 @@ every platform; its text is not. macOS renders `pad of version "1.2"` as
 freely, but never compare `pad of X as string` or substring-match a padded
 version.
 
-Note also that the platform-guard idiom above depends on left-to-right
-evaluation: reversed, `(exists regapps "x") and (windows of operating system)`
-runs a Windows-only inspector on every endpoint.
+## Only `if` guards a platform-specific inspector
+
+An `and` guard does not guard. A name the platform does not define raises
+**wherever it appears**, so nothing to its left prevents it, and nothing that
+absorbs an evaluation error absorbs this - not `exists`, `number of` or `|`.
+On macOS `false and (exists keys "x" of registry)` errors, where `false and
+(1/0 = 1)` is `A: False`. A branch of an `if` that is not taken is the only
+escape, either side, and it is chosen at runtime:
+
+```
+if (windows of operating system) then (exists keys "x" of registry) else false
+```
 
 ## Where to read more
 

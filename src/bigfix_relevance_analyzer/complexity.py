@@ -444,6 +444,42 @@ COST_RULES: tuple[CostRule, ...] = (
         anchors=("smbios",),
     ),
     CostRule(
+        label="registry enumeration",
+        # The lowest tier deliberately. Registry access on Windows is fast --
+        # it is a memory-mapped, OS-cached store, not a database round trip --
+        # so this is nothing like the `wmi query` or `event log` tiers, and
+        # charging it as if it were would miss rank every Windows fixlet against
+        # every other kind of cost in this table. What is being charged is the
+        # *count*: a hive level is unbounded, so a statement that walks several
+        # of them accumulates, and one that walks one does not trip anything.
+        costs=uniform_cost(COST_LOW, CLIENT_ONLY),
+        # `keys "X" of <key>` -- the bounded lookup by name, and how nearly all
+        # shipped Windows content reads the registry -- cannot match this, and
+        # not by accident: the string literal breaks the word run, so the
+        # tokens either side of it are never one phrase. That is what keeps
+        # this rule off 55,218 sites in one content site alone, against 1,440
+        # it does charge.
+        # The object is matched by lookahead so it is not consumed, which makes
+        # `keys of keys of key ...` count twice rather than once. Two hive
+        # levels is a cross product, and a rule whose rationale is "the count
+        # is unbounded" has to say so.
+        pattern=re.compile(
+            r"\b(?:keys|values) of "
+            r"(?=(?:key|keys|registry|native registry|x32 registry|x64 registry)\b)"
+        ),
+        why=(
+            "enumerates every subkey or value at a hive level; each read is cheap, "
+            "but the count is unbounded"
+        ),
+        example='exists keys of key "HKEY_LOCAL_MACHINE\\SOFTWARE" of registry',
+        # `registry` alone, not `keys`/`values`: those two are defined in both
+        # dialects (session has `keys of <bes property>`), and the anchors are
+        # what `test_declared_dialects_match_the_inspector_dumps` reads to
+        # confirm a client-only rule really is client-only. The registry is the
+        # part that exists on one side only, and it is the part being charged.
+        anchors=("registry",),
+    ),
+    CostRule(
         label="event log",
         costs=uniform_cost(COST_HIGH, CLIENT_ONLY),
         pattern=re.compile(r"\brecords? of\b.*\bevent log\b|\bevent log\b"),

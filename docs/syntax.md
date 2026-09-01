@@ -187,6 +187,10 @@ is `0 = (x | 999)` - but a bare `*`, `/`, `mod` or `&` result cannot meet
 `|` at all: `2 * 3 | 5` is a parse error; write `(2 * 3) | 5`. `exists`
 and `not` do not absorb a fallback: `exists x | false` is `(exists x) | false`.
 
+One thing `|` does **not** rescue: a name the engine does not define, which
+raises rather than falling back. Only an untaken `if` branch absorbs that. See
+[`universal_relevance.md`](universal_relevance.md#an-undefined-name-raises-wherever-it-appears---except-in-an-untaken-if-branch).
+
 ## Errors propagate, except where a plural flattens them
 
 An error in a singular context is an error. In a *plural* context it is

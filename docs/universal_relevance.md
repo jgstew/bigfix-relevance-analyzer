@@ -301,6 +301,105 @@ For a deliberate default, use the error-fallback operator `|`, documented in
 byproduct of plural flattening; `|` is the construct that means it -- but note
 `|` rescues fewer errors than it appears to; see the next section.
 
+Everything above is about an error raised *during* evaluation. An undefined
+name is a different thing entirely, and of everything here only an untaken `if`
+branch absorbs it -- see the next section.
+
+## An undefined name raises wherever it appears - except in an untaken `if` branch
+
+The absorbers above, the short-circuit rule, and `|` all deal with a statement
+that ran and went wrong. A name the engine does not define is a different
+thing: it raises from any position it is written in, including one whose value
+is never used.
+
+Confirmed on both engines with a name each one lacks - `registry` is
+client-only vocabulary, so the session engine is the one refusing it below,
+and a macOS client refuses `keys ... of registry` in exactly the same words:
+
+```
+Q: false and (exists keys "x" of registry)
+E: The operator "registry" is not defined.        (session)
+E: The operator "keys" is not defined.            (client, macOS 14.6.1)
+Q: false and (1/0 = 1)
+A: False                                          (both)
+```
+
+The contrast is the whole finding. Same guard, same position, same engine -
+one is absorbed and the other is not, and the difference is only whether the
+name exists:
+
+| construct | evaluation error `1/0` | undefined name |
+| --- | --- | --- |
+| `exists (...)` | `False` | raises |
+| `number of (...)` | `0` | raises |
+| `(7; ...)` collection | `7`, then the error | raises, nothing returned |
+| `false and (...)` | `False` | raises |
+| `(...) \| fallback` | the fallback | raises |
+| `not (...)` | propagates | raises |
+| untaken `if` branch | skipped | **skipped** |
+
+### The one exception, and what it is not
+
+A branch of an `if` that is not taken absorbs an undefined name, in either
+position:
+
+```
+Q: if true then false else (exists keys "x" of registry)
+A: False
+Q: if false then (exists keys "x" of registry) else 1
+A: 1
+```
+
+It is a **runtime** decision, not a literal the engine could fold away. Give
+the condition something it has to evaluate and the untaken branch is still
+spared, on both engines:
+
+```
+Q: if (exists file "/nope-xyz") then (exists keys "x" of registry) else false
+A: False                                                            (client)
+Q: if (number of bes computers > 999999) then (exists keys "x" of registry) else false
+A: False                                                            (session)
+```
+
+Take the branch and it raises, so this is about the branch not running rather
+than about `if` being special-cased for undefined names:
+
+```
+Q: if true then (exists keys "x" of registry) else false
+E: The operator "registry" is not defined.        (both)
+```
+
+The `if` keeps working inside the constructs that do not absorb, so an
+`if`-guarded name is safe wherever it is put:
+
+```
+Q: false and (if false then (exists keys "x" of registry) else false)
+A: False                                          (both)
+Q: (if false then (exists keys "x" of registry) else false) | true
+A: False                                          (client)
+```
+
+**The untaken branch is not skipped wholesale**, which is the part that
+resists a tidy explanation: it is still type-checked, on both engines.
+
+```
+Q: if false then 1 else "a"
+E: Incompatible types.                            (both)
+```
+
+So the branch is compiled and typed, and it is the *name* error specifically
+that does not fire there. No mechanism is asserted here to reconcile that with
+`false and (...)` raising: the observations are firm and any story about when
+resolution happens would not be.
+
+Two consequences worth carrying. Guarding a dialect-specific or
+platform-specific name with `and` does not work, in either operand order -
+only `if`/`then`/`else` does; the platform case is worked through in
+[`client_relevance.md`](client_relevance.md#only-if-guards-a-platform-specific-inspector).
+And when reading an `is not defined` error, nothing about where the name sat
+in the statement made it fire: it fires wherever the name appears, unless it
+sat in a branch that did not run.
+
 ## The empty case: a singular that finds nothing, and what rescues it
 
 The complement of the non-unique finding below: where a singular spelling over

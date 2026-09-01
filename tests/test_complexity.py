@@ -234,6 +234,14 @@ def test_hashing_is_charged_and_named() -> None:
         ("exists packages of rpm", "package database"),
         ("maximum of modification times of files of folder", "modification time"),
         ('exists xpaths "//a" of xml document of file "/tmp/x"', "xpath evaluation"),
+        (
+            'exists keys of key "HKEY_LOCAL_MACHINE\\SOFTWARE" of registry',
+            "registry enumeration",
+        ),
+        (
+            'exists values of key "HKEY_LOCAL_MACHINE\\SOFTWARE\\x" of registry',
+            "registry enumeration",
+        ),
     ],
 )
 def test_each_heavy_inspector_is_recognized(statement: str, label: str) -> None:
@@ -387,6 +395,61 @@ def test_bare_active_directory_reference_is_cheap() -> None:
     result = analyze("exists active directory", dialect=Dialect.CLIENT)
     assert result.costly_inspectors == ("active directory",)
     assert result.evaluation_cost == COST_LOW
+
+
+def test_a_named_registry_lookup_is_not_charged() -> None:
+    """The rule that pays for itself by what it stays off.
+
+    `keys "X" of <key>` is a bounded lookup by name, and it is how essentially
+    all shipped Windows content reads the registry -- 55,218 sites in one
+    content site alone. Charging it would put a cost on nearly every Windows
+    fixlet in existence and tell nobody anything. What deserves the charge is
+    the unfiltered enumeration below it, which walks a hive level.
+    """
+    named = analyze(
+        'exists key "Adobe" of key "HKEY_LOCAL_MACHINE\\SOFTWARE" of registry',
+        dialect=Dialect.CLIENT,
+    )
+    assert named.evaluation_cost == 0.0
+    assert named.costly_inspectors == ()
+
+
+def test_registry_enumeration_costs_more_than_a_named_lookup() -> None:
+    enumerated = analyze(
+        'exists keys of key "HKEY_LOCAL_MACHINE\\SOFTWARE" of registry',
+        dialect=Dialect.CLIENT,
+    ).evaluation_cost
+    named = analyze(
+        'exists keys "Adobe" of key "HKEY_LOCAL_MACHINE\\SOFTWARE" of registry',
+        dialect=Dialect.CLIENT,
+    ).evaluation_cost
+    assert enumerated > named == 0.0
+
+
+def test_nested_registry_enumeration_costs_more_than_one_level() -> None:
+    """Two hive levels is a cross product, not a second lookup.
+
+    The rule's whole rationale is that the *count* is unbounded, so a statement
+    walking the subkeys of every subkey has to cost more than one walking a
+    single level -- otherwise the cost says the same thing about two very
+    different statements.
+    """
+    one = analyze(
+        'exists keys of key "HKEY_LOCAL_MACHINE\\SOFTWARE" of registry',
+        dialect=Dialect.CLIENT,
+    ).evaluation_cost
+    nested = analyze(
+        'exists keys of keys of key "HKEY_LOCAL_MACHINE\\SOFTWARE" of registry',
+        dialect=Dialect.CLIENT,
+    ).evaluation_cost
+    assert nested > one > 0
+
+
+def test_registry_rules_are_not_charged_to_session() -> None:
+    """There is no registry in session relevance; the rules are client-only."""
+    statement = 'exists keys of key "HKEY_LOCAL_MACHINE\\SOFTWARE" of registry'
+    assert "registry enumeration" in analyze(statement, dialect=Dialect.CLIENT).costly_inspectors
+    assert analyze(statement, dialect=Dialect.SESSION).evaluation_cost == 0.0
 
 
 def test_active_directory_enumeration_costs_more_than_a_bare_reference() -> None:

@@ -131,6 +131,9 @@ because the engine does not.
 element, so `(7; 1/0)` answers `7` *and* errors. For a deliberate default, use
 the error-fallback operator `|`.
 
+All of that is about an error raised *during* evaluation. An undefined name is
+absorbed by none of it, only by an untaken `if` branch - see the last section.
+
 ## A singular spelling over several objects fails at evaluation
 
 Both engines reject it, and the complaint is about the *object*:
@@ -179,3 +182,15 @@ Q: number of processors         (session)  E: The operator "processors" is not d
 
 A hard error naming the phrase - cheap to catch at an engine, invisible before
 then, since the statement is perfectly well-formed.
+
+An undefined name raises **wherever it appears**, so nothing that rescues an
+evaluation error rescues this: not short-circuiting, not `exists`, `number of`
+or a `;` collection, not `|`. `false and (exists keys "x" of registry)` raises
+on both engines where `false and (1/0 = 1)` answers `False`.
+
+A branch of an `if` that is not taken is the sole escape, either side of the
+condition, and it is chosen at runtime - not folded from a literal. So
+guarding a dialect- or platform-specific name with `and` does not work in any
+operand order, and only `if`/`then`/`else` does. The untaken branch is still
+type-checked (`if false then 1 else "a"` is `Incompatible types.`), so it is
+the name error that is skipped, not the branch.
