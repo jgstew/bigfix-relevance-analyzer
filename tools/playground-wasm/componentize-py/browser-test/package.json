@@ -1,0 +1,12 @@
+{
+  "name": "componentize-py-browser-test",
+  "private": true,
+  "description": "CI-only: headless-browser regression tests for the built playground page (tools/playground-wasm/componentize-py/build-playground/). Not part of the published artifact.",
+  "type": "module",
+  "dependencies": {
+    "playwright": "1.62.1"
+  },
+  "engines": {
+    "npm": ">=11.10.0"
+  }
+}

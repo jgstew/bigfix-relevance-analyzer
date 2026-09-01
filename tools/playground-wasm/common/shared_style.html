@@ -1,0 +1,101 @@
+<!--
+  Shared by every tools/playground-wasm/*/build-playground/template.html,
+  injected at %%SHARED_STYLE%%. Edit here, not in a built page.
+
+  Nothing in here is runtime-specific: the two playgrounds render identical
+  payloads (both call analyze_relevance_to_dict and hand back its JSON), so
+  they should look identical too. Keeping one copy is also what stops the two
+  pages drifting into disagreeing about the same data -- a drift the
+  byte-for-byte page comparison in ../parity-test/ would NOT catch, because it
+  compares JSON, not DOM.
+-->
+<style>
+  :root {
+    color-scheme: light dark;
+    --fg: #1a1a1a;
+    --bg: #ffffff;
+    --muted: #6b7280;
+    --border: #d7dbe0;
+    --panel: #f6f7f9;
+    --accent: #2563eb;
+    --error: #b91c1c;
+    --mono: ui-monospace, "SF Mono", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fg: #e5e7eb;
+      --bg: #14161a;
+      --muted: #9aa1ab;
+      --border: #33373f;
+      --panel: #1c1f24;
+      --accent: #60a5fa;
+      --error: #f87171;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 2rem 1.25rem 4rem;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+  }
+  main { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 1.35rem; margin: 0 0 0.25rem; }
+  .subtitle { color: var(--muted); margin: 0 0 1.5rem; font-size: 0.92rem; }
+  .subtitle a { color: var(--accent); }
+  textarea {
+    width: 100%;
+    min-height: 4.5rem;
+    padding: 0.75rem;
+    font: 0.95rem/1.4 var(--mono);
+    color: var(--fg);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    resize: vertical;
+  }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.6rem; }
+  button {
+    font: inherit;
+    font-weight: 600;
+    padding: 0.5rem 1.1rem;
+    border-radius: 6px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .hint { color: var(--muted); font-size: 0.85rem; }
+  #status { color: var(--muted); font-size: 0.9rem; }
+  #status.error { color: var(--error); }
+  #output { margin-top: 1.5rem; }
+  table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1.25rem; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; width: 11rem; }
+  h2 { font-size: 1rem; margin: 1.5rem 0 0.25rem; }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+    overflow-x: auto;
+    font: 0.85rem/1.45 var(--mono);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  details summary { cursor: pointer; color: var(--muted); font-size: 0.88rem; margin-top: 1rem; }
+  .badge {
+    display: inline-block;
+    padding: 0.05rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border: 1px solid var(--border);
+  }
+  .badge.ok { color: #15803d; border-color: #15803d; }
+  .badge.bad { color: var(--error); border-color: var(--error); }
+</style>

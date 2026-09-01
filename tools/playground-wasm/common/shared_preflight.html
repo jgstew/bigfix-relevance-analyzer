@@ -1,0 +1,71 @@
+<!--
+  Shared by every tools/playground-wasm/*/build-playground/template.html,
+  injected at %%SHARED_PREFLIGHT%%. Edit here, not in a built page.
+
+  This block exists to run *before* the multi-MiB script that follows it has
+  finished downloading, which is why it is a separate <script> and why it
+  defines functions instead of calling them: each template runs the checks it
+  actually needs, with its own wording, in its own tiny early script. The
+  Pyodide page needs WebAssembly; the componentize-py page also needs
+  DecompressionStream, because its core wasm modules are embedded gzipped.
+
+  window.stop() is the point of the whole exercise -- it cancels the rest of the
+  page download, so an unsupported browser does not spend 10-17 MiB finding out.
+-->
+<script>
+"use strict";
+
+function checkWasmSupport() {
+  if (typeof WebAssembly !== "object" || typeof WebAssembly.instantiate !== "function") {
+    return "This browser has no WebAssembly support at all.";
+  }
+  try {
+    // Smallest possible valid module (magic number + version, no sections).
+    const minimalModule = new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
+    if (!WebAssembly.validate(minimalModule)) {
+      return "WebAssembly.validate() rejected a minimal, definitely-valid module.";
+    }
+  } catch (err) {
+    return `WebAssembly is present but throws when used: ${err}`;
+  }
+  return null;
+}
+
+// Only the componentize-py page calls this. Its ~20 MiB of core wasm is
+// embedded gzipped -- that is what keeps the page smaller than the Pyodide one
+// rather than half again as large -- so inflating it natively is not optional.
+function checkDecompressionStreamSupport() {
+  if (typeof DecompressionStream !== "function") {
+    return "This browser has no DecompressionStream.";
+  }
+  try {
+    new DecompressionStream("gzip");
+  } catch (err) {
+    return `DecompressionStream is present but rejects "gzip": ${err}`;
+  }
+  return null;
+}
+
+/**
+ * Report a failed pre-flight and stop the page downloading.
+ *
+ * `needs` is the runtime-specific half of the explanation -- what this
+ * particular page requires and why -- since the generic advice below is the
+ * same either way.
+ */
+function preflightBailout(problem, needs) {
+  const statusEl = document.getElementById("status");
+  statusEl.textContent = "This browser can't run this page.";
+  statusEl.classList.add("error");
+  const errorEl = document.createElement("pre");
+  errorEl.textContent =
+    `${problem}\n\n` +
+    `${needs}\n\n` +
+    "Try a current version of a major browser (Chrome, Firefox, Safari, " +
+    "Edge), and check whether an extension or an administrator policy has " +
+    "disabled it.";
+  document.getElementById("output").replaceChildren(errorEl);
+  // No point downloading the rest of this page now.
+  window.stop();
+}
+</script>

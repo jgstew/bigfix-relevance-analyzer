@@ -3,12 +3,19 @@
 # head element / plural), not typos for "thread"/"threads". They show up in
 # tests/examples/session_relevance/**.
 #
+# "wit" is WIT, the WebAssembly Interface Types IDL -- the .wit file format
+# that defines the componentize-py playground's world (see
+# tools/playground-wasm/componentize-py/build-playground/wit/analyzer.wit).
+# codespell maps wit->with, which is a reasonable guess in prose and wrong in
+# every occurrence here. _typos.toml needs no matching entry: typos does not
+# flag it.
+#
 # "oprating" is half of a deliberately garbled name in
 # tests/test_inspectors.py ("wnidows of oprating system"), proving lookup()
 # returns nothing for an unknown name rather than "correcting" it. codespell's
 # dictionary maps oprating->operating unambiguously, so it needs an explicit
 # override; _typos.toml carries the matching entry for "wnidows".
-ignore-words-list = thead,theads,oprating,wnidows
+ignore-words-list = thead,theads,oprating,wnidows,wit
 
 # tests/examples/ holds real-world BigFix content copied verbatim from
 # https://github.com/jgstew/bigfix-content for fidelity (see its README), plus
@@ -27,4 +34,7 @@ ignore-words-list = thead,theads,oprating,wnidows
 # tools/generate_inspector_data.py - the same verbatim BigFix inspector names
 # (e.g. `additional_information of <dmi>`), just relocated into src/ so the
 # library can read them at runtime. Same rationale, same exclusion.
-skip = tests/examples/**,src/bigfix_relevance_analyzer/_inspector_data.py
+# npm lockfiles are generated, and their integrity hashes and truncated
+# registry metadata produce false positives that cannot be
+# fixed in the file -- regenerating it would just bring them back.
+skip = tests/examples/**,src/bigfix_relevance_analyzer/_inspector_data.py,tools/playground-wasm/**/package-lock.json

@@ -77,7 +77,7 @@ if (payload.types?.ok !== true) fail(`expected types.ok === true, got ${JSON.str
 // whether it's running in a GitHub Action, a terminal, or anything else, and
 // it stays that way on purpose: where this output *goes* (a log, a step
 // summary, both) is a decision for whatever invokes it, not for this script.
-// See .github/workflows/pyodide.yaml for how the workflow uses it.
+// See .github/workflows/wasm-html.yaml for how the workflow uses it.
 const referenceRows = payload.references
   .map((ref) => `| \`${ref.phrase}\` | ${ref.known} | ${ref.return_types.join(", ")} |`)
   .join("\n");

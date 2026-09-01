@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Build ``template.html`` into a single, fully offline playground page.
 
-    python tools/pyodide-playground/build_playground.py \\
+    python tools/playground-wasm/pyodide/build-playground/build_playground.py \\
         --wheel dist/bigfix_relevance_analyzer-*.whl \\
-        --pyodide-dir tools/pyodide-smoke/node_modules/pyodide \\
+        --pyodide-dir tools/playground-wasm/pyodide/smoke/node_modules/pyodide \\
         --out playground/index.html
 
 Every asset Pyodide needs at runtime -- its two JS modules, the wasm binary,
@@ -12,30 +12,42 @@ are embedded into the page as base64. The built file makes no network
 requests at all when opened; see template.html's ``boot()`` for how each
 asset is handed to Pyodide instead of being fetched.
 
+The styling, pre-flight checks and rendering come from ../../common/ and are
+shared with the componentize-py page; ``embed.render`` injects them. Only the
+asset embedding below is Pyodide-specific.
+
 ``--pyodide-dir`` is a local install of the npm ``pyodide`` package (i.e.
-``tools/pyodide-smoke/node_modules/pyodide`` after ``npm ci`` there) --
+``tools/playground-wasm/pyodide/smoke/node_modules/pyodide``
+  after ``npm ci`` there) --
 that package ships these exact files for its own offline/Node use, so this
 script reads them from there instead of fetching them a second time.
 PYODIDE_VERSION below must match the version pinned in
-tools/pyodide-smoke/package.json; this script checks that itself.
+tools/playground-wasm/pyodide/smoke/package.json; this script checks that itself.
 """
 
 from __future__ import annotations
 
 import argparse
-import base64
 import glob
 import json
 import sys
 from pathlib import Path
 
+# The substitution/hard-fail machinery and the shared UI partials, both shared
+# with the componentize-py build script next door. sys.path rather than a
+# package import: these scripts run from a bare `python3` in CI with nothing
+# installed, so there is no package to import from.
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "common"))
+
+import embed
+
 # Keep in step with the "pyodide" version pinned in
-# tools/pyodide-smoke/package.json -- checked against that file below so the
+# tools/playground-wasm/pyodide/smoke/package.json -- checked against that file below so the
 # two can't silently drift into embedding different Pyodide releases.
 PYODIDE_VERSION = "314.0.6"
 
 DEFAULT_TEMPLATE = Path(__file__).parent / "template.html"
-PACKAGE_JSON = Path(__file__).parent.parent / "pyodide-smoke" / "package.json"
+PACKAGE_JSON = Path(__file__).parent.parent / "smoke" / "package.json"
 
 # Filename -> template placeholder, for the files read from --pyodide-dir.
 _PYODIDE_ASSETS = {
@@ -68,27 +80,17 @@ def build(wheel_path: Path, pyodide_dir: Path, template_path: Path, out_path: Pa
     """Fill ``template_path``'s placeholders and write the result to ``out_path``."""
     _check_pinned_version_matches()
 
-    template_text = template_path.read_text(encoding="utf-8")
-
-    substitutions = {"%%WHEEL_BASE64%%": base64.b64encode(wheel_path.read_bytes()).decode("ascii")}
+    substitutions = {"%%WHEEL_BASE64%%": embed.b64_file(wheel_path)}
     for filename, placeholder in _PYODIDE_ASSETS.items():
         asset_path = pyodide_dir / filename
         if not asset_path.is_file():
             raise SystemExit(f"expected {asset_path} to exist (from --pyodide-dir {pyodide_dir})")
-        substitutions[placeholder] = base64.b64encode(asset_path.read_bytes()).decode("ascii")
+        substitutions[placeholder] = embed.b64_file(asset_path)
 
-    rendered = template_text
-    for placeholder, value in substitutions.items():
-        rendered = rendered.replace(placeholder, value)
-
-    leftover = [p for p in substitutions if p in rendered]
-    if leftover:
-        raise SystemExit(
-            f"template still contains unreplaced placeholder(s) after substitution: {leftover}"
-        )
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(rendered, encoding="utf-8")
+    # embed.render injects the shared UI partials, then these substitutions, and
+    # hard-fails on any placeholder left over -- including ones this script
+    # never knew about.
+    embed.write_page(out_path, embed.render(template_path, substitutions))
 
 
 def _resolve_single(pattern: str, *, kind: str) -> Path:
@@ -110,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
         required=True,
         help=(
             "local npm 'pyodide' package install to read the runtime assets from "
-            "(e.g. tools/pyodide-smoke/node_modules/pyodide)"
+            "(e.g. tools/playground-wasm/pyodide/smoke/node_modules/pyodide)"
         ),
     )
     parser.add_argument("--template", default=str(DEFAULT_TEMPLATE), help="template HTML path")
@@ -124,10 +126,9 @@ def main(argv: list[str] | None = None) -> int:
 
     build(wheel_path, pyodide_dir, Path(args.template), Path(args.out))
     out_path = Path(args.out)
-    size_mib = out_path.stat().st_size / (1024 * 1024)
     print(
-        f"wrote {out_path} ({size_mib:.1f} MiB, embedding {wheel_path.name} "
-        f"+ Pyodide {PYODIDE_VERSION})"
+        f"wrote {out_path} ({embed.mib(out_path.stat().st_size)}, embedding "
+        f"{wheel_path.name} + Pyodide {PYODIDE_VERSION})"
     )
     return 0
 

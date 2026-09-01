@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bigfix-relevance-analyzer"
-version = "1.11.0"
+version = "1.11.1"
 description = "A python module for working with BigFix Relevance generically. Extract, Analyze, etc."
 readme = "README.md"
 license = "MIT"
@@ -40,6 +40,13 @@ Homepage = "https://github.com/JGStew/bigfix-relevance-analyzer"
 Repository = "https://github.com/JGStew/bigfix-relevance-analyzer"
 
 [dependency-groups]
+# The componentize-py toolchain, kept out of `dev` because it is only ever
+# needed by .github/workflows/wasm-html.yaml and pulls a 15 MiB binary wheel that
+# embeds a whole CPython-for-WASI build. Pinned exactly: the version decides
+# which CPython ends up inside the component, and
+# tools/playground-wasm/componentize-py/build-playground/build_playground.py
+# cross-checks this pin against its own so the two cannot drift.
+wasm = ["componentize-py==0.25.0"]
 dev = [
     "pytest>=8",
     "pytest-cov>=5",

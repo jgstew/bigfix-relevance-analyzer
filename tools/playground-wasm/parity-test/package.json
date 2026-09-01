@@ -1,0 +1,12 @@
+{
+  "name": "playground-parity-test",
+  "private": true,
+  "description": "CI-only: loads both built playground pages in one browser and compares their JSON output byte-for-byte. Not part of the published artifact.",
+  "type": "module",
+  "dependencies": {
+    "playwright": "1.62.1"
+  },
+  "engines": {
+    "npm": ">=11.10.0"
+  }
+}

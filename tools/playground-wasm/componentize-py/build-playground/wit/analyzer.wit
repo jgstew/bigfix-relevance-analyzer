@@ -1,0 +1,22 @@
+// The entire JS<->Python boundary for the playground, and deliberately no
+// larger: two exports, strings only, no records and no resources.
+//
+// That is not a simplification -- it is what the Pyodide playground already
+// does. Its boot() hands one string to Python and reads back one JSON string
+// (see ../../pyodide/build-playground/template.html). Keeping this world the
+// same shape is what lets both pages share the rendering code in
+// ../../common/, and what makes comparing the two pages a byte comparison of
+// two strings rather than a structural diff of two object graphs.
+//
+// World-level funcs rather than an exported interface, on purpose: jco
+// transpiles world-level exports to top-level JS functions (`analyze`,
+// `version`), whereas an exported interface nests them under an object keyed
+// by the interface name. One less layer for the template to know about.
+package local:relevance-analyzer;
+
+world analyzer {
+    /// A relevance statement in, the JSON of analyze_relevance_to_dict() out.
+    export analyze: func(text: string) -> string;
+    /// The installed bigfix-relevance-analyzer version, e.g. "1.11.0".
+    export version: func() -> string;
+}

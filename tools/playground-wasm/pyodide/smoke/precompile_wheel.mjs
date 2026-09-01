@@ -27,7 +27,7 @@
 // tied to the CPython *language* version, not the platform/build -- Pyodide
 // 314.0.6's CPython 3.14.2 and a plain macOS CPython 3.14.6 both report the
 // identical magic number (b'+\x0e\r\n' at the time of writing). But this
-// project's pyodide.yaml workflow pins actions/setup-python to "3.13",
+// project's wasm-html.yaml workflow pins actions/setup-python to "3.13",
 // already a minor version behind what Pyodide currently ships (3.14) --
 // relying on the *host's* Python version staying in lockstep with whatever
 // Pyodide happens to bundle is exactly the drift this avoids by

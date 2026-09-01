@@ -1,0 +1,352 @@
+---
+name: wasm-html
+
+# Proves this package's wheel installs and runs under Pyodide (CPython
+# compiled to WASM) inside Node -- with no system Python in the loop at all.
+# That's the constraint a VS Code extension bundling this package would ship
+# under (see issue #10: "could a VS Code extension use the python code
+# directly rather than porting to Rust?"). This workflow answers only the
+# build/runtime half of that question -- it does not implement or exercise
+# any LSP surface, just import-and-run-one-example under the real target
+# runtime. tools/playground-wasm/pyodide/smoke/smoke.mjs is the script; see its header for
+# what it checks and why.
+#
+# It also builds a standalone HTML playground with the same analyzer embedded
+# for interactive use in a browser, uploads it as this run's artifact, then
+# tests that built page in a real headless browser -- placed after the upload
+# so a test failure doesn't delay or block the artifact being available.
+#
+# TWO runtimes are built, from tools/playground-wasm/:
+#
+#   componentize-py/  the PREFERRED path. Compiles this package and a whole
+#                     CPython into one pre-initialized Wasm component, which
+#                     jco then lowers to core Wasm plus JS for the browser.
+#   pyodide/          the parity BASELINE. A general-purpose WASM CPython that
+#                     imports the wheel at load time.
+#
+# Measured on the same machine, same analyzer version: the componentize-py page
+# is ~10.3 MiB and boots in ~450 ms, against Pyodide's ~17.7 MiB and ~1500 ms,
+# with identical per-analysis throughput. That is why componentize-py is
+# preferred.
+#
+# Pyodide is kept because of the third job. The two runtimes embed different
+# CPython builds produced by different toolchains, so `parity` loads both built
+# pages in one browser and asserts their JSON output is byte-identical over
+# every statement in tests/corpus/. That is the strongest correctness check
+# available for this analyzer in a WASM host, and it needs two independent
+# implementations to exist at all.
+#
+# Renamed from pyodide.yaml (and from `name: pyodide`) once it stopped being
+# Pyodide-only. Named for what it produces -- WASM-backed standalone HTML pages
+# -- rather than for either runtime, so adding or swapping a runtime later does
+# not make the name a lie again. NOTE: this changes the check name, so any
+# branch-protection rule or required status check naming `pyodide` needs
+# updating to `wasm-html`.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wasm-html-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pyodide:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Same pin as .github/workflows/test.yaml -- only used here to build
+      # the wheel that gets handed to Pyodide, not to run the package.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      # Same awk-from-.pre-commit-config.yaml trick as test.yaml, so this
+      # workflow doesn't carry a second, driftable uv version pin.
+      - name: read uv version from .pre-commit-config.yaml
+        run: |
+          UV_VERSION="$(awk '
+            /^[[:space:]]*-[[:space:]]*repo:.*astral-sh\/uv-pre-commit[[:space:]]*$/ { found = 1; next }
+            found && $1 == "rev:" {
+              if (match($0, /#[ \t]*(frozen:[ \t]*)?[vV]?[0-9]+(\.[0-9]+)*/)) {
+                ver = substr($0, RSTART, RLENGTH)
+                sub(/^#[ \t]*(frozen:[ \t]*)?[vV]?/, "", ver)
+              } else {
+                ver = $2
+                gsub(/["'\'']/, "", ver)
+                sub(/^[vV]/, "", ver)
+              }
+              print ver
+              exit
+            }
+          ' .pre-commit-config.yaml)"
+          if [ -z "$UV_VERSION" ]; then
+            echo "::error::could not read the astral-sh/uv-pre-commit version from .pre-commit-config.yaml"
+            exit 1
+          fi
+          echo "UV_VERSION=$UV_VERSION" >> "$GITHUB_ENV"
+          echo "uv version: $UV_VERSION"
+
+      - name: install uv
+        run: python -m pip install "uv==${UV_VERSION}"
+
+      # Only the wheel this step produces is what Pyodide gets -- not the
+      # source tree -- so this exercises the same artifact a release ships,
+      # same as the "install the built wheel" step in test.yaml.
+      - name: uv build (wheel)
+        run: uv build --wheel
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            tools/playground-wasm/pyodide/smoke/package-lock.json
+            tools/playground-wasm/pyodide/browser-test/package-lock.json
+
+      - name: npm ci
+        working-directory: tools/playground-wasm/pyodide/smoke
+        run: npm ci
+
+      # The version this checks against __version__ comes from the wheel's
+      # own package metadata, same as the "smoke-import" step in test.yaml --
+      # nothing here can drift from what was actually built.
+      # smoke.mjs prints its report as plain Markdown on stdout and knows
+      # nothing about CI -- `tee` is what puts it in both the job log and the
+      # step summary, so that decision lives here, not in the script. The
+      # default `bash --noprofile --norc -eo pipefail` shell GitHub Actions
+      # runs `run:` steps with (docs: "Exit codes and error action
+      # preferences") is what makes a non-zero exit from smoke.mjs still fail
+      # this step despite the pipe into tee.
+      - name: run the analyzer under Pyodide in Node
+        working-directory: tools/playground-wasm/pyodide/smoke
+        run: node smoke.mjs ../../../../dist/*.whl | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # Precompiles the wheel's .py files to .pyc using this exact Pyodide
+      # build's own CPython, rather than the runner's host Python -- see the
+      # script's header for why that distinction matters (magic-number drift
+      # between this workflow's pinned Python and whatever Pyodide bundles).
+      # A real compile failure here fails this job instead of surfacing as a
+      # confusing runtime failure for someone using the playground.
+      - name: precompile the wheel's .pyc with Pyodide's own CPython
+        working-directory: tools/playground-wasm/pyodide/smoke
+        run: node precompile_wheel.mjs --wheel ../../../../dist/*.whl --out ../../../../dist/precompiled.zip
+
+      # the smoke stage's npm ci above already fetched the exact Pyodide
+      # release this repo pins, as the "pyodide" npm package -- that package
+      # ships its own runtime assets (the wasm binary, stdlib zip, etc.) for
+      # its own offline/Node use, so this reads them from there instead of
+      # fetching Pyodide's release a second time. build_playground.py checks
+      # its own version pin against tools/playground-wasm/pyodide/smoke/package.json's, so
+      # the two can't silently drift apart.
+      #
+      # The built page is fully self-contained: everything Pyodide and this
+      # package need is embedded as base64, so opening it makes no network
+      # requests at all -- see template.html's boot() for how. That's also
+      # why this step is the slow one: encoding ~13 MiB of runtime assets as
+      # base64 is real work, not just a wheel copy.
+      - name: build the standalone playground page
+        run: |
+          python3 tools/playground-wasm/pyodide/build-playground/build_playground.py \
+            --wheel dist/precompiled.zip \
+            --pyodide-dir tools/playground-wasm/pyodide/smoke/node_modules/pyodide \
+            --out playground/bigfix-relevance-analyzer-playground.html
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bigfix-relevance-analyzer-html-playground
+          path: playground/bigfix-relevance-analyzer-playground.html
+          if-no-files-found: error
+
+      # Everything from here on tests the built page itself in a real
+      # browser (not Node's Pyodide, which takes a different internal code
+      # path -- see the test script's header) -- placed after the artifact
+      # upload above so a failure here still leaves the page downloadable
+      # and doesn't add browser-install time to getting it.
+      - name: npm ci (playground browser test)
+        working-directory: tools/playground-wasm/pyodide/browser-test
+        run: npm ci
+
+      - name: install headless Chromium for the playground test
+        working-directory: tools/playground-wasm/pyodide/browser-test
+        run: npx playwright install --with-deps chromium
+
+      - name: test the playground page in a real browser
+        working-directory: tools/playground-wasm/pyodide/browser-test
+        run: node test_playground.mjs ../../../../playground/bigfix-relevance-analyzer-playground.html
+
+  componentize-py:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      # Same awk-from-.pre-commit-config.yaml trick as the job above, so this
+      # workflow doesn't carry a second, driftable uv version pin.
+      - name: read uv version from .pre-commit-config.yaml
+        run: |
+          UV_VERSION="$(awk '
+            /^[[:space:]]*-[[:space:]]*repo:.*astral-sh\/uv-pre-commit[[:space:]]*$/ { found = 1; next }
+            found && $1 == "rev:" {
+              if (match($0, /#[ \t]*(frozen:[ \t]*)?[vV]?[0-9]+(\.[0-9]+)*/)) {
+                ver = substr($0, RSTART, RLENGTH)
+                sub(/^#[ \t]*(frozen:[ \t]*)?[vV]?/, "", ver)
+              } else {
+                ver = $2
+                gsub(/["'"'"']/, "", ver)
+                sub(/^[vV]/, "", ver)
+              }
+              print ver
+              exit
+            }
+          ' .pre-commit-config.yaml)"
+          if [ -z "$UV_VERSION" ]; then
+            echo "::error::could not read the astral-sh/uv-pre-commit version from .pre-commit-config.yaml"
+            exit 1
+          fi
+          echo "UV_VERSION=$UV_VERSION" >> "$GITHUB_ENV"
+          echo "uv version: $UV_VERSION"
+
+      - name: install uv
+        run: python -m pip install "uv==${UV_VERSION}"
+
+      # As in the pyodide job: only the built wheel reaches the component, not
+      # the source tree, so this exercises the artifact a release ships.
+      - name: uv build (wheel)
+        run: uv build --wheel
+
+      # componentize-py is a 15 MiB binary wheel embedding a CPython-for-WASI
+      # build, which is why it lives in its own `wasm` dependency group rather
+      # than in `dev`. build_playground.py cross-checks its own pin against
+      # that group, so the two can't silently drift.
+      #
+      # This step runs componentize-py TWICE and throws the first result away
+      # -- see componentize.py for why (it is a 3.4 MiB size difference and,
+      # more importantly, the difference between a deterministic build and one
+      # that depends on whether the directory had been used before).
+      - name: build the Wasm component
+        run: |
+          uv run --group wasm python \
+            tools/playground-wasm/componentize-py/build-playground/componentize.py \
+            --wheel 'dist/*.whl' \
+            --work dist/componentize
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            tools/playground-wasm/componentize-py/smoke/package-lock.json
+            tools/playground-wasm/componentize-py/browser-test/package-lock.json
+
+      - name: npm ci
+        working-directory: tools/playground-wasm/componentize-py/smoke
+        run: npm ci
+
+      # Browsers can't load a Wasm component directly. jco lowers it to core
+      # modules plus JS glue, and esbuild bundles that glue together with
+      # preview2-shim into one self-contained ES module. Two bundles come out:
+      # a browser one for the page and a Node one for the smoke test.
+      - name: transpile the component for the browser
+        working-directory: tools/playground-wasm/componentize-py/smoke
+        run: node transpile.mjs --component ../../../../dist/componentize/analyzer.wasm --work ../../../../dist/componentize/web
+
+      # Same tee-into-the-step-summary arrangement as the pyodide job, and for
+      # the same reason: smoke.mjs prints plain Markdown on stdout and knows
+      # nothing about CI, so where that output goes is decided here.
+      - name: run the analyzer as a component in Node
+        working-directory: tools/playground-wasm/componentize-py/smoke
+        run: node smoke.mjs ../../../../dist/componentize/web | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # The ~20 MiB of core Wasm goes in gzipped, and the page inflates it with
+      # DecompressionStream. Raw base64 would make this page ~28 MiB -- bigger
+      # than the Pyodide one instead of considerably smaller.
+      - name: build the standalone playground page
+        run: |
+          python3 tools/playground-wasm/componentize-py/build-playground/build_playground.py \
+            --work dist/componentize/web \
+            --out playground/bigfix-relevance-analyzer-component-playground.html
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bigfix-relevance-analyzer-component-playground
+          path: playground/bigfix-relevance-analyzer-component-playground.html
+          if-no-files-found: error
+
+      # Everything from here tests the built page in a real browser, which is
+      # the only place preview2-shim's *browser* build, DecompressionStream and
+      # the page's fetch intercept are exercised at all. Placed after the
+      # artifact upload for the same reason as in the pyodide job.
+      - name: npm ci (playground browser test)
+        working-directory: tools/playground-wasm/componentize-py/browser-test
+        run: npm ci
+
+      - name: install headless Chromium for the playground test
+        working-directory: tools/playground-wasm/componentize-py/browser-test
+        run: npx playwright install --with-deps chromium
+
+      - name: test the playground page in a real browser
+        working-directory: tools/playground-wasm/componentize-py/browser-test
+        run: node test_playground.mjs ../../../../playground/bigfix-relevance-analyzer-component-playground.html
+
+  # The job that justifies building two runtimes: same inputs, two entirely
+  # separate CPython-in-WASM implementations, and the JSON they produce must
+  # match byte for byte. Both pages come from the jobs above as artifacts
+  # rather than being rebuilt, so this compares exactly what those jobs
+  # published.
+  parity:
+    runs-on: ubuntu-latest
+    needs: [pyodide, componentize-py]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tools/playground-wasm/parity-test/package-lock.json
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: bigfix-relevance-analyzer-html-playground
+          path: playground
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: bigfix-relevance-analyzer-component-playground
+          path: playground
+
+      - name: npm ci
+        working-directory: tools/playground-wasm/parity-test
+        run: npm ci
+
+      - name: install headless Chromium for the parity test
+        working-directory: tools/playground-wasm/parity-test
+        run: npx playwright install --with-deps chromium
+
+      # The corpus is tests/corpus/*.rlvcorpus, read from the checkout -- the
+      # same records the Python parser suite runs, so the two cannot drift.
+      - name: compare both playground pages
+        working-directory: tools/playground-wasm/parity-test
+        run: |
+          node test_parity.mjs \
+            ../../../playground/bigfix-relevance-analyzer-playground.html \
+            ../../../playground/bigfix-relevance-analyzer-component-playground.html \
+            | tee -a "$GITHUB_STEP_SUMMARY"

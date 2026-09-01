@@ -6,7 +6,12 @@
 #
 # The 7-day cooldown is the point, not a courtesy: a release published minutes
 # ago is the likeliest to be a compromised one. It matches `exclude-newer` in
-# pyproject.toml and is zizmor's minimum.
+# pyproject.toml, `min-release-age` in every tools/playground-wasm/*/.npmrc,
+# and is zizmor's minimum -- one number across every dependency manager here.
+#
+# Cooldown covers automated bumps. The .npmrc / exclude-newer settings cover a
+# human resolving versions by hand. Both are needed: neither sees the other's
+# entry point.
 version: 2
 updates:
   # "uv", not "pip": uv.lock is what the release wheel is built from
@@ -24,6 +29,73 @@ updates:
 
   - package-ecosystem: "github-actions"
     directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  # The five CI-only npm packages under tools/playground-wasm/. Each is its own
+  # project with its own lockfile, and dependabot only looks where it is told --
+  # a stage added without an entry here is silently unwatched, which is what
+  # tests/test_playground_layout.py::test_every_npm_package_is_watched_by_dependabot
+  # exists to catch.
+  #
+  # These never ship: they drive and test the WASM playground builds (see
+  # .github/workflows/wasm-html.yaml) and nothing here reaches the published
+  # wheel. They are still worth watching -- a compromised build-time dependency
+  # can alter the artifact CI publishes, which is the whole point of a
+  # build-chain attack.
+
+  # jco + esbuild + preview2-shim: builds the component into a browser bundle
+  - package-ecosystem: "npm"
+    directory: "/tools/playground-wasm/componentize-py/smoke"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  # playwright
+  - package-ecosystem: "npm"
+    directory: "/tools/playground-wasm/componentize-py/browser-test"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  # the pinned pyodide release
+  - package-ecosystem: "npm"
+    directory: "/tools/playground-wasm/pyodide/smoke"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  # playwright
+  - package-ecosystem: "npm"
+    directory: "/tools/playground-wasm/pyodide/browser-test"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  # playwright; compares both built pages byte-for-byte
+  - package-ecosystem: "npm"
+    directory: "/tools/playground-wasm/parity-test"
     schedule:
       interval: "weekly"
     cooldown:

@@ -1,9 +1,0 @@
-{
-  "name": "pyodide-smoke",
-  "private": true,
-  "description": "CI-only: proves the built wheel installs and runs under Pyodide (WASM CPython) in Node. Not part of the published package -- see .github/workflows/pyodide.yaml.",
-  "type": "module",
-  "dependencies": {
-    "pyodide": "314.0.6"
-  }
-}

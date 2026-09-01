@@ -24,4 +24,13 @@ oprating = "oprating"
 # tools/generate_inspector_data.py - the same verbatim BigFix inspector names,
 # just relocated into src/ so the library can read them at runtime. Same
 # rationale, same exclusion.
-extend-exclude = ["tests/examples/**", "src/bigfix_relevance_analyzer/_inspector_data.py"]
+#
+# npm lockfiles are generated, and their integrity hashes and truncated
+# registry metadata produce false positives that cannot
+# be fixed in the file - regenerating it would just bring them back.
+# .codespellrc carries the matching exclusion.
+extend-exclude = [
+    "tests/examples/**",
+    "src/bigfix_relevance_analyzer/_inspector_data.py",
+    "tools/playground-wasm/**/package-lock.json",
+]

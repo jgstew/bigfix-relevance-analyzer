@@ -1,0 +1,279 @@
+<!--
+  Shared by every tools/playground-wasm/*/build-playground/template.html,
+  injected at %%SHARED_SCRIPT%%. Edit here, not in a built page.
+
+  This is a classic (non-module) script on purpose, so everything it defines is
+  a global the per-runtime script block below it can use. The seam between the
+  two is exactly one function:
+
+      window.analyzeJson(text) -> string     the JSON of analyze_relevance_to_dict
+
+  Each runtime's boot() sets that, and everything here is written against it.
+  A *string*, not a parsed object, deliberately: it is what both runtimes
+  natively produce, and it is what makes comparing the two pages a byte
+  comparison. run() parses it for rendering and stashes the raw string on
+  window.__lastJson for the parity test to read.
+-->
+<script>
+"use strict";
+
+function bytesFromBase64(b64) {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function textFromBase64(b64) {
+  // UTF-8, not ASCII -- decode as bytes first.
+  return new TextDecoder("utf-8").decode(bytesFromBase64(b64));
+}
+
+const statusEl = document.getElementById("status");
+const outputEl = document.getElementById("output");
+const inputEl = document.getElementById("input");
+const runEl = document.getElementById("run");
+
+function setStatus(text, isError) {
+  statusEl.textContent = text;
+  statusEl.classList.toggle("error", Boolean(isError));
+}
+
+function el(tag, props, children) {
+  const node = document.createElement(tag);
+  if (props) {
+    for (const [key, value] of Object.entries(props)) {
+      if (key === "text") node.textContent = value;
+      else node.setAttribute(key, value);
+    }
+  }
+  for (const child of children || []) node.appendChild(child);
+  return node;
+}
+
+function factsTable(rows) {
+  const table = el("table");
+  for (const [label, value] of rows) {
+    table.appendChild(
+      el("tr", null, [el("th", { text: label }), el("td", { text: value })])
+    );
+  }
+  return table;
+}
+
+// `resolved` over `classified`: the classifier runs on raw text before parsing
+// and is deliberately blind to common English words like `file`, so it sees
+// only part of the evidence. `resolved` is the same question asked of the
+// inspector tables once a parse tree exists, and it is the one that can say a
+// statement uses *both* dialects and so is valid as neither -- which the
+// classifier reports as a confident verdict for whichever half it noticed.
+function dialectBadge(dialect) {
+  switch (dialect.resolved) {
+    case "uncertain":
+      return { state: "bad", label: "uncertain (client and session)" };
+    case "both":
+      return { state: "ok", label: "both (valid either way)" };
+    case "client":
+    case "session":
+      return { state: "ok", label: dialect.resolved };
+  }
+  // Nothing resolved: no reference in the statement is exclusive to either
+  // dialect, or nothing parsed. Fall back to the text classifier, and stay
+  // neutral rather than red -- an absence of evidence is not a fault.
+  if (dialect.classified !== null) return { state: "ok", label: dialect.classified };
+  return { state: "", label: "undetermined" };
+}
+
+function renderPayload(payload) {
+  outputEl.replaceChildren();
+
+  // "types" is omitted entirely when parsing failed.
+  const dialect = dialectBadge(payload.dialect);
+  const typesOk = payload.types?.ok === true;
+  outputEl.appendChild(
+    el("p", null, [
+      el("span", { class: `badge ${dialect.state}`, text: `dialect: ${dialect.label}` }),
+      document.createTextNode(" "),
+      el("span", { class: `badge ${payload.parse.ok ? "ok" : "bad"}`, text: `parse: ${payload.parse.ok ? "ok" : "error"}` }),
+      document.createTextNode(" "),
+      el("span", { class: `badge ${typesOk ? "ok" : "bad"}`, text: `types: ${payload.types ? (typesOk ? "ok" : "error") : "n/a"}` }),
+    ])
+  );
+
+  const parseCell = payload.parse.ok
+    ? `${payload.parse.node_count} nodes, depth ${payload.parse.tree_depth}`
+    : `${payload.parse.error.message} (line ${payload.parse.error.line}, column ${payload.parse.error.column})`;
+
+  // types.ok === true just means "no error" -- an unresolved identifier
+  // still gets types: null rather than a list.
+  const resultTypeCell = !payload.types
+    ? "--"
+    : Array.isArray(payload.types.types)
+      ? `${payload.types.types.join(", ")} (${payload.types.plurality})`
+      : `unknown (${payload.types.plurality})`;
+
+  outputEl.appendChild(
+    factsTable([
+      ["dialect (effective)", `${payload.dialect.effective}${payload.dialect.assumed ? " (assumed)" : ""}`],
+      ["tokens", `${payload.lexing.tokens} total, ${payload.lexing.code_tokens} code`],
+      ["parse", parseCell],
+      ["complexity score", payload.complexity.score],
+      ["evaluation cost", payload.complexity.evaluation_cost],
+      ["result type", resultTypeCell],
+      ["viable in", payload.platforms.viable.join(", ") || "(none)"],
+    ])
+  );
+
+  // Findings first: a red `types` badge with no message is barely better than
+  // silence, and the diagnostic is the whole reason the badge is red.
+  const diagnostics = payload.types?.diagnostics ?? [];
+  if (diagnostics.length) {
+    outputEl.appendChild(el("h2", { text: "diagnostics" }));
+    const table = el("table");
+    table.appendChild(
+      el("tr", null, [el("th", { text: "at" }), el("th", { text: "code" }), el("th", { text: "message" })])
+    );
+    for (const diagnostic of diagnostics) {
+      table.appendChild(
+        el("tr", null, [
+          el("td", { text: `${diagnostic.line}:${diagnostic.column}` }),
+          el("td", { text: diagnostic.code }),
+          el("td", { text: diagnostic.message }),
+        ])
+      );
+    }
+    outputEl.appendChild(table);
+  }
+
+  if (payload.unknown_references.length) {
+    outputEl.appendChild(el("h2", { text: "unknown inspectors" }));
+    outputEl.appendChild(el("p", { text: payload.unknown_references.join(", ") }));
+    outputEl.appendChild(
+      el("p", {
+        class: "hint",
+        text:
+          "No dump defines these names. A lead rather than a fault: the dumps are one " +
+          "snapshot and do not cover every platform, product version or evaluation context.",
+      })
+    );
+  }
+
+  // Ordered by likely usefulness: probes, parse tree, it-bindings, references, raw JSON.
+
+  if (payload.levels?.length) {
+    outputEl.appendChild(el("h2", { text: "probes" }));
+    outputEl.appendChild(
+      el("p", { class: "hint" }, [
+        document.createTextNode(
+          "One ready-to-run relevance statement per level of the expression -- paste into the Fixlet Debugger or QnA to count matches at that level."
+        ),
+      ])
+    );
+    for (const level of payload.levels) {
+      outputEl.appendChild(
+        el("p", { class: "hint" }, [
+          document.createTextNode(`${level.label} `),
+          el("span", { text: `(line ${level.line}, column ${level.column})` }),
+        ])
+      );
+      outputEl.appendChild(el("pre", { text: level.probe }));
+    }
+  }
+
+  if (payload.parse.ok) {
+    outputEl.appendChild(el("h2", { text: "s-expression" }));
+    outputEl.appendChild(el("pre", { text: payload.parse.sexpr }));
+  }
+
+  if (payload.it_bindings?.length) {
+    outputEl.appendChild(el("h2", { text: "it bindings" }));
+    const table = el("table");
+    table.appendChild(
+      el("tr", null, [
+        el("th", { text: "binder" }),
+        el("th", { text: "context" }),
+        el("th", { text: "bound" }),
+        el("th", { text: "position" }),
+      ])
+    );
+    for (const binding of payload.it_bindings) {
+      table.appendChild(
+        el("tr", null, [
+          el("td", { text: binding.binder }),
+          el("td", { text: binding.context }),
+          el("td", { text: String(binding.bound) }),
+          el("td", { text: `line ${binding.line}, column ${binding.column}` }),
+        ])
+      );
+    }
+    outputEl.appendChild(table);
+  }
+
+  if (payload.references.length) {
+    outputEl.appendChild(el("h2", { text: "references" }));
+    const table = el("table");
+    table.appendChild(
+      el("tr", null, [el("th", { text: "phrase" }), el("th", { text: "known" }), el("th", { text: "return type(s)" })])
+    );
+    for (const ref of payload.references) {
+      table.appendChild(
+        el("tr", null, [
+          el("td", { text: ref.phrase }),
+          el("td", { text: String(ref.known) }),
+          el("td", { text: ref.return_types.join(", ") }),
+        ])
+      );
+    }
+    outputEl.appendChild(table);
+  }
+
+  const details = el("details", null, [
+    el("summary", { text: "raw JSON" }),
+    el("pre", { text: JSON.stringify(payload, null, 2) }),
+  ]);
+  outputEl.appendChild(details);
+}
+
+function renderError(err) {
+  outputEl.replaceChildren(el("pre", { text: String(err && err.stack ? err.stack : err) }));
+}
+
+// The seam. Each runtime's boot() replaces this; calling it before then is a
+// bug in the template, not something to paper over with a null check.
+window.analyzeJson = () => {
+  throw new Error("analyzeJson called before boot() finished wiring it");
+};
+
+function run() {
+  const text = inputEl.value;
+  if (!text.trim()) return;
+  try {
+    setStatus("Analyzing...");
+    // Kept raw as well as parsed: ../parity-test/ reads window.__lastJson off
+    // both pages and compares the two strings.
+    const json = window.analyzeJson(text);
+    window.__lastJson = json;
+    renderPayload(JSON.parse(json));
+    setStatus("Done.");
+  } catch (err) {
+    renderError(err);
+    setStatus("Analysis raised an exception -- see below.", true);
+  }
+}
+
+inputEl.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    if (!runEl.disabled) run();
+  }
+});
+runEl.addEventListener("click", run);
+
+function withTimeout(promise, ms, message) {
+  let timer;
+  const timeout = new Promise((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+</script>
