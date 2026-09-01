@@ -67,8 +67,13 @@ def test_client_statement_reaches_every_analysis() -> None:
     assert report.check.value.types == frozenset({"boolean"})
     assert report.check.value.plurality is Plurality.SINGULAR
 
-    assert report.platforms
-    assert not report.missing_platforms
+    # `file <string>` is client-only, and `exists` carries its operand's
+    # platforms rather than widening back to everything, so the statement is
+    # viable on every endpoint and in no session context.
+    assert report.platforms == frozenset({"debian", "macos", "rhel", "ubuntu", "windows"})
+    assert report.missing_platforms == frozenset(
+        {"session:console", "session:rest_api", "session:web_reports"}
+    )
     assert {entry.phrase for entry in report.references} == {"file", "size"}
     assert not report.unknown_references
     assert report.complexity.score > 0

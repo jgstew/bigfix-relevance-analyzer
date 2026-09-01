@@ -183,6 +183,98 @@ def test_a_chain_intersects_its_platforms(env: TypeEnvironment) -> None:
     assert resolve_property("block size", drives.types, env).platforms < drives.platforms
 
 
+# A fixed-type result -- `exists` answers boolean whatever it wraps -- still only
+# evaluates where its operand does. Every rule in this block was settled against
+# the client engine rather than argued from semantics; each test names its probe.
+WINDOWS_PROPERTY = 'key "x" of registry'
+
+
+def test_exists_keeps_its_operands_platforms(env: TypeEnvironment) -> None:
+    """`exists` swallows a *runtime* nonexistent object, not a missing inspector.
+
+    qna 11.0.6.137 on macOS, where `registry` does not exist:
+    `exists (1/0)` answers `False`, but `exists key "x" of registry` is
+    `E: The operator "key" is not defined.` -- so the guard is not viable there,
+    however boolean-shaped its type is.
+    """
+    operand = check(parse(WINDOWS_PROPERTY), env)
+    assert set(operand.platforms) & ALL_PLATFORMS == {"windows"}
+    assert check(parse(f"exists {WINDOWS_PROPERTY}"), env).platforms == operand.platforms
+
+
+def test_number_of_keeps_its_operands_platforms(env: TypeEnvironment) -> None:
+    """qna: `number of applications of registry` is `E: The operator
+    "applications" is not defined.` on macOS -- the count is an integer
+    everywhere it can be taken, and it can only be taken where the collection
+    resolves."""
+    operand = check(parse("applications of registry"), env)
+    assert set(operand.platforms) & ALL_PLATFORMS == {"windows"}
+    assert check(parse("number of applications of registry"), env).platforms == operand.platforms
+
+
+def test_not_keeps_its_operands_platforms(env: TypeEnvironment) -> None:
+    """qna: `not (1 = 1/0)` errors rather than answering -- `not` evaluates its
+    operand, so it inherits where that operand can run."""
+    result = check(parse(f"not (exists {WINDOWS_PROPERTY})"), env)
+    assert set(result.platforms) & ALL_PLATFORMS == {"windows"}
+
+
+def test_a_tuple_intersects_its_items_platforms(env: TypeEnvironment) -> None:
+    """qna: `(1, 1/0)` errors -- a tuple is every element at once, so it runs
+    only where all of them do."""
+    result = check(parse(f"({WINDOWS_ONLY}, {LINUX_ONLY})"), env)
+    assert not set(result.platforms) & ALL_PLATFORMS
+
+
+def test_a_collection_intersects_its_items_platforms(env: TypeEnvironment) -> None:
+    """`;` looks tolerant and is not, for the failure that matters here.
+
+    qna: `(1; 1/0)` answers `1` *and* reports the error -- the runtime failure
+    of one element does not take the collection down. But
+    `(1; keys of registry)` on macOS is `E: The operator "keys" is not
+    defined.`, and a platform that lacks the inspector is exactly that second
+    case, not the first.
+    """
+    result = check(parse(f"({WINDOWS_ONLY}; {LINUX_ONLY})"), env)
+    assert not set(result.platforms) & ALL_PLATFORMS
+
+
+def test_and_takes_only_its_left_operands_platforms(env: TypeEnvironment) -> None:
+    """The guard idiom, which intersecting would call viable nowhere.
+
+    qna: `false and (1 = 1/0)` answers `False` -- `and` short-circuits, so the
+    right operand is conditional and cannot narrow the whole. This is what lets
+    `<platform test> and <platform-specific relevance>` be written at all.
+    """
+    guarded = check(parse(f"(exists {WINDOWS_PROPERTY}) and ({LINUX_ONLY} = {LINUX_ONLY})"), env)
+    assert set(guarded.platforms) & ALL_PLATFORMS == {"windows"}
+
+
+def test_or_takes_only_its_left_operands_platforms(env: TypeEnvironment) -> None:
+    """qna: `true or (1 = 1/0)` answers `True`; `false or (1 = 1/0)` errors.
+    The right side runs only sometimes, so only the left side narrows."""
+    guarded = check(parse(f"(exists {WINDOWS_PROPERTY}) or ({LINUX_ONLY} = {LINUX_ONLY})"), env)
+    assert set(guarded.platforms) & ALL_PLATFORMS == {"windows"}
+
+
+def test_an_if_intersects_its_condition_with_its_branches(env: TypeEnvironment) -> None:
+    """The condition always runs; the branches are alternatives.
+
+    qna: `if false then (exists key "x" of registry) else true` answers `True`
+    on macOS -- the untaken branch's missing inspector is tolerated, which is
+    the union rule. The condition gets no such tolerance.
+    """
+    result = check(parse(f'if (exists {WINDOWS_PROPERTY}) then "a" else "b"'), env)
+    assert set(result.platforms) & ALL_PLATFORMS == {"windows"}
+
+
+def test_a_literal_is_viable_everywhere(env: TypeEnvironment) -> None:
+    """Characterisation: nothing above may narrow a bare literal, which has no
+    operand to inherit from and runs wherever the statement does."""
+    for source in ('"x"', "1", "true"):
+        assert set(check(parse(source), env).platforms) == set(env.universe)
+
+
 def test_session_relevance_reports_its_own_contexts(session_env: TypeEnvironment) -> None:
     """Session is an axis too. The dumps name three server-side surfaces, and a
     session-only inspector is defined in the ones that sampled it -- an empty

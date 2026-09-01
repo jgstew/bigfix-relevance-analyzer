@@ -104,7 +104,11 @@
       "tree_depth": 4
     },
     "platforms": {
-      "missing": [],
+      "missing": [
+        "session:console",
+        "session:rest_api",
+        "session:web_reports"
+      ],
       "universe": [
         "debian",
         "macos",
@@ -119,9 +123,6 @@
         "debian",
         "macos",
         "rhel",
-        "session:console",
-        "session:rest_api",
-        "session:web_reports",
         "ubuntu",
         "windows"
       ]
@@ -343,7 +344,16 @@
       "tree_depth": 5
     },
     "platforms": {
-      "missing": [],
+      "missing": [
+        "debian",
+        "macos",
+        "rhel",
+        "session:console",
+        "session:rest_api",
+        "session:web_reports",
+        "ubuntu",
+        "windows"
+      ],
       "universe": [
         "debian",
         "macos",
@@ -354,16 +364,7 @@
         "ubuntu",
         "windows"
       ],
-      "viable": [
-        "debian",
-        "macos",
-        "rhel",
-        "session:console",
-        "session:rest_api",
-        "session:web_reports",
-        "ubuntu",
-        "windows"
-      ]
+      "viable": []
     },
     "references": [
       {

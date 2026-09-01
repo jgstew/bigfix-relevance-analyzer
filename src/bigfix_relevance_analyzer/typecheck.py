@@ -1016,11 +1016,20 @@ class _Checker:
         rows = _matched_rows(node.phrase, subject, self.env, indexed=node.index is not None)
         self.resolutions[id(node)] = tuple(rows or ())
 
-    def literal(self, name: str) -> RelevanceValue:
+    def literal(self, name: str, platforms: frozenset[str] | None = None) -> RelevanceValue:
+        """A value of one known type, singular.
+
+        ``platforms`` defaults to the whole universe, which is right for an
+        actual literal -- ``"x"`` and ``1`` are readable anywhere the statement
+        is. A *computed* fixed type is different: `exists X` answers boolean
+        whatever `X` is, but only where `X` itself resolves, so its callers
+        pass the set they were built from rather than taking the default. See
+        the module docstring's chain rule.
+        """
         return RelevanceValue(
             types=frozenset({name}),
             plurality=Plurality.SINGULAR,
-            platforms=self.env.universe,
+            platforms=self.env.universe if platforms is None else platforms,
         )
 
     def rows(self, entries: tuple[inspectors.Inspector, ...]) -> list[inspectors.Inspector]:
@@ -1236,7 +1245,7 @@ class _Checker:
                 left, right = self.pop(2)
                 self.values.append(self.combine_bar(node, left, right))
             case Exists():
-                self.pop(1)
+                (operand,) = self.pop(1)
                 # Under `exists` the non-unique error genuinely never fires --
                 # confirmed live in qna: `exists file of folder "/"` and
                 # `exists file of folders "/"` both answer `True`, no error,
@@ -1257,10 +1266,19 @@ class _Checker:
                 # `exists name whose (...) of it` is the predicate-testing
                 # idiom, not a mid-chain collapse (see `_FILTERED_SPELLING`).
                 self.retract_exact(_FILTERED_SPELLING, node.operand.span)
-                self.values.append(self.literal("boolean"))
+                # Boolean everywhere it can be asked, and it can only be asked
+                # where the operand resolves: `exists` swallows a *runtime*
+                # nonexistent object, not a missing inspector. Confirmed live
+                # in qna on macOS: `exists (1/0)` answers `False`, while
+                # `exists key "x" of registry` is `E: The operator "key" is not
+                # defined.`
+                self.values.append(self.literal("boolean", operand.platforms))
             case NumberOf():
-                self.pop(1)
-                self.values.append(self.literal("integer"))
+                (operand,) = self.pop(1)
+                # The same, for the same reason: `number of applications of
+                # registry` on macOS is `E: The operator "applications" is not
+                # defined.`, not a count of zero.
+                self.values.append(self.literal("integer", operand.platforms))
             case ItemOf():
                 (operand,) = self.pop(1)
                 self.values.append(self.combine_item_of(node, operand))
@@ -1312,11 +1330,21 @@ class _Checker:
             # 11.0.6.137: `attr lists of (("onclick", "x"); ("href", "y"))`
             # evaluates -- aggregating every pair into one attribute list.
             tuple_types = frozenset().union(*(value.tuple_types for value in values))
+        # Both spellings need every element, so the platform sets intersect --
+        # this is a chain, not a set of alternatives. `,` is obvious: qna
+        # `(1, 1/0)` errors. `;` reads as tolerant and is not, for the failure
+        # that matters here: `(1; 1/0)` answers `1` *and* reports the error,
+        # but `(1; keys of registry)` on macOS is `E: The operator "keys" is
+        # not defined.` -- and a platform lacking an inspector is that second
+        # case, not the first.
+        platforms = self.env.universe
+        for value in values:
+            platforms &= value.platforms
         return RelevanceValue(
             types=types,
             plurality=Plurality.PLURAL if isinstance(node, Collection) else Plurality.SINGULAR,
             tuple_types=tuple_types,
-            platforms=self.env.universe,
+            platforms=platforms,
         )
 
     def combine_reference(self, node: Reference, index: RelevanceValue | None) -> RelevanceValue:
@@ -1694,7 +1722,13 @@ class _Checker:
             self.require_singular_boolean(
                 right, node.right.span, "right-operand-not-boolean", token=node.op
             )
-            return self.literal("boolean")
+            # Only the left operand narrows: both spellings short-circuit, so
+            # the right one may never be evaluated. qna: `false and (1 = 1/0)`
+            # answers `False` and `true or (1 = 1/0)` answers `True`, while
+            # `false or (1 = 1/0)` errors. This is what lets the ordinary guard
+            # -- `<platform test> and <platform-specific relevance>` -- be
+            # written at all; intersecting would report it viable nowhere.
+            return self.literal("boolean", left.platforms)
 
         # An operator takes one value a side, whatever its types. This is the
         # engine's `A singular expression is required.`, and it is the
@@ -1853,7 +1887,9 @@ class _Checker:
             self.require_singular_boolean(
                 operand, node.operand.span, "argument-not-boolean", token="not"
             )
-            return self.literal("boolean")
+            # `not` evaluates its operand -- qna: `not (1 = 1/0)` errors rather
+            # than answering -- so it runs only where the operand does.
+            return self.literal("boolean", operand.platforms)
         self.require_singular(operand, node.operand.span, "argument-not-singular", token=node.op)
         if operand.types is None:
             return self.unknown()
@@ -2038,8 +2074,12 @@ class _Checker:
                 else Plurality.UNKNOWN
             ),
             # Alternatives: only one branch ever runs, so the statement covers
-            # the union of what its branches cover.
-            platforms=then_value.platforms | else_value.platforms,
+            # the union of what its branches cover -- qna on macOS, where
+            # `registry` does not exist: `if false then (exists key "x" of
+            # registry) else true` answers `True`, the untaken branch's missing
+            # inspector tolerated. The condition gets no such tolerance: it
+            # runs every time, so it narrows the union.
+            platforms=condition.platforms & (then_value.platforms | else_value.platforms),
         )
 
 
