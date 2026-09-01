@@ -581,3 +581,40 @@ def test_narrowing_does_not_change_what_visible_here_means() -> None:
     entry = _reference(report, "bes computers")
     assert entry.known
     assert not entry.visible
+
+
+# ---------------------------------------------------------------------------
+# A statement using both dialects has no dialect to report
+# ---------------------------------------------------------------------------
+
+
+MIXED = '(exists files of folders "/") AND (exists bes computers)'
+
+
+def test_a_contradicted_classification_is_not_a_finding() -> None:
+    """`assumed` must not stay False when the references refute the classifier.
+
+    `bes computers` is a strong session marker, so the pre-parse text
+    classifier calls this session and never sees the client-only `files` and
+    `folders`. The reference tables do see them, and settle on `UNCERTAIN`:
+    nothing can evaluate this. Analysis still has to pick a dialect to run as,
+    but reporting that pick as a conclusion states a fact that is not one.
+    """
+    report = analyze(MIXED)
+
+    assert report.classified_dialect is Dialect.SESSION
+    assert report.resolved_dialect is Dialect.UNCERTAIN
+    assert report.dialect_assumed
+    assert report.to_dict()["dialect"]["assumed"] is True
+
+
+def test_a_classification_the_references_agree_with_is_still_definite() -> None:
+    report = analyze(SESSION)
+
+    assert report.resolved_dialect is Dialect.SESSION
+    assert not report.dialect_assumed
+
+
+def test_a_forced_dialect_is_never_an_assumption() -> None:
+    """The caller said so; the tables do not get a vote on that."""
+    assert not analyze(MIXED, Dialect.CLIENT).dialect_assumed

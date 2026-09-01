@@ -167,6 +167,17 @@ class ReferenceReport:
         return self.narrowed or self.visible or self.matches
 
     @property
+    def dialects(self) -> frozenset[Dialect]:
+        """Which dialects define this name, over *every* row rather than the
+        narrowed or visible ones.
+
+        Deliberately read from :attr:`matches`: the question is what the tables
+        know about the name, which cannot depend on the environment the lookup
+        already filtered by, or the answer would just restate the environment.
+        """
+        return frozenset(dialect for entry in self.matches for dialect in entry.dialects)
+
+    @property
     def return_types(self) -> tuple[str, ...]:
         """The distinct types this name can evaluate to, sorted."""
         return tuple(sorted({entry.return_type for entry in self.resolved}))
@@ -270,9 +281,7 @@ class RelevanceAnalysis:
             return None
         supported: frozenset[Dialect] | None = None
         for reference in self.references:
-            found: frozenset[Dialect] = frozenset(
-                dialect for entry in reference.matches for dialect in entry.dialects
-            )
+            found = reference.dialects
             if not found:
                 continue  # an unknown name, or one with no dialect at all
             supported = found if supported is None else supported & found
@@ -286,6 +295,25 @@ class RelevanceAnalysis:
             return Dialect.SESSION
         return Dialect.UNCERTAIN  # empty intersection: genuinely contradictory
 
+    def references_only_in(self, dialect: Dialect) -> tuple[str, ...]:
+        """Names whose every known row is defined in ``dialect`` and no other.
+
+        The two halves of a :attr:`resolved_dialect` of
+        :attr:`~bigfix_relevance_analyzer.dialect.Dialect.UNCERTAIN`, so a
+        report can name what actually contradicts what rather than saying only
+        that something does. Empty for an unknown name, which proves nothing in
+        either direction.
+        """
+        return tuple(
+            sorted(
+                {
+                    reference.phrase
+                    for reference in self.references
+                    if reference.dialects == frozenset({dialect})
+                }
+            )
+        )
+
     @property
     def dialect_assumed(self) -> bool:
         """Whether :attr:`dialect` is a fallback rather than a finding.
@@ -293,11 +321,28 @@ class RelevanceAnalysis:
         False when the caller forced a dialect, when the pre-parse text
         classifier reached a verdict, or when :attr:`resolved_dialect` -- the
         reference table's own post-parse evidence -- settles on one specific
-        dialect by itself. True only when none of the three determined
-        anything, so every dialect-dependent conclusion below is conditional
-        on a guess, which a report should say out loud.
+        dialect by itself. True when none of the three determined anything, so
+        every dialect-dependent conclusion below is conditional on a guess,
+        which a report should say out loud.
+
+        Also true when :attr:`resolved_dialect` is
+        :attr:`~bigfix_relevance_analyzer.dialect.Dialect.UNCERTAIN`, whatever
+        the classifier said. A statement using inspectors exclusive to both
+        dialects *has* no dialect, so there is nothing for a verdict to be
+        right about, and the classifier reaching one only means it saw half the
+        evidence: `(exists files of folders "/") AND (exists bes computers)`
+        classifies as session on the strength of the `bes ` prefix, while the
+        client-only `files` and `folders` are words the text classifier is
+        deliberately blind to. Analysis still has to run as *some* dialect, but
+        reporting that pick as a conclusion would state a fact that is not one.
+        A forced dialect is exempt: the caller said so, and the tables do not
+        get a vote on what the caller meant.
         """
-        if self.requested_dialect is not None or self.classified_dialect is not None:
+        if self.requested_dialect is not None:
+            return False
+        if self.resolved_dialect is Dialect.UNCERTAIN:
+            return True
+        if self.classified_dialect is not None:
             return False
         return not is_definite(self.resolved_dialect)
 

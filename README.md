@@ -405,6 +405,7 @@ same way instead of each inventing a description:
 | `type-error` | error | the type checker reported a problem beyond an unbound `it` | always on |
 | `site-type-mismatch` | error | the value does not fit the kind of site it was extracted from | always on |
 | `unbound-it` | error | `it` is used where there is no context to bind it to | always on |
+| `mixed-dialect` | error | inspectors exclusive to client relevance and to session relevance in one statement | always on |
 | `non-unique-risk` | warning | a property written singular where more than one value may come back | always on |
 | `plural-preferred` | warning | a `whose` filter written on a singular spelling, where the plural reads safer | always on |
 | `version-truncating-compare` | warning | a version comparison that truncates to the shorter operand's components | always on |
