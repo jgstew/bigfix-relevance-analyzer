@@ -138,14 +138,8 @@
         ],
         "signatures": [
           "file <binary_string>",
-          "file <binary_string> of <encoding>",
-          "file <binary_string> of <folder>",
           "file <string>",
-          "file <string> of <encoding>",
-          "file <string> of <folder>",
-          "file <symlink>",
-          "file of <service>",
-          "files of <folder>"
+          "file <symlink>"
         ],
         "visible_here": true
       },
@@ -182,11 +176,9 @@
           "windows"
         ],
         "return_types": [
-          "boolean",
-          "integer"
+          "boolean"
         ],
         "signatures": [
-          "window of <route>",
           "windows of <operating system>"
         ],
         "visible_here": true
@@ -662,44 +654,10 @@
         "phrase": "set",
         "platforms": [],
         "return_types": [
-          "bes action set",
-          "bes computer group set",
-          "bes computer set",
-          "bes domain set",
-          "bes filter set",
-          "bes fixlet set",
-          "bes idp directory set",
-          "bes ldap directory set",
-          "bes property set",
-          "bes role set",
-          "bes site file set",
-          "bes site set",
-          "bes unmanagedasset set",
-          "bes user set",
-          "bes webui app set",
-          "bes wizard set",
-          "integer set",
-          "string set"
+          "integer set"
         ],
         "signatures": [
-          "sets of <bes action>",
-          "sets of <bes computer group>",
-          "sets of <bes computer>",
-          "sets of <bes domain>",
-          "sets of <bes filter>",
-          "sets of <bes fixlet>",
-          "sets of <bes idp directory>",
-          "sets of <bes ldap directory>",
-          "sets of <bes property>",
-          "sets of <bes role>",
-          "sets of <bes site file>",
-          "sets of <bes site>",
-          "sets of <bes unmanagedasset>",
-          "sets of <bes user>",
-          "sets of <bes webui app>",
-          "sets of <bes wizard>",
-          "sets of <integer>",
-          "sets of <string>"
+          "sets of <integer>"
         ],
         "visible_here": true
       },
@@ -710,29 +668,10 @@
         "phrase": "id",
         "platforms": [],
         "return_types": [
-          "( integer, integer, integer )",
-          "integer",
-          "string",
-          "uinteger"
+          "integer"
         ],
         "signatures": [
-          "id of <bes action>",
-          "id of <bes activation>",
-          "id of <bes baseline component>",
-          "id of <bes computer group>",
-          "id of <bes computer>",
-          "id of <bes domain>",
-          "id of <bes filter>",
-          "id of <bes fixlet>",
-          "id of <bes idp directory>",
-          "id of <bes ldap directory>",
-          "id of <bes property>",
-          "id of <bes role>",
-          "id of <bes site file>",
-          "id of <bes site>",
-          "id of <bes tag>",
-          "id of <bes unmanagedasset>",
-          "id of <bes user>"
+          "id of <bes site>"
         ],
         "visible_here": true
       },
@@ -760,8 +699,6 @@
           "bes fixlet"
         ],
         "signatures": [
-          "fixlet <integer> of <bes site>",
-          "fixlet of <bes fixlet result>",
           "fixlets of <bes site>"
         ],
         "visible_here": true
@@ -776,7 +713,6 @@
           "integer"
         ],
         "signatures": [
-          "applicable computer count of <bes baseline component>",
           "applicable computer count of <bes fixlet>"
         ],
         "visible_here": true
@@ -788,29 +724,10 @@
         "phrase": "id",
         "platforms": [],
         "return_types": [
-          "( integer, integer, integer )",
-          "integer",
-          "string",
-          "uinteger"
+          "integer"
         ],
         "signatures": [
-          "id of <bes action>",
-          "id of <bes activation>",
-          "id of <bes baseline component>",
-          "id of <bes computer group>",
-          "id of <bes computer>",
-          "id of <bes domain>",
-          "id of <bes filter>",
-          "id of <bes fixlet>",
-          "id of <bes idp directory>",
-          "id of <bes ldap directory>",
-          "id of <bes property>",
-          "id of <bes role>",
-          "id of <bes site file>",
-          "id of <bes site>",
-          "id of <bes tag>",
-          "id of <bes unmanagedasset>",
-          "id of <bes user>"
+          "id of <bes fixlet>"
         ],
         "visible_here": true
       },
@@ -824,10 +741,7 @@
           "bes site"
         ],
         "signatures": [
-          "site of <bes computer group>",
-          "site of <bes fixlet>",
-          "site of <bes peer download>",
-          "site of <bes wizard>"
+          "site of <bes fixlet>"
         ],
         "visible_here": true
       },
@@ -838,29 +752,10 @@
         "phrase": "id",
         "platforms": [],
         "return_types": [
-          "( integer, integer, integer )",
-          "integer",
-          "string",
-          "uinteger"
+          "integer"
         ],
         "signatures": [
-          "id of <bes action>",
-          "id of <bes activation>",
-          "id of <bes baseline component>",
-          "id of <bes computer group>",
-          "id of <bes computer>",
-          "id of <bes domain>",
-          "id of <bes filter>",
-          "id of <bes fixlet>",
-          "id of <bes idp directory>",
-          "id of <bes ldap directory>",
-          "id of <bes property>",
-          "id of <bes role>",
-          "id of <bes site file>",
-          "id of <bes site>",
-          "id of <bes tag>",
-          "id of <bes unmanagedasset>",
-          "id of <bes user>"
+          "id of <bes site>"
         ],
         "visible_here": true
       }

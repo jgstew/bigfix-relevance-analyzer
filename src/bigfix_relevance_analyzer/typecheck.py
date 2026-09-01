@@ -60,7 +60,7 @@ from __future__ import annotations
 import enum
 import itertools
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any, Final, assert_never
 
@@ -185,6 +185,26 @@ class CheckResult:
 
     value: RelevanceValue
     diagnostics: tuple[TypeDiagnostic, ...] = ()
+
+    resolutions: Mapping[int, tuple[inspectors.Inspector, ...]] = field(
+        default_factory=dict, repr=False
+    )
+    """Which table rows each `Reference` actually resolved to, keyed by ``id``.
+
+    The narrowing :func:`resolve_property` performs is otherwise thrown away:
+    the walk keeps the resulting types and discards the rows that produced
+    them, so a caller wanting to say *why* a name typed the way it did had to
+    look it up again bare -- and got the union over every overload rather than
+    the one the direct object selected.
+
+    Keyed by ``id`` of the node, so it is only meaningful while the tree that
+    was checked is still alive. That is the whole of its intended use: a
+    consumer reads it during the same call that produced the tree. It is walk
+    state rather than a finding, so it is deliberately absent from
+    :meth:`to_dict`. Absent for a reference the walk never resolved -- one
+    suppressed by another finding, or reached through a context that was
+    itself unresolved.
+    """
 
     @property
     def ok(self) -> bool:
@@ -838,7 +858,11 @@ def check(node: Node, environment: TypeEnvironment) -> CheckResult:
     """
     checker = _Checker(environment)
     value = checker.run(node)
-    return CheckResult(value=value, diagnostics=tuple(checker.diagnostics))
+    return CheckResult(
+        value=value,
+        diagnostics=tuple(checker.diagnostics),
+        resolutions=checker.resolutions,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -912,6 +936,8 @@ class _Checker:
         # Per-item types, so `item N of (...)` can pick one out after the tuple
         # as a whole has been collapsed to a single value.
         self.tuple_items: dict[int, tuple[RelevanceValue, ...]] = {}
+        # Which rows each reference resolved to. See `CheckResult.resolutions`.
+        self.resolutions: dict[int, tuple[inspectors.Inspector, ...]] = {}
 
     def run(self, root: Node) -> RelevanceValue:
         work: list[_Work] = [_Descend(root)]
@@ -945,6 +971,16 @@ class _Checker:
 
     def unknown(self) -> RelevanceValue:
         return RelevanceValue(types=None, platforms=self.env.universe)
+
+    def record(self, node: Reference, subject: frozenset[str] | None) -> None:
+        """Keep the rows `node` resolved to, for `CheckResult.resolutions`.
+
+        Called with whichever subject actually produced the value returned, so
+        a reference rescued by the world fallback records the world's rows
+        rather than the ones that failed to match.
+        """
+        rows = _matched_rows(node.phrase, subject, self.env, indexed=node.index is not None)
+        self.resolutions[id(node)] = tuple(rows or ())
 
     def literal(self, name: str) -> RelevanceValue:
         return RelevanceValue(
@@ -1296,10 +1332,12 @@ class _Checker:
             # about a property of it.
             return self.unknown()
         value = resolve_property(node.phrase, subject, self.env, indexed=node.index is not None)
+        self.record(node, subject)
         explicit = id(node) in self.explicit_objects
         if subject is not None and not explicit and value.types is not None and not value.types:
             world = resolve_property(node.phrase, None, self.env, indexed=node.index is not None)
             if world.types:
+                self.record(node, None)
                 return world
         if value.types is not None and not value.types:
             if subject is None:

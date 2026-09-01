@@ -126,6 +126,23 @@ class ReferenceReport:
     or a Windows one under ``--platform macos``.
     """
 
+    narrowed: tuple[inspectors.Inspector, ...] = ()
+    """The rows the checker actually resolved this occurrence to.
+
+    :attr:`matches` and :attr:`visible` both answer "what could this name be",
+    which for an overloaded name is a much larger question than "what is it
+    here". `keys` is nineteen properties across json, yaml, registry, metabase
+    and plugin stores; `keys of <registry key>` is one of them. The checker has
+    always narrowed -- see
+    :func:`~bigfix_relevance_analyzer.typecheck.resolve_property` -- and this
+    is that answer, carried out of the walk rather than recomputed bare.
+
+    Empty when the walk did not resolve this occurrence at all, and also when
+    it resolved to nothing: both fall back to the wider sets, because a name
+    that exists somewhere is more useful to show than a blank. Which of the
+    two happened is what :attr:`known` and the checker's diagnostics say.
+    """
+
     @property
     def phrase(self) -> str:
         """The case-folded, space-normalized name, e.g. ``operating system``."""
@@ -138,13 +155,16 @@ class ReferenceReport:
 
     @property
     def resolved(self) -> tuple[inspectors.Inspector, ...]:
-        """What to report: the visible rows, or every row when none are visible.
+        """What to report, narrowest answer first.
 
-        Falling back to :attr:`matches` is deliberate. A name that exists but is
-        out of scope is a more useful thing to show than nothing, and
-        :attr:`known` and :attr:`visible` are what distinguish the two cases.
+        The rows this occurrence resolved to, else the ones the environment can
+        see, else every row with the name. Falling back is deliberate at both
+        steps. A name that exists but is out of scope -- or one whose direct
+        object rules every overload out -- is a more useful thing to show than
+        nothing, and :attr:`known`, :attr:`visible` and the checker's
+        diagnostics are what distinguish the cases.
         """
-        return self.visible or self.matches
+        return self.narrowed or self.visible or self.matches
 
     @property
     def return_types(self) -> tuple[str, ...]:
@@ -538,6 +558,7 @@ def analyze(
                 reference=item,
                 matches=(matches := inspectors.lookup(item.phrase)),
                 visible=tuple(entry for entry in matches if environment.visible(entry)),
+                narrowed=checked.resolutions.get(id(item), ()),
             )
             for item in _walk(node)
             if isinstance(item, Reference)
