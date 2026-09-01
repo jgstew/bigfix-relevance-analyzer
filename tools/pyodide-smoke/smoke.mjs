@@ -97,7 +97,7 @@ console.log(`\
 | complexity score | ${payload.complexity.score} |
 | evaluation cost | ${payload.complexity.evaluation_cost} |
 | result type | ${payload.types.types.join(", ")} (${payload.types.plurality}) |
-| platforms viable | ${payload.platforms.viable.join(", ")} |
+| viable in | ${payload.platforms.viable.join(", ")} |
 
 **S-expression**
 

@@ -184,10 +184,11 @@ class ReferenceReport:
 
     @property
     def platforms(self) -> frozenset[str]:
-        """Client platforms defining any resolved row. Empty for session-only."""
+        """Evaluation contexts defining any resolved row -- client platforms by
+        name, session surfaces as ``session:<context>``."""
         found: frozenset[str] = frozenset()
         for entry in self.resolved:
-            found |= entry.platforms
+            found |= entry.contexts
         return found
 
 
@@ -414,16 +415,18 @@ class RelevanceAnalysis:
 
     @property
     def platforms(self) -> frozenset[str]:
-        """Client platforms the statement as a whole can run on.
+        """The evaluation contexts the statement as a whole can run on.
 
-        Empty for session relevance, where platform is not an axis, and empty
-        when there is no tree to check.
+        Client platforms by their bare name and session surfaces as
+        ``session:<context>``; both dialects are on the one axis, so a
+        statement every dialect defines says so here. Empty when there is no
+        tree to check.
         """
         return frozenset() if self.check is None else self.check.platforms
 
     @property
     def missing_platforms(self) -> frozenset[str]:
-        """Platforms in play that this statement is *not* viable on.
+        """Contexts in play that this statement is *not* viable on.
 
         Reported, never enforced: a platform absent from the dumps has not been
         proven unsupported, only never observed.

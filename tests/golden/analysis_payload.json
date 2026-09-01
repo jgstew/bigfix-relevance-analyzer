@@ -109,6 +109,9 @@
         "debian",
         "macos",
         "rhel",
+        "session:console",
+        "session:rest_api",
+        "session:web_reports",
         "ubuntu",
         "windows"
       ],
@@ -116,6 +119,9 @@
         "debian",
         "macos",
         "rhel",
+        "session:console",
+        "session:rest_api",
+        "session:web_reports",
         "ubuntu",
         "windows"
       ]
@@ -342,6 +348,9 @@
         "debian",
         "macos",
         "rhel",
+        "session:console",
+        "session:rest_api",
+        "session:web_reports",
         "ubuntu",
         "windows"
       ],
@@ -349,6 +358,9 @@
         "debian",
         "macos",
         "rhel",
+        "session:console",
+        "session:rest_api",
+        "session:web_reports",
         "ubuntu",
         "windows"
       ]
@@ -381,6 +393,9 @@
           "debian",
           "macos",
           "rhel",
+          "session:console",
+          "session:rest_api",
+          "session:web_reports",
           "ubuntu",
           "windows"
         ],
@@ -642,9 +657,28 @@
       "tree_depth": 7
     },
     "platforms": {
-      "missing": [],
-      "universe": [],
-      "viable": []
+      "missing": [
+        "debian",
+        "macos",
+        "rhel",
+        "ubuntu",
+        "windows"
+      ],
+      "universe": [
+        "debian",
+        "macos",
+        "rhel",
+        "session:console",
+        "session:rest_api",
+        "session:web_reports",
+        "ubuntu",
+        "windows"
+      ],
+      "viable": [
+        "session:console",
+        "session:rest_api",
+        "session:web_reports"
+      ]
     },
     "references": [
       {
@@ -652,7 +686,16 @@
         "known": true,
         "line": 1,
         "phrase": "set",
-        "platforms": [],
+        "platforms": [
+          "debian",
+          "macos",
+          "rhel",
+          "session:console",
+          "session:rest_api",
+          "session:web_reports",
+          "ubuntu",
+          "windows"
+        ],
         "return_types": [
           "integer set"
         ],
@@ -666,7 +709,11 @@
         "known": true,
         "line": 1,
         "phrase": "id",
-        "platforms": [],
+        "platforms": [
+          "session:console",
+          "session:rest_api",
+          "session:web_reports"
+        ],
         "return_types": [
           "integer"
         ],
@@ -680,7 +727,11 @@
         "known": true,
         "line": 1,
         "phrase": "bes sites",
-        "platforms": [],
+        "platforms": [
+          "session:console",
+          "session:rest_api",
+          "session:web_reports"
+        ],
         "return_types": [
           "bes site"
         ],
@@ -694,7 +745,11 @@
         "known": true,
         "line": 1,
         "phrase": "fixlets",
-        "platforms": [],
+        "platforms": [
+          "session:console",
+          "session:rest_api",
+          "session:web_reports"
+        ],
         "return_types": [
           "bes fixlet"
         ],
@@ -708,7 +763,11 @@
         "known": true,
         "line": 1,
         "phrase": "applicable computer count",
-        "platforms": [],
+        "platforms": [
+          "session:console",
+          "session:rest_api",
+          "session:web_reports"
+        ],
         "return_types": [
           "integer"
         ],
@@ -722,7 +781,11 @@
         "known": true,
         "line": 1,
         "phrase": "id",
-        "platforms": [],
+        "platforms": [
+          "session:console",
+          "session:rest_api",
+          "session:web_reports"
+        ],
         "return_types": [
           "integer"
         ],
@@ -736,7 +799,11 @@
         "known": true,
         "line": 1,
         "phrase": "site",
-        "platforms": [],
+        "platforms": [
+          "session:console",
+          "session:rest_api",
+          "session:web_reports"
+        ],
         "return_types": [
           "bes site"
         ],
@@ -750,7 +817,11 @@
         "known": true,
         "line": 1,
         "phrase": "id",
-        "platforms": [],
+        "platforms": [
+          "session:console",
+          "session:rest_api",
+          "session:web_reports"
+        ],
         "return_types": [
           "integer"
         ],
@@ -851,6 +922,9 @@
         "debian",
         "macos",
         "rhel",
+        "session:console",
+        "session:rest_api",
+        "session:web_reports",
         "ubuntu",
         "windows"
       ],
@@ -858,6 +932,9 @@
         "debian",
         "macos",
         "rhel",
+        "session:console",
+        "session:rest_api",
+        "session:web_reports",
         "ubuntu",
         "windows"
       ],

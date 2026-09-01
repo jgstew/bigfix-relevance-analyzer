@@ -281,7 +281,7 @@ function renderPayload(payload) {
       ["complexity score", payload.complexity.score],
       ["evaluation cost", payload.complexity.evaluation_cost],
       ["result type", resultTypeCell],
-      ["platforms viable", payload.platforms.viable.join(", ") || "(none)"],
+      ["viable in", payload.platforms.viable.join(", ") || "(none)"],
     ])
   );
 

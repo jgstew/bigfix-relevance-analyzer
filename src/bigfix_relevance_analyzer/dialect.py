@@ -75,10 +75,14 @@ RHEL-family) -- defines ``rate``, ``linear projection`` and
 (``statistical bin``, ``linear fit of <statistical bin>``) and would be a
 false-positive session marker if typed from a non-macOS client sample alone.
 
-Deciding which *client* platforms a piece of client relevance can evaluate on is
-a further question this module does not answer: client relevance is often written
-to run on many platforms, and inspectors that are not shared have to be guarded
-so an endpoint never evaluates relevance not meant for it.
+Deciding which evaluation contexts a statement can actually run in is a further
+question this module does not answer:
+:class:`~bigfix_relevance_analyzer.typecheck.TypeEnvironment` does, over one
+axis carrying both dialects -- client platforms by name, session surfaces as
+``session:<context>``. Client relevance is often written to run on many
+platforms, and inspectors that are not shared have to be guarded so an endpoint
+never evaluates relevance not meant for it; the same axis is what lets a
+statement every dialect defines say so.
 """
 
 from __future__ import annotations

@@ -194,6 +194,51 @@ def test_a_windows_only_property_lists_only_windows() -> None:
     assert entry.platforms == frozenset({"windows"})
 
 
+def test_contexts_name_the_session_surfaces_platforms_leaves_out() -> None:
+    """`platforms` answers "which client dumps define this" and stays that
+    narrow. `contexts` is the reporting axis: the same client names, plus the
+    session surfaces spelled with their prefix so `console` cannot be read as
+    a platform."""
+    session_only = only("bes computers", "bes computers")
+    assert session_only.contexts == frozenset(
+        {"session:console", "session:rest_api", "session:web_reports"}
+    )
+    assert session_only.platforms == frozenset()
+
+    client_only = only("key", "key <string> of <registry>")
+    assert client_only.contexts == client_only.platforms == frozenset({"windows"})
+
+
+def test_a_context_that_never_sampled_a_category_is_not_counted_against_it() -> None:
+    """The sampling gap the axis must not read as an absence.
+
+    Only the REST API dump captured casts and operators session-side; the
+    console and Web Reports dumps are `properties` only (see
+    `tests/examples/relevance_inspectors/README.md`). Reading their silence as
+    "this operator does not exist there" would collapse every session
+    statement that uses an operator -- which is all of them -- to
+    `session:rest_api` alone, and that is a fact about our dumps, not about
+    BigFix.
+    """
+    equals = next(entry for entry in lookup("=") if entry.contexts)
+    assert "session:rest_api" in equals.contexts
+    assert {"session:console", "session:web_reports"} <= equals.contexts
+
+    # The widening is per category and per dialect, so it never invents a
+    # presence: `bes computers` is a property, a category all three session
+    # dumps captured, and no client dump defines it at all.
+    session_property = only("bes computers", "bes computers")
+    assert not session_property.contexts & {"windows", "macos"}
+
+
+def test_something_both_dialects_define_carries_both_halves() -> None:
+    entry = only("casts", "casts")
+    assert entry.contexts == frozenset(
+        {"windows", "macos", "ubuntu", "debian", "rhel"}
+        | {"session:console", "session:rest_api", "session:web_reports"}
+    )
+
+
 def test_a_property_shared_by_both_dialects_reports_both() -> None:
     entry = only("key", "key <string> of <json value>")
     assert entry.dialects == frozenset({Dialect.CLIENT, Dialect.SESSION})

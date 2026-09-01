@@ -29,7 +29,20 @@ from bigfix_relevance_analyzer.typecheck import (
     resolve_property,
 )
 
-ALL_PLATFORMS = {"debian", "macos", "rhel", "ubuntu", "windows"}
+ALL_PLATFORMS = {
+    context
+    for source in inspectors.sources()
+    for context in [source.partition(":")[2]]
+    if source.startswith("client:")
+}
+ALL_SESSION_CONTEXTS = {source for source in inspectors.sources() if source.startswith("session:")}
+ALL_CONTEXTS = ALL_PLATFORMS | ALL_SESSION_CONTEXTS
+
+# One name per corner of the dialect axis, verified against the dumps: `bes
+# computers` exists only server-side, `casts` is the introspection meta-layer
+# every client platform and every session context defines.
+SESSION_ONLY = "bes computers"
+BOTH_DIALECTS = "casts"
 
 # Two casts from a string literal that exist on disjoint platforms. They are the
 # only way to reach a narrowed platform set without property resolution, which
@@ -41,6 +54,11 @@ LINUX_ONLY = '"x" as strverscmp version'
 @pytest.fixture
 def env() -> TypeEnvironment:
     return TypeEnvironment.create(Dialect.CLIENT)
+
+
+@pytest.fixture
+def session_env() -> TypeEnvironment:
+    return TypeEnvironment.create(Dialect.SESSION)
 
 
 def types_of(source: str, env: TypeEnvironment) -> set[str] | None:
@@ -138,12 +156,16 @@ def test_if_branches_union_their_platforms_rather_than_intersecting(env: TypeEnv
     """
     windows = check(parse(WINDOWS_ONLY), env)
     linux = check(parse(LINUX_ONLY), env)
-    assert set(windows.platforms) == {"windows"}
-    assert set(linux.platforms) == {"debian", "rhel", "ubuntu"}
-    assert not (windows.platforms & linux.platforms)
+    # Both casts also exist in the REST API dump, so the sets are not disjoint
+    # across the whole axis. The divergence this rule is about is the client
+    # half of it: no one endpoint can take both branches.
+    assert set(windows.platforms) & ALL_PLATFORMS == {"windows"}
+    assert set(linux.platforms) & ALL_PLATFORMS == {"debian", "rhel", "ubuntu"}
+    assert not (windows.platforms & linux.platforms & ALL_PLATFORMS)
 
     both = check(parse(f"if true then ({WINDOWS_ONLY}) else ({LINUX_ONLY})"), env)
-    assert set(both.platforms) == {"windows", "debian", "rhel", "ubuntu"}
+    assert set(both.platforms) == set(windows.platforms) | set(linux.platforms)
+    assert set(both.platforms) & ALL_PLATFORMS == {"windows", "debian", "rhel", "ubuntu"}
     assert both.diagnostics == ()
 
 
@@ -152,13 +174,64 @@ def test_error_fallback_unions_its_platforms_too(env: TypeEnvironment) -> None:
     only when the left one errors. No example in the corpus uses it to guard
     platforms, so this rule is reasoned from the semantics, not observed."""
     result = check(parse(f"({WINDOWS_ONLY}) | ({LINUX_ONLY})"), env)
-    assert set(result.platforms) == {"windows", "debian", "rhel", "ubuntu"}
+    assert set(result.platforms) & ALL_PLATFORMS == {"windows", "debian", "rhel", "ubuntu"}
 
 
 def test_a_chain_intersects_its_platforms(env: TypeEnvironment) -> None:
     """Within one reading, everything has to hold at once."""
     drives = resolve_property("drives", None, env)
     assert resolve_property("block size", drives.types, env).platforms < drives.platforms
+
+
+def test_session_relevance_reports_its_own_contexts(session_env: TypeEnvironment) -> None:
+    """Session is an axis too. The dumps name three server-side surfaces, and a
+    session-only inspector is defined in the ones that sampled it -- an empty
+    set said nothing at all."""
+    expected = {source for source in inspectors.lookup(SESSION_ONLY)[0].sources}
+    assert expected <= ALL_SESSION_CONTEXTS
+    value = resolve_property(SESSION_ONLY, None, session_env)
+    assert set(value.platforms) == expected
+
+
+def test_something_defined_in_both_dialects_reports_both(
+    env: TypeEnvironment, session_env: TypeEnvironment
+) -> None:
+    """The answer the report could not give: this runs on every client platform
+    *and* in every session context, and saying so needs one axis, not two."""
+    for environment in (env, session_env):
+        value = resolve_property(BOTH_DIALECTS, None, environment)
+        assert set(value.platforms) == ALL_CONTEXTS
+
+
+def test_an_operator_does_not_collapse_a_session_statement_to_the_rest_api(
+    session_env: TypeEnvironment,
+) -> None:
+    """End to end over the gap: an everyday session statement uses an operator,
+    and only the REST API dump captured session operators. Narrowing on that
+    silence would report every such statement as REST-API-only."""
+    source = f"{SESSION_ONLY} whose (id of it = 2)"
+    assert set(check(parse(source), session_env).platforms) == ALL_SESSION_CONTEXTS
+
+
+def test_selecting_a_session_context_restricts_resolution() -> None:
+    """`--platform session:console` narrows the way `--platform windows` does."""
+    console = TypeEnvironment.create(Dialect.SESSION, "session:console")
+    assert resolve_property(SESSION_ONLY, None, console).known
+    assert set(resolve_property(SESSION_ONLY, None, console).platforms) == {"session:console"}
+    assert not resolve_property("drives", None, console).known
+
+
+def test_session_branches_still_answer_for_their_types(session_env: TypeEnvironment) -> None:
+    """The guard on the one behaviour the axis change must not move.
+
+    Session relevance gained a context set, but the coexistence rule still
+    ignores it: the three session dumps are sampled unevenly, so contexts two
+    branches do not share are a gap in the data rather than proof that no one
+    surface sees both. Every session branch coexists, exactly as before, and a
+    genuine type disagreement between them is still reported."""
+    source = f'if true then (number of {SESSION_ONLY}) else ("x")'
+    codes = [diagnostic.code for diagnostic in check(parse(source), session_env).diagnostics]
+    assert codes == ["if-branch-types-incompatible"]
 
 
 def _corpus_diagnostics(env: TypeEnvironment) -> list[tuple[str, int, str, str]]:

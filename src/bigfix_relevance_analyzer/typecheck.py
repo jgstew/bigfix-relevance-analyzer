@@ -34,6 +34,18 @@ proof. Empty is "every candidate was ruled out", which is a finding.
 
 Platform coverage is reported, not enforced
 -------------------------------------------
+"Platform" here is one axis over both dialects: the five sampled client
+platforms by their bare names, and the three session surfaces as
+``session:console`` / ``session:rest_api`` / ``session:web_reports``. Session
+relevance used to report nothing at all on this axis, which read as "no answer"
+when the dumps had one. A statement whose inspectors every dialect defines is
+viable in all eight, and says so.
+
+Where the dumps' coverage is uneven the axis widens rather than narrows -- only
+the REST API dump captured session casts and operators, so the console and Web
+Reports surfaces are not counted out of them; see
+:attr:`~bigfix_relevance_analyzer.inspectors.Inspector.contexts`.
+
 One relevance statement routinely targets several platforms at once, guarding
 platform-specific inspectors behind ``if``/``then``/``else`` so the wrong
 platform never evaluates the branch that would fail on it. The statement is
@@ -152,11 +164,16 @@ class RelevanceValue:
     """
 
     platforms: frozenset[str] = frozenset()
-    """Client platforms on which this reading is viable.
+    """The evaluation contexts in which this reading is viable.
 
-    Reported, never enforced -- see the module docstring. Empty under
-    :attr:`~bigfix_relevance_analyzer.dialect.Dialect.SESSION`, where platform
-    is not a meaningful axis.
+    Client platforms by their bare name and session surfaces as
+    ``session:<context>`` -- see
+    :attr:`~bigfix_relevance_analyzer.inspectors.Inspector.contexts`, whose
+    spelling this carries. Named ``platforms`` because that is what it is on
+    the client side, which is most of what anyone reads it for, and because the
+    name is the public JSON key.
+
+    Reported, never enforced -- see the module docstring.
     """
 
     @property
@@ -276,9 +293,13 @@ class TypeEnvironment:
 
     @property
     def universe(self) -> frozenset[str]:
-        """Every platform in play -- all of them, or just the one selected."""
-        if self.dialect is not Dialect.CLIENT:
-            return frozenset()
+        """Every context in play -- all of them, or just the one selected.
+
+        Both dialects, always. The axis used to be client-only, which left
+        session relevance reporting an empty set and the report explaining the
+        emptiness away in prose; the dumps record session availability just as
+        precisely, so there was nothing to explain.
+        """
         if self.platform is not None:
             return frozenset({self.platform})
         return self._all_platforms or _platform_universe()
@@ -287,25 +308,38 @@ class TypeEnvironment:
         """Whether this row counts, given the dialect and platform selected."""
         if self.dialect not in entry.dialects:
             return False
-        if self.dialect is Dialect.CLIENT and self.platform is not None:
-            return self.platform in entry.platforms
+        if self.platform is not None:
+            return self.platform in entry.contexts
         return True
 
     def platforms_of(self, entries: list[inspectors.Inspector]) -> frozenset[str]:
-        if self.dialect is not Dialect.CLIENT:
-            return frozenset()
         found: frozenset[str] = frozenset()
         for entry in entries:
-            found |= entry.platforms
+            found |= entry.contexts
         return found & self.universe
 
 
-def _platform_universe() -> frozenset[str]:
+def _client_platforms() -> frozenset[str]:
+    """The client half of the context universe, for the one rule that reasons
+    about "could one machine take both branches" -- see
+    :meth:`_Checker.branches_coexist`."""
     return frozenset(
         context
         for source in inspectors.sources()
         for dialect, _, context in [source.partition(":")]
         if dialect == "client" and context
+    )
+
+
+def _platform_universe() -> frozenset[str]:
+    """Every context the dumps name, spelled the way
+    :attr:`~bigfix_relevance_analyzer.inspectors.Inspector.contexts` spells
+    them."""
+    return frozenset(
+        context if dialect == "client" else source
+        for source in inspectors.sources()
+        for dialect, _, context in [source.partition(":")]
+        if context
     )
 
 
@@ -1558,11 +1592,18 @@ class _Checker:
         differing is the whole point, not a mistake. Only branches that some
         single platform could take together can disagree about type.
 
-        Session relevance has no platform axis, so every branch coexists there.
+        Deliberately the *client* half of the context axis, not the whole of
+        it. The three session dumps are sampled unevenly, so two branches
+        sharing no session surface is a gap in the data rather than proof that
+        nothing sees both -- and letting the session half in would also let a
+        shared session surface make two genuinely Windows-vs-Linux branches
+        look simultaneous, silencing a finding this rule exists to keep. Under
+        session relevance itself the axis says nothing usable, so every branch
+        coexists there, as before.
         """
         if self.env.dialect is not Dialect.CLIENT:
             return True
-        return bool(then_value.platforms & else_value.platforms)
+        return bool(then_value.platforms & else_value.platforms & _client_platforms())
 
     def combine_whose(
         self, node: Whose, collection: RelevanceValue, predicate: RelevanceValue

@@ -138,6 +138,44 @@ class _Sourced:
             if dialect == "client" and context
         )
 
+    @property
+    def contexts(self) -> frozenset[str]:
+        """Where this can evaluate, as the analysis reports it.
+
+        The same set as :attr:`sampled_contexts` for anything not carrying an
+        introspection category to reason about; :class:`Inspector` overrides
+        this to apply the sampling discipline its :attr:`~Inspector.kind`
+        makes possible.
+        """
+        return self.sampled_contexts
+
+    @property
+    def sampled_contexts(self) -> frozenset[str]:
+        """Every evaluation context whose dump literally carries this row.
+
+        The axis the analysis reports against, where :attr:`platforms` is the
+        narrower table fact behind half of it. Client contexts keep their bare
+        platform name -- ``windows``, ``macos`` -- and session contexts keep
+        the ``session:`` prefix of their source label, because a bare
+        ``console`` sitting in a list beside ``macos`` reads as a platform and
+        is not one.
+
+        Session availability is recorded with exactly the same fidelity as
+        client availability -- one bit per dump in the same mask -- so leaving
+        it out of the axis threw away an answer the tables already had.
+
+        Literal, so a context missing here has not been ruled out -- it may
+        simply never have been captured. :attr:`Inspector.contexts` is the
+        reporting axis, and applies that discipline for the one gap that is
+        systematic rather than incidental.
+        """
+        return frozenset(
+            context if dialect == "client" else source
+            for source in self.sources
+            for dialect, _, context in [source.partition(":")]
+            if context
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class Inspector(_Sourced):
@@ -220,6 +258,30 @@ class Inspector(_Sourced):
     Usually identical to :attr:`name`; kept distinct because the two are
     conceptually different fields upstream (``symbol of <binary operator>``).
     """
+
+    @property
+    def contexts(self) -> frozenset[str]:
+        """Where this row can evaluate, as the analysis reports it.
+
+        :attr:`sampled_contexts`, widened by the contexts that never sampled
+        this row's :attr:`kind` at all. Only the REST API dump captured casts
+        and operators session-side; the console and Web Reports dumps are
+        `properties` only. Reading their silence as an absence collapses every
+        session statement using an operator -- which is nearly all of them --
+        to `session:rest_api`, reporting a fact about our dumps as a fact about
+        BigFix.
+
+        The widening is per *dialect*, so it never invents a presence: a row
+        no session dump defines gains no session context, because there the
+        silence is the properties dumps' and they did sample it.
+        """
+        found = self.sampled_contexts
+        return found | frozenset(
+            context
+            for dialect in self.dialects
+            for context in _unsampled_contexts(self.kind)
+            if _dialect_of_context(context) is dialect
+        )
 
     def to_dict(self) -> dict[str, Any]:
         """This inspector as JSON-serializable plain data.
@@ -517,6 +579,32 @@ def known_types() -> frozenset[str]:
     return frozenset(entry.name for entry in relevance_types())
 
 
+def _dialect_of_context(context: str) -> Dialect | None:
+    """Which engine evaluates ``context``, from the way the axis spells it."""
+    dialect, _, _rest = context.partition(":")
+    return Dialect.SESSION if dialect == "session" else Dialect.CLIENT
+
+
+@functools.cache
+def _unsampled_contexts(kind: InspectorKind) -> frozenset[str]:
+    """Contexts whose dumps carry no row of ``kind`` at all.
+
+    A systematic gap rather than an incidental one: the console and Web
+    Reports captures are `properties` dumps, so they say nothing whatsoever
+    about casts or operators. Silence over a whole category is not evidence,
+    and :attr:`Inspector.contexts` refuses to read it as any.
+    """
+    sampled = {
+        source for entry in all_inspectors() if entry.kind is kind for source in entry.sources
+    }
+    return frozenset(
+        context if dialect == "client" else source
+        for source in sources()
+        for dialect, _, context in [source.partition(":")]
+        if context and source not in sampled
+    )
+
+
 @functools.cache
 def all_inspectors() -> tuple[Inspector, ...]:
     """Every row of all four inspector categories."""
@@ -713,6 +801,11 @@ class SearchResult:
     def dialects(self) -> frozenset[Dialect]:
         """Every dialect that defines any row behind this result."""
         return frozenset(dialect for entry in self.inspectors for dialect in entry.dialects)
+
+    @property
+    def contexts(self) -> frozenset[str]:
+        """Every evaluation context that defines any row behind this result."""
+        return frozenset(context for entry in self.inspectors for context in entry.contexts)
 
     def to_dict(self) -> dict[str, Any]:
         """This result as JSON-serializable plain data, sized for a wire.

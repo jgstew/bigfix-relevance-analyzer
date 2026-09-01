@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from bigfix_relevance_analyzer import RelevanceAnalysis, __version__, analyze_relevance
+from bigfix_relevance_analyzer import RelevanceAnalysis, __version__, analyze_relevance, inspectors
 from bigfix_relevance_analyzer.__main__ import _cell, main
 from bigfix_relevance_analyzer.analyzer import ReferenceReport, analyze
 from bigfix_relevance_analyzer.binding import Binder
@@ -24,6 +24,15 @@ SESSION = "names of bes computers"
 BES_EXAMPLE = Path("tests/examples/mixed_context/task_with_client_and_session_relevance.bes")
 BROKEN = 'exists file "unterminated'
 UNKNOWN_INSPECTOR = "totally bogus made up inspector"
+
+
+def inspectors_sources_as_contexts() -> set[str]:
+    """The dump labels as the axis spells them: client platforms bare, session
+    surfaces keeping the prefix that says which engine evaluates them."""
+    return {
+        source.partition(":")[2] if source.startswith("client:") else source
+        for source in inspectors.sources()
+    }
 
 
 def test_version_is_importable_and_nonempty() -> None:
@@ -81,14 +90,25 @@ def test_unbound_it_is_reported_not_raised() -> None:
     assert len(report.unbound_its) == 1
 
 
-def test_session_statement_is_classified_and_has_no_platform_axis() -> None:
+def test_session_statement_is_classified_and_reports_session_contexts() -> None:
+    """Session relevance has an axis of its own: the three server-side surfaces
+    the dumps sampled. Reporting an empty set said nothing, and the report had
+    to explain the emptiness away in prose."""
     report = analyze(SESSION)
 
     assert report.classified_dialect is Dialect.SESSION
     assert report.dialect is Dialect.SESSION
     assert not report.dialect_assumed
-    assert report.platforms == frozenset()
-    assert report.environment.universe == frozenset()
+    assert report.platforms
+    assert report.platforms <= {"session:console", "session:rest_api", "session:web_reports"}
+    assert report.environment.universe == frozenset(inspectors_sources_as_contexts())
+
+
+def test_the_universe_is_every_context_in_the_dumps() -> None:
+    """One axis over both dialects, so a statement valid in each can say so."""
+    universe = analyze(SESSION).to_dict()["platforms"]["universe"]
+    assert set(universe) == set(inspectors_sources_as_contexts())
+    assert len(universe) == len(inspectors.sources())
 
 
 def test_dialect_is_assumed_only_when_nothing_settles_it() -> None:
@@ -203,6 +223,22 @@ def test_cli_json_adds_the_flowchart_only_when_asked(capsys: pytest.CaptureFixtu
 
     assert main(["--json", "--mermaid", CLIENT]) == 0
     assert "mermaid" in json.loads(capsys.readouterr().out)["parse"]
+
+
+def test_cli_reports_the_platform_section_for_session_relevance(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The section used to be an apology -- "not an axis" -- because the axis
+    was client-only. It now answers for session too, in the Summary row and in
+    the section itself."""
+    assert main(["--verbose", SESSION]) == 0
+    out = capsys.readouterr().out
+
+    assert "Not an axis" not in out
+    assert re.search(r"\| Platforms \| \d+/\d+ viable \|", out)
+    viable = re.search(r"- \*\*Viable:\*\* (.+)", out)
+    assert viable is not None
+    assert "session:console" in viable.group(1)
 
 
 def test_cli_prints_markdown_with_every_section(capsys: pytest.CaptureFixture[str]) -> None:

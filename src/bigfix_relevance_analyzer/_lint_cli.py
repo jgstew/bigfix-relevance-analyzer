@@ -158,7 +158,10 @@ def main(argv: list[str] | None = None) -> int:
         choices=[Dialect.CLIENT.value, Dialect.SESSION.value],
         help="force the dialect instead of trusting extraction",
     )
-    parser.add_argument("--platform", help="narrow client lookups to one platform, e.g. windows")
+    parser.add_argument(
+        "--platform",
+        help="narrow lookups to one evaluation context, e.g. windows or session:console",
+    )
     parser.add_argument(
         "--list-rules",
         action="store_true",

@@ -122,7 +122,7 @@ def _render_summary(report: RelevanceAnalysis, level: int) -> list[str]:
             prefix = "" if plurality is Plurality.UNKNOWN else f"{plurality.value} "
             rendered = prefix + " or ".join(sorted(types))
         lines.append(f"| Type | {rendered} |")
-    if report.dialect is Dialect.CLIENT and report.parsed:
+    if report.parsed:
         lines.append(
             f"| Platforms | {len(report.platforms)}/{len(report.environment.universe)} viable |"
         )
@@ -181,15 +181,13 @@ def _render_parse(report: RelevanceAnalysis, level: int, *, mermaid: bool) -> li
 
 def _render_platforms(report: RelevanceAnalysis, level: int) -> list[str]:
     lines = [_heading(level, "Platforms"), ""]
-    if report.dialect is not Dialect.CLIENT:
-        lines.append("Not an axis: session relevance runs on the server, not an endpoint.")
-        lines.append("")
-        return lines
     viable = sorted(report.platforms)
     missing = sorted(report.missing_platforms)
     lines.append(f"- **Viable:** {', '.join(viable) or 'none reported'}")
     lines.append(f"- **Missing:** {', '.join(missing) or 'none'}")
-    lines.append("- _Tables only - a platform absent from the dumps is not proven unsupported._")
+    lines.append("- _Where this can evaluate: client platforms by name, server-side")
+    lines.append("  surfaces as `session:<context>`._")
+    lines.append("- _Tables only - a context absent from the dumps is not proven unsupported._")
     lines.append("")
     return lines
 
