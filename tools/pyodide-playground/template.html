@@ -222,18 +222,38 @@ function factsTable(rows) {
   return table;
 }
 
+// `resolved` over `classified`: the classifier runs on raw text before parsing
+// and is deliberately blind to common English words like `file`, so it sees
+// only part of the evidence. `resolved` is the same question asked of the
+// inspector tables once a parse tree exists, and it is the one that can say a
+// statement uses *both* dialects and so is valid as neither -- which the
+// classifier reports as a confident verdict for whichever half it noticed.
+function dialectBadge(dialect) {
+  switch (dialect.resolved) {
+    case "uncertain":
+      return { state: "bad", label: "uncertain (client and session)" };
+    case "both":
+      return { state: "ok", label: "both (valid either way)" };
+    case "client":
+    case "session":
+      return { state: "ok", label: dialect.resolved };
+  }
+  // Nothing resolved: no reference in the statement is exclusive to either
+  // dialect, or nothing parsed. Fall back to the text classifier, and stay
+  // neutral rather than red -- an absence of evidence is not a fault.
+  if (dialect.classified !== null) return { state: "ok", label: dialect.classified };
+  return { state: "", label: "undetermined" };
+}
+
 function renderPayload(payload) {
   outputEl.replaceChildren();
 
   // "types" is omitted entirely when parsing failed.
-  const dialectOk = payload.dialect.classified !== null;
+  const dialect = dialectBadge(payload.dialect);
   const typesOk = payload.types?.ok === true;
   outputEl.appendChild(
     el("p", null, [
-      el("span", {
-        class: `badge ${dialectOk ? "ok" : "bad"}`,
-        text: dialectOk ? `dialect: ${payload.dialect.classified}` : "dialect: undetermined",
-      }),
+      el("span", { class: `badge ${dialect.state}`, text: `dialect: ${dialect.label}` }),
       document.createTextNode(" "),
       el("span", { class: `badge ${payload.parse.ok ? "ok" : "bad"}`, text: `parse: ${payload.parse.ok ? "ok" : "error"}` }),
       document.createTextNode(" "),
@@ -264,6 +284,40 @@ function renderPayload(payload) {
       ["platforms viable", payload.platforms.viable.join(", ") || "(none)"],
     ])
   );
+
+  // Findings first: a red `types` badge with no message is barely better than
+  // silence, and the diagnostic is the whole reason the badge is red.
+  const diagnostics = payload.types?.diagnostics ?? [];
+  if (diagnostics.length) {
+    outputEl.appendChild(el("h2", { text: "diagnostics" }));
+    const table = el("table");
+    table.appendChild(
+      el("tr", null, [el("th", { text: "at" }), el("th", { text: "code" }), el("th", { text: "message" })])
+    );
+    for (const diagnostic of diagnostics) {
+      table.appendChild(
+        el("tr", null, [
+          el("td", { text: `${diagnostic.line}:${diagnostic.column}` }),
+          el("td", { text: diagnostic.code }),
+          el("td", { text: diagnostic.message }),
+        ])
+      );
+    }
+    outputEl.appendChild(table);
+  }
+
+  if (payload.unknown_references.length) {
+    outputEl.appendChild(el("h2", { text: "unknown inspectors" }));
+    outputEl.appendChild(el("p", { text: payload.unknown_references.join(", ") }));
+    outputEl.appendChild(
+      el("p", {
+        class: "hint",
+        text:
+          "No dump defines these names. A lead rather than a fault: the dumps are one " +
+          "snapshot and do not cover every platform, product version or evaluation context.",
+      })
+    );
+  }
 
   // Ordered by likely usefulness: probes, parse tree, it-bindings, references, raw JSON.
 

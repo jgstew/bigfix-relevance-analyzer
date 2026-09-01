@@ -21,6 +21,14 @@ if (!htmlPath) {
 // Chosen to cover every failure mode a real bug has actually hit in this
 // page: the happy path, an unresolved identifier, a parse error, and an
 // it-binding (see template.html's renderPayload for what these read).
+//
+// The dialect badge reads `dialect.resolved` -- the inspector tables' own
+// post-parse verdict -- rather than `dialect.classified`, which runs on raw
+// text and is deliberately blind to common English words like `file`. The
+// last two cases are the ones that distinguish them: a statement the text
+// classifier has no opinion about is still definitely client relevance if
+// every name in it resolves that way, and a statement it *does* have an
+// opinion about is still valid as neither dialect when the names contradict.
 const CASES = [
   {
     text: 'exists running application "winlogon.exe" AND version of operating system >= "10.0"',
@@ -33,7 +41,14 @@ const CASES = [
   },
   {
     text: 'exists file "x.txt" of folders "/" whose (size of it > 100)',
-    expectBadges: "dialect: undetermined parse: ok types: error",
+    expectBadges: "dialect: client parse: ok types: error",
+  },
+  {
+    // `files`/`folders` are client-only, `bes computers` is session-only, so
+    // no engine evaluates this. The text classifier calls it session on the
+    // strength of the `bes ` prefix alone.
+    text: '(exists files of folders "/") AND (exists bes computers)',
+    expectBadges: "dialect: uncertain (client and session) parse: ok types: ok",
   },
 ];
 
