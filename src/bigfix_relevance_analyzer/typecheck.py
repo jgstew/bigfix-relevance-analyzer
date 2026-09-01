@@ -1770,13 +1770,33 @@ class _Checker:
         )
 
     def combine_bar(self, node: Bar, left: RelevanceValue, right: RelevanceValue) -> RelevanceValue:
-        # `a | b` yields `b` when `a` errored, so a collapse risk inside `a` is
-        # a risk the author has already answered -- this is what the corpus's
-        # `free space of drives of system folders | 0` is for.
-        self.accept_collapse(node.left.span)
-        # The shape rule too: left of a `|`, the empty case erroring is the
-        # mechanism the fallback runs on, and the suggested plural spelling
-        # would answer 0 rows without tripping it (see `_FILTERED_SPELLING`).
+        # Both operands must be singular, and the engine refuses a plural
+        # before evaluating anything -- the absent `T:` line marks a
+        # compile-time refusal rather than a runtime error. Confirmed on both
+        # engines, so this is not dialect-gated::
+        #
+        #     Q: (names of files of folder "/etc") | "x"
+        #     E: A singular expression is required.
+        #     Q: "x" | (names of files of folder "/etc")
+        #     E: A singular expression is required.
+        #
+        # This is also *why* the fallback idiom is inherently singular: the
+        # missing case has to arrive as an error to trip the fallback, and a
+        # plural that finds nothing answers 0 values rather than erroring.
+        #
+        # `require_singular` delegates to `accept_collapse`, so the retraction
+        # a fallback earns rides along with the check: `a | b` yields `b` when
+        # `a` errored, making a collapse risk inside `a` one the author has
+        # already answered -- the corpus's `free space of drives of system
+        # folders | 0`. The right operand earns it for the plainer reason
+        # every `require_singular` site does: a position that demands a
+        # singular cannot also advise writing the plural.
+        self.require_singular(left, node.left.span, "left-operand-not-singular", token="|")
+        self.require_singular(right, node.right.span, "right-operand-not-singular", token="|")
+        # The shape rule too, and only on the left: there the empty case
+        # erroring is the mechanism the fallback runs on, and the suggested
+        # plural spelling would answer 0 rows without tripping it (see
+        # `_FILTERED_SPELLING`). Nothing on the right needs the error.
         self.retract(_FILTERED_SPELLING, node.left.span)
 
         # The evaluator's own message for this is the terse "Incompatible types."

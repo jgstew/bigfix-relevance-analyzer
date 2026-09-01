@@ -985,6 +985,90 @@ def test_the_shape_rule_is_withdrawn_under_a_direct_exists(env: TypeEnvironment)
     assert [d.code for d in check(parse(cast), env).diagnostics] == ["filtered-singular-spelling"]
 
 
+def test_both_operands_of_a_pipe_must_be_singular(env: TypeEnvironment) -> None:
+    """`|` is not merely happier with a singular -- it *requires* one, on both
+    sides, and the engine refuses a plural before evaluating anything. The
+    absent `T:` line marks a compile-time refusal rather than a runtime error::
+
+        Q: (names of files of folder "/etc") | "x"
+        E: A singular expression is required.
+        Q: "x" | (names of files of folder "/etc")
+        E: A singular expression is required.
+
+    Session agrees on both sides, so this is not dialect-gated::
+
+        (1;2) | 3   -> A singular expression is required.
+        3 | (1;2)   -> A singular expression is required.
+
+    This is what makes the error-fallback idiom inherently singular: the
+    "missing" case has to arrive as an *error* to trip the fallback, and a
+    plural that finds nothing answers 0 values instead of erroring.
+    """
+    left = '(names of files of folder "/etc") | "x"'
+    result = check(parse(left), env)
+    assert [d.code for d in result.diagnostics] == ["left-operand-not-singular"]
+    assert result.diagnostics[0].message == "the left operand of '|' must be singular"
+
+    right = '"x" | (names of files of folder "/etc")'
+    assert [d.code for d in check(parse(right), env).diagnostics] == ["right-operand-not-singular"]
+
+    # A collection is plural however short it is, and reaches the same refusal.
+    assert [d.code for d in check(parse("(1;2) | 3"), env).diagnostics] == [
+        "left-operand-not-singular"
+    ]
+    assert [d.code for d in check(parse("3 | (1;2)"), env).diagnostics] == [
+        "right-operand-not-singular"
+    ]
+
+    # `nothing` is an *empty plural*, not a singular null -- it answers no
+    # values at all (`T:` with no `A:`) -- so it cannot be a `|` operand
+    # either, on either engine::
+    #
+    #     Q: nothing
+    #     T: 31
+    #     Q: (1) | nothing
+    #     E: A singular expression is required.
+    #     Q: (nothing) | 1
+    #     E: A singular expression is required.
+    #
+    # The singular undefined-typed spelling is `ERROR "..."`, which the engine
+    # accepts (`(1) | ERROR "x"` answers `1`) and which the fallback idiom
+    # actually uses.
+    assert [d.code for d in check(parse("(1) | nothing"), env).diagnostics] == [
+        "right-operand-not-singular"
+    ]
+    assert [d.code for d in check(parse('(1) | ERROR "x"'), env).diagnostics] == []
+
+
+def test_a_pipe_distributed_over_a_plural_object_is_clean(env: TypeEnvironment) -> None:
+    """The false positive this rule must not create, and the documented idiom
+    in `syntax.md`: `(name of it | "unknown") of bes computers`.
+
+    The `of` distributes, so each `|` sees one element at a time and both its
+    operands are singular; only the whole expression is plural. Both engines
+    run it happily -- client answers one line per file, session one per
+    computer::
+
+        Q: number of ((name of it | "unknown") of files of folder "/etc")
+        A: 58
+        (session) number of ((name of it | "unknown") of bes computers) -> 2
+
+    Also clean for the corpus's own `free space of drives of system folders |
+    0`: `free space` is a singular *spelling*, whatever the object holds, so
+    the operand is singular and the collapse risk it raises is retracted by
+    the `|` requiring one (see `accept_collapse`).
+    """
+    distributed = '(name of it | "unknown") of files of folder "/etc"'
+    assert [d.code for d in check(parse(distributed), env).diagnostics] == []
+
+    corpus = "free space of drives of system folders | 0"
+    assert [d.code for d in check(parse(corpus), env).diagnostics] == []
+
+    session = TypeEnvironment.create(Dialect.SESSION)
+    idiom = '(name of it | "unknown") of bes computers'
+    assert [d.code for d in check(parse(idiom), session).diagnostics] == []
+
+
 def test_a_property_used_on_the_wrong_direct_object_is_a_finding(env: TypeEnvironment) -> None:
     """`size` is real and `string` is a real type; no row joins them."""
     result = check(parse('size of "a"'), env)
@@ -1263,7 +1347,7 @@ def test_a_ruled_out_value_does_not_cascade(env: TypeEnvironment) -> None:
         pytest.param(
             'if windows of operating system then "a" else nothings', id="if-branch-plural"
         ),
-        pytest.param("(1) | nothing", id="bar"),
+        pytest.param('(1) | ERROR "x"', id="bar"),
         pytest.param("nothing as string", id="cast"),
     ],
 )
@@ -1277,6 +1361,18 @@ def test_nothing_is_compatible_with_whatever_it_is_held_against(
     ordinary shipped content the evaluator accepts. Compared as an ordinary
     type name it unified with nothing, which accounted for 41 of the 46 type
     errors over a 1,108-file corpus of real content.
+
+    The `|` case spells its undefined operand `ERROR "x"` rather than
+    `nothing`, which this test used to hold: `nothing` is an *empty plural*
+    (`nothing` alone answers no values at all), and `|` requires singular
+    operands, so both engines refuse `(1) | nothing` on a plurality ground
+    that has nothing to do with the type question asked here. `ERROR "x"` is
+    the singular undefined-typed spelling, and the engine runs it::
+
+        Q: (1) | ERROR "x"
+        A: 1
+
+    See `test_both_operands_of_a_pipe_must_be_singular` for the plurality half.
     """
     assert [d.code for d in check(parse(source), env).diagnostics] == []
 

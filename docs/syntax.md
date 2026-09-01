@@ -158,6 +158,27 @@ chain is; see the empty-case findings in
 its first value when uniqueness is violated, and the expression still errors
 with the fallback unused. Transcripts in the same section.
 
+The singularity rule catches `nothing`, which reads like a null but is an
+**empty plural** - it answers no values at all, so it cannot be a `|` operand
+on either engine:
+
+```
+Q: nothing
+T: 31
+Q: (1) | nothing
+E: A singular expression is required.
+```
+
+(That bare `T:` with no `A:` line is the tell; see [`qna.md`](qna.md).) The
+singular undefined-typed spelling is `ERROR "..."`, which is what the idiom
+actually wants - it is a value that *errors*, so it also works as the left
+operand where `nothing` would be silently empty:
+
+```
+Q: (1) | ERROR "x"
+A: 1
+```
+
 `|` has no row in the operator table at all, because the grammar defines it
 rather than the inspector layer. The same is true of `and` and `or`.
 
