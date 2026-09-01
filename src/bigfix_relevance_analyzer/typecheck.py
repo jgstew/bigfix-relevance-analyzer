@@ -60,7 +60,7 @@ from __future__ import annotations
 import enum
 import itertools
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any, Final, assert_never
 
@@ -185,6 +185,26 @@ class CheckResult:
 
     value: RelevanceValue
     diagnostics: tuple[TypeDiagnostic, ...] = ()
+
+    resolutions: Mapping[int, tuple[inspectors.Inspector, ...]] = field(
+        default_factory=dict, repr=False
+    )
+    """Which table rows each `Reference` actually resolved to, keyed by ``id``.
+
+    The narrowing :func:`resolve_property` performs is otherwise thrown away:
+    the walk keeps the resulting types and discards the rows that produced
+    them, so a caller wanting to say *why* a name typed the way it did had to
+    look it up again bare -- and got the union over every overload rather than
+    the one the direct object selected.
+
+    Keyed by ``id`` of the node, so it is only meaningful while the tree that
+    was checked is still alive. That is the whole of its intended use: a
+    consumer reads it during the same call that produced the tree. It is walk
+    state rather than a finding, so it is deliberately absent from
+    :meth:`to_dict`. Absent for a reference the walk never resolved -- one
+    suppressed by another finding, or reached through a context that was
+    itself unresolved.
+    """
 
     @property
     def ok(self) -> bool:
@@ -838,7 +858,11 @@ def check(node: Node, environment: TypeEnvironment) -> CheckResult:
     """
     checker = _Checker(environment)
     value = checker.run(node)
-    return CheckResult(value=value, diagnostics=tuple(checker.diagnostics))
+    return CheckResult(
+        value=value,
+        diagnostics=tuple(checker.diagnostics),
+        resolutions=checker.resolutions,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -906,9 +930,14 @@ class _Checker:
         self.contexts: list[RelevanceValue] = []
         # Reference nodes whose own resolution is not the finding to report.
         self.suppressed: set[int] = set()
+        # Reference nodes written *as* the property of an `of` -- the ones that
+        # named a direct object out loud. See `combine_reference`.
+        self.explicit_objects: set[int] = set()
         # Per-item types, so `item N of (...)` can pick one out after the tuple
         # as a whole has been collapsed to a single value.
         self.tuple_items: dict[int, tuple[RelevanceValue, ...]] = {}
+        # Which rows each reference resolved to. See `CheckResult.resolutions`.
+        self.resolutions: dict[int, tuple[inspectors.Inspector, ...]] = {}
 
     def run(self, root: Node) -> RelevanceValue:
         work: list[_Work] = [_Descend(root)]
@@ -942,6 +971,16 @@ class _Checker:
 
     def unknown(self) -> RelevanceValue:
         return RelevanceValue(types=None, platforms=self.env.universe)
+
+    def record(self, node: Reference, subject: frozenset[str] | None) -> None:
+        """Keep the rows `node` resolved to, for `CheckResult.resolutions`.
+
+        Called with whichever subject actually produced the value returned, so
+        a reference rescued by the world fallback records the world's rows
+        rather than the ones that failed to match.
+        """
+        rows = _matched_rows(node.phrase, subject, self.env, indexed=node.index is not None)
+        self.resolutions[id(node)] = tuple(rows or ())
 
     def literal(self, name: str) -> RelevanceValue:
         return RelevanceValue(
@@ -1110,6 +1149,12 @@ class _Checker:
                 # `first` is typed in. Getting this backwards silently binds the
                 # wrong node in every nested expression. `binding.py` spells out
                 # the same rule for the same reason.
+                if isinstance(node, Of) and isinstance(node.prop, Reference):
+                    # Written with a direct object, which is what stops the
+                    # world fallback in `combine_reference` from rescuing a
+                    # world-only name. Only the property *itself* counts: a
+                    # reference deeper inside the subtree named no object.
+                    self.explicit_objects.add(id(node.prop))
                 if isinstance(node, Of) and self.bad_tuple_index(node) is not None:
                     # `item "a" of (1,2,3)` is one mistake, not two: the tuple
                     # rule is the finding, so the name is not also resolved as
@@ -1254,6 +1299,28 @@ class _Checker:
         `packages ... whose (exists properties whose (...))`, where `properties`
         is the world's. So resolution falls back, and only a name the *world*
         does not define either is a finding.
+
+        That fallback is for an **implicit** context only. A `whose` surrounds a
+        bare reference without claiming the item is what the name belongs to; an
+        `of` says exactly that, out loud, and is wrong when it is not true. The
+        engine draws the same line, and it is the whole difference between two
+        expressions over the same objects::
+
+            number of files whose (exists properties) of folder "/etc"
+                                                          -> A: 58
+            number of files whose (exists properties of it) of folder "/etc"
+                                                          -> E: ... not defined.
+
+        1,372 names resolve as a bare world property on a client and 1,008 of
+        those are world-*only*, so falling back for an explicit object would
+        silently accept any of them written as `<name> of <anything>`.
+        Which reference is which is decided syntactically, at the parent: the
+        `prop` of an `of` named an object, anything else did not. It has to be
+        the node rather than the context stack, because a reference nested
+        inside the property subtree is *not* the one the object was written
+        for -- in `(value of setting "x" of client | "none") of setting "y"`,
+        the innermost context is explicit but `client` is the object of its own
+        inner `of` and still resolves against the world.
         """
         if id(node) in self.suppressed:
             return self.unknown()
@@ -1265,9 +1332,12 @@ class _Checker:
             # about a property of it.
             return self.unknown()
         value = resolve_property(node.phrase, subject, self.env, indexed=node.index is not None)
-        if subject is not None and value.types is not None and not value.types:
+        self.record(node, subject)
+        explicit = id(node) in self.explicit_objects
+        if subject is not None and not explicit and value.types is not None and not value.types:
             world = resolve_property(node.phrase, None, self.env, indexed=node.index is not None)
             if world.types:
+                self.record(node, None)
                 return world
         if value.types is not None and not value.types:
             if subject is None:

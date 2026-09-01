@@ -19,7 +19,7 @@ itself something to report, not something to crash over.
     if any(f.severity is Severity.ERROR for f in findings):
         raise SystemExit(1)
 
-Ten rules, eight of them always on and two tunable:
+Eleven rules, nine of them always on and two tunable:
 
 - ``parse-error`` / ``error-token`` -- the statement is broken. Always an
   error; nothing to configure.
@@ -35,6 +35,11 @@ Ten rules, eight of them always on and two tunable:
   own independent detection of the same unbound ``it`` the ``unbound-it``
   rule above already reports, and including both would report one root cause
   twice.
+- ``mixed-dialect`` -- inspectors exclusive to client relevance and to session
+  relevance in one statement, so no engine can evaluate it. Always an error:
+  unlike ``unknown-inspector``, this is not a gap in the snapshot but two
+  halves of it that exclude each other. See the rule's rationale in
+  :data:`RULES` for why the two halves are not equally strong evidence.
 - ``unknown-inspector`` -- a name no dump defines, or a bare world reference
   the dumps know only with a direct object (the checker's
   ``world-property-not-defined``). Always a warning, never an error by
@@ -232,6 +237,12 @@ class LintRule:
         }
 
 
+def _names(phrases: tuple[str, ...]) -> str:
+    """`` `a` is `` / `` `a`, `b` are ``, for a clause that reads as English."""
+    quoted = ", ".join(f"`{phrase}`" for phrase in phrases)
+    return f"{quoted} {'is' if len(phrases) == 1 else 'are'}"
+
+
 def _rule(
     code: str,
     default_severity: Severity,
@@ -251,7 +262,7 @@ def _rule(
 
 
 #: Every rule this module can report. The rationales are the module docstring's
-#: own seven-rule list, moved here so there is one copy rather than a prose one
+#: own rule list, moved here so there is one copy rather than a prose one
 #: for humans and an implicit one for consumers.
 RULES: Mapping[str, LintRule] = MappingProxyType(
     dict(
@@ -321,6 +332,26 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "inspectors define top-level names like `devices` that the dumps record "
                 "only as grub's `device of <grub file location>`). Always a warning, "
                 "never an error by default.",
+            ),
+            _rule(
+                "mixed-dialect",
+                Severity.ERROR,
+                "inspectors exclusive to client relevance and to session relevance in "
+                "one statement",
+                "Client relevance is evaluated by the BES Client on an endpoint and "
+                "session relevance by the root server, so a statement needing "
+                "inspectors from both is not a question either one can be asked -- "
+                '`(exists files of folders "/") AND (exists bes computers)` has no '
+                "engine. An error rather than a warning because, unlike "
+                "`unknown-inspector`, this is not a gap in the snapshot: both halves "
+                "are in it and they exclude each other. The evidence is not quite "
+                "symmetric -- the client dumps are verified complete for the five "
+                "sampled platforms against the engine's own `number of <category>`, "
+                "while the session surface is sampled from the console, Web Reports "
+                "and the REST API but not the WebUI or the Fixlet Debugger, so a name "
+                "that looks client-only is the weaker half of the pair. Reported at "
+                "error severity by deliberate choice rather than by symmetry of "
+                "evidence; no site in `tests/examples/` triggers it.",
             ),
             _rule(
                 "non-unique-risk",
@@ -749,6 +780,18 @@ def lint_analysis(
     mismatch = _slot_mismatch(site, report)
     if mismatch is not None:
         emit("site-type-mismatch", mismatch, 1)
+
+    # Statement-level too, and before `unknown-inspector`: when a statement is
+    # in neither dialect, that is the more useful thing to read first.
+    if report.resolved_dialect is Dialect.UNCERTAIN:
+        client_only = report.references_only_in(Dialect.CLIENT)
+        session_only = report.references_only_in(Dialect.SESSION)
+        emit(
+            "mixed-dialect",
+            f"{_names(client_only)} client relevance only, "
+            f"{_names(session_only)} session relevance only",
+            1,
+        )
 
     if report.unknown_references:
         names = ", ".join(f"`{name}`" for name in report.unknown_references)

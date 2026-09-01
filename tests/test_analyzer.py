@@ -13,7 +13,7 @@ import pytest
 
 from bigfix_relevance_analyzer import RelevanceAnalysis, __version__, analyze_relevance
 from bigfix_relevance_analyzer.__main__ import _cell, main
-from bigfix_relevance_analyzer.analyzer import analyze
+from bigfix_relevance_analyzer.analyzer import ReferenceReport, analyze
 from bigfix_relevance_analyzer.binding import Binder
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.lint import LintConfig, lint_analysis
@@ -494,3 +494,127 @@ def test_cli_check_wires_max_score_flag(tmp_path: Path, capsys: pytest.CaptureFi
     assert main(["--check", "--max-score=1", str(path)]) == 1
     out = capsys.readouterr().out
     assert "[complexity]" in out
+
+
+# ---------------------------------------------------------------------------
+# The reference report is narrowed by the direct object, like the types are
+# ---------------------------------------------------------------------------
+
+
+def _reference(
+    report: RelevanceAnalysis, phrase: str, column: int | None = None
+) -> ReferenceReport:
+    found = [
+        entry
+        for entry in report.references
+        if entry.phrase == phrase and (column is None or entry.reference.span.column == column)
+    ]
+    assert found, [(e.phrase, e.reference.span.column) for e in report.references]
+    return found[0]
+
+
+def test_a_reference_reports_only_the_rows_its_direct_object_allows() -> None:
+    """`keys` is nineteen different properties; `keys of <registry key>` is one.
+
+    The checker has always narrowed -- this statement types as
+    `registry key value` -- but the reference report looked every name up bare,
+    so it answered with the union over every `keys` row: six return types, all
+    five platforms. A consumer reading `references[]` to offer completions or
+    to say where a statement can run was reading the unnarrowed set.
+    """
+    report = analyze('values "DisplayName" of keys of keys "HKLM\\Software" of native registry')
+
+    outer = _reference(report, "keys", column=25)
+    assert outer.return_types == ("registry key",)
+    assert set(outer.platforms) == {"windows"}
+    assert [entry.signature for entry in outer.resolved] == ["keys of <registry key>"]
+
+
+def test_narrowing_follows_the_object_rather_than_the_name() -> None:
+    """The same `keys` written over a json value answers `json key`."""
+    report = analyze('keys of jsons of files "json_example.txt"')
+
+    assert _reference(report, "keys").return_types == ("json key",)
+
+
+def test_a_narrowed_reference_drops_the_unrelated_overload() -> None:
+    """`windows` is both `windows of <operating system>` and `window of <route>`.
+
+    Written over an operating system it is the boolean one. This is the case
+    pinned in the golden payload, where it reported both `boolean` and
+    `integer`.
+    """
+    report = analyze("windows of operating system")
+
+    windows = _reference(report, "windows")
+    assert windows.return_types == ("boolean",)
+    assert [entry.signature for entry in windows.resolved] == ["windows of <operating system>"]
+
+
+def test_an_unresolved_reference_still_reports_everything_known() -> None:
+    """Narrowing to nothing is not the same as knowing nothing.
+
+    `computer name of file "x"` is a real finding -- the property does not
+    exist on a file -- but the report still says what `computer name` *is*,
+    because a name that exists somewhere is more useful to show than a blank.
+    """
+    report = analyze('computer name of file "/etc/hosts"')
+
+    entry = _reference(report, "computer name")
+    assert entry.known
+    assert entry.return_types == ("string",)
+
+
+def test_an_unknown_name_is_unaffected_by_narrowing() -> None:
+    report = analyze('exists nonexistent inspector "x"')
+
+    entry = _reference(report, "nonexistent inspector")
+    assert not entry.known
+    assert entry.return_types == ()
+    assert "nonexistent inspector" in report.unknown_references
+
+
+def test_narrowing_does_not_change_what_visible_here_means() -> None:
+    """`visible` stays a dialect-and-platform fact about the bare match set."""
+    report = analyze(SESSION, Dialect.CLIENT)
+
+    entry = _reference(report, "bes computers")
+    assert entry.known
+    assert not entry.visible
+
+
+# ---------------------------------------------------------------------------
+# A statement using both dialects has no dialect to report
+# ---------------------------------------------------------------------------
+
+
+MIXED = '(exists files of folders "/") AND (exists bes computers)'
+
+
+def test_a_contradicted_classification_is_not_a_finding() -> None:
+    """`assumed` must not stay False when the references refute the classifier.
+
+    `bes computers` is a strong session marker, so the pre-parse text
+    classifier calls this session and never sees the client-only `files` and
+    `folders`. The reference tables do see them, and settle on `UNCERTAIN`:
+    nothing can evaluate this. Analysis still has to pick a dialect to run as,
+    but reporting that pick as a conclusion states a fact that is not one.
+    """
+    report = analyze(MIXED)
+
+    assert report.classified_dialect is Dialect.SESSION
+    assert report.resolved_dialect is Dialect.UNCERTAIN
+    assert report.dialect_assumed
+    assert report.to_dict()["dialect"]["assumed"] is True
+
+
+def test_a_classification_the_references_agree_with_is_still_definite() -> None:
+    report = analyze(SESSION)
+
+    assert report.resolved_dialect is Dialect.SESSION
+    assert not report.dialect_assumed
+
+
+def test_a_forced_dialect_is_never_an_assumption() -> None:
+    """The caller said so; the tables do not get a vote on that."""
+    assert not analyze(MIXED, Dialect.CLIENT).dialect_assumed

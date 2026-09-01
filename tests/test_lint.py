@@ -15,6 +15,7 @@ import re
 from pathlib import Path
 
 import pytest
+from test_examples import corpus_files
 
 from bigfix_relevance_analyzer.analyzer import analyze
 from bigfix_relevance_analyzer.dialect import Dialect
@@ -37,6 +38,7 @@ from bigfix_relevance_analyzer.lint import (
 CLIENT = 'exists file "C:\\foo.txt" whose (size of it > 100)'
 BROKEN = 'exists file "unterminated'
 UNBOUND_IT = "size of it"  # `it` with nothing to bind to
+MIXED_DIALECT = '(exists files of folders "/") AND (exists bes computers)'
 UNKNOWN_INSPECTOR = "totally bogus made up inspector"
 BES_EXAMPLE = Path("tests/examples/mixed_context/task_with_client_and_session_relevance.bes")
 # A real type mismatch, not merely an unbound `it` (which the type checker
@@ -566,6 +568,7 @@ def _every_emitted_code() -> set[str]:
         PLURAL_PREFERRED,
         VERSION_TRUNCATING,
         VERSION_LIKE_STRING,
+        MIXED_DIALECT,
     ):
         for config in (LintConfig(), thresholds):
             emitted.update(finding.code for finding in lint_analysis(analyze(text), config))
@@ -912,3 +915,74 @@ def test_the_version_rules_stay_off_the_safe_shapes() -> None:
         '"2.10.1" > "2.3.3" as version',
     ):
         assert codes(lint_analysis(analyze(text), LintConfig())) == set(), text
+
+
+# ---------------------------------------------------------------------------
+# mixed-dialect
+# ---------------------------------------------------------------------------
+
+
+def _codes(text: str, config: LintConfig | None = None) -> list[str]:
+    return [finding.code for finding in lint_analysis(analyze(text), config or LintConfig())]
+
+
+def test_using_both_dialects_at_once_is_an_error() -> None:
+    """No engine evaluates this: `files` is client-only, `bes computers` is not.
+
+    Client relevance runs on an endpoint and session relevance on the root
+    server, so an expression needing inspectors from both is not a statement
+    either one can be asked. Reported as an error rather than a warning
+    because, unlike an unknown name, this is not a gap in the snapshot -- both
+    halves are in it, and they exclude each other.
+    """
+    findings = lint_analysis(analyze(MIXED_DIALECT), LintConfig())
+
+    mixed = [finding for finding in findings if finding.code == "mixed-dialect"]
+    assert len(mixed) == 1
+    assert mixed[0].severity is Severity.ERROR
+    assert "files" in mixed[0].message
+    assert "bes computers" in mixed[0].message
+
+
+def test_a_single_dialect_statement_is_not_mixed() -> None:
+    assert "mixed-dialect" not in _codes('exists file "C:\\foo.txt"')
+    assert "mixed-dialect" not in _codes("names of bes computers")
+
+
+def test_an_inspector_missing_only_on_this_platform_is_not_mixed() -> None:
+    """`visible` covers dialect and platform; only the dialect axis is this rule."""
+    codes = _codes("exists native registry", LintConfig(platform="macos"))
+
+    assert "mixed-dialect" not in codes
+
+
+def test_an_unknown_name_is_not_a_dialect_conflict() -> None:
+    codes = _codes("totally bogus made up inspector")
+
+    assert "mixed-dialect" not in codes
+    assert "unknown-inspector" in codes
+
+
+def test_mixed_dialect_is_in_the_rule_catalogue() -> None:
+    assert RULES["mixed-dialect"].default_severity is Severity.ERROR
+
+
+def test_no_example_site_is_reported_as_mixed_dialect() -> None:
+    """The false-positive guard, and the reason this rule can be an error.
+
+    The two halves of the evidence are not equally strong: the client dumps are
+    verified complete for the five sampled platforms, while the session surface
+    has never been sampled from the WebUI or the Fixlet Debugger, so a name that
+    looks client-only could in principle exist in an unsampled session context
+    and manufacture a conflict. Across every site in `tests/examples/` it does
+    not happen once. A failure here is a reason to reconsider the rule, not to
+    update the test.
+    """
+    offenders = [
+        str(finding)
+        for path in corpus_files()
+        for finding in lint_file(path, LintConfig())
+        if finding.code == "mixed-dialect"
+    ]
+
+    assert offenders == []
