@@ -9,6 +9,11 @@
   byte-for-byte page comparison in ../parity-test/ would NOT catch, because it
   compares JSON, not DOM.
 -->
+<!-- Intentional exception to the templates' "no network ever" guarantee: the
+     browser fetches this favicon lazily and its absence/failure doesn't
+     affect page function, so it doesn't need to be embedded like everything
+     else on these pages. -->
+<link rel="icon" href="https://www.jgstew.com/images/BigFix/BigFix_logo_DevSiteToOriginal.svg" type="image/svg+xml" />
 <style>
   :root {
     color-scheme: light dark;
