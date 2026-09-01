@@ -906,6 +906,9 @@ class _Checker:
         self.contexts: list[RelevanceValue] = []
         # Reference nodes whose own resolution is not the finding to report.
         self.suppressed: set[int] = set()
+        # Reference nodes written *as* the property of an `of` -- the ones that
+        # named a direct object out loud. See `combine_reference`.
+        self.explicit_objects: set[int] = set()
         # Per-item types, so `item N of (...)` can pick one out after the tuple
         # as a whole has been collapsed to a single value.
         self.tuple_items: dict[int, tuple[RelevanceValue, ...]] = {}
@@ -1110,6 +1113,12 @@ class _Checker:
                 # `first` is typed in. Getting this backwards silently binds the
                 # wrong node in every nested expression. `binding.py` spells out
                 # the same rule for the same reason.
+                if isinstance(node, Of) and isinstance(node.prop, Reference):
+                    # Written with a direct object, which is what stops the
+                    # world fallback in `combine_reference` from rescuing a
+                    # world-only name. Only the property *itself* counts: a
+                    # reference deeper inside the subtree named no object.
+                    self.explicit_objects.add(id(node.prop))
                 if isinstance(node, Of) and self.bad_tuple_index(node) is not None:
                     # `item "a" of (1,2,3)` is one mistake, not two: the tuple
                     # rule is the finding, so the name is not also resolved as
@@ -1254,6 +1263,28 @@ class _Checker:
         `packages ... whose (exists properties whose (...))`, where `properties`
         is the world's. So resolution falls back, and only a name the *world*
         does not define either is a finding.
+
+        That fallback is for an **implicit** context only. A `whose` surrounds a
+        bare reference without claiming the item is what the name belongs to; an
+        `of` says exactly that, out loud, and is wrong when it is not true. The
+        engine draws the same line, and it is the whole difference between two
+        expressions over the same objects::
+
+            number of files whose (exists properties) of folder "/etc"
+                                                          -> A: 58
+            number of files whose (exists properties of it) of folder "/etc"
+                                                          -> E: ... not defined.
+
+        1,372 names resolve as a bare world property on a client and 1,008 of
+        those are world-*only*, so falling back for an explicit object would
+        silently accept any of them written as `<name> of <anything>`.
+        Which reference is which is decided syntactically, at the parent: the
+        `prop` of an `of` named an object, anything else did not. It has to be
+        the node rather than the context stack, because a reference nested
+        inside the property subtree is *not* the one the object was written
+        for -- in `(value of setting "x" of client | "none") of setting "y"`,
+        the innermost context is explicit but `client` is the object of its own
+        inner `of` and still resolves against the world.
         """
         if id(node) in self.suppressed:
             return self.unknown()
@@ -1265,7 +1296,8 @@ class _Checker:
             # about a property of it.
             return self.unknown()
         value = resolve_property(node.phrase, subject, self.env, indexed=node.index is not None)
-        if subject is not None and value.types is not None and not value.types:
+        explicit = id(node) in self.explicit_objects
+        if subject is not None and not explicit and value.types is not None and not value.types:
             world = resolve_property(node.phrase, None, self.env, indexed=node.index is not None)
             if world.types:
                 return world

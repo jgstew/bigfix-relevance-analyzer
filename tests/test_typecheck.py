@@ -48,6 +48,10 @@ def types_of(source: str, env: TypeEnvironment) -> set[str] | None:
     return None if value.types is None else set(value.types)
 
 
+def codes_of(source: str, env: TypeEnvironment) -> list[str]:
+    return [diagnostic.code for diagnostic in check(parse(source), env).diagnostics]
+
+
 # ---------------------------------------------------------------------------
 # Narrowing
 # ---------------------------------------------------------------------------
@@ -1695,3 +1699,84 @@ def test_a_bare_indexable_world_object_is_a_non_unique_risk(
 def test_an_unambiguous_world_object_is_left_alone(source: str, env: TypeEnvironment) -> None:
     codes = [d.code for d in check(parse(source), env).diagnostics]
     assert "singular-over-plural-object" not in codes, codes
+
+
+# ---------------------------------------------------------------------------
+# The world fallback applies to an implicit context, never an explicit object
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        # Three world-only names written against a `file`. The engine refuses
+        # each one: `E: The operator "<name>" is not defined.`
+        pytest.param('action lock state of file "/etc/hosts"', id="action-lock-state"),
+        pytest.param('computer name of file "/etc/hosts"', id="computer-name"),
+        pytest.param('current date of file "/etc/hosts"', id="current-date"),
+        # qna: `number of properties of files of folder "/etc"` -> E: ... not defined.
+        pytest.param('number of properties of files of folder "/etc"', id="of-chain"),
+        # qna: the same, reached through `it` inside a `whose` -- still explicit.
+        pytest.param(
+            'number of files whose (exists properties of it) of folder "/etc"',
+            id="explicit-it-inside-whose",
+        ),
+    ],
+)
+def test_a_property_with_an_explicit_direct_object_does_not_fall_back(
+    source: str, env: TypeEnvironment
+) -> None:
+    """A name the world defines is still not a property *of* the object written.
+
+    The fallback exists for a bare reference inside a `whose`, where the
+    enclosing context supplies a subject the name is not a property of. Written
+    with an explicit `of`, there is no such excuse -- and the engine agrees, so
+    resolving these against the world masks content that cannot run. 1,008
+    names resolve as a world property and nowhere else, so the blast radius is
+    the whole of that set.
+    """
+    assert codes_of(source, env) == ["property-not-defined"]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        # The motivating case for the fallback. qna: A: 58 -- valid relevance.
+        pytest.param(
+            'number of files whose (exists properties) of folder "/etc"',
+            id="bare-reference-in-whose",
+        ),
+        # qna: A: 58. `types of <file>` is defined, so the qualified lookup
+        # answers and the fallback is never reached.
+        pytest.param(
+            'number of files whose (exists types of it) of folder "/etc"',
+            id="resolves-without-the-fallback",
+        ),
+        # No context at all: the world is the only scope there is.
+        pytest.param("properties", id="bare-world-reference"),
+    ],
+)
+def test_an_implicit_filter_context_still_falls_back_to_the_world(
+    source: str, env: TypeEnvironment
+) -> None:
+    """`whose` supplies a subject, not a scope.
+
+    A global name written inside a filter still resolves against the world when
+    the item defines nothing by that name, which is ordinary relevance and the
+    reason the fallback was added. Narrowing it must not reach this shape.
+    """
+    assert codes_of(source, env) == []
+
+
+def test_a_world_only_name_in_a_filter_keeps_the_softer_finding(env: TypeEnvironment) -> None:
+    """The docstring's other example must not be promoted to a hard error.
+
+    `operating system` here is the *object* of its `of`, so it is typed in the
+    enclosing `whose` frame -- an implicit context. It already reports
+    `world-property-not-defined`, the soft finding lint maps to
+    `unknown-inspector`, and it must stay on that code rather than becoming
+    `property-not-defined`.
+    """
+    assert codes_of("files whose (name of it = name of operating system)", env) == [
+        "world-property-not-defined"
+    ]
