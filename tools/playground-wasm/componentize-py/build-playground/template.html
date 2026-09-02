@@ -159,23 +159,15 @@ if (!window.__wasmProblem) {
   // timeout stays for the same reason the Pyodide page has one: a page that
   // sits on "Instantiating..." forever is indistinguishable from a hang, and
   // saying so is better than saying nothing.
-  withTimeout(
-    boot(),
-    90000,
-    "The component did not finish instantiating within 90 seconds. Check the " +
+  runBoot(boot(), {
+    timeoutMs: 90000,
+    timeoutMessage:
+      "The component did not finish instantiating within 90 seconds. Check the " +
       "browser console: a missing or incorrectly shimmed WASI import fails here, and " +
       "wasi:sockets in particular is satisfied by a local stub (see " +
-      "sockets_stub.js) that a preview2-shim upgrade can invalidate."
-  )
-    .then(({ version, totalMs }) => {
-      setStatus(`Ready -- bigfix_relevance_analyzer ${version} (loaded in ${(totalMs / 1000).toFixed(1)}s).`);
-      runEl.disabled = false;
-      run();
-    })
-    .catch((err) => {
-      setStatus("Failed to load the component or the analyzer -- see below.", true);
-      renderError(err);
-    });
+      "sockets_stub.js) that a preview2-shim upgrade can invalidate.",
+    failureMessage: "Failed to load the component or the analyzer -- see below.",
+  });
 }
 </script>
 </body>

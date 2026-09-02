@@ -39,6 +39,22 @@ function setStatus(text, isError) {
   statusEl.classList.toggle("error", Boolean(isError));
 }
 
+// Created here rather than in each template's markup -- one more thing that
+// doesn't need to be kept identical by hand across the two pages.
+//
+// #status gets overwritten immediately by run()'s "Analyzing.../Done." (the
+// page auto-runs the sample statement right after boot), so the version
+// string each boot() reports would otherwise flash for a moment and vanish.
+// This puts it somewhere that doesn't get clobbered -- present for a bug
+// report screenshot, out of the way otherwise.
+const versionEl = document.createElement("footer");
+versionEl.id = "version";
+document.body.appendChild(versionEl);
+
+function setVersion(version) {
+  versionEl.textContent = `bigfix_relevance_analyzer ${version}`;
+}
+
 function el(tag, props, children) {
   const node = document.createElement(tag);
   if (props) {
@@ -275,5 +291,23 @@ function withTimeout(promise, ms, message) {
     timer = setTimeout(() => reject(new Error(message)), ms);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+// Wraps a template's boot() with the timeout and the success/failure handling
+// both templates need identically -- everything runtime-specific is passed in
+// rather than duplicated: what boot() resolves to (`{ version, totalMs }`) and
+// how it fails are the same shape either way, only the wording differs.
+function runBoot(bootPromise, { timeoutMs, timeoutMessage, failureMessage }) {
+  withTimeout(bootPromise, timeoutMs, timeoutMessage)
+    .then(({ version, totalMs }) => {
+      setStatus(`Ready -- bigfix_relevance_analyzer ${version} (loaded in ${(totalMs / 1000).toFixed(1)}s).`);
+      setVersion(version);
+      runEl.disabled = false;
+      run();
+    })
+    .catch((err) => {
+      setStatus(failureMessage, true);
+      renderError(err);
+    });
 }
 </script>

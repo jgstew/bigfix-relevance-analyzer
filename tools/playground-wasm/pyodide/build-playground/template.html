@@ -157,24 +157,16 @@ from bigfix_relevance_analyzer import __version__, analyze_relevance_to_dict
 if (!window.__wasmProblem) {
   // A failed wasm instantiation inside Pyodide's own loader only logs a
   // console warning and never rejects -- this timeout is what surfaces it.
-  withTimeout(
-    boot(),
-    90000,
-    "Pyodide did not finish loading within 90 seconds. A failed WebAssembly " +
+  runBoot(boot(), {
+    timeoutMs: 90000,
+    timeoutMessage:
+      "Pyodide did not finish loading within 90 seconds. A failed WebAssembly " +
       'instantiation inside Pyodide\'s own loader logs a "wasm instantiation ' +
       'failed!" console warning but never raises an error, so this is what a ' +
       "real failure there looks like from here -- check the browser console " +
-      "for that warning to confirm."
-  )
-    .then(({ version, totalMs }) => {
-      setStatus(`Ready -- bigfix_relevance_analyzer ${version} (loaded in ${(totalMs / 1000).toFixed(1)}s).`);
-      runEl.disabled = false;
-      run();
-    })
-    .catch((err) => {
-      setStatus("Failed to load Pyodide or the analyzer -- see below.", true);
-      renderError(err);
-    });
+      "for that warning to confirm.",
+    failureMessage: "Failed to load Pyodide or the analyzer -- see below.",
+  });
 }
 </script>
 </body>
