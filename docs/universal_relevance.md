@@ -116,6 +116,15 @@ applies: **`>=` and `<` match full-precision comparison, `>` and `<=` do not.**
 `=` and `!=` never do, whichever side is longer - which is also what makes `=`
 useful as a deliberate prefix match.
 
+**When the intent was "at least this version," `>=` fixes this specific case
+with no `pad of` needed** - `version of operating system >= version "14"`
+already gives the intended answer here, since `>=` is in the unaffected
+column above. `pad of` is still the fix that generalizes: it's needed for
+`<=`, `=`/`!=`, and any comparison where you can't be sure which side is
+shorter. This is why the linter's `version-truncating-compare` warning
+suggests `>=` specifically for `>`, while still pointing every other affected
+operator at `pad of`.
+
 `pad of` restores the expected ordering by giving both sides the same shape,
 and is the fix regardless of which side is which:
 
