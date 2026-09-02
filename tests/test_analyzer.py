@@ -162,6 +162,30 @@ def test_resolved_dialect_is_none_before_parsing_and_when_nothing_resolves() -> 
     assert analyze("totallymadeupinspectorname").resolved_dialect is None
 
 
+@pytest.mark.parametrize(
+    "text", ['""', "1", '"1.1" as floating point', '"a5" as hexadecimal'], ids=repr
+)
+def test_resolved_dialect_is_both_for_pure_core_syntax(text: str) -> None:
+    """A statement with no inspector references at all -- just literals,
+    casts, operators -- uses none of the vocabulary that tells the two
+    dialects apart, so it is BOTH rather than the unknown-name ``None``.
+
+    Distinct from ``totallymadeupinspectorname`` above: that statement *has*
+    a reference, it just fails to resolve to anything. These have zero
+    references to begin with.
+    """
+    report = analyze(text)
+
+    assert report.parsed
+    assert not report.references
+    assert report.resolved_dialect is Dialect.BOTH
+    # BOTH still does not settle which single dialect this runs as, so it
+    # keeps counting as an assumption -- same as the existing BOTH case in
+    # test_resolved_dialect_is_both_when_every_reference_supports_both.
+    assert report.dialect_assumed
+    assert report.dialect is Dialect.CLIENT
+
+
 def test_forced_dialect_overrides_classification() -> None:
     report = analyze(SESSION, Dialect.CLIENT)
 

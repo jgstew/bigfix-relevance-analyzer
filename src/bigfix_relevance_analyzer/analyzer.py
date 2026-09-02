@@ -271,15 +271,21 @@ class RelevanceAnalysis:
         once. :attr:`~bigfix_relevance_analyzer.dialect.Dialect.BOTH` means
         every resolved reference supports both -- provable here in a way the
         text classifier's own docstring says it cannot be, because a parse
-        tree already exists by this point.
+        tree already exists by this point. A statement with *no* references
+        at all is BOTH for the same reason, vacuously: literals, casts and
+        operators are the universal core of the language, identical on every
+        engine sampled -- see the ``universal-relevance`` reference document
+        -- so there is nothing left in it that could be dialect-specific.
         :attr:`~bigfix_relevance_analyzer.dialect.Dialect.UNCERTAIN` means the
         references contradict each other: some resolve only in client
         relevance, others only in session, so this statement cannot be valid
-        as either. ``None`` means nothing parsed, or nothing resolved to a
-        known name at all.
+        as either. ``None`` means nothing parsed, or the statement has at
+        least one reference and none of them resolved to a known name.
         """
         if self.node is None:
             return None
+        if not self.references:
+            return Dialect.BOTH  # only core syntax used -- no inspectors to disagree
         supported: frozenset[Dialect] | None = None
         for reference in self.references:
             found = reference.dialects
