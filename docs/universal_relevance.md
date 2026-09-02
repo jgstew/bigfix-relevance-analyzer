@@ -76,7 +76,38 @@ and `14 > 14` is false. **A fixlet gating on "newer than 14" therefore matches
 nothing on 14.6.1** - it silently excludes exactly the machines it was written
 for. Nothing errors; the statement is well-typed and answers cleanly.
 
-`pad of` restores the expected ordering by giving both sides the same shape:
+### Not every truncating comparison is wrong
+
+This is easy to overstate, and the overstated version is itself a trap: reading
+only the example above suggests every truncating comparison is suspect, and
+that is not true. Truncation makes the engine treat `1.2.3` and `1.2` as
+**equal**, so it only changes the answer for the operators that turn on
+equality in the direction of the discarded tail. Confirmed exhaustively on a
+live engine (2026-08-31):
+
+| operator | left side longer | right side longer |
+| --- | --- | --- |
+| `>` | **wrong** | safe |
+| `>=` | safe | **wrong** |
+| `<` | safe | **wrong** |
+| `<=` | **wrong** | safe |
+| `=` / `!=` | **wrong** | **wrong** |
+
+The dropped tail can only make its side *larger*, so the side that loses it is
+under-valued, and only a comparison that would flip at equality is affected.
+This is why `version of operating system >= version "5.1"` - the common idiom,
+and the shape this project's own example content uses in three places - is
+perfectly safe, while `version of operating system > version "14"` above is the
+defect: both compare a property of unknown length against a shorter literal,
+and only the direction of the operator decides which one is trustworthy.
+
+In the common shape - a property on the left, compared against a shorter
+literal threshold on the right - the "left side longer" column is the one that
+applies: **`>=` and `<` are safe, `>` and `<=` are not.** `=` and `!=` are
+never safe under truncation, whichever side is longer.
+
+`pad of` restores the expected ordering by giving both sides the same shape,
+and is the fix regardless of which side is which:
 
 ```
 Q: pad of version of operating system > pad of version "14"
