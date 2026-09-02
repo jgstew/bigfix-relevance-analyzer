@@ -1781,12 +1781,13 @@ class _Checker:
         left_types: frozenset[str],
         right_types: frozenset[str],
     ) -> None:
-        """The two version-comparison advisories, both about a *wrong answer*.
+        """The two version-comparison advisories -- gotchas, not defect reports.
 
-        Neither is a type error: the engine accepts these and answers them, so
-        nothing here changes the value this operator returns. They are reported
-        because the answer is not the one the author asked for, which no other
-        check in this module can say.
+        Neither is a type error: the engine accepts these and answers them, on
+        purpose. Truncating equality in particular looks like deliberate design
+        (see below), so someone may be relying on it. What earns the warning is
+        only that the answer commonly differs from what an author who was not
+        relying on it would expect, which no other check in this module can say.
 
         Ordering matters between the two branches. A comparison with a version
         anywhere in it *is* a version comparison -- one `as version` coerces the
@@ -1794,29 +1795,37 @@ class _Checker:
         to be considered first, and the string-compare branch only applies when
         neither side is a version at all.
 
-        **Not every truncating comparison is wrong**, which is what keeps this
-        rule quiet enough to be worth having. Truncation makes the engine treat
-        `1.2.3` and `1.2` as *equal*, so it only changes the answer for the
-        operators that turn on equality in the direction of the discarded tail.
-        Confirmed exhaustively on a live engine (2026-08-31):
+        **Only half the operators are actually affected by truncation**, which is
+        what keeps this rule quiet enough to be worth having. Truncation makes
+        the engine treat `1.2.3` and `1.2` as *equal*, so it only changes the
+        answer for the operators that turn on equality in the direction of the
+        discarded tail. Confirmed exhaustively on a live engine (2026-08-31):
 
-        =============  ===============  ===============
-        operator       left is longer   right is longer
-        =============  ===============  ===============
-        ``>``          **wrong**        safe
-        ``>=``         safe             **wrong**
-        ``<``          safe             **wrong**
-        ``<=``         **wrong**        safe
-        ``=`` / ``!=`` **wrong**        **wrong**
-        =============  ===============  ===============
+        ==============  ==================  ==================
+        operator        left is longer      right is longer
+        ==============  ==================  ==================
+        ``>``           **affected**        unaffected
+        ``>=``          unaffected          **affected**
+        ``<``           unaffected          **affected**
+        ``<=``          **affected**        unaffected
+        ``=`` / ``!=``  **affected**        **affected**
+        ==============  ==================  ==================
+
+        For `=`, being affected reads as deliberate design -- it is what lets
+        `version "1.2.3" = version "1.2"` work as a prefix match, with no
+        separate `starts with`-for-versions operator needed. Applied to the
+        ordering operators the same rule falls out as a side effect, producing
+        an answer that differs from full-precision comparison for exactly half
+        the possible directions. That is a gotcha worth flagging, not proof the
+        engine misbehaves.
 
         The dropped tail can only make its side *larger*, so the side that loses
         it is under-valued, and only a comparison that would flip at equality is
         affected. This is why `version of operating system >= version "5.1"` --
         the shape most real content uses, and three of this repo's own example
-        files -- is left alone, while the verified defect
-        `version of operating system > version "14"` (`False` on a 14.6.1 host)
-        is reported.
+        files -- is left alone, while
+        `version of operating system > version "14"` (`False` on a 14.6.1 host,
+        the case this rule warns on) is reported.
         """
         left_count = _version_components(node.left)
         right_count = _version_components(node.right)
@@ -1845,10 +1854,12 @@ class _Checker:
             else:
                 left_loses = left_count > right_count
 
-            # `=` and `!=` are wrong whichever side is longer: the engine calls
-            # unequal versions equal. `form.operator` is `=` for both, since a
-            # negation keeps the canonical operator. `pad of` is the only fix
-            # here -- there is no single other operator that would do instead.
+            # `=` and `!=` are affected whichever side is longer: the engine calls
+            # unequal versions equal, which is also what makes truncating equality
+            # useful as a deliberate prefix match. `form.operator` is `=` for
+            # both, since a negation keeps the canonical operator. `pad of` is
+            # the only fix here -- there is no single other operator that would
+            # do instead.
             if form.operator == "=":
                 self.report(
                     "version-truncating-compare",
@@ -1861,13 +1872,13 @@ class _Checker:
             # `form.swapped` is what separates `>` from `<` and `>=` from `<=`,
             # since `>` has no row of its own and reduces to a swapped `<`.
             strict = form.operator == "<"
-            broken = (strict == form.swapped) if left_loses else (strict != form.swapped)
-            if broken:
+            affected = (strict == form.swapped) if left_loses else (strict != form.swapped)
+            if affected:
                 # `>` (and its word form `is greater than`) is `form.operator ==
                 # "<"` with `swapped` set -- the one case in this branch with an
                 # obvious, more-common one-operator fix than `pad of`: the
-                # author almost always meant `>=`, the idiom the safe half of
-                # this same table uses. The other three broken spellings
+                # author almost always meant `>=`, the idiom the unaffected half
+                # of this same table uses. The other three affected spellings
                 # (`>=`, `<`, `<=`) keep the general `pad of` suggestion.
                 fix = (
                     "did you mean '>='?"

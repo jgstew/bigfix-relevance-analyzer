@@ -306,9 +306,12 @@ _TYPE_CHECK: Final = [
     ),
     # Version comparison. Both are advisories with the runtime origin, for the
     # same reason `singular-over-plural-object` has it: the statement type-checks
-    # and the engine answers it. What is wrong is the *answer*, so nothing here
-    # may fail a type check. Confirmed on a live client engine and a live session
-    # engine (2026-08-30); `docs/universal_relevance.md` carries the transcripts.
+    # and the engine answers it, on purpose -- truncating equality in particular
+    # looks like deliberate design (see `docs/universal_relevance.md`), not a
+    # bug. What earns the warning is that the answer commonly differs from what
+    # an author who was not relying on it would expect, so nothing here may fail
+    # a type check. Confirmed on a live client engine and a live session engine
+    # (2026-08-30); `docs/universal_relevance.md` carries the transcripts.
     _entry(
         "version-like-string-compare",
         Origin.RUNTIME,

@@ -76,10 +76,10 @@ and `14 > 14` is false. **A fixlet gating on "newer than 14" therefore matches
 nothing on 14.6.1** - it silently excludes exactly the machines it was written
 for. Nothing errors; the statement is well-typed and answers cleanly.
 
-### Not every truncating comparison is wrong
+### Only half the operators are affected by truncation - and `=` looks deliberate
 
 This is easy to overstate, and the overstated version is itself a trap: reading
-only the example above suggests every truncating comparison is suspect, and
+only the example above suggests every truncating comparison misbehaves, and
 that is not true. Truncation makes the engine treat `1.2.3` and `1.2` as
 **equal**, so it only changes the answer for the operators that turn on
 equality in the direction of the discarded tail. Confirmed exhaustively on a
@@ -87,24 +87,34 @@ live engine (2026-08-31):
 
 | operator | left side longer | right side longer |
 | --- | --- | --- |
-| `>` | **wrong** | safe |
-| `>=` | safe | **wrong** |
-| `<` | safe | **wrong** |
-| `<=` | **wrong** | safe |
-| `=` / `!=` | **wrong** | **wrong** |
+| `>` | **affected** | unaffected |
+| `>=` | unaffected | **affected** |
+| `<` | unaffected | **affected** |
+| `<=` | **affected** | unaffected |
+| `=` / `!=` | **affected** | **affected** |
+
+**This is a gotcha to watch for, not a claim that the engine is buggy.** For
+`=`, truncating to the shorter operand's length reads as deliberate design: it
+is what lets `version "1.2.3" = version "1.2"` work as a prefix match with no
+separate `starts with`-for-versions operator needed. Applied to the ordering
+operators, the same rule falls out as a side effect and produces an answer that
+differs from full-precision comparison for exactly half the possible
+directions - worth knowing whether you are relying on it on purpose or not.
 
 The dropped tail can only make its side *larger*, so the side that loses it is
 under-valued, and only a comparison that would flip at equality is affected.
 This is why `version of operating system >= version "5.1"` - the common idiom,
-and the shape this project's own example content uses in three places - is
-perfectly safe, while `version of operating system > version "14"` above is the
-defect: both compare a property of unknown length against a shorter literal,
-and only the direction of the operator decides which one is trustworthy.
+and the shape this project's own example content uses in three places - behaves
+exactly as expected, while `version of operating system > version "14"` above
+is the gotcha case: both compare a property of unknown length against a shorter
+literal, and only the direction of the operator decides whether truncation
+changes the answer.
 
 In the common shape - a property on the left, compared against a shorter
 literal threshold on the right - the "left side longer" column is the one that
-applies: **`>=` and `<` are safe, `>` and `<=` are not.** `=` and `!=` are
-never safe under truncation, whichever side is longer.
+applies: **`>=` and `<` match full-precision comparison, `>` and `<=` do not.**
+`=` and `!=` never do, whichever side is longer - which is also what makes `=`
+useful as a deliberate prefix match.
 
 `pad of` restores the expected ordering by giving both sides the same shape,
 and is the fix regardless of which side is which:
@@ -167,7 +177,7 @@ correct comparison of unknown-shaped versions needs `pad of` regardless.
 
 `pad of` widens components; it does not compare as a decimal number. Both
 engines order `pad of version "1.2.3"` below `pad of version "1.2.10"`, which
-is what you want and what a naive `as string` compare gets wrong.
+is what you want, and what a naive `as string` compare would get backwards.
 
 ## Equality is type-strict
 

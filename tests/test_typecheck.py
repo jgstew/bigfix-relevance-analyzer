@@ -1711,8 +1711,11 @@ def test_a_wide_expression_does_not_exhaust_the_python_stack(env: TypeEnvironmen
 # Both rules below encode behaviour confirmed against a live client engine and
 # a live session engine (2026-08-30), recorded with the transcripts in
 # `docs/universal_relevance.md`. They are the only checks here that fire on
-# relevance the engine accepts and answers: the statement is well-typed, and the
-# answer is simply wrong. That is why they are worth a warning at all.
+# relevance the engine accepts and answers, on purpose: the statement is
+# well-typed, and the engine is not misbehaving -- truncating equality in
+# particular looks like deliberate design. What earns the warning is that the
+# answer commonly differs from what an author who was not relying on it would
+# expect.
 
 
 @pytest.mark.parametrize(
@@ -1725,7 +1728,7 @@ def test_a_wide_expression_does_not_exhaust_the_python_stack(env: TypeEnvironmen
         pytest.param('"1.2" = "1.2.3"', "version-like-string-compare", id="bare-strings-equality"),
         # Truncation makes the engine call unequal versions equal, so only the
         # operators that flip at equality in the direction of the dropped tail
-        # are wrong. Every expectation below was read off a live engine.
+        # are affected. Every expectation below was read off a live engine.
         # Left side longer -- `>` and `<=` break.
         pytest.param(
             'version "1.2.3" > version "1.2"',
@@ -1748,7 +1751,7 @@ def test_a_wide_expression_does_not_exhaust_the_python_stack(env: TypeEnvironmen
             "version-truncating-compare",
             id="right-longer-lt",
         ),
-        # Equality is wrong whichever side is longer.
+        # Equality is affected whichever side is longer.
         pytest.param(
             'version "1.2.3" = version "1.2"',
             "version-truncating-compare",
@@ -1759,7 +1762,7 @@ def test_a_wide_expression_does_not_exhaust_the_python_stack(env: TypeEnvironmen
             "version-truncating-compare",
             id="inequality",
         ),
-        # The verified real-world defect: `False` on a 14.6.1 host, where the
+        # The verified real-world gotcha: `False` on a 14.6.1 host, where the
         # author asked for "newer than 14". The property's count is unknown and
         # is taken to be the longer side.
         pytest.param(

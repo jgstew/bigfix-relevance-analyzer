@@ -409,16 +409,18 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "a version comparison that truncates to the shorter operand's components",
                 "A version comparison only compares as many components as the *shorter* "
                 'side has, so the engine calls `version "1.2.3"` and `version "1.2"` '
-                "equal. That is harmless for half the operators and silently wrong for "
-                "the other half: on a 14.6.1 host, `version of operating system > version "
-                '"14"` answers `False`, so a fixlet gating on "newer than 14" excludes '
-                "exactly the machines it was written for -- without erroring, which is "
-                "why nothing downstream notices. Only the operators that flip at "
-                "equality in the direction of the dropped tail are reported, so the "
-                'common and correct `>= version "5.1"` idiom is left alone. The fix is '
-                "`pad of` on both sides, which is defined in every captured source. A "
-                "warning rather than an error because the statement is well-formed and "
-                "the author may have meant a prefix match.",
+                "equal -- deliberate engine behavior, and the reason a truncating `=` "
+                "works as a prefix match. Applied to the ordering operators it is "
+                "harmless for half of them and a gotcha for the other half: on a 14.6.1 "
+                'host, `version of operating system > version "14"` answers `False`, so '
+                'a fixlet gating on "newer than 14" excludes exactly the machines it was '
+                "written for -- without erroring, which is why nothing downstream "
+                "notices. Only the operators that flip at equality in the direction of "
+                "the dropped tail are reported, so the common and correct `>= version "
+                '"5.1"` idiom is left alone. The fix is `pad of` on both sides, which is '
+                "defined in every captured source. A warning, not an error, both "
+                "because the statement is well-formed and because the truncating "
+                "behavior is sometimes exactly what the author wanted.",
             ),
             _rule(
                 "version-like-string-compare",

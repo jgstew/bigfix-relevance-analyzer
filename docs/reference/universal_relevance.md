@@ -10,8 +10,10 @@ grammar is not what goes wrong.
 
 ## Version comparison has two silent traps
 
-The highest-consequence facts in the language, because each produces a **wrong
-answer** rather than an error.
+The highest-consequence facts in the language, because each answers silently
+rather than erroring. Truncation in particular looks like deliberate design
+for `=` -- see below -- so this is a gotcha to know about, not proof the engine
+is misbehaving.
 
 ### Comparison truncates to the shorter operand's component count
 

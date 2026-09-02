@@ -54,9 +54,11 @@ NON_UNIQUE_RISK = "free space of drives of system folders"
 # A `whose` on a singular spelling that cannot collapse -- the index makes it
 # unique -- so only the style rule has anything to say about it.
 PLURAL_PREFERRED = 'pathname of file "x.bes" whose (size of it > 1) of folder "c:\\"'
-# Two version-comparison defects, both read off a live engine. The engine
-# answers each cleanly and the answer is wrong, which is why they are warnings
-# on well-typed relevance rather than type errors.
+# Two version-comparison gotchas, both read off a live engine. The engine
+# answers each cleanly and on purpose -- truncating equality in particular is
+# deliberate design, not a bug -- but the answer commonly differs from what an
+# author who was not relying on it would expect, which is why they are
+# warnings on well-typed relevance rather than type errors.
 VERSION_TRUNCATING = 'version of operating system > version "14"'
 VERSION_LIKE_STRING = '"2.10.1" > "2.3.3"'
 
@@ -880,8 +882,9 @@ def test_the_version_rules_warn_rather_than_error() -> None:
     """Both fire on relevance that parses and type-checks, so neither may fail it.
 
     The engine accepts `version of operating system > version "14"` and answers
-    `False` on a 14.6.1 host. Nothing is malformed; the author asked the wrong
-    question. That makes these warnings by default -- an adopting repo can
+    `False` on a 14.6.1 host. Nothing is malformed, and the engine is not
+    misbehaving -- the author most likely just did not expect the answer.
+    That makes these warnings by default -- an adopting repo can
     ratchet them to errors, which is the point of the severity being
     configurable, but shipping them as errors would break every build that has
     one of these in a file nobody is touching.
@@ -901,7 +904,7 @@ def test_the_version_rules_warn_rather_than_error() -> None:
 def test_the_version_rules_stay_off_the_safe_shapes() -> None:
     """The shapes real content actually uses, including this repo's own examples.
 
-    `>=` against a shorter threshold is the common idiom and is *not* wrong --
+    `>=` against a shorter threshold is the common idiom and is *not* affected --
     truncation only changes the answer for the operators that flip at equality
     in the direction of the dropped tail. Three of this package's own example
     files use this shape, so a rule that flagged it would have been noise on its
