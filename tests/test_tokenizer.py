@@ -96,8 +96,11 @@ def test_non_ascii_lexes_as_a_word_not_an_error() -> None:
     assert code('"a\u00e9b"') == [(STRING, '"a\u00e9b"')]
 
 
-def test_floating_point_literal_is_one_number() -> None:
-    assert code("1.5") == [(NUMBER, "1.5")]
+def test_decimal_point_is_not_part_of_a_number() -> None:
+    """Relevance has no decimal-point numeral syntax -- confirmed live on both
+    engines, `1.5` draws the identical lexical complaint a stray `#` would.
+    `.` lexes as its own ERROR token rather than joining either digit run."""
+    assert code("1.5") == [(NUMBER, "1"), (ERROR, "."), (NUMBER, "5")]
 
 
 def test_hex_looking_text_is_not_a_hex_literal() -> None:
@@ -105,9 +108,10 @@ def test_hex_looking_text_is_not_a_hex_literal() -> None:
     assert code("0x1F") == [(NUMBER, "0"), (WORD, "x1F")]
 
 
-def test_number_followed_by_trailing_dot() -> None:
-    """A `.` with no digit after it is not part of the number."""
-    assert code("1.") == [(NUMBER, "1"), (WORD, ".")]
+def test_trailing_dot_is_its_own_error_token() -> None:
+    """A `.` with no digit after it is still not part of anything else --
+    not the number to its left, and not swept into a word."""
+    assert code("1.") == [(NUMBER, "1"), (ERROR, ".")]
 
 
 # ---------------------------------------------------------------------------

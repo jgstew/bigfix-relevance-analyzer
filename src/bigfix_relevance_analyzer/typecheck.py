@@ -2086,5 +2086,8 @@ class _Checker:
 _NUMBER_TYPES = {
     NumberKind.INTEGER: "integer",
     NumberKind.LARGE_INTEGER: "large integer",
+    # Unreachable from any tokenized `NumberLiteral` -- relevance has no
+    # decimal-point numeral syntax, so `kind` can no longer return this. Kept
+    # so the mapping stays total over every `NumberKind`; see its docstring.
     NumberKind.NOT_AN_INTEGER: "floating point",
 }

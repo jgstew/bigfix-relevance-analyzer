@@ -3,10 +3,10 @@
 ----
 (num "42")
 
-==== a decimal literal keeps its verbatim text
+==== a decimal point is not valid outside a string -- confirmed live, both engines
 1.5
 ----
-(num "1.5")
+ERROR line 1 column 2
 
 ==== a string literal, quotes stripped in the s-expression only
 "abc"

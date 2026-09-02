@@ -47,10 +47,13 @@ def test_a_number_parses_to_a_number_literal_with_verbatim_text() -> None:
     assert node.text == "42"
 
 
-def test_a_decimal_number_keeps_its_text_undamaged() -> None:
-    node = parse("1.5")
-    assert isinstance(node, NumberLiteral)
-    assert node.text == "1.5"
+def test_a_decimal_point_is_a_parse_error_not_a_number() -> None:
+    """Relevance has no decimal-point numeral syntax; see
+    ``test_tokenizer.test_decimal_point_is_not_part_of_a_number``. `1.5` lexes
+    as `1`, an ERROR token for `.`, then `5` -- fatal to the parser at the
+    ERROR token, same as any other unlexable character."""
+    with pytest.raises(ParseError, match=r"unexpected character '\.'"):
+        parse("1.5")
 
 
 def test_a_string_literal_keeps_its_quotes_and_escapes() -> None:
@@ -439,8 +442,6 @@ def test_to_mermaid_also_survives_the_deepest_accepted_tree() -> None:
         (str(MAX_LARGE_INTEGER), NumberKind.LARGE_INTEGER),
         (str(MAX_LARGE_INTEGER + 1), NumberKind.CONSTANT_TOO_LARGE),
         ("99999999999999999999999999999999999999999", NumberKind.CONSTANT_TOO_LARGE),
-        ("1.5", NumberKind.NOT_AN_INTEGER),
-        ("0.0", NumberKind.NOT_AN_INTEGER),
     ],
 )
 def test_numerals_are_classified_by_magnitude(source: str, expected: NumberKind) -> None:
@@ -450,6 +451,19 @@ def test_numerals_are_classified_by_magnitude(source: str, expected: NumberKind)
     node = parse(source)
     assert isinstance(node, NumberLiteral)
     assert node.kind is expected
+
+
+def test_not_an_integer_is_not_reachable_via_parsing() -> None:
+    """`NumberKind.NOT_AN_INTEGER` cannot come from `parse` any more --
+    relevance has no decimal-point numeral syntax, so the tokenizer never
+    hands the parser a NUMBER token containing `.` (see
+    ``test_tokenizer.test_decimal_point_is_not_part_of_a_number``). The
+    :meth:`NumberLiteral.kind` branch it names is still real, though, for a
+    :class:`NumberLiteral` built directly rather than parsed -- covered here
+    so the enum member does not silently rot."""
+    node = NumberLiteral(span=parse("1").span, text="1.5")
+    assert node.kind is NumberKind.NOT_AN_INTEGER
+    assert not node.is_integer_literal
 
 
 def test_a_negative_literal_is_a_unary_operator_over_a_positive_one() -> None:

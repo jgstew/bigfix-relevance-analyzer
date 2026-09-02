@@ -21,6 +21,13 @@ The practical consequence when writing: **parenthesize anything that could
 split two ways.** You cannot rely on a keyword being unambiguous, because it
 is not a keyword.
 
+`true` and `false` are the same story from the other direction: they read
+like boolean literals but are not special-cased grammar at all - they are
+ordinary zero-argument inspectors (`true: boolean`, `false: boolean` in the
+property tables), present identically in both dialects. Nothing stops a
+platform from not defining them, in principle; nothing in the sampled dumps
+suggests one doesn't.
+
 ## `of` chains read right to left
 
 `a of b of c` means `a of (b of c)` - `of` is right-associative. Evaluation
@@ -119,6 +126,11 @@ both engines; see
 `<value> as <type>` converts. These are ordinary, not exotic: `it as string`,
 `it as lowercase`, `it as trimmed string`, `it as integer`, `it as hexadecimal`
 appear throughout real content, and they chain - `it as string as lowercase`.
+
+`it as hexadecimal` is worth a second look before copying: it **encodes**
+`it`'s own bytes to a hex string, whatever `it` is - it does not parse a hex
+*string* back into the number it names. See the transcript in
+[`universal_relevance.md`](universal_relevance.md#as-hexadecimal-encodes-it-does-not-decode-a-hex-string).
 
 A cast that cannot succeed is an error, not a null; see error fallback below.
 
@@ -219,6 +231,48 @@ is a backslash followed by `x`, which is why Windows paths are written plainly:
 This is the part of relevance syntax most often written wrongly by anyone
 carrying habits over from C-like languages.
 
+## Number literals
+
+A run of digits, nothing else - `42`, `340282366920938463463374607431768211455`.
+Magnitude is free to write, but the engine settles a numeral's type from its
+size while parsing, in three tiers:
+
+| Up to | Type | |
+| --- | --- | --- |
+| `2^63 - 1` | `integer` | [INFER] read off the type table's reported size, not yet confirmed live |
+| `2^128 - 1` | `large integer` | confirmed live - still a real, usable literal everywhere, bare or in arithmetic |
+| beyond that | rejected outright | confirmed live - `An integer constant was too large.`, wherever the literal appears |
+
+See `nodes.MAX_INTEGER` / `nodes.MAX_LARGE_INTEGER` for the exact boundaries and
+how each was established.
+
+**There is no decimal-point numeral syntax at all.** `.` is not a legal
+character in relevance source outside a string literal - not as a decimal
+point, not anywhere. Verified live 2026-09-01 (client QnA, macOS 14.6.1;
+session `bf160001489`): every one of these draws the identical lexical error,
+`This expression contained a character which is not allowed.`, regardless of
+position or spacing:
+
+```
+1.5        3.0        1.        .5        1 . 5        1.2.3        (1).(5)
+```
+
+The only way to a `floating point` value is a cast - from a string literal, or
+from an ordinary numeric expression, which is computed in floating point
+rather than reinterpreting an already-truncated integer result:
+
+```
+1/2                           -> 0        (integer division)
+"1.5" as floating point      -> 1.5
+1/2 as floating point         -> 0.5
+```
+
+There is no hexadecimal literal syntax either: `0x1F` lexes as the number `0`
+followed by the word `x1F` - two tokens, not one. `hexadecimal` only ever
+appears as a cast target or as its own decode inspector, and the two are easy
+to reach for backwards; see the transcript in
+[`universal_relevance.md`](universal_relevance.md#as-hexadecimal-encodes-it-does-not-decode-a-hex-string).
+
 ## Comments
 
 `/* ... */`, and they do not nest - a comment ends at the first `*/`. There is
@@ -285,7 +339,10 @@ type-checks: the grammar is not what went wrong.
 
 ## Version literals have three spellings
 
-All three produce a `version`, and the choice is stylistic:
+All three are quoted - the dots inside `"1.2.3"` are text, not the illegal
+bare-numeral punctuation the [Number literals](#number-literals) section
+above rules out; a version literal is never written unquoted. All three
+produce a `version`, and the choice is stylistic:
 
 ```
 version "1.2.3"

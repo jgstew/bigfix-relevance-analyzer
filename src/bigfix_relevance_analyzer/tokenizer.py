@@ -179,11 +179,24 @@ GRAMMAR_WORDS: frozenset[str] = frozenset(
 )
 
 # Characters that can never appear in a word: whitespace, the string delimiter,
-# every punctuation character, and `!`, which only ever participates in `!=`.
-_NOT_WORD_CHARS = frozenset('"!') | {char for lexeme in PUNCTUATION for char in lexeme}
+# every punctuation character, `!` (only ever participates in `!=`), and `.`.
+# `.` is not sugar for anything and does not combine with a digit run either --
+# confirmed live on both engines, `1.5`, `1.`, `.5` and even `1 . 5` all draw the
+# identical lexical complaint `This expression contained a character which is
+# not allowed.`, regardless of position or spacing. So it is excluded from
+# words too, rather than left to fall into one by the complement rule below --
+# a WORD swallowing it would hide the bad character inside a token that looks
+# fine instead of surfacing it as the single-character ERROR the engine's own
+# message describes.
+_NOT_WORD_CHARS = frozenset('"!.') | {char for lexeme in PUNCTUATION for char in lexeme}
 
 _WHITESPACE_RE = re.compile(r"\s+")
-_NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
+# Integers only -- relevance has no decimal-point numeral syntax at all; see
+# `_NOT_WORD_CHARS` above. A `floating point` value exists only as a cast
+# result (`"1.5" as floating point`, `1/2 as floating point`), never as
+# something written directly. `NumberKind.NOT_AN_INTEGER` in `nodes.py`
+# documents the consequence for `NumberLiteral.kind`.
+_NUMBER_RE = re.compile(r"\d+")
 # The complement approach: a word is any run of characters nothing else claims,
 # so underscores, dots and non-ASCII letters stay inside one token instead of
 # fragmenting into errors.

@@ -154,6 +154,63 @@ types*". Cast one side.
 
 Contrast the version case above: `version` is the exception, not the pattern.
 
+## There is no decimal-point numeral syntax
+
+Confirmed live 2026-09-01 (client QnA, macOS 14.6.1; session `bf160001489`),
+not 2026-08-30/31 like the rest of this document. `.` is not a legal character
+in relevance source outside a string literal - not as a decimal point, in any
+position, with or without surrounding spaces:
+
+```
+Q: 1.5     E: This expression contained a character which is not allowed.
+Q: 1.      E: This expression contained a character which is not allowed.
+Q: .5      E: This expression contained a character which is not allowed.
+Q: 1 . 5   E: This expression contained a character which is not allowed.
+Q: 1.2.3   E: This expression contained a character which is not allowed.
+```
+
+Identical wording to a stray `#` or `@` - this is the lexer rejecting a
+character outright, the same failure mode as any other unlexable input, not a
+type or magnitude complaint about a numeral it otherwise accepts (contrast
+`An integer constant was too large.`, which *is* magnitude-shaped and named
+differently). `item 1.5 of (1, 2)` fails the same way, at the same character,
+whether or not the position looks like an index.
+
+The only way to a `floating point` value is a cast - of a string literal, or
+of an ordinary integer expression, which is computed in floating point rather
+than reinterpreting an already-truncated integer result:
+
+```
+Q: 1/2                          A: 0            (integer division)
+Q: "1.5" as floating point      A: 1.5
+Q: 1/2 as floating point        A: 0.5
+```
+
+This is a grammar fact rather than an evaluator quirk - see [`syntax.md`
+`Number literals`](syntax.md#number-literals) - but it earns a transcript here
+too because it is easy to assume otherwise from casts alone ever producing a
+`floating point` value.
+
+## `as hexadecimal` encodes; it does not decode a hex string
+
+Confirmed live 2026-09-01, both engines. The name reads like a parse, and
+`as hexadecimal` never parses - it always *encodes* the operand's own bytes to
+a hex string, whatever type the operand is:
+
+```
+Q: 165 as hexadecimal            A: a5      (an integer's hex string)
+Q: "a5" as hexadecimal           A: 6135    (the STRING's own bytes, hex-encoded:
+                                              'a' = 0x61, '5' = 0x35)
+Q: hexadecimal integer "a5"      A: 165     (the actual hex-string decode)
+```
+
+`"a5" as hexadecimal` looks like it should undo `165 as hexadecimal` and does
+not - a string operand is encoded exactly like any other, character by
+character, never interpreted as hex digits first. `hexadecimal integer`
+(`hexadecimal large integer`, `hexadecimal uinteger` for the wider types) is
+the decode, and it is a distinct inspector, not a cast - `as` never decodes
+here in either direction.
+
 ## `and` and `or` short-circuit strictly left to right
 
 They short-circuit, and the direction is fixed:

@@ -462,7 +462,9 @@ def test_the_corpus_really_does_contain_platform_divergent_branches() -> None:
     [
         ("42", {"integer"}),
         ("99999999999999999999999", {"large integer"}),
-        ("1.5", {"floating point"}),
+        # No decimal-point numeral syntax exists to type directly -- a
+        # `floating point` value only ever comes from a cast.
+        ('"1.5" as floating point', {"floating point"}),
         ('"a"', {"string"}),
         ("1 + 2", {"integer"}),
         ('"a" & "b"', {"string"}),

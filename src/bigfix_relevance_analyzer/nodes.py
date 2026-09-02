@@ -114,8 +114,18 @@ class NumberKind(enum.Enum):
     :attr:`LARGE_INTEGER` and :attr:`NOT_AN_INTEGER`."""
 
     NOT_AN_INTEGER = "not an integer"
-    """Not whole -- a decimal literal, which the engine types as
-    ``floating point``. Named ``NoInteger`` in the engine."""
+    """Named ``NoInteger`` in the engine, and real as a *value* type --
+    ``floating point`` is what a cast like ``"1.5" as floating point`` or
+    ``1/2 as floating point`` produces. It is not reachable here, though:
+    confirmed live on both engines, relevance has no decimal-point numeral
+    syntax at all -- ``1.5``, ``1.``, ``.5`` and ``1 . 3`` are all a lexical
+    error (`` "This expression contained a character which is not allowed."
+    ``), not a numeral this package's own tokenizer would ever hand a
+    :class:`NumberLiteral` -- see ``tokenizer._NOT_WORD_CHARS``. Kept for the
+    :class:`NumberKind` enumeration's own completeness against the engine's
+    three numeral node classes; :meth:`NumberLiteral.kind` only reaches it
+    through the defensive ``not text.isdigit()`` branch, which no tokenized
+    input can trigger any more."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,7 +147,11 @@ class Span:
 
 @dataclass(frozen=True, slots=True)
 class NumberLiteral:
-    """A numeric literal, kept verbatim: ``42``, ``1.5``."""
+    """A numeric literal, kept verbatim: ``42``, ``99999999999999999999``.
+
+    Always a run of digits -- the tokenizer has no decimal-point numeral
+    syntax, so ``text`` can never contain ``.``; see :attr:`NumberKind.
+    NOT_AN_INTEGER`."""
 
     span: Span
     text: str
@@ -150,7 +164,7 @@ class NumberLiteral:
         what was written. Literals are never negative here -- ``-1`` parses as
         :class:`Unary` over ``1`` -- so the sign plays no part.
         """
-        if not self.text.isdigit():
+        if not self.text.isdigit():  # defensive: not reachable via the tokenizer/parser
             return NumberKind.NOT_AN_INTEGER
         value = int(self.text)
         if value > MAX_LARGE_INTEGER:

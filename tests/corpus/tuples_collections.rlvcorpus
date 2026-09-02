@@ -75,10 +75,10 @@ items of folder "c:\temp"
 ----
 (of (ref "items") (ref "folder" (str "c:\\temp")))
 
-==== [unverified] a non-integer index is not a tuple index
+==== a decimal-point index is not writable -- there is no such numeral syntax
 item 1.5 of (1, 2)
 ----
-(of (ref "item" (num "1.5")) (tuple (num "1") (num "2")))
+ERROR line 1 column 7
 
 ==== the error fallback is its own node, not a binary operator
 size of file "c:\nope.txt" | 42
