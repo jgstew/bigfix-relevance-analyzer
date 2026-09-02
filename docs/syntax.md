@@ -77,6 +77,39 @@ The object decides only where the property has no name of its own to speak
 with - a cast, a nested `of`. `(it as string) of files of folder "c:\"` is
 plural off a singular `it`.
 
+**`whose` is transparent to this.** `X whose (P)` keeps whichever spelling of
+`X` was written, filter or no filter - it is not made plural by having a
+predicate at all:
+
+```
+Q: (line whose (it contains "...") of file "...") as string contains "..."
+A: True
+Q: (line whose (it contains "...") of file "...") as string      -- filter matches several lines
+A: True
+E: Singular expression refers to non-unique object.
+Q: (lines whose (it contains "...") of file "...") as string contains "..."
+E: A singular expression is required.
+```
+
+Singular stays a runtime risk, exactly as the bare `name of files ...` case
+above; plural is a static error in the same position. The empty-match case is
+the mirror image and uses the *other* runtime message:
+
+```
+Q: (line whose (it contains "<nothing matches>") of file "...") as string
+E: Singular expression refers to nonexistent object.
+Q: number of (lines whose (it contains "<nothing matches>") of file "...")
+A: 0
+```
+
+Practically: filtering does not make a singular spelling safe, and it does not
+make it more dangerous than the bare form either - `key whose (...) of key
+"HKLM\SOFTWARE" of registry` carries the same risk as `key of key
+"HKLM\SOFTWARE" of registry`, no more. The safer habit either way is to stay
+plural for as long as the chain runs, filtering the plural spelling, and
+collapse once at the very end - with a plain index if one match is guaranteed,
+or with the aggregate `unique value of` below if it is not.
+
 Four other constructs turn a plural into something singular:
 
 - `exists <plural>` - a boolean: did it produce anything at all.

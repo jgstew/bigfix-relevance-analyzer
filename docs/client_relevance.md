@@ -73,6 +73,26 @@ Three inspectors that look session-only but are macOS **client** inspectors:
   recursion in a `<Relevance>` element are the classic causes of client CPU
   complaints - see the cost table below.
 
+## What each slot requires
+
+Not every surface in the table above accepts anything that types and parses.
+
+- **A `<Relevance>` element must be a singular boolean.** It decides
+  applicability; a clause that types as a string, or as a plural, is content
+  that can never apply anywhere, on any endpoint.
+- **An ActionScript `{...}` substitution must be singular.** One hole, one
+  value - a plural value has no single answer to put in it, the same
+  non-unique-object risk as anywhere else a plural meets a singular slot, only
+  here there is no fallback position to retreat to. A boolean is fine and
+  coerces to a string, which shipped content relies on heavily.
+
+The type requirement is the part still open. QnA is not the authority for it:
+it prints a plural cheerfully (one `A:` line per value), because printing and
+substituting are different operations, and only the second is the one that
+actually has one hole to fill. Confirming exactly which types beyond `string`
+and `boolean` a substitution accepts needs a real ActionScript run, not an
+evaluation - unverified here.
+
 ## Where to read more
 
 The full inspector reference is at
