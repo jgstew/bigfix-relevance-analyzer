@@ -844,12 +844,12 @@ def test_inspector_contexts_depends_on_kind_not_only_on_sources() -> None:
     row's answer, silently reporting a property as available in contexts that
     never sampled it.
     """
-    common = dict(
-        sources=frozenset({"session:rest_api"}),
-        signature="<x> as y",
-        name="y",
-        return_type="y",
-    )
+    common = {
+        "sources": frozenset({"session:rest_api"}),
+        "signature": "<x> as y",
+        "name": "y",
+        "return_type": "y",
+    }
     as_property = Inspector(kind=InspectorKind.PROPERTY, **common)  # type: ignore[arg-type]
     as_cast = Inspector(kind=InspectorKind.CAST, **common)  # type: ignore[arg-type]
 

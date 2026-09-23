@@ -3,7 +3,7 @@
 Not shipped, not imported by the package, not collected by pytest (`testpaths`
 is `tests`). Scripts a human runs by hand, like the generators beside them.
 
-## `parity.py` — the equivalence gate
+## `parity.py` - the equivalence gate
 
 Optimising this package is supposed to be invisible. This is how that gets
 checked: two implementations are run over every relevance statement available
@@ -19,14 +19,14 @@ python tools/perf/parity.py --arm parse --extra-corpus ../bigfix-content
 
 Arms are `analyze`, `parse` and `tokenize`. `--extra-corpus` is opt-in and no
 test passes it, because the committed suite has to run on a machine without
-that checkout — but for anything touching the lexer or the parser it is worth
+that checkout - but for anything touching the lexer or the parser it is worth
 the ten seconds. It found nothing the small corpus missed, so far; the point is
 that a 145x wider net is cheap.
 
 `CANDIDATES` is empty on `main`. While an optimisation is in flight, keep the
 old implementation beside the new one as a `_legacy` twin and register the pair
 there; delete both when it lands. With nothing registered the script compares
-an arm with itself, which is still a real check — it exercises the corpus and
+an arm with itself, which is still a real check - it exercises the corpus and
 each arm's internal assertions, including the tokenizer's roundtrip guarantee,
 which no cross-arm comparison could catch because both arms would share the
 bug.
@@ -39,7 +39,7 @@ throwaway `python -c` settled each one, and a harness would have been more code
 than the changes it graded.
 
 If something ever lands close to the noise floor, the three things worth
-building — and not more — are paired A/B interleaving in one process (separate
+building - and not more - are paired A/B interleaving in one process (separate
 runs drift by more than the effects being chased), an A/A calibration to
 establish what the floor actually is, and a replication requirement. Anything
 smaller than the A/A floor is not a result. Pin the interpreter in whatever you
