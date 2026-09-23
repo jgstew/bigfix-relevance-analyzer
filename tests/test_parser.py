@@ -9,6 +9,8 @@ re-pinned here.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import pytest
 
 from bigfix_relevance_analyzer import inspectors
@@ -35,6 +37,7 @@ from bigfix_relevance_analyzer.parser import (
     parse,
     try_parse,
 )
+from bigfix_relevance_analyzer.tokenizer import code_tokens
 
 # ---------------------------------------------------------------------------
 # Literals and the trivial operands
@@ -509,7 +512,7 @@ def test_a_name_colliding_with_an_operator_binds_to_a_real_inspector() -> None:
 def test_match_word_infix_does_not_consume_on_a_partial_match() -> None:
     """`phrase_ends_here` asks the trie a question and then may decline to act
     on the answer, so the matcher has to be free of side effects."""
-    parser = _Parser("does not start of it")
+    parser = _Parser(text := "does not start of it", tuple(code_tokens(text)))
     before = parser.at
     assert parser.match_word_infix() is None
     assert parser.at == before
@@ -596,3 +599,28 @@ def test_the_specialised_forms_keep_the_span_of_the_whole_expression() -> None:
     for source in ("number of processors", "item 0 of (1, 2)", "1 | 2"):
         node = parse(source)
         assert (node.span.start, node.span.end) == (0, len(source)), source
+
+
+def test_parse_does_not_build_the_trivia_it_will_not_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sharing a lex with `analyze` must not make a standalone parse slower.
+
+    `analyze` needs the full stream, trivia included, for
+    `RelevanceAnalysis.tokens`; the parser never looks at a whitespace token.
+    Handing the parser the shared `_Lexed` regressed `parse` by ~20%, because
+    it then paid to build tokens it immediately ignored. The parser takes the
+    code tokens alone so each caller pays only for what it reads.
+    """
+    from bigfix_relevance_analyzer import tokenizer
+
+    asked: list[bool] = []
+    real = tokenizer._iter_tokens
+
+    def recording(text: str, *, skip_trivia: bool) -> Iterator[tokenizer.Token]:
+        asked.append(skip_trivia)
+        return real(text, skip_trivia=skip_trivia)
+
+    monkeypatch.setattr(tokenizer, "_iter_tokens", recording)
+    parse('exists  file  /* c */  "x"')
+    assert asked == [True], "parse must lex once, and only for code tokens"

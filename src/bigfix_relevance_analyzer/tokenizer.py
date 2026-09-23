@@ -300,3 +300,40 @@ def code_tokens(text: str) -> Iterator[Token]:
     them silently would report on relevance it never actually read.
     """
     return _iter_tokens(text, skip_trivia=True)
+
+
+@dataclass(frozen=True, slots=True)
+class _Lexed:
+    """One statement, lexed once, for the layers that all want the same stream.
+
+    :func:`~bigfix_relevance_analyzer.analyzer.analyze` used to lex its input
+    four times -- once for its own token list, once inside the parser, and
+    twice inside the complexity scorer -- because each layer's public entry
+    point takes ``str`` and nothing carried a stream between them. Lexing is a
+    quarter of that function's time, so three of those four were pure waste.
+
+    This is deliberately private. Making it public would put an internal
+    representation in an API that is documented in the README and serialized
+    over a wire, and would invite a caller to hand over tokens lexed from
+    *different* text -- a silent wrong answer that costs as much to guard
+    against as re-lexing costs to avoid. The private twins that accept one are
+    named ``_..._lexed``; every public signature is unchanged.
+    """
+
+    text: str
+
+    tokens: tuple[Token, ...]
+    """Everything, trivia included -- what :func:`tokenize` yields."""
+
+    code: tuple[Token, ...]
+    """The non-trivia subset, the same objects -- what :func:`code_tokens` yields."""
+
+
+def _lex(text: str) -> _Lexed:
+    """Lex ``text`` once into both views the rest of the package asks for."""
+    tokens = tuple(tokenize(text))
+    return _Lexed(
+        text=text,
+        tokens=tokens,
+        code=tuple(token for token in tokens if not token.is_trivia()),
+    )

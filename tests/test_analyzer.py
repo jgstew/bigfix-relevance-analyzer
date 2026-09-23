@@ -7,6 +7,7 @@ parts that depend on it, and that broken input degrades instead of raising.
 
 import json
 import re
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -683,3 +684,45 @@ def test_a_classification_the_references_agree_with_is_still_definite() -> None:
 def test_a_forced_dialect_is_never_an_assumption() -> None:
     """The caller said so; the tables do not get a vote on that."""
     assert not analyze(MIXED, Dialect.CLIENT).dialect_assumed
+
+
+# ---------------------------------------------------------------------------
+# One lex per analysis
+# ---------------------------------------------------------------------------
+
+
+def test_analyze_lexes_the_source_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every layer wants the same token stream, so only one may produce it.
+
+    This used to be four: the analyzer's own token list, the parser's, and the
+    complexity scorer's two. Lexing is roughly a quarter of this function's
+    time, so three of the four were pure waste. Counting the scans rather than
+    timing them keeps the guard honest on a loaded CI machine.
+    """
+    from bigfix_relevance_analyzer import tokenizer
+
+    scans = 0
+    real = tokenizer._iter_tokens
+
+    def counting(text: str, *, skip_trivia: bool) -> Iterator[tokenizer.Token]:
+        nonlocal scans
+        scans += 1
+        return real(text, skip_trivia=skip_trivia)
+
+    monkeypatch.setattr(tokenizer, "_iter_tokens", counting)
+    analyze('exists file "C:\\foo.txt" whose (size of it > 100)')
+    assert scans == 1
+
+
+def test_analyze_reports_unlexable_input_once(caplog: pytest.LogCaptureFixture) -> None:
+    """The debug record follows the lex, so collapsing the lexes collapses it.
+
+    Four identical records for one bad character was never intended -- it was
+    an artifact of lexing four times -- but it is still a visible change, so it
+    gets a test rather than a silent fix.
+    """
+    with caplog.at_level("DEBUG", logger="bigfix_relevance_analyzer.tokenizer"):
+        analyze("a ! b")
+
+    unlexable = [r for r in caplog.records if "unlexable input" in r.getMessage()]
+    assert len(unlexable) == 1

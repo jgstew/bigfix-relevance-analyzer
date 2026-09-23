@@ -43,13 +43,13 @@ from bigfix_relevance_analyzer.breakdown import Level, ProbeKind, breakdown_prob
 from bigfix_relevance_analyzer.complexity import (
     CostRule,
     RelevanceComplexity,
-    evaluation_cost_rules,
+    _analyze_lexed,
+    _evaluation_cost_rules_lexed,
 )
-from bigfix_relevance_analyzer.complexity import analyze as analyze_complexity
 from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect, is_definite
 from bigfix_relevance_analyzer.nodes import Node, Reference, Span, to_mermaid, to_sexpr
-from bigfix_relevance_analyzer.parser import ParseError, try_parse
-from bigfix_relevance_analyzer.tokenizer import Token, TokenKind, tokenize
+from bigfix_relevance_analyzer.parser import ParseError, _try_parse_lexed
+from bigfix_relevance_analyzer.tokenizer import Token, TokenKind, _lex
 from bigfix_relevance_analyzer.typecheck import CheckResult, TypeEnvironment, check
 
 __all__ = [
@@ -598,7 +598,11 @@ def analyze(
     effective = dialect or classified or Dialect.CLIENT
     environment = TypeEnvironment.create(effective, platform)
 
-    parsed = try_parse(text)
+    # Lex once and hand the same stream to everything below. Each of the three
+    # layers takes `str` at its public entry point and used to lex again behind
+    # it, which made this function scan the input four times for one answer.
+    lexed = _lex(text)
+    parsed = _try_parse_lexed(text, lexed.code)
     node = parsed.node
 
     references: tuple[ReferenceReport, ...] = ()
@@ -625,13 +629,13 @@ def analyze(
         classified_dialect=classified,
         requested_dialect=dialect,
         environment=environment,
-        tokens=tuple(tokenize(text)),
+        tokens=lexed.tokens,
         parse_error=parsed.error,
         node=node,
         check=checked,
         references=references,
         it_bindings=it_bindings,
         levels=levels,
-        complexity=analyze_complexity(text, effective),
-        cost_rules=evaluation_cost_rules(text, effective),
+        complexity=_analyze_lexed(lexed.code, effective),
+        cost_rules=_evaluation_cost_rules_lexed(lexed.code, effective),
     )

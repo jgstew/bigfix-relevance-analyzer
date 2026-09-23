@@ -124,7 +124,7 @@ class ParseResult:
 
 def parse(text: str) -> Node:
     """Parse one relevance expression; raise :class:`ParseError` on failure."""
-    return _Parser(text).parse_statement()
+    return _parse_lexed(text, tuple(code_tokens(text)))
 
 
 def try_parse(text: str) -> ParseResult:
@@ -133,16 +133,32 @@ def try_parse(text: str) -> ParseResult:
     Only ParseError is caught -- anything else escaping :func:`parse` is a
     bug in this package and must surface.
     """
+    return _try_parse_lexed(text, tuple(code_tokens(text)))
+
+
+def _parse_lexed(text: str, tokens: tuple[Token, ...]) -> Node:
+    """:func:`parse`, for a caller that has already lexed the text.
+
+    Takes the code tokens rather than the whole
+    :class:`~bigfix_relevance_analyzer.tokenizer._Lexed`, so a caller that only
+    wants a tree never pays to build the trivia the parser does not read.
+    ``text`` is still needed: an error at end of input is positioned against it.
+    """
+    return _Parser(text, tokens).parse_statement()
+
+
+def _try_parse_lexed(text: str, tokens: tuple[Token, ...]) -> ParseResult:
+    """:func:`try_parse`, for a caller that has already lexed the text."""
     try:
-        return ParseResult(node=parse(text), error=None)
+        return ParseResult(node=_parse_lexed(text, tokens), error=None)
     except ParseError as error:
         return ParseResult(node=None, error=error)
 
 
 class _Parser:
-    def __init__(self, text: str) -> None:
+    def __init__(self, text: str, tokens: tuple[Token, ...]) -> None:
         self.text = text
-        self.tokens = list(code_tokens(text))
+        self.tokens = tokens
         self.at = 0
         self.depth = 0
         # Nodes that came out of explicit parentheses, by identity. `|` needs

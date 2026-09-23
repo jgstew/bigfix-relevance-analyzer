@@ -114,7 +114,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from bigfix_relevance_analyzer.dialect import Dialect, is_definite
-from bigfix_relevance_analyzer.tokenizer import GRAMMAR_WORDS, TokenKind, code_tokens
+from bigfix_relevance_analyzer.tokenizer import GRAMMAR_WORDS, Token, TokenKind, code_tokens
 
 __all__ = [
     "BOTH_DIALECTS",
@@ -574,7 +574,7 @@ def cost_rules_for(dialect: Dialect | None) -> tuple[CostRule, ...]:
     return tuple(rule for rule in COST_RULES if dialect in rule.dialects)
 
 
-def _word_runs(text: str) -> list[str]:
+def _word_runs(tokens: tuple[Token, ...]) -> list[str]:
     """Normalized runs of adjacent code words, split at anything else.
 
     Cost patterns match against these rather than the raw text, which buys two
@@ -584,7 +584,7 @@ def _word_runs(text: str) -> list[str]:
     """
     runs: list[str] = []
     current: list[str] = []
-    for token in code_tokens(text):
+    for token in tokens:
         if token.kind is TokenKind.WORD:
             current.append(token.normalized)
         elif current:
@@ -597,7 +597,14 @@ def _word_runs(text: str) -> list[str]:
 
 def evaluation_cost_rules(text: str, dialect: Dialect | None = None) -> tuple[CostRule, ...]:
     """Which cost rules ``text`` triggers, in table order, without duplicates."""
-    runs = _word_runs(text)
+    return _evaluation_cost_rules_lexed(tuple(code_tokens(text)), dialect)
+
+
+def _evaluation_cost_rules_lexed(
+    tokens: tuple[Token, ...], dialect: Dialect | None = None
+) -> tuple[CostRule, ...]:
+    """:func:`evaluation_cost_rules`, for a caller that has already lexed."""
+    runs = _word_runs(tokens)
     return tuple(
         rule for rule in cost_rules_for(dialect) if any(rule.pattern.search(run) for run in runs)
     )
@@ -916,6 +923,18 @@ def analyze(text: str, dialect: Dialect | None = None) -> RelevanceComplexity:
     Never raises. Malformed relevance is scored like anything else, with the
     unlexable part reported as :attr:`RelevanceComplexity.error_tokens`.
     """
+    return _analyze_lexed(tuple(code_tokens(text)), dialect)
+
+
+def _analyze_lexed(
+    tokens: tuple[Token, ...], dialect: Dialect | None = None
+) -> RelevanceComplexity:
+    """:func:`analyze`, for a caller that has already lexed the text.
+
+    Takes the code tokens, not the whole
+    :class:`~bigfix_relevance_analyzer.tokenizer._Lexed`: the scorer never
+    reads trivia, so a standalone call should not build any.
+    """
     token_count = 0
     depth = 0
     max_depth = 0
@@ -961,7 +980,7 @@ def analyze(text: str, dialect: Dialect | None = None) -> RelevanceComplexity:
             return 0
         return max(0, closing.commas - closing.member_filters)
 
-    for token in code_tokens(text):
+    for token in tokens:
         token_count += 1
         word = token.normalized
         opening = token.kind is TokenKind.PUNCT and word == "("
