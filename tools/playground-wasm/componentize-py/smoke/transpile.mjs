@@ -67,7 +67,7 @@ const BUILD = resolve(HERE, "..", "build-playground");
 // Kept in step with the pins in this directory's package.json, checked below --
 // a silent mismatch would mean the page was built by a different toolchain than
 // the one recorded.
-const JCO_VERSION = "1.33.0";
+const JCO_VERSION = "1.34.0";
 const ESBUILD_VERSION = "0.28.2";
 
 function parseArgs(argv) {
