@@ -4,7 +4,7 @@
   "description": "CI-only: headless-browser regression tests for the built playground page (tools/playground-wasm/pyodide/build-playground/). Not part of the published artifact.",
   "type": "module",
   "dependencies": {
-    "playwright": "1.62.1"
+    "playwright": "1.63.0"
   },
   "engines": {
     "npm": ">=11.10.0"
