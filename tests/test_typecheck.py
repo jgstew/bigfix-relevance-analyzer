@@ -1995,3 +1995,25 @@ def test_the_visible_rows_cache_is_bounded() -> None:
 
     assert _visible_rows.cache_info().maxsize == _VISIBLE_ROWS_CACHE_SIZE
     assert _VISIBLE_ROWS_CACHE_SIZE is not None
+
+
+def test_a_check_result_survives_a_round_trip_through_pickle() -> None:
+    """A report has to be able to cross a process boundary.
+
+    Anything that fans work out to a pool -- a parallel linter, a job runner --
+    sends the result back by pickle. `resolutions` is exposed as a read-only
+    view so a shared cached report cannot be corrupted, and a raw
+    `MappingProxyType` is not picklable, so the two requirements have to be
+    reconciled here rather than by giving one of them up.
+    """
+    import pickle
+
+    original = check(parse('name of file "x"'), TypeEnvironment.create(Dialect.CLIENT))
+    restored = pickle.loads(pickle.dumps(original))
+
+    assert restored.value == original.value
+    assert restored.diagnostics == original.diagnostics
+    assert dict(restored.resolutions) == dict(original.resolutions)
+    # Still read-only on the far side -- the guarantee must survive the trip.
+    with pytest.raises(TypeError):
+        restored.resolutions[0] = ()

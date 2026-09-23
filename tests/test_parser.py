@@ -624,3 +624,28 @@ def test_parse_does_not_build_the_trivia_it_will_not_read(
     monkeypatch.setattr(tokenizer, "_iter_tokens", recording)
     parse('exists  file  /* c */  "x"')
     assert asked == [True], "parse must lex once, and only for code tokens"
+
+
+def test_a_parse_error_survives_a_round_trip_through_pickle() -> None:
+    """A positioned error has to be able to come back from a worker process.
+
+    `ParseError` passes only the formatted message up to `ValueError`, so
+    `args` is a one-tuple while `__init__` wants four arguments -- and pickle
+    rebuilds an exception by calling the class with `args`. Anything fanning
+    analysis out to a pool got a `TypeError` on the way back instead of the
+    error it asked for, and only for the inputs that failed to parse.
+    """
+    import pickle
+
+    original = try_parse('exists file "unterminated').error
+    assert original is not None
+    restored = pickle.loads(pickle.dumps(original))
+
+    assert isinstance(restored, ParseError)
+    assert (restored.message, restored.offset, restored.line, restored.column) == (
+        original.message,
+        original.offset,
+        original.line,
+        original.column,
+    )
+    assert str(restored) == str(original)

@@ -225,6 +225,27 @@ class CheckResult:
     itself unresolved.
     """
 
+    def __getstate__(self) -> tuple[object, object, dict[int, tuple[inspectors.Inspector, ...]]]:
+        """Unwrap the read-only view so the result can cross a process boundary.
+
+        A ``mappingproxy`` is not picklable, and a report that cannot be
+        pickled cannot be returned from a worker pool. Note the standing caveat
+        on :attr:`resolutions`: its keys are ``id()`` values of the checked
+        tree, so they do not mean anything on the far side of a pickle --
+        the tree there is a different object. Carrying them is what this
+        class has always done; reading them after a round trip is not.
+        """
+        return (self.value, self.diagnostics, dict(self.resolutions))
+
+    def __setstate__(
+        self, state: tuple[object, object, dict[int, tuple[inspectors.Inspector, ...]]]
+    ) -> None:
+        """Rebuild, restoring the read-only view rather than a bare dict."""
+        value, diagnostics, resolutions = state
+        object.__setattr__(self, "value", value)
+        object.__setattr__(self, "diagnostics", diagnostics)
+        object.__setattr__(self, "resolutions", MappingProxyType(resolutions))
+
     @property
     def ok(self) -> bool:
         """Whether the statement type-checks -- not whether it is unremarkable.

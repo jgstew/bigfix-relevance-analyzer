@@ -95,6 +95,18 @@ class ParseError(ValueError):
         self.line = line
         self.column = column
 
+    def __reduce__(self) -> tuple[Any, ...]:
+        """Rebuild from the four arguments, not from the formatted message.
+
+        `ValueError.__init__` is handed one preformatted string, so `args` is a
+        one-tuple -- and pickle reconstructs an exception by calling its class
+        with `args`. Without this, unpickling raises `TypeError: missing 3
+        required positional arguments` instead of returning the error, which
+        breaks anything that fans analysis out to a worker pool, and breaks it
+        only for the inputs that failed to parse.
+        """
+        return (self.__class__, (self.message, self.offset, self.line, self.column))
+
     def to_dict(self) -> dict[str, Any]:
         """This error as JSON-serializable plain data.
 
