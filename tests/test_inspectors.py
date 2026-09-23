@@ -785,8 +785,14 @@ def test_the_search_index_is_not_built_at_import() -> None:
         "from bigfix_relevance_analyzer import inspectors\n"
         "assert inspectors.all_inspectors.cache_info().currsize == 0, 'tables parsed'\n"
         "assert inspectors._search_index.cache_info().currsize == 0, 'index built'\n"
+        # The derived-set memos are caches too, and the same rule applies to
+        # them: importing the package must not populate one.
+        "assert inspectors._dialects_for.cache_info().currsize == 0, 'dialects memo warm'\n"
+        "assert inspectors._contexts_for.cache_info().currsize == 0, 'contexts memo warm'\n"
         "inspectors.search('sha')\n"
         "assert inspectors._search_index.cache_info().currsize == 1, 'index not cached'\n"
+        "inspectors.lookup('name')[0].dialects\n"
+        "assert inspectors._dialects_for.cache_info().currsize == 1, 'dialects not cached'\n"
         "print('ok')\n"
     )
     result = subprocess.run(
@@ -794,3 +800,69 @@ def test_the_search_index_is_not_built_at_import() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert result.stdout.strip() == "ok"
+
+
+# --------------------------------------------------------------------------
+# Derived sets are memoized on what they actually depend on
+# --------------------------------------------------------------------------
+#
+# `dialects`, `platforms` and `sampled_contexts` are pure functions of
+# `sources`, and `Inspector.contexts` of `(sources, kind)`. There are 5574 rows
+# but only 22 distinct `sources` frozensets, so recomputing per access was 45%
+# of `analyze`'s cumulative time. These tests pin the memo -- and, more
+# importantly, pin the two keys apart, because collapsing them is a real bug
+# rather than a hypothetical one.
+
+
+def test_rows_with_the_same_sources_share_their_derived_sets() -> None:
+    """Identity, not equality: equality would pass without any memo at all."""
+    by_sources: dict[frozenset[str], list[Inspector]] = {}
+    for entry in all_inspectors():
+        by_sources.setdefault(entry.sources, []).append(entry)
+    shared = [rows for rows in by_sources.values() if len(rows) > 1]
+    assert shared, "expected some sources set to be shared by several rows"
+
+    first, second = shared[0][0], shared[0][1]
+    assert first.dialects is second.dialects
+    assert first.platforms is second.platforms
+    assert first.sampled_contexts is second.sampled_contexts
+
+
+def test_inspector_contexts_depends_on_kind_not_only_on_sources() -> None:
+    """The reason the contexts memo is keyed on ``(sources, kind)``.
+
+    Only the REST API dump captured casts and operators session-side; the
+    console and Web Reports dumps are `properties` only. So two rows with
+    identical session-only sources widen differently depending on their kind
+    -- see :func:`~bigfix_relevance_analyzer.inspectors._unsampled_contexts`.
+    A memo keyed on ``sources`` alone would hand the second row the first
+    row's answer, silently reporting a property as available in contexts that
+    never sampled it.
+    """
+    common = dict(
+        sources=frozenset({"session:rest_api"}),
+        signature="<x> as y",
+        name="y",
+        return_type="y",
+    )
+    as_property = Inspector(kind=InspectorKind.PROPERTY, **common)  # type: ignore[arg-type]
+    as_cast = Inspector(kind=InspectorKind.CAST, **common)  # type: ignore[arg-type]
+
+    assert as_property.sources == as_cast.sources
+    assert as_property.contexts != as_cast.contexts, (
+        "contexts must not be memoized on sources alone"
+    )
+
+
+def test_a_relevance_type_and_an_inspector_with_the_same_sources_may_differ() -> None:
+    """``_Sourced.contexts`` stays the unwidened answer.
+
+    Guards against collapsing the two memos into one: a :class:`RelevanceType`
+    carries no introspection category, so it has no sampling discipline to
+    apply and must report exactly what was sampled.
+    """
+    entry = next(e for e in all_inspectors() if e.kind is InspectorKind.CAST)
+    relevance_type = next(t for t in relevance_types() if t.sources == entry.sources)
+
+    assert relevance_type.contexts == relevance_type.sampled_contexts
+    assert entry.contexts >= entry.sampled_contexts

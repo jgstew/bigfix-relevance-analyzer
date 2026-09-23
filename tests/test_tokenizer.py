@@ -233,6 +233,50 @@ def test_line_advances_through_a_multiline_comment() -> None:
     assert (tokens[0].text, tokens[0].line, tokens[0].column) == ("x", 2, 6)
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "",
+        "   ",
+        "a\n  b",
+        "/* a\nb */ x",
+        'exists file "C:\\x.txt" whose (size of it > 100)',
+        '"unterminated',
+        "/* unterminated",
+        "x /* c */ !  y",
+        "\n\n\t",
+    ],
+)
+def test_code_tokens_is_exactly_tokenize_without_the_trivia(text: str) -> None:
+    """The load-bearing invariant of the two-entry-point scan.
+
+    ``code_tokens`` does not build trivia rather than building and discarding
+    it, which means its position bookkeeping runs over spans it never emits.
+    That is the part that could drift, so pin the whole token -- offset, line
+    and column included -- against the filtered full stream.
+    """
+    assert list(code_tokens(text)) == [t for t in tokenize(text) if not t.is_trivia()]
+
+
+def test_code_tokens_reports_unlexable_input_once_per_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Skipping trivia must not skip the diagnostic.
+
+    The debug record is the only trace an ERROR token leaves for a caller that
+    is about to stop at one, and it used to be emitted by ``tokenize`` with
+    ``code_tokens`` inheriting it through the filter. The two share a loop now,
+    so this pins that the record survived the split -- once, not twice.
+    """
+    with caplog.at_level("DEBUG", logger="bigfix_relevance_analyzer.tokenizer"):
+        tokens = list(code_tokens("a ! b"))
+
+    assert [t.kind for t in tokens] == [WORD, ERROR, WORD]
+    unlexable = [r for r in caplog.records if "unlexable input" in r.getMessage()]
+    assert len(unlexable) == 1
+    assert "'!'" in unlexable[0].getMessage()
+
+
 # ---------------------------------------------------------------------------
 # Normalization and grammar words
 # ---------------------------------------------------------------------------

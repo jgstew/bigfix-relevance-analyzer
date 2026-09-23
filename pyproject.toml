@@ -102,7 +102,17 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "RUF"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
-files = ["src", "tests"]
+files = ["src", "tests", "tools/perf"]
+# `tools/perf` only, not all of `tools`: the two `build_playground.py` files
+# under `tools/playground-wasm/` share a module name, which mypy refuses before
+# it checks anything. Bringing those under type checking is worth doing, but it
+# is a separate change -- see the note in tools/perf/README.md.
+#
+# `mypy_path` mirrors how these scripts actually resolve their imports at
+# runtime: `parity.py` inserts `tests/` on `sys.path` to reuse the corpus
+# readers, and `tests/test_perf_tools.py` inserts `tools/perf` to import it
+# back. Without this, every such import is reported as missing.
+mypy_path = ["tests", "tools/perf"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

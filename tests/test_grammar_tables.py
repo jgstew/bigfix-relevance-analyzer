@@ -189,3 +189,41 @@ def test_the_grammar_level_operators_really_have_no_rows() -> None:
         entry.written_name for entry in binary_operators() if entry.written_name
     }
     assert not (GRAMMAR_LEVEL_BINARY & named)
+
+
+def test_no_punctuation_lexeme_is_shadowed_by_an_earlier_one() -> None:
+    """The longest-first ordering of :data:`PUNCTUATION` is load-bearing.
+
+    ``_scan`` returns the first entry that matches at the cursor, so an entry
+    listed after one of its own prefixes can never be reached: put ``!`` before
+    ``!=`` and ``a != b`` lexes as ``!`` then ``=``, silently. Today that
+    ordering is asserted by a comment above the tuple and by nothing else, and
+    any rewrite of the scan -- a first-character dispatch table, a single
+    alternation -- re-encodes the same assumption.
+
+    This is the check twinkleplop's grammar compiler makes when two rules claim
+    the same character, and the reason it makes it at table-build time rather
+    than trusting the reader: a shadowed rule is not a crash, it is a wrong
+    answer that looks fine.
+    """
+    shadowed = [
+        (lexeme, earlier)
+        for index, lexeme in enumerate(PUNCTUATION)
+        for earlier in PUNCTUATION[:index]
+        if lexeme.startswith(earlier)
+    ]
+    assert shadowed == []
+
+
+def test_every_punctuation_lexeme_has_a_consumer() -> None:
+    """A lexeme the parser never reads is a dead lexical rule.
+
+    Either it is an infix operator with a row in :data:`PUNCT_INFIX`, or it is
+    one of the four structural marks ``parse_prefix``/``parse_infix`` handle
+    by name. Anything else lexes to a ``PUNCT`` token that every branch
+    declines, which surfaces as a confusing "expected an expression" rather
+    than as the missing grammar it actually is.
+    """
+    structural = {"(", ")", ",", ";"}
+    orphans = sorted(set(PUNCTUATION) - set(PUNCT_INFIX) - structural)
+    assert orphans == []

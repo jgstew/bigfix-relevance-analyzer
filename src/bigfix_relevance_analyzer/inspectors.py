@@ -104,6 +104,80 @@ class InspectorKind(enum.Enum):
     """A prefix operator; in practice only ``-``."""
 
 
+# ---------------------------------------------------------------------------
+# Derived source sets, memoized
+# ---------------------------------------------------------------------------
+#
+# These four are pure functions of a row's `sources` -- and, for one of them,
+# its `kind`. They read as properties on `_Sourced` below and are documented
+# there; they live out here as cached free functions because recomputing them
+# per access was, measured, 45% of `analyze_relevance`'s cumulative time.
+#
+# Keying on `sources` rather than on the row is what makes that work: there are
+# 5574 rows but only 22 distinct `sources` frozensets, so the memo hits
+# essentially always. Caching on the row instead (`@functools.cache` on the
+# property) would hash all twelve fields per lookup and pin every row alive for
+# the life of the process, which is the opposite of the intent.
+#
+# `functools.cache` rather than a plain dict for the same reason the thirteen
+# other caches in this module use it: `cache_info()` makes the laziness
+# observable, which is how `test_the_search_index_is_not_built_at_import`
+# proves nothing warms at import.
+
+
+@functools.cache
+def _dialects_for(sources: frozenset[str]) -> frozenset[Dialect]:
+    found = set()
+    for source in sources:
+        dialect, _, _context = source.partition(":")
+        if dialect == "client":
+            found.add(Dialect.CLIENT)
+        elif dialect == "session":
+            found.add(Dialect.SESSION)
+    return frozenset(found)
+
+
+@functools.cache
+def _platforms_for(sources: frozenset[str]) -> frozenset[str]:
+    return frozenset(
+        context
+        for source in sources
+        for dialect, _, context in [source.partition(":")]
+        if dialect == "client" and context
+    )
+
+
+@functools.cache
+def _sampled_contexts_for(sources: frozenset[str]) -> frozenset[str]:
+    return frozenset(
+        context if dialect == "client" else source
+        for source in sources
+        for dialect, _, context in [source.partition(":")]
+        if context
+    )
+
+
+@functools.cache
+def _contexts_for(sources: frozenset[str], kind: InspectorKind) -> frozenset[str]:
+    """The widened reporting axis for an :class:`Inspector`.
+
+    Keyed on `kind` as well as `sources`, and that second half of the key is
+    load-bearing rather than defensive: the widening asks which contexts never
+    sampled this row's *category*, so two rows with identical sources widen
+    differently when their kinds differ. Dropping `kind` from the key would
+    report a property as available in contexts that only ever dumped
+    properties' siblings. `test_inspector_contexts_depends_on_kind_not_only_
+    on_sources` is the falsifier.
+    """
+    unsampled = _unsampled_contexts(kind)
+    return _sampled_contexts_for(sources) | frozenset(
+        context
+        for dialect in _dialects_for(sources)
+        for context in unsampled
+        if _dialect_of_context(context) is dialect
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class _Sourced:
     """Something attributed to the set of dumps that defined it."""
@@ -114,14 +188,7 @@ class _Sourced:
     @property
     def dialects(self) -> frozenset[Dialect]:
         """Which dialects define this, derived from :attr:`sources`."""
-        found = set()
-        for source in self.sources:
-            dialect, _, _context = source.partition(":")
-            if dialect == "client":
-                found.add(Dialect.CLIENT)
-            elif dialect == "session":
-                found.add(Dialect.SESSION)
-        return frozenset(found)
+        return _dialects_for(self.sources)
 
     @property
     def platforms(self) -> frozenset[str]:
@@ -131,12 +198,7 @@ class _Sourced:
         not necessarily been ruled out -- it may simply never have been
         captured; see the dump README for which platforms exist.
         """
-        return frozenset(
-            context
-            for source in self.sources
-            for dialect, _, context in [source.partition(":")]
-            if dialect == "client" and context
-        )
+        return _platforms_for(self.sources)
 
     @property
     def contexts(self) -> frozenset[str]:
@@ -169,12 +231,7 @@ class _Sourced:
         reporting axis, and applies that discipline for the one gap that is
         systematic rather than incidental.
         """
-        return frozenset(
-            context if dialect == "client" else source
-            for source in self.sources
-            for dialect, _, context in [source.partition(":")]
-            if context
-        )
+        return _sampled_contexts_for(self.sources)
 
 
 @dataclass(frozen=True, slots=True)
@@ -275,13 +332,7 @@ class Inspector(_Sourced):
         no session dump defines gains no session context, because there the
         silence is the properties dumps' and they did sample it.
         """
-        found = self.sampled_contexts
-        return found | frozenset(
-            context
-            for dialect in self.dialects
-            for context in _unsampled_contexts(self.kind)
-            if _dialect_of_context(context) is dialect
-        )
+        return _contexts_for(self.sources, self.kind)
 
     def to_dict(self) -> dict[str, Any]:
         """This inspector as JSON-serializable plain data.

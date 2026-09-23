@@ -1,7 +1,17 @@
 {
-  "include": ["src", "tests"],
-  "exclude": [".venv"],
+  "include": [
+    "src",
+    "tests",
+    "tools/perf"
+  ],
+  "exclude": [
+    ".venv"
+  ],
   "venvPath": ".",
   "venv": ".venv",
-  "pythonVersion": "3.11"
+  "pythonVersion": "3.11",
+  "extraPaths": [
+    "tests",
+    "tools/perf"
+  ]
 }
