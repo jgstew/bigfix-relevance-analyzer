@@ -60,6 +60,11 @@ item 0 of (1, 2, 3)
 ----
 (item-of (num "0") (tuple (num "1") (num "2") (num "3")))
 
+==== the plural spelling is the same node, marked plural (qna: `items 1 of ("a","b") | "x"` is `A singular expression is required.`)
+items 0 of (1, 2, 3)
+----
+(items-of (num "0") (tuple (num "1") (num "2") (num "3")))
+
 ==== [unverified] a tuple index too big for an integer is still a tuple index
 item 99999999999999999999 of (1, 2)
 ----

@@ -594,6 +594,64 @@ def test_the_plural_spelling_indexes_the_same_tuple(env: TypeEnvironment) -> Non
     assert types_of('items 1 of (1, "c")', env) == {"string"}
 
 
+def test_a_filter_does_not_make_an_unnamed_singular_plural(env: TypeEnvironment) -> None:
+    """`whose` is transparent to plurality whatever it filtered, not only when
+    the collection is a name. An expression, a cast, a chain and an `if` all
+    stay singular through a filter, and so reach a `|` fallback -- the idiom
+    the filter-then-fall-back shape is built on -- without a refusal::
+
+        Q: ((" /p=" & "abcdefgh") whose (length of it > 7)) | "x"
+        A:  /p=abcdefgh
+        Q: ((it as string) whose (it contains "z") of 5) | "x"
+        A: x
+        Q: ((line 1 of file "/etc/hosts") whose (it contains "z")) | "x"
+        A: x
+        Q: ((if true then "a" else "b") whose (it contains "z")) | "x"
+        A: x
+
+    Only a plural collection makes the filter plural::
+
+        Q: (("a";"b") whose (length of it > 0)) | "x"
+        E: A singular expression is required.
+        Q: ((lines of file "/etc/hosts") whose (it contains "z")) | "x"
+        E: A singular expression is required.
+    """
+    singular = [
+        '((" /p=" & "abcdefgh") whose (length of it > 7)) | "x"',
+        '((it as string) whose (it contains "z") of 5) | "x"',
+        '((line 1 of file "/etc/hosts") whose (it contains "z")) | "x"',
+        '((if true then "a" else "b") whose (it contains "z")) | "x"',
+        '(("a" as string) whose (it contains "z")) | "x"',
+    ]
+    for source in singular:
+        codes = [d.code for d in check(parse(source), env).diagnostics]
+        assert "left-operand-not-singular" not in codes, source
+
+    plural = [
+        '(("a";"b") whose (length of it > 0)) | "x"',
+        '((lines of file "/etc/hosts") whose (it contains "z")) | "x"',
+    ]
+    for source in plural:
+        codes = [d.code for d in check(parse(source), env).diagnostics]
+        assert "left-operand-not-singular" in codes, source
+
+
+def test_the_plural_spelling_answers_plurally(env: TypeEnvironment) -> None:
+    """`items N of` is plural because of how it is written, not because of what
+    it indexed -- a singular tuple does not make it singular, and a singular
+    position rejects it::
+
+        Q: (item 1 of ("a","b")) | "x"
+        A: b
+        Q: (items 1 of ("a","b")) | "x"
+        E: A singular expression is required.
+    """
+    assert [d.code for d in check(parse('item 1 of ("a", "b") | "x"'), env).diagnostics] == []
+    assert [d.code for d in check(parse('items 1 of ("a", "b") | "x"'), env).diagnostics] == [
+        "left-operand-not-singular"
+    ]
+
+
 def test_a_filtered_tuple_is_still_indexed_by_position(env: TypeEnvironment) -> None:
     """A `whose` picks tuples out of the set without changing what any one
     position holds, so the index still names an element's type -- plurally now,

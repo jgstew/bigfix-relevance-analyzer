@@ -1716,24 +1716,35 @@ class _Checker:
             )
         return RelevanceValue(
             types=collection.types,
-            # A *named* collection keeps its own spelling rather than becoming
-            # `PLURAL`: see `_written_reference` for the qna transcript.
-            # Filtering a singular spelling leaves it singular and merely
-            # *risky*, which `combine_of` reports as the runtime non-unique
-            # risk it is -- calling it plural here would instead fail every
-            # `value whose (...) of it as string contains "..."` in the wild
-            # with the static `A singular expression is required.`, which the
-            # engine does not raise.
+            # A filter is transparent to plurality: the collection keeps its
+            # own spelling, named or not. See `_written_reference` for the
+            # named case's transcript; the unnamed ones behave identically,
+            # confirmed live in qna (client engine, 2026-09)::
             #
-            # Anything else -- a tuple or `;` collection literal, a cast, a
-            # chain -- has no name to be read off, and there filtering is what
-            # it looks like: a set of the rows that passed, plural however
-            # singular the thing filtered was.
-            plurality=(
-                collection.plurality
-                if _written_reference(node.collection) is not None
-                else Plurality.PLURAL
-            ),
+            #     Q: ((" /p=" & "abcdefgh") whose (length of it > 7)) | "x"
+            #     A:  /p=abcdefgh
+            #     Q: ((it as string) whose (it contains "z") of 5) | "x"
+            #     A: x
+            #     Q: ((line 1 of file "/etc/hosts") whose (it contains "z")) | "x"
+            #     A: x
+            #     Q: ((concatenation of ("a";"b")) whose (it contains "z")) | "x"
+            #     A: x
+            #     Q: ((if true then "a" else "b") whose (it contains "z")) | "x"
+            #     A: x
+            #     Q: (("a";"b") whose (length of it > 0)) | "x"
+            #     E: A singular expression is required.
+            #     Q: ((lines of file "/etc/hosts") whose (it contains "z")) | "x"
+            #     E: A singular expression is required.
+            #
+            # Only a plural collection makes the filter plural. Filtering a
+            # singular leaves it singular and merely *risky* -- an empty
+            # result raises `Singular expression refers to nonexistent
+            # object.` at evaluation, which is precisely the error the `|`
+            # fallback idiom is built to catch. Calling the unnamed cases
+            # plural instead failed every `(<expr> whose (...)) | <default>`
+            # in the wild with a static `A singular expression is required.`
+            # the engine does not raise.
+            plurality=collection.plurality,
             platforms=collection.platforms & predicate.platforms,
         )
 
@@ -2061,8 +2072,7 @@ class _Checker:
             self.report("tuple-index-unreasonable", node.span, token=node.index.text)
             return RelevanceValue(types=frozenset(), platforms=frozenset())
         # A `whose` filters the tuples without changing what any one position
-        # holds, so `items 1 of (a, b) whose (...)` indexes the same tuple --
-        # only plurally, since filtering yields a set of tuples.
+        # holds, so `items 1 of (a, b) whose (...)` indexes the same tuple.
         subscripted = node.operand
         while isinstance(subscripted, Whose):
             subscripted = subscripted.collection
@@ -2077,7 +2087,12 @@ class _Checker:
             )
             return RelevanceValue(types=frozenset(), platforms=frozenset())
         picked = items[index]
-        if operand.plurality is Plurality.PLURAL and picked.plurality is not Plurality.PLURAL:
+        # The plural spelling answers plurally whatever it indexed -- the
+        # engine reads that off the phrase, not off the tuple (see
+        # `ItemOf.plural`) -- and indexing a plural object is plural too.
+        if (operand.plurality is Plurality.PLURAL or node.plural) and (
+            picked.plurality is not Plurality.PLURAL
+        ):
             return replace(picked, plurality=Plurality.PLURAL)
         return picked
 

@@ -254,6 +254,18 @@ class ItemOf:
     span: Span
     index: NumberLiteral
     operand: Node
+    plural: bool = False
+    """Whether it was written ``items N of``.
+
+    The two spellings index the same position; only the plurality of the
+    answer differs, and the engine settles that from the spelling alone --
+    the tuple being singular does not make ``items`` singular::
+
+        Q: (item 1 of ("a","b")) | "x"
+        A: b
+        Q: (items 1 of ("a","b")) | "x"
+        E: A singular expression is required.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -402,8 +414,9 @@ def to_sexpr(node: Node) -> str:
             return f"(ref {_quote(phrase)} {to_sexpr(index)})"
         case Of(prop=prop, obj=obj):
             return f"(of {to_sexpr(prop)} {to_sexpr(obj)})"
-        case ItemOf(index=index, operand=operand):
-            return f"(item-of {to_sexpr(index)} {to_sexpr(operand)})"
+        case ItemOf(index=index, operand=operand, plural=plural):
+            head = "items-of" if plural else "item-of"
+            return f"({head} {to_sexpr(index)} {to_sexpr(operand)})"
         case NumberOf(operand=operand):
             return f"(number-of {to_sexpr(operand)})"
         case Bar(left=left, right=right):
@@ -632,8 +645,8 @@ def to_mermaid(node: Node) -> str:
                 rendered_obj = walk(obj)
                 edge(rendered_prop.sink, rendered_obj.result, "of")
                 return _Rendered(result=rendered_prop.result, sink=rendered_obj.sink)
-            case ItemOf(index=index, operand=operand):
-                me = emit("item of", "hexagon")
+            case ItemOf(index=index, operand=operand, plural=plural):
+                me = emit("items of" if plural else "item of", "hexagon")
                 edge(me, walk(index).result, "index")
                 edge(me, walk(operand).result, "of")
                 return _plain(me)

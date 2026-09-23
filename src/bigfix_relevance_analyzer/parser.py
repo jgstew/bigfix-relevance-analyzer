@@ -601,7 +601,7 @@ def _of(prop: Node, obj: Node) -> Node:
             and isinstance(prop.index, NumberLiteral)
             and prop.index.is_integer_literal
         ):
-            return ItemOf(span=span, index=prop.index, operand=obj)
+            return ItemOf(span=span, index=prop.index, operand=obj, plural=prop.phrase == "items")
     return Of(span=span, prop=prop, obj=obj)
 
 
