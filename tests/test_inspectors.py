@@ -18,6 +18,7 @@ from test_examples import corpus_files
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.extract import extract_relevance_from_file
 from bigfix_relevance_analyzer.inspectors import (
+    _LOOKUP_CACHE_SIZE,
     SIGNATURE_SAMPLE,
     Inspector,
     InspectorKind,
@@ -789,10 +790,14 @@ def test_the_search_index_is_not_built_at_import() -> None:
         # them: importing the package must not populate one.
         "assert inspectors._dialects_for.cache_info().currsize == 0, 'dialects memo warm'\n"
         "assert inspectors._contexts_for.cache_info().currsize == 0, 'contexts memo warm'\n"
+        "assert inspectors.lookup.cache_info().currsize == 0, 'lookup cache warm'\n"
+        "from bigfix_relevance_analyzer import typecheck\n"
+        "assert typecheck._visible_rows.cache_info().currsize == 0, 'visible-rows memo warm'\n"
         "inspectors.search('sha')\n"
         "assert inspectors._search_index.cache_info().currsize == 1, 'index not cached'\n"
         "inspectors.lookup('name')[0].dialects\n"
         "assert inspectors._dialects_for.cache_info().currsize == 1, 'dialects not cached'\n"
+        "assert inspectors.lookup.cache_info().currsize == 1, 'lookup not cached'\n"
         "print('ok')\n"
     )
     result = subprocess.run(
@@ -866,3 +871,31 @@ def test_a_relevance_type_and_an_inspector_with_the_same_sources_may_differ() ->
 
     assert relevance_type.contexts == relevance_type.sampled_contexts
     assert entry.contexts >= entry.sampled_contexts
+
+
+def test_lookup_is_cached() -> None:
+    """Resolution asks for the same handful of names thousands of times.
+
+    `_by_name` was already cached, but `lookup` re-lowercased the name and
+    rebuilt a kind-filtered tuple on every call. Over a real corpus that is
+    399,306 calls against 1,020 distinct keys -- a 99.7% hit rate going
+    begging. Identity rather than equality, so the test fails if the cache is
+    ever removed.
+    """
+    assert lookup("name") is lookup("name")
+    assert lookup("name", kind=InspectorKind.PROPERTY) is lookup(
+        "name", kind=InspectorKind.PROPERTY
+    )
+    # The kind filter is part of the key, not something the cache flattens.
+    assert lookup("name") is not lookup("name", kind=InspectorKind.PROPERTY)
+
+
+def test_the_lookup_cache_is_bounded() -> None:
+    """`lookup` takes an arbitrary string, so an unbounded cache is a leak.
+
+    Names reaching it come from parsed relevance, which is attacker-shaped
+    input for a hook running over untrusted content: a file full of distinct
+    nonsense names would otherwise grow the cache without limit.
+    """
+    assert lookup.cache_info().maxsize == _LOOKUP_CACHE_SIZE
+    assert _LOOKUP_CACHE_SIZE is not None

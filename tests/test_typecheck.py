@@ -1950,3 +1950,48 @@ def test_a_world_only_name_in_a_filter_keeps_the_softer_finding(env: TypeEnviron
     assert codes_of("files whose (name of it = name of operating system)", env) == [
         "world-property-not-defined"
     ]
+
+
+def test_resolutions_cannot_be_mutated() -> None:
+    """A `CheckResult` must be immutable all the way down, not just at the top.
+
+    `resolutions` is declared `Mapping`, which promises read-only, but it used
+    to be handed over as the checker's own `dict`. That mattered the moment
+    anything began sharing one result between call sites -- `lint` caches
+    analyses across a run, so a mutation here would corrupt every other site
+    that resolved to the same statement, in a field the annotation says cannot
+    be written.
+    """
+    result = check(parse('name of file "x"'), TypeEnvironment.create(Dialect.CLIENT))
+
+    with pytest.raises(TypeError):
+        result.resolutions[0] = ()  # type: ignore[index]
+
+
+def test_visible_rows_are_resolved_once_per_name_and_environment() -> None:
+    """Which rows a name resolves to is fixed by the dialect and platform.
+
+    `_matched_rows` re-filtered every overload of a name through
+    `TypeEnvironment.visible` on every call -- 99,928 `visible` calls for 227
+    real statements, against 613 distinct `(name, environment, indexed)`
+    combinations. The subject-type narrowing below it still runs per call,
+    because that genuinely varies; only the dialect/platform slice is fixed.
+    """
+    from bigfix_relevance_analyzer.typecheck import _visible_rows
+
+    _visible_rows.cache_clear()
+    environment = TypeEnvironment.create(Dialect.CLIENT)
+    node = parse('name of file "x" & name of folder "y" & name of file "z"')
+    check(node, environment)
+
+    info = _visible_rows.cache_info()
+    assert info.hits > 0, "repeated names should be served from the memo"
+    assert info.currsize < info.hits + info.misses, "nothing was reused"
+
+
+def test_the_visible_rows_cache_is_bounded() -> None:
+    """Keyed partly on a name from parsed relevance, so it must not grow freely."""
+    from bigfix_relevance_analyzer.typecheck import _VISIBLE_ROWS_CACHE_SIZE, _visible_rows
+
+    assert _visible_rows.cache_info().maxsize == _VISIBLE_ROWS_CACHE_SIZE
+    assert _VISIBLE_ROWS_CACHE_SIZE is not None

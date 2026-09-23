@@ -989,3 +989,101 @@ def test_no_example_site_is_reported_as_mixed_dialect() -> None:
     ]
 
     assert offenders == []
+
+
+# ---------------------------------------------------------------------------
+# One analysis per distinct statement across a run
+# ---------------------------------------------------------------------------
+#
+# Relevance is boilerplate-heavy: across a real content repository 88% of
+# extracted statements are byte-identical to another one, and a single clause
+# (`/* Windows Only */ windows of operating system`) appears over six thousand
+# times. Linting re-analysed every one of them from scratch.
+
+
+def test_the_same_statement_is_analysed_once_per_lint_run(tmp_path: Path) -> None:
+    """Three sites, one statement, one analysis.
+
+    Counted through the cache's own `cache_info` rather than by patching a
+    name: `lru_cache` closes over the function it wrapped at import, so a
+    monkeypatched `lint.analyze` would never be reached and the test would
+    read zero no matter what happened.
+    """
+    from bigfix_relevance_analyzer.lint import _analyze_cached
+
+    _analyze_cached.cache_clear()
+
+    path = tmp_path / "repeated.bes"
+    path.write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n<BES>\n'
+        + "".join(
+            "<Fixlet><Title>t</Title>"
+            "<Relevance>name of operating system</Relevance>"
+            "<DefaultAction><ActionScript>// nothing</ActionScript></DefaultAction>"
+            "</Fixlet>\n"
+            for _ in range(3)
+        )
+        + "</BES>\n"
+    )
+    lint_file(path, LintConfig())
+
+    info = _analyze_cached.cache_info()
+    assert info.misses == 1, f"the same statement was analysed {info.misses} times"
+    assert info.hits == 2, "the other two sites should have been served from the cache"
+
+
+def test_two_identical_statements_still_report_their_own_positions(
+    tmp_path: Path,
+) -> None:
+    """The risk the cache introduces, and the only one that matters.
+
+    A `RelevanceAnalysis` describes the *statement*; where that statement sits
+    is `lint_analysis`'s business, passed alongside as `base_line` and `site`.
+    Sharing one report between two occurrences must therefore not smear the
+    first one's position onto the second. A cache that got this wrong would
+    still pass the call-count test above.
+    """
+    path = tmp_path / "twice.bes"
+    path.write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n<BES>\n'
+        "<Fixlet><Title>a</Title>"
+        "<Relevance>name of operating system</Relevance>"
+        "<DefaultAction><ActionScript>// nothing</ActionScript></DefaultAction>"
+        "</Fixlet>\n"
+        "\n\n\n"
+        "<Fixlet><Title>b</Title>"
+        "<Relevance>name of operating system</Relevance>"
+        "<DefaultAction><ActionScript>// nothing</ActionScript></DefaultAction>"
+        "</Fixlet>\n"
+        "</BES>\n"
+    )
+    findings = [f for f in lint_file(path, LintConfig()) if f.code == "site-type-mismatch"]
+    assert len(findings) == 2
+    assert findings[0].line != findings[1].line, "both occurrences reported the same line"
+
+
+def test_the_analysis_cache_is_bounded() -> None:
+    """An unbounded cache in a long-running process is a leak, not a cache."""
+    from bigfix_relevance_analyzer.lint import _ANALYSIS_CACHE_SIZE, _analyze_cached
+
+    assert _analyze_cached.cache_info().maxsize == _ANALYSIS_CACHE_SIZE
+    assert _ANALYSIS_CACHE_SIZE is not None
+
+
+def test_the_cache_key_covers_every_parameter_of_analyze() -> None:
+    """The drift guard.
+
+    `analyze` takes `probe_kind` as well as text, dialect and platform. A
+    hand-written key listing only the first three would hand one probe kind's
+    answer to another -- silently, and only for the caller that passed a
+    non-default kind. Wrapping the function instead keys on the arguments
+    actually passed, so a parameter added later is covered without anyone
+    remembering to. This test fails if that ever becomes a hand-rolled key.
+    """
+    from bigfix_relevance_analyzer.breakdown import ProbeKind
+    from bigfix_relevance_analyzer.lint import _analyze_cached
+
+    _analyze_cached.cache_clear()
+    for kind in ProbeKind:
+        _analyze_cached(CLIENT, Dialect.CLIENT, None, probe_kind=kind)
+    assert _analyze_cached.cache_info().currsize == len(ProbeKind)

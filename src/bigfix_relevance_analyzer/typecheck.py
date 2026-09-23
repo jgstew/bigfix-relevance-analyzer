@@ -70,10 +70,12 @@ Findings and message wording come from
 from __future__ import annotations
 
 import enum
+import functools
 import itertools
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
+from types import MappingProxyType
 from typing import Any, Final, assert_never
 
 from bigfix_relevance_analyzer import grammar, inspectors
@@ -204,7 +206,7 @@ class CheckResult:
     diagnostics: tuple[TypeDiagnostic, ...] = ()
 
     resolutions: Mapping[int, tuple[inspectors.Inspector, ...]] = field(
-        default_factory=dict, repr=False
+        default_factory=lambda: MappingProxyType({}), repr=False
     )
     """Which table rows each `Reference` actually resolved to, keyed by ``id``.
 
@@ -732,6 +734,43 @@ def _diagnostic(code: str, span: Span, **fields: object) -> TypeDiagnostic:
     return TypeDiagnostic(code=code, message=entry.format(**fields), span=span)
 
 
+_VISIBLE_ROWS_CACHE_SIZE: Final = 4096
+"""How many ``(name, environment, indexed)`` slices :func:`_visible_rows` keeps.
+
+Bounded because ``name`` comes from parsed relevance, which is untrusted input
+for a hook running over arbitrary content. The real working set is small -- 613
+entries served 455,492 lookups over a whole content repository.
+"""
+
+
+@functools.lru_cache(maxsize=_VISIBLE_ROWS_CACHE_SIZE)
+def _visible_rows(
+    name: str, environment: TypeEnvironment, indexed: bool | None
+) -> tuple[inspectors.Inspector, ...]:
+    """The rows ``name`` has in this dialect and platform, before type narrowing.
+
+    Split out of :func:`_matched_rows` and memoized because this half does not
+    vary with the subject: a name's overloads, and which of them the selected
+    dialect and platform can see, are fixed for the run. Re-deriving it per
+    call meant filtering every overload through
+    :meth:`TypeEnvironment.visible` thousands of times -- the single largest
+    cost in type checking.
+
+    ``environment`` is a frozen dataclass whose ``_all_platforms`` field is
+    excluded from comparison, so it hashes on exactly the ``(dialect,
+    platform)`` pair this depends on. A tuple is returned rather than a list
+    so a caller cannot mutate the cached slice.
+    """
+    rows = tuple(
+        entry
+        for entry in inspectors.lookup(name, kind=inspectors.InspectorKind.PROPERTY)
+        if environment.visible(entry)
+    )
+    if indexed is not None:
+        rows = tuple(entry for entry in rows if (entry.index_type is not None) is indexed)
+    return rows
+
+
 def _matched_rows(
     name: str,
     subject: frozenset[str] | None,
@@ -745,16 +784,9 @@ def _matched_rows(
     snapshot" case :func:`resolve_property` must keep distinct from an empty
     match, which *is* a finding. Parameters mean what they mean there.
     """
-    rows = [
-        entry
-        for entry in inspectors.lookup(name, kind=inspectors.InspectorKind.PROPERTY)
-        if environment.visible(entry)
-    ]
+    rows = _visible_rows(name, environment, indexed)
     if not rows:
         return None
-
-    if indexed is not None:
-        rows = [entry for entry in rows if (entry.index_type is not None) is indexed]
 
     if subject is None:
         return [entry for entry in rows if not entry.operands]
@@ -895,7 +927,12 @@ def check(node: Node, environment: TypeEnvironment) -> CheckResult:
     return CheckResult(
         value=value,
         diagnostics=tuple(checker.diagnostics),
-        resolutions=checker.resolutions,
+        # A read-only view, not the checker's own dict. The annotation already
+        # says `Mapping`; this makes that true at runtime, which matters
+        # because a `CheckResult` is shared -- `lint` caches one analysis per
+        # distinct statement across a run, so a write here would reach every
+        # other site that resolved to the same text.
+        resolutions=MappingProxyType(checker.resolutions),
     )
 
 

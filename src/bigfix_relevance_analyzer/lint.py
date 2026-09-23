@@ -96,6 +96,7 @@ behaves like any other literal path).
 from __future__ import annotations
 
 import enum
+import functools
 import os
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
@@ -868,6 +869,39 @@ def _file_error(path: Path, detail: str, config: LintConfig) -> tuple[Finding, .
     )
 
 
+_ANALYSIS_CACHE_SIZE: Final = 2048
+"""How many distinct statements one process keeps analyses for.
+
+Relevance is boilerplate-heavy. Across a real content repository 88% of
+extracted statements are byte-identical to another one -- `/* Windows Only */
+windows of operating system` alone appears over six thousand times -- and a
+lint run walks every file in one process. Measured over 400 real `.bes` files:
+3.07s without this, 0.26s with it, at a 94.8% hit rate.
+
+2048 covers the distinct statements in that corpus with room to spare, at
+roughly 7 KiB per entry -- about 14 MB if it ever fills. Bounded rather than
+unbounded because `lint_paths` is also reachable from a long-running process.
+"""
+
+_analyze_cached = functools.lru_cache(maxsize=_ANALYSIS_CACHE_SIZE)(analyze)
+"""`analyze`, memoized on its arguments, for the duration of the process.
+
+Safe because a :class:`~bigfix_relevance_analyzer.analyzer.RelevanceAnalysis`
+describes the *statement* and nothing else: it is frozen, it has no ``__dict__``
+to accumulate caller state in, its derived properties recompute rather than
+memoize, and everything positional a finding needs -- ``path``, ``base_line``,
+``site`` -- reaches :func:`lint_analysis` as its own arguments rather than
+through the report. ``test_two_identical_statements_still_report_their_own_positions``
+is what holds that line.
+
+Deliberately the *wrapped function* rather than a hand-written key. `analyze`
+takes a keyword-only ``probe_kind`` as well as text, dialect and platform; a
+key listing only the first three would quietly serve one probe kind's answer
+for another, and would need remembering again for every parameter added later.
+Wrapping keys on the arguments actually passed, so it cannot drift.
+"""
+
+
 def lint_file(path: str | bytes | os.PathLike[str], config: LintConfig) -> tuple[Finding, ...]:
     """Extract and judge every relevance site in one file.
 
@@ -898,7 +932,7 @@ def lint_file(path: str | bytes | os.PathLike[str], config: LintConfig) -> tuple
     findings: list[Finding] = []
     for site in sites:
         dialect = _site_dialect(site, config.dialect)
-        report = analyze(site.text, dialect, config.platform)
+        report = _analyze_cached(site.text, dialect, config.platform)
         findings.extend(
             lint_analysis(report, config, path=file_path, base_line=site.line, site=site)
         )
