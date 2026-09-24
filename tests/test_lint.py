@@ -386,6 +386,28 @@ def test_a_plural_substitution_is_reported_even_when_its_type_is_unknown(
     assert "site-type-mismatch" in codes(lint_file(path, LintConfig()))
 
 
+def test_a_plural_non_boolean_relevance_reports_the_type_too(tmp_path: Path) -> None:
+    """The real bug, from `AutomaticComputerGroups/VM - Hyper-V.bes`.
+
+    Both axes fail here at once: `unique values of names of drives` is
+    plural, *and* strings are never a `boolean` whatever their cardinality.
+    The two checks used to be two `if`/`return`s in sequence, so the first to
+    fire -- always plurality, since it is checked first -- won and the type
+    problem was silently dropped. That is a real trap: `unique value of
+    names of drives` (respelled singular) clears the plurality check and
+    still is not a boolean, so a fix guided only by the reported message
+    lands on an expression that is differently wrong, not correct. The
+    message has to name the type problem whenever it is real, plurality
+    finding or not.
+    """
+    path = tmp_path / "plural_and_wrong_type.bes"
+    path.write_text(_fixlet("unique values of names of drives"))
+    findings = [f for f in lint_file(path, LintConfig()) if f.code == "site-type-mismatch"]
+    assert len(findings) == 1
+    assert "must be a `boolean`" in findings[0].message
+    assert "plural" in findings[0].message
+
+
 def test_a_statement_with_no_site_is_not_judged_against_a_slot(tmp_path: Path) -> None:
     """The bare-statement path has no slot to conform to.
 

@@ -697,6 +697,20 @@ def _slot_mismatch(site: RelevanceSite | None, report: RelevanceAnalysis) -> str
     A value already ruled out -- an empty type set, meaning every candidate was
     eliminated -- is skipped on both axes, because some other rule has already
     faulted it and this would be one problem told twice.
+
+    Both axes are evaluated before either is reported, because a value can
+    fail both at once, and the type failure is the one worth naming: shipped
+    content proves that a plurality finding alone reads as an instruction --
+    "collapse it" -- that a reader follows to a respelling still not the
+    required type. `AutomaticComputerGroups/VM - Hyper-V.bes` was exactly
+    this, `unique values whose (...) of (dmis; smbioses; bioses)` over a
+    `SearchComponentRelevance/Relevance` slot, which needs a `boolean`: the
+    respelling that clears the plurality complaint, `unique value of
+    <plural>`, is still a version string, not a `boolean`, and only `exists`
+    over the plural form actually answers the slot's question. The type
+    problem does not depend on the plurality one -- it does not go away when
+    the value is singular -- so it is worth stating whichever finding
+    literally fired first.
     """
     if site is None or report.check is None:
         return None
@@ -708,14 +722,30 @@ def _slot_mismatch(site: RelevanceSite | None, report: RelevanceAnalysis) -> str
     if value.types is not None and not value.types:
         return None
 
-    if plurality == "singular" and value.plurality is Plurality.PLURAL:
+    is_plural = plurality == "singular" and value.plurality is Plurality.PLURAL
+    if (
+        required_type is not None
+        and (known_types := value.types) is not None
+        and required_type not in known_types
+    ):
+        rendered = " or ".join(f"`{name}`" for name in sorted(known_types))
+        message = f"{site.context} must be a `{required_type}`; this is {rendered}"
+        if is_plural:
+            # Naming both, not just the type: a reader who only collapses the
+            # plurality -- exactly the fix the other message on its own
+            # suggests -- still has not produced a `required_type`, and needs
+            # to know that before trying it.
+            message += (
+                ", and plural -- respelling it singular does not change the type; "
+                "`exists` answers the slot directly"
+            )
+        return message
+
+    if is_plural:
         return (
             f"{site.context} takes one value; this is plural -- "
             "an aggregate such as `unique value of` collapses it"
         )
-    if required_type is not None and value.types is not None and required_type not in value.types:
-        rendered = " or ".join(f"`{name}`" for name in sorted(value.types))
-        return f"{site.context} must be a `{required_type}`; this is {rendered}"
     return None
 
 
