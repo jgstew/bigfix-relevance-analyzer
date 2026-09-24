@@ -411,6 +411,7 @@ same way instead of each inventing a description:
 | `version-truncating-compare` | warning | a version comparison that truncates to the shorter operand's components | always on |
 | `version-like-string-compare` | warning | two version-looking strings compared as strings, not as versions | always on |
 | `unknown-inspector` | warning | a name no inspector dump defines | always on |
+| `non-renderable-substitution` | warning | an ordinary ActionScript substitution's value is an opaque object with no text form | always on |
 
 There is no CLI spelling to disable `complexity`/`evaluation-cost` entirely -
 only to raise their ceiling. A caller that wants a rule off altogether passes

@@ -338,6 +338,25 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "never an error by default.",
             ),
             _rule(
+                "non-renderable-substitution",
+                Severity.WARNING,
+                "an ordinary ActionScript substitution's value is an opaque object with "
+                "no text form",
+                "A `run`/`wait`/`parameter` substitution embeds whatever its relevance "
+                "answers with as text, and most types manage that fine -- a `boolean`, "
+                "an `integer`, a `version`, even a `folder` (via its pathname). A "
+                "curated handful genuinely can't: the whole `bes *` object family, "
+                "`dmi *`/`smbios *` structs, `xml dom *`, `active directory *` objects, "
+                "`sqlite *`, and bare objects like `dictionary`, `registry`, `process`, "
+                "`socket`, `connection`. Unlike `site-type-mismatch`'s requirement on an "
+                "`if`/`elseif`/`continue if` condition, nobody has run a real "
+                "substitution with one of these and watched it fail -- this is the "
+                "reasoning that an opaque object has no text form, not a live-engine "
+                "confirmation, which is why it is a warning rather than that rule's "
+                "hard error. Positive evidence only: a value that might resolve to a "
+                "renderable type in one branch is not flagged.",
+            ),
+            _rule(
                 "mixed-dialect",
                 Severity.ERROR,
                 "inspectors exclusive to client relevance and to session relevance in "
@@ -767,6 +786,82 @@ def _slot_mismatch(site: RelevanceSite | None, report: RelevanceAnalysis) -> str
     return None
 
 
+# Object types with no meaningful text form when substituted -- curated by
+# name pattern, not derived from the dumps' cast table. The cast table only
+# records a `<T> as string` row where something else in the dumps sampled
+# one, so most scalars have no row at all despite obviously rendering fine
+# (`utf8 string`, every `... with multiplicity` element type); deriving from
+# it would flag the common case, not the rare one. Confirmed directly on two
+# of the bare entries below, unrelated to anything else in this codebase's
+# history:
+#
+#     Q: "x" & (processes as string)
+#     E: The operator "string" is not defined.
+#     Q: "x" & (dictionaries of files "/etc/hosts" as string)
+#     E: The operator "string" is not defined.
+#
+# and that an object *not* on this list, `folder`, does render -- via its
+# pathname, confirmed the same way:
+#
+#     Q: "x" & (folder "/tmp" as string)
+#     A: x/tmp
+#
+# so the list stays narrow and deliberate. This is inference, not a
+# live-confirmed engine fact the way the `actionscript-condition` type
+# requirement above is -- see `non-renderable-substitution` in `RULES` for
+# why that keeps it a warning rather than a `site-type-mismatch` error.
+_NON_RENDERABLE_TYPE_PREFIXES: Final = (
+    "bes ",
+    "dmi ",
+    "smbios ",
+    "xml dom ",
+    "active directory ",
+    "sqlite ",
+)
+_NON_RENDERABLE_TYPES: Final = frozenset(
+    {
+        "wmi object",
+        "registry",
+        "socket",
+        "connection",
+        "process",
+        "security descriptor",
+        "security database",
+        "array",
+        "dictionary",
+        "nothing",
+    }
+)
+
+
+def _is_non_renderable(name: str) -> bool:
+    return name in _NON_RENDERABLE_TYPES or name.startswith(_NON_RENDERABLE_TYPE_PREFIXES)
+
+
+def _non_renderable_substitution(
+    site: RelevanceSite | None, report: RelevanceAnalysis
+) -> str | None:
+    """Whether an ordinary substitution's value is an opaque object.
+
+    Gated to `"actionscript-substitution"` alone: an `if`/`elseif`/`continue
+    if` condition already has its own, stricter, confirmed requirement in
+    `_slot_mismatch`, and a `<Relevance>` element's boolean requirement rules
+    this out on its own axis.
+
+    Positive evidence only, same discipline as `_slot_mismatch`: flags only
+    when *every* possible type is on the blocklist, so a value that might
+    resolve to a renderable type in one branch and an opaque one in another
+    is left alone.
+    """
+    if site is None or site.kind != "actionscript-substitution" or report.check is None:
+        return None
+    types = report.check.value.types
+    if not types or not all(_is_non_renderable(name) for name in types):
+        return None
+    rendered = " or ".join(f"`{name}`" for name in sorted(types))
+    return f"{site.context} substitutes {rendered}, which has no string representation to embed"
+
+
 def lint_analysis(
     report: RelevanceAnalysis,
     config: LintConfig,
@@ -831,6 +926,10 @@ def lint_analysis(
     mismatch = _slot_mismatch(site, report)
     if mismatch is not None:
         emit("site-type-mismatch", mismatch, 1)
+
+    non_renderable = _non_renderable_substitution(site, report)
+    if non_renderable is not None:
+        emit("non-renderable-substitution", non_renderable, 1)
 
     # Statement-level too, and before `unknown-inspector`: when a statement is
     # in neither dialect, that is the more useful thing to read first.

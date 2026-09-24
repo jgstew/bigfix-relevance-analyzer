@@ -466,6 +466,79 @@ def test_an_elseif_and_continue_if_condition_are_judged_the_same_way(
     assert len(findings) == 2
 
 
+# ---------------------------------------------------------------------------
+# An ordinary substitution's value has to have *some* text form
+# ---------------------------------------------------------------------------
+#
+# Inference, not a live-engine confirmation like the boolean-or-string
+# requirement above -- hence its own WARNING-tier code, `non-renderable-
+# substitution`, rather than folding into the hard `site-type-mismatch`
+# error. Confirmed directly (unrelated to anything else this session):
+#
+#     Q: "x" & (processes as string)
+#     E: The operator "string" is not defined.
+#     Q: "x" & (dictionaries of files "/etc/hosts" as string)
+#     E: The operator "string" is not defined.
+#     Q: "x" & (folder "/tmp" as string)
+#     A: x/tmp
+#
+# so the blocklist is deliberately narrow -- an opaque object like
+# `dictionary` or the whole `bes *` family, not "any type without a sampled
+# cast," which `folder` would wrongly catch.
+
+
+def test_a_substitution_of_an_opaque_object_is_a_warning(tmp_path: Path) -> None:
+    path = tmp_path / "dictionary_substitution.bes"
+    path.write_text(_fixlet("true", action='run echo {dictionaries of files "/etc/hosts"}'))
+    findings = [f for f in lint_file(path, LintConfig()) if f.code == "non-renderable-substitution"]
+    assert len(findings) == 1
+    assert findings[0].severity is Severity.WARNING
+    assert "`dictionary`" in findings[0].message
+
+
+def test_ordinary_scalar_substitutions_are_silent(tmp_path: Path) -> None:
+    """The common case this rule must never touch."""
+    for relevance in ("true", "name of operating system", "1 + 1", "version of operating system"):
+        path = tmp_path / "scalar.bes"
+        path.write_text(_fixlet("true", action=f"run echo {{{relevance}}}"))
+        assert "non-renderable-substitution" not in codes(lint_file(path, LintConfig()))
+
+
+def test_a_folder_substitution_is_silent(tmp_path: Path) -> None:
+    """`folder` is an object too, but it renders via its pathname -- proof
+    the blocklist is curated, not "anything without a sampled cast."""
+    path = tmp_path / "folder_substitution.bes"
+    path.write_text(_fixlet("true", action='run echo {folder "/tmp"}'))
+    assert "non-renderable-substitution" not in codes(lint_file(path, LintConfig()))
+
+
+def test_a_substitution_that_might_be_renderable_is_silent(tmp_path: Path) -> None:
+    """Positive evidence only: a value that could resolve to `boolean` in one
+    branch and `dictionary` in another is not flagged, the same discipline
+    `_slot_mismatch` already holds everywhere else in this module."""
+    path = tmp_path / "mixed_types.bes"
+    path.write_text(
+        _fixlet(
+            "true",
+            action='run echo {if true then true else (dictionaries of files "/etc/hosts")}',
+        )
+    )
+    assert "non-renderable-substitution" not in codes(lint_file(path, LintConfig()))
+
+
+def test_non_renderable_substitution_does_not_apply_to_other_slots(tmp_path: Path) -> None:
+    """The check is gated to ordinary substitutions -- an `if` condition or a
+    `<Relevance>` element are judged by their own, separate rules."""
+    path = tmp_path / "other_slots.bes"
+    path.write_text(
+        _fixlet(
+            'exists dictionaries of files "/etc/hosts"',
+            action='if {exists dictionaries of files "/etc/hosts"}\nendif',
+        )
+    )
+    assert "non-renderable-substitution" not in codes(lint_file(path, LintConfig()))
+
+
 def test_a_statement_with_no_site_is_not_judged_against_a_slot(tmp_path: Path) -> None:
     """The bare-statement path has no slot to conform to.
 
@@ -688,6 +761,13 @@ def test_every_rule_in_the_catalog_is_a_rule_that_fires(tmp_path: Path) -> None:
     slotted = tmp_path / "slotted.bes"
     slotted.write_text(_fixlet("name of operating system"))
     emitted.update(finding.code for finding in lint_file(slotted, LintConfig()))
+
+    # `non-renderable-substitution` is the same story, for the other slot it
+    # reads: an ordinary substitution, not the statement, holding an opaque
+    # object with no text form.
+    substituted = tmp_path / "substituted.bes"
+    substituted.write_text(_fixlet("true", action='run echo {dictionaries of files "/etc/hosts"}'))
+    emitted.update(finding.code for finding in lint_file(substituted, LintConfig()))
 
     assert emitted == set(RULES)
 
