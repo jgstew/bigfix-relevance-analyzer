@@ -84,14 +84,25 @@ Not every surface in the table above accepts anything that types and parses.
   value - a plural value has no single answer to put in it, the same
   non-unique-object risk as anywhere else a plural meets a singular slot, only
   here there is no fallback position to retreat to. A boolean is fine and
-  coerces to a string, which shipped content relies on heavily.
+  coerces to a string, which shipped content relies on heavily. Confirmed by
+  testing against a live client: a plural condition genuinely does not work,
+  not merely an inference from the general non-unique-object risk.
+- **An `if`/`elseif`/`continue if` condition must be singular, and either a
+  `boolean` or a `string` - nothing else.** These three commands write their
+  condition directly against the keyword (`if{...}`, `elseif {...}`,
+  `continue if{...}`, both spacings confirmed in shipped content) and branch
+  on the answer, unlike an ordinary substitution elsewhere, which just embeds
+  text and so tolerates any renderable type. Also confirmed by testing
+  against a live client.
 
-The type requirement is the part still open. QnA is not the authority for it:
-it prints a plural cheerfully (one `A:` line per value), because printing and
-substituting are different operations, and only the second is the one that
-actually has one hole to fill. Confirming exactly which types beyond `string`
-and `boolean` a substitution accepts needs a real ActionScript run, not an
-evaluation - unverified here.
+The type requirement for an *ordinary* substitution is the part still open.
+QnA is not the authority for it: it prints a plural cheerfully (one `A:` line
+per value), because printing and substituting are different operations, and
+only the second is the one that actually has one hole to fill. Confirming
+exactly which types beyond `string` and `boolean` an ordinary substitution
+accepts needs a real ActionScript run, not an evaluation - unverified here.
+The `if`/`elseif`/`continue if` case above is the one exception already
+settled: real testing, not inference.
 
 ## Where to read more
 

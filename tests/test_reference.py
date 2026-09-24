@@ -283,6 +283,7 @@ def test_every_extraction_context_is_documented_somewhere() -> None:
         "success-criteria": ("<successcriteria>",),
         "analysis-property": ("analysis properties", "analysis property"),
         "actionscript-substitution": ("actionscript",),
+        "actionscript-condition": ("elseif",),
         "relevance-pi": ("<?relevance ?>",),
         "javascript-call": ("evaluaterelevance",),
         "plain-text": (".rel", ".bsr"),

@@ -408,6 +408,64 @@ def test_a_plural_non_boolean_relevance_reports_the_type_too(tmp_path: Path) -> 
     assert "plural" in findings[0].message
 
 
+def test_an_if_condition_may_be_boolean(tmp_path: Path) -> None:
+    """`if`/`elseif`/`continue if` accept a boolean condition, same as ever."""
+    path = tmp_path / "if_boolean.bes"
+    path.write_text(_fixlet("true", action='if {exists file "/etc/hosts"}\nendif'))
+    assert "site-type-mismatch" not in codes(lint_file(path, LintConfig()))
+
+
+def test_an_if_condition_may_also_be_a_string(tmp_path: Path) -> None:
+    """The one way this slot is *more* permissive than `<Relevance>`: a
+    string is fine here, confirmed by testing against a live client, where a
+    string is never acceptable for a `<Relevance>` element's boolean slot."""
+    path = tmp_path / "if_string.bes"
+    path.write_text(_fixlet("true", action="if {name of operating system}\nendif"))
+    assert "site-type-mismatch" not in codes(lint_file(path, LintConfig()))
+
+
+def test_an_if_condition_that_is_neither_boolean_nor_string_is_a_finding(
+    tmp_path: Path,
+) -> None:
+    """`size of file "..."` is an `integer` -- neither of the two types this
+    slot accepts -- so it is exactly as broken here as a plural or a string
+    is in a `<Relevance>` element."""
+    path = tmp_path / "if_integer.bes"
+    path.write_text(_fixlet("true", action='if {size of file "/etc/hosts"}\nendif'))
+    findings = [f for f in lint_file(path, LintConfig()) if f.code == "site-type-mismatch"]
+    assert len(findings) == 1
+    assert "must be" in findings[0].message
+    assert "`boolean`" in findings[0].message
+    assert "`string`" in findings[0].message
+
+
+def test_a_plural_if_condition_still_reports_plurality(tmp_path: Path) -> None:
+    """The new kind shares the plurality axis with every other slot; adding
+    it must not disturb that shared check."""
+    path = tmp_path / "if_plural.bes"
+    path.write_text(_fixlet("true", action='if {names of files of folder "/tmp"}\nendif'))
+    assert "site-type-mismatch" in codes(lint_file(path, LintConfig()))
+
+
+def test_an_elseif_and_continue_if_condition_are_judged_the_same_way(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "elseif_continueif.bes"
+    path.write_text(
+        _fixlet(
+            "true",
+            action=(
+                "if {false}\n"
+                'elseif {size of file "/etc/hosts"}\n'
+                "endif\n"
+                'continue if {size of file "/etc/hosts"}'
+            ),
+        )
+    )
+    findings = [f for f in lint_file(path, LintConfig()) if f.code == "site-type-mismatch"]
+    assert len(findings) == 2
+
+
 def test_a_statement_with_no_site_is_not_judged_against_a_slot(tmp_path: Path) -> None:
     """The bare-statement path has no slot to conform to.
 

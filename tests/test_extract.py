@@ -48,6 +48,61 @@ def test_actionscript_no_substitution() -> None:
     assert extract_relevance_from_actionscript("waithidden cmd.exe /c dir") == []
 
 
+# --------------------------------------------------------------------------
+# `if` / `elseif` / `continue if` conditions are a distinct kind of site
+# --------------------------------------------------------------------------
+#
+# Real `.bes` content only ever writes these three commands' condition as a
+# `{...}` substitution directly against the keyword, in either spacing --
+# `if{...}`, `elseif {...}`, `continue if{...}`, `continue if {...}` -- never
+# with a bare condition or a parenthesized `if(...)`. Confirmed grammar, not
+# an assumption: see `AutomaticComputerGroups`/`fixlet` corpus lines quoted
+# in the session that added this.
+
+
+def test_if_condition_is_its_own_kind() -> None:
+    sites = extract_relevance_from_actionscript('if{exists file "/etc/hosts"}')
+    assert len(sites) == 1
+    assert sites[0].kind == "actionscript-condition"
+    assert sites[0].text == 'exists file "/etc/hosts"'
+
+
+def test_elseif_condition_with_a_space_is_its_own_kind() -> None:
+    sites = extract_relevance_from_actionscript('elseif {exists file "/etc/hosts"}')
+    assert sites[0].kind == "actionscript-condition"
+
+
+def test_continue_if_condition_is_its_own_kind_either_spacing() -> None:
+    tight = extract_relevance_from_actionscript('continue if{exists file "/etc/hosts"}')
+    spaced = extract_relevance_from_actionscript('continue if {exists file "/etc/hosts"}')
+    assert tight[0].kind == "actionscript-condition"
+    assert spaced[0].kind == "actionscript-condition"
+
+
+def test_condition_keywords_are_case_insensitive() -> None:
+    assert extract_relevance_from_actionscript("IF{true}")[0].kind == "actionscript-condition"
+    assert extract_relevance_from_actionscript("ElseIf {true}")[0].kind == "actionscript-condition"
+
+
+def test_endif_does_not_false_match_as_a_condition() -> None:
+    """`endif` ends in `if`, and must not be mistaken for the keyword `if`.
+
+    The word-boundary this depends on: the character immediately before the
+    matched keyword must not be a word character, which rules out matching
+    `if` inside `endif`, `notif`, or any other identifier that merely ends
+    with those letters.
+    """
+    sites = extract_relevance_from_actionscript("endif {name of operating system}")
+    assert sites[0].kind == "actionscript-substitution"
+
+
+def test_an_ordinary_substitution_is_unaffected() -> None:
+    """A `run`/`wait`/`appendfile` substitution is not near any of the three
+    keywords, so it keeps the permissive kind it always had."""
+    sites = extract_relevance_from_actionscript('appendfile {parameter "RootServerURL"}')
+    assert sites[0].kind == "actionscript-substitution"
+
+
 def test_actionscript_escaped_braces_are_literal() -> None:
     """`{{` and `}}` are literal braces in ActionScript, not a substitution."""
     assert extract_relevance_from_actionscript("appendfile {{ not relevance }}") == []

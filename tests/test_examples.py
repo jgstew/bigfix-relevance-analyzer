@@ -28,6 +28,7 @@ UNCERTAIN = Dialect.UNCERTAIN
 REL = "relevance"
 PROP = "analysis-property"
 SUB = "actionscript-substitution"
+COND = "actionscript-condition"
 PI = "relevance-pi"
 JS = "javascript-call"
 PLAIN = "plain-text"
@@ -88,9 +89,9 @@ EXPECTED: dict[str, Expected] = {
             (REL, CLIENT, 11),
             (REL, CLIENT, 12),
             (REL, CLIENT, 13),
-            (SUB, CLIENT, 33),
-            (SUB, CLIENT, 39),
-            (SUB, CLIENT, 45),
+            (COND, CLIENT, 33),
+            (COND, CLIENT, 39),
+            (COND, CLIENT, 45),
         ),
         text_prefixes=(
             "/* PowerManagement not applicable to Proxy",
@@ -270,11 +271,11 @@ EXPECTED: dict[str, Expected] = {
             (SUB, CLIENT, 58),
             *((SUB, CLIENT, 85),) * 2,
             *((SUB, CLIENT, 88),) * 3,
-            (SUB, CLIENT, 92),
+            (COND, CLIENT, 92),
             *((SUB, CLIENT, 95),) * 8,
-            (SUB, CLIENT, 112),
+            (COND, CLIENT, 112),
             *((SUB, CLIENT, 114),) * 9,
-            (SUB, CLIENT, 119),
+            (COND, CLIENT, 119),
         ),
         note="Mixed context: client applicability plus dynamic session relevance in JS.",
     ),

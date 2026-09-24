@@ -64,6 +64,7 @@ SiteKind = Literal[
     "success-criteria",
     "analysis-property",
     "actionscript-substitution",
+    "actionscript-condition",
     "relevance-pi",
     "javascript-call",
     "plain-text",
@@ -225,12 +226,26 @@ def _make_site(
 # it are not relevance substitutions.
 _HEREDOC_RE = re.compile(r"^\s*(?:create|append)file\s+until\s+(\S+)\s*$", re.IGNORECASE)
 
+# `if`, `elseif`, `continue if` write their condition directly against the
+# keyword -- `if{...}`, `elseif {...}`, `continue if{...}` -- confirmed
+# against real `.bes` content in both spacings, never with a bare condition or
+# a parenthesized `if(...)`. The `(?:^|[^A-Za-z0-9_])` prefix is load-bearing:
+# without it, `endif{...}` would match on its own trailing `if`, since the
+# alternation only anchors the *end* of the match to the brace.
+_CONDITION_KEYWORD_RE = re.compile(
+    r"(?:^|[^A-Za-z0-9_])(?:continue\s+if|elseif|if)\s*$", re.IGNORECASE
+)
 
-def _iter_substitution_spans(body: str) -> Iterator[tuple[int, str]]:
-    """Yield ``(line, relevance_text)`` for each `{...}` substitution in ``body``.
+
+def _iter_substitution_spans(body: str) -> Iterator[tuple[int, str, bool]]:
+    """Yield ``(line, relevance_text, is_condition)`` for each `{...}`
+    substitution in ``body``.
 
     Handles `{{`/`}}` literal-brace escapes, ignores `}` inside a relevance
-    string literal, and skips heredoc content entirely.
+    string literal, and skips heredoc content entirely. ``is_condition`` is
+    whether the substitution is the condition of an `if`/`elseif`/`continue
+    if` command, which the type checker holds to a different requirement than
+    an ordinary substitution -- see `_SLOT_REQUIREMENTS` in `lint.py`.
     """
     lines = body.split("\n")
     heredoc_terminator: str | None = None
@@ -272,7 +287,8 @@ def _iter_substitution_spans(body: str) -> Iterator[tuple[int, str]]:
 
             text = body[line_start + brace + 1 : end].strip()
             if text:
-                yield line_number, text
+                is_condition = _CONDITION_KEYWORD_RE.search(line[:brace]) is not None
+                yield line_number, text, is_condition
             else:
                 logger.debug("empty relevance substitution at line %d", line_number)
 
@@ -319,13 +335,13 @@ def extract_relevance_from_actionscript(
     """
     return [
         _make_site(
-            kind="actionscript-substitution",
+            kind="actionscript-condition" if is_condition else "actionscript-substitution",
             text=text,
             line=line + line_offset,
             context=context,
             context_dialect=dialect,
         )
-        for line, text in _iter_substitution_spans(body)
+        for line, text, is_condition in _iter_substitution_spans(body)
     ]
 
 

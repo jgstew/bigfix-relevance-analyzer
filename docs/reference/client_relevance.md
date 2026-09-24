@@ -43,24 +43,26 @@ guards platform-specific parts explicitly, with `if` - see below, because the
 guard has to be an `if`. `windows of operating system`, `mac of operating
 system` and `unix of operating system` are the usual tests.
 
-Three inspectors that look session-only but are macOS **client** inspectors:
-`rate`, `linear projection`, `exponential projection`.
+Three macOS **client** inspectors that look session-only: `rate`, `linear
+projection`, `exponential projection`.
 
 ## Common mistakes
 
 - **Session inspectors in a `<Relevance>` element.** Anything starting `bes ` -
   `bes computers`, `bes fixlets` - has no meaning on a client. This is the
   single most common dialect error, and it fails on every endpoint.
-- **Assuming platform coverage.** A statement that works on Windows may have no
-  meaning on Linux. Guard, or stay portable.
-- **An unbound `it`.** `size of it` with nothing to bind to is meaningless to
-  the engine, not merely unusual.
-- **Backslash escaping in paths.** `"C:\Windows"` is correct as written; a
-  backslash escapes nothing.
+- **Assuming platform coverage.** A Windows statement may have no meaning on
+  Linux. Guard, or stay portable.
+- **An unbound `it`.** `size of it` with nothing to bind to is meaningless,
+  not merely unusual.
+- **Backslash escaping.** `"C:\Windows"` is correct as written - nothing is
+  escaped.
 - **Expensive constructs in applicability relevance.** Applicability is
   evaluated repeatedly, on every endpoint. Whole-file hashing and directory
   recursion in a `<Relevance>` element are the classic causes of client CPU
   complaints - see the cost table below.
+- **A non-boolean `if`/`elseif`/`continue if` condition.** Only `boolean` or
+  `string` works; an ordinary substitution takes any type.
 
 ## `pad of` compares safely; its string form does not travel
 

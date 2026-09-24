@@ -308,18 +308,21 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "Only extraction knows this: the same expression is correct in one slot "
                 "and broken in another, so this is the one rule that reads the "
                 "`RelevanceSite` rather than the statement alone -- and it is silent for "
-                "a caller that lints bare text, which has no slot. Two slots constrain "
+                "a caller that lints bare text, which has no slot. Three slots constrain "
                 "their value and are checked. A `<Relevance>` element decides "
                 "applicability, so a clause that is not a boolean makes the content "
-                "unable to apply anywhere. An ActionScript `{...}` substitution has one "
-                "hole to fill, so a plural value has no single answer to put in it; a "
-                "boolean is fine there and coerces to a string, which shipped content "
-                "relies on heavily. An error, not a warning, because neither is a risk "
-                "the author may have ruled out -- the content cannot work. Positive "
-                "evidence only, as everywhere else: an undetermined type or plurality is "
-                "not a finding, and neither is a value some other rule already faulted. "
-                "Analysis properties are deliberately unlisted, being legitimately "
-                "plural and of any renderable type.",
+                "unable to apply anywhere. An `if`/`elseif`/`continue if` condition "
+                "branches on its answer, and -- confirmed by testing against a live "
+                "client -- accepts a `boolean` or a `string` but nothing else. An "
+                "ordinary ActionScript `{...}` substitution has one hole to fill and no "
+                "type requirement of its own: it just embeds text, so a plural value has "
+                "no single answer to put in it, but any singular type serves, a boolean "
+                "included, which shipped content relies on heavily. An error, not a "
+                "warning, because neither is a risk the author may have ruled out -- the "
+                "content cannot work. Positive evidence only, as everywhere else: an "
+                "undetermined type or plurality is not a finding, and neither is a value "
+                "some other rule already faulted. Analysis properties are deliberately "
+                "unlisted, being legitimately plural and of any renderable type.",
             ),
             _rule(
                 "unknown-inspector",
@@ -671,15 +674,26 @@ _CHECK_RULES: Final = {
 }
 
 
-# What each kind of site requires of the value it holds. Only the two slots the
-# engine genuinely constrains are listed: an applicability clause decides yes or
-# no, and an ActionScript substitution has one hole to fill. An analysis
-# property may legitimately be plural and may be any renderable type, a
-# `.rel` file or a markdown block is not a slot at all, and the remaining
-# contexts have not been confirmed -- an unlisted kind is judged on nothing.
+# What each kind of site requires of the value it holds. Only the slots the
+# engine genuinely constrains are listed: an applicability clause decides yes
+# or no, an `if`/`elseif`/`continue if` condition needs an answer to branch
+# on, and an ordinary ActionScript substitution has one hole to fill but no
+# constraint of its own on the value's type -- confirmed by testing against a
+# live client, and the reason it is *more* permissive than a condition rather
+# than the reverse: a `run`/`wait`/`parameter` substitution just embeds text,
+# so any renderable value serves, where `if`/`elseif`/`continue if` actually
+# branch on the answer and only accept a `boolean` or a `string`. An analysis
+# property may legitimately be plural and of any renderable type, a `.rel`
+# file or a markdown block is not a slot at all, and the remaining contexts
+# have not been confirmed -- an unlisted kind is judged on nothing.
+#
+# The required-type axis is always a set, even where exactly one name would
+# do: one representation for `_slot_mismatch` to check, rather than a
+# single-name shape and a set shape both needing their own branch.
 _SLOT_REQUIREMENTS: Final = {
-    "relevance": ("singular", "boolean"),
+    "relevance": ("singular", frozenset({"boolean"})),
     "actionscript-substitution": ("singular", None),
+    "actionscript-condition": ("singular", frozenset({"boolean", "string"})),
 }
 
 
@@ -717,23 +731,27 @@ def _slot_mismatch(site: RelevanceSite | None, report: RelevanceAnalysis) -> str
     requirement = _SLOT_REQUIREMENTS.get(site.kind)
     if requirement is None:
         return None
-    plurality, required_type = requirement
+    plurality, required_types = requirement
     value = report.check.value
     if value.types is not None and not value.types:
         return None
 
     is_plural = plurality == "singular" and value.plurality is Plurality.PLURAL
     if (
-        required_type is not None
+        required_types is not None
         and (known_types := value.types) is not None
-        and required_type not in known_types
+        and known_types.isdisjoint(required_types)
     ):
         rendered = " or ".join(f"`{name}`" for name in sorted(known_types))
-        message = f"{site.context} must be a `{required_type}`; this is {rendered}"
+        wanted = sorted(required_types)
+        requirement_phrase = (
+            f"a `{wanted[0]}`" if len(wanted) == 1 else " or ".join(f"`{name}`" for name in wanted)
+        )
+        message = f"{site.context} must be {requirement_phrase}; this is {rendered}"
         if is_plural:
             # Naming both, not just the type: a reader who only collapses the
             # plurality -- exactly the fix the other message on its own
-            # suggests -- still has not produced a `required_type`, and needs
+            # suggests -- still has not produced an acceptable type, and needs
             # to know that before trying it.
             message += (
                 ", and plural -- respelling it singular does not change the type; "
