@@ -242,7 +242,7 @@ class Of:
         Q: computer name of file "/etc/hosts"
         E: The operator "computer name" is not defined.
         Q: (computer name) of file "/etc/hosts"
-        A: LP1-US-51719315 (796)
+        A: Laptop (796)
 
     Deliberately absent from :func:`to_sexpr`: the parse-tree corpus pins the
     grammar's shape, and this is a fact *about* a shape the corpus already
