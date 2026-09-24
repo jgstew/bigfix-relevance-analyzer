@@ -1966,6 +1966,129 @@ def test_a_property_with_an_explicit_direct_object_does_not_fall_back(
     assert codes_of(source, env) == ["property-not-defined"]
 
 
+# ---------------------------------------------------------------------------
+# Parentheses decide whether the object is a direct object at all
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        # The mirror image of the cases just above, one paren apart. The
+        # unparenthesized spelling is a direct object and the engine refuses
+        # it; parenthesized, the same name resolves against the world and the
+        # object only binds `it`::
+        #
+        #     Q: computer name of file "/etc/hosts"
+        #     E: The operator "computer name" is not defined.
+        #     Q: (computer name) of file "/etc/hosts"
+        #     A: LP1-US-51719315 (796)
+        pytest.param('(computer name) of file "/etc/hosts"', id="computer-name"),
+        # qna: A: Wed, 23 Sep 2026
+        pytest.param('(current date) of file "/etc/hosts"', id="current-date"),
+        # qna: A: 137402, against `number of properties of files of folder
+        # "/etc"` -> E: The operator "properties" is not defined.
+        pytest.param(
+            'number of (properties) of files of folder "/etc"',
+            id="of-chain",
+        ),
+        # The shape the content corpus actually writes: a world creator whose
+        # index is `it`, so the object is the *index*, never a direct object.
+        # qna: A: usr
+        pytest.param('name of (folder it) of "/usr"', id="folder-it"),
+        # qna: A: qna_test_file.png, against a file that exists. Plural on
+        # both sides deliberately: `name of (files it)` resolves just as well,
+        # but earns `singular-over-plural-object` on top, and the risk axis is
+        # not what this test is about.
+        pytest.param('names of (files it) of "/tmp/x.png"', id="files-it"),
+        # A constant index, so `it` is unused -- the object is still not a
+        # direct object. qna: A: tmp
+        pytest.param('name of (folder "/tmp") of file "/etc/hosts"', id="constant-index"),
+        # qna: A: hosts
+        pytest.param(
+            'name of (file it) of pathname of file "/etc/hosts"',
+            id="file-it-over-pathname",
+        ),
+    ],
+)
+def test_a_parenthesized_property_resolves_against_the_world(
+    source: str, env: TypeEnvironment
+) -> None:
+    """`(A) of B` is a standalone expression evaluated with `it` bound to B.
+
+    The parentheses are semantic, not cosmetic: they stop `B` being the
+    property's direct object, so the name has to resolve at the world level and
+    the direct-object tables are never consulted. Every case here is a name the
+    tables define only without an operand, written over an object that does not
+    define it -- exactly the shape
+    :func:`test_a_property_with_an_explicit_direct_object_does_not_fall_back`
+    rejects one paren away.
+    """
+    assert codes_of(source, env) == []
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        # World-only means world-*only*: there is no fallback the other way.
+        # `name of <file>` is a perfectly good property, and parenthesizing
+        # puts it out of reach::
+        #
+        #     Q: name of file "/etc/hosts"
+        #     A: hosts
+        #     Q: (name) of file "/etc/hosts"
+        #     E: The operator "name" is not defined.
+        pytest.param('(name) of file "/etc/hosts"', id="name"),
+        # qna: E: The operator "size" is not defined.
+        pytest.param('(size) of file "/etc/hosts"', id="size"),
+    ],
+)
+def test_a_parenthesized_property_the_world_does_not_define_is_reported(
+    source: str, env: TypeEnvironment
+) -> None:
+    """The soft code, because a missing world name never proves a mistake.
+
+    The dumps do not cover every evaluation context, which is the whole reason
+    a bare world reference reports `world-property-not-defined` rather than
+    `property-not-defined`. A parenthesized property *is* a bare world
+    reference, so it inherits that caution -- `lint` shows these as
+    `unknown-inspector`.
+    """
+    assert codes_of(source, env) == ["world-property-not-defined"]
+
+
+def test_a_parenthesized_property_distributes_instead_of_collapsing(
+    env: TypeEnvironment,
+) -> None:
+    """Parens move the plurality question from the spelling to the object.
+
+    A bare singular spelling over a plural object collapses, and the engine
+    says so; the same property parenthesized is evaluated once per element
+    with `it` bound to it, and answers once per element without complaint::
+
+        Q: name of files of folder "/etc"
+        A: afpovertcp.cfg
+        E: Singular expression refers to non-unique object.
+        Q: (name of it) of files of folder "/etc"
+        A: afpovertcp.cfg
+        A: aliases
+        A: aliases.db
+        ...
+
+    So a parenthesized property carries no written form into its `of` -- it
+    belongs with the cast and the nested `of`, where the object settles
+    plurality and no collapse risk arises. This shape is why: the corpus's
+    `concatenations ", " of (html it) of (...)` began reporting a non-unique
+    risk it does not take, and `(html it) of ("a";"b")` answers `a` and `b`
+    with no error at all.
+    """
+    assert codes_of('name of files of folder "/etc"', env) == ["singular-over-plural-object"]
+    assert codes_of('(name of it) of files of folder "/etc"', env) == []
+    # And the result is plural, off a singular spelling, because the object is.
+    value = check(parse('(name of it) of files of folder "/etc"'), env).value
+    assert value.plurality is Plurality.PLURAL
+
+
 @pytest.mark.parametrize(
     "source",
     [

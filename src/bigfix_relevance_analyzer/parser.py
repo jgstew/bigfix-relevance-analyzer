@@ -412,7 +412,7 @@ class _Parser:
             if token.normalized == "of" and min_bp < grammar.BP_OF:
                 self.advance()
                 obj = self.parse_expression(grammar.BP_OF - 1)  # right-associative
-                return _of(left, obj)
+                return _of(left, obj, grouped=id(left) in self.grouped)
 
             if token.normalized == "whose" and min_bp < grammar.BP_WHOSE:
                 self.advance()
@@ -579,7 +579,7 @@ def _sequence(kind: type[TupleExpr] | type[Collection], left: Node, right: Node)
     )
 
 
-def _of(prop: Node, obj: Node) -> Node:
+def _of(prop: Node, obj: Node, *, grouped: bool = False) -> Node:
     """Build ``prop of obj``, specialising the two forms that are not property
     access.
 
@@ -587,9 +587,18 @@ def _of(prop: Node, obj: Node) -> Node:
     Neither needs the object's type, which is what keeps this in the parser:
     `number` is not an inspector at all, so `number of x` can only be
     aggregation, and a numeric index can only be a tuple subscript.
+
+    ``grouped`` -- ``prop`` came out of its own parentheses -- suppresses both,
+    because both read a *bare* phrase and parentheses end that. The names have
+    to stand on their own then, and neither does::
+
+        Q: (number) of files of folder "/etc"
+        E: The operator "number" is not defined.
+        Q: (item 0) of ("a","b")
+        E: The operator "item" is not defined.
     """
     span = _join_spans(prop.span, obj.span)
-    if isinstance(prop, Reference):
+    if isinstance(prop, Reference) and not grouped:
         if prop.phrase == "number" and prop.index is None:
             return NumberOf(span=span, operand=obj)
         if (
@@ -602,7 +611,7 @@ def _of(prop: Node, obj: Node) -> Node:
             and prop.index.is_integer_literal
         ):
             return ItemOf(span=span, index=prop.index, operand=obj, plural=prop.phrase == "items")
-    return Of(span=span, prop=prop, obj=obj)
+    return Of(span=span, prop=prop, obj=obj, prop_grouped=grouped)
 
 
 def _binary(op: str, left: Node, right: Node) -> Node:

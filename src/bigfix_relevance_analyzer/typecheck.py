@@ -1025,6 +1025,9 @@ class _Checker:
         # Reference nodes written *as* the property of an `of` -- the ones that
         # named a direct object out loud. See `combine_reference`.
         self.explicit_objects: set[int] = set()
+        # Reference nodes written as the property of an `of` but inside their
+        # own parentheses, which names no direct object at all.
+        self.world_only: set[int] = set()
         # Per-item types, so `item N of (...)` can pick one out after the tuple
         # as a whole has been collapsed to a single value.
         self.tuple_items: dict[int, tuple[RelevanceValue, ...]] = {}
@@ -1255,7 +1258,20 @@ class _Checker:
                     # world fallback in `combine_reference` from rescuing a
                     # world-only name. Only the property *itself* counts: a
                     # reference deeper inside the subtree named no object.
-                    self.explicit_objects.add(id(node.prop))
+                    #
+                    # Unless it was parenthesized, which un-names the object
+                    # again: `(A) of B` evaluates `A` on its own with `it`
+                    # bound to `B`, so `A` resolves against the world and `B`
+                    # is not its direct object. The engine is emphatic in both
+                    # directions -- `computer name of file "/etc/hosts"` is
+                    # `E: The operator "computer name" is not defined.` while
+                    # `(computer name) of file "/etc/hosts"` answers, and
+                    # `name of file "/etc/hosts"` answers where `(name) of
+                    # file "/etc/hosts"` is `E: ... not defined.`
+                    if node.prop_grouped:
+                        self.world_only.add(id(node.prop))
+                    else:
+                        self.explicit_objects.add(id(node.prop))
                 if isinstance(node, Of) and self.bad_tuple_index(node) is not None:
                     # `item "a" of (1,2,3)` is one mistake, not two: the tuple
                     # rule is the finding, so the name is not also resolved as
@@ -1446,8 +1462,15 @@ class _Checker:
             return self.unknown()
         if self.contexts and _ruled_out(self.contexts[-1]):
             return self.contexts[-1]
-        subject = _subject(self.contexts[-1]) if self.contexts else None
-        if self.contexts and subject is None:
+        # Parenthesized: the object binds `it` and nothing else, so this is a
+        # bare world reference that happens to sit left of an `of`. It takes
+        # the world path whole -- including the softer finding, since a name
+        # the dumps do not know here proves no more than it does anywhere else
+        # they are silent -- and skips the unresolved-context guard below,
+        # which asks about a direct object this reference does not have.
+        world_only = id(node) in self.world_only
+        subject = None if world_only else (_subject(self.contexts[-1]) if self.contexts else None)
+        if not world_only and self.contexts and subject is None:
             # The context itself is unresolved, so nothing can be concluded
             # about a property of it.
             return self.unknown()
@@ -1533,8 +1556,9 @@ class _Checker:
         "/"` answers cleanly because the object turned out to be unique.
 
         The object decides only where the property has no written form of its
-        own to speak with -- a cast, a nested `of` -- which is why `(it as
-        string) of files of folder "c:\\"` is plural off a singular `it`.
+        own to speak with -- a cast, a nested `of`, a parenthesized property --
+        which is why `(it as string) of files of folder "c:\\"` is plural off a
+        singular `it`.
         """
         index = self.bad_tuple_index(node)
         if index is not None:
@@ -1548,7 +1572,23 @@ class _Checker:
         # A `whose` is transparent to the written form (`_written_reference`),
         # so `value whose (...) of it` is read here exactly as `value of it`
         # is: same plurality, same risk, same suggested plural spelling.
-        written = _written_reference(node.prop)
+        # A parenthesized property has no written form to lend this `of`: it is
+        # evaluated once per element with `it` bound to that element, so it
+        # distributes where the bare spelling would collapse. The engine keeps
+        # the two apart sharply::
+        #
+        #     Q: name of files of folder "/etc"
+        #     A: afpovertcp.cfg
+        #     E: Singular expression refers to non-unique object.
+        #     Q: (name of it) of files of folder "/etc"
+        #     A: afpovertcp.cfg
+        #     A: aliases
+        #     ...
+        #
+        # so it joins the cast and the nested `of` in the `else` branch below,
+        # where the object settles plurality and none of the collapse risks
+        # apply.
+        written = None if node.prop_grouped else _written_reference(node.prop)
         filtered = written is not None and written is not node.prop
         if written is not None and prop.plurality is not Plurality.UNKNOWN:
             plurality = prop.plurality

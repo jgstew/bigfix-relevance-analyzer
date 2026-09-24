@@ -232,6 +232,22 @@ class Of:
     span: Span
     prop: Node
     obj: Node
+    prop_grouped: bool = False
+    """Whether ``prop`` was written inside its own parentheses.
+
+    Semantic, not cosmetic. Parentheses make ``prop`` a standalone expression
+    evaluated with ``it`` bound to ``obj``, so ``obj`` stops being a direct
+    object and the name must resolve against the world::
+
+        Q: computer name of file "/etc/hosts"
+        E: The operator "computer name" is not defined.
+        Q: (computer name) of file "/etc/hosts"
+        A: LP1-US-51719315 (796)
+
+    Deliberately absent from :func:`to_sexpr`: the parse-tree corpus pins the
+    grammar's shape, and this is a fact *about* a shape the corpus already
+    distinguishes by where its parens fall.
+    """
 
 
 @dataclass(frozen=True, slots=True)

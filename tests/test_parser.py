@@ -533,6 +533,47 @@ def test_the_plural_spelling_subscripts_a_tuple_too() -> None:
     assert node.index.text == "1"
 
 
+def test_parentheses_suppress_both_specialisations() -> None:
+    """Both specialisations read a bare phrase, and parentheses end that.
+
+    `(A) of B` makes `A` a standalone expression, so the names have to resolve
+    on their own -- and neither does, which the engine says out loud::
+
+        Q: number of files of folder "/etc"
+        A: 58
+        Q: (number) of files of folder "/etc"
+        E: The operator "number" is not defined.
+        Q: item 0 of ("a","b")
+        A: a
+        Q: (item 0) of ("a","b")
+        E: The operator "item" is not defined.
+    """
+    grouped_number = parse('(number) of files of folder "/etc"')
+    assert isinstance(grouped_number, Of)
+    assert not isinstance(grouped_number, NumberOf)
+
+    grouped_item = parse('(item 0) of ("a","b")')
+    assert isinstance(grouped_item, Of)
+    assert not isinstance(grouped_item, ItemOf)
+
+
+def test_prop_grouped_records_the_parentheses() -> None:
+    """The checker needs the parens, and the span alone cannot carry them.
+
+    Parenthesization decides whether the object is a direct object at all --
+    `(computer name) of file "/etc/hosts"` answers where `computer name of file
+    "/etc/hosts"` is `E: The operator "computer name" is not defined.` -- so it
+    has to survive onto the tree.
+    """
+    grouped = parse('(computer name) of file "/etc/hosts"')
+    assert isinstance(grouped, Of)
+    assert grouped.prop_grouped is True
+
+    bare = parse('computer name of file "/etc/hosts"')
+    assert isinstance(bare, Of)
+    assert bare.prop_grouped is False
+
+
 def test_a_string_index_stays_a_property_because_item_really_is_one() -> None:
     """`item <string> of <folder>` is a real inspector, so a string index
     cannot be read as a tuple subscript without knowing the object's type --
