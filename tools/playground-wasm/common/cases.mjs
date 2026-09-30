@@ -13,8 +13,9 @@
 
 // Each case is a relevance string plus the badge text run() should produce.
 // Chosen to cover every failure mode a real bug has actually hit in this
-// page: the happy path, an unresolved identifier, a parse error, and an
-// it-binding (see template.html's renderPayload for what these read).
+// page: the happy path, an unresolved identifier, a parse error, an
+// it-binding, and a statement autofix rewrites (see template.html's
+// renderPayload for what these read).
 //
 // The dialect badge reads `dialect.resolved` -- the inspector tables' own
 // post-parse verdict -- rather than `dialect.classified`, which runs on raw
@@ -26,22 +27,28 @@
 export const CASES = [
   {
     text: 'exists running application "winlogon.exe" AND version of operating system >= "10.0"',
-    expectBadges: "dialect: client parse: ok types: ok",
+    expectBadges: "dialect: client parse: ok types: ok fix: none",
   },
-  { text: "asdfdffds", expectBadges: "dialect: undetermined parse: ok types: ok" },
+  { text: "asdfdffds", expectBadges: "dialect: undetermined parse: ok types: ok fix: none" },
   {
     text: "exists ((( unclosed nonsense here",
-    expectBadges: "dialect: undetermined parse: error types: n/a",
+    expectBadges: "dialect: undetermined parse: error types: n/a fix: n/a",
   },
   {
     text: 'exists file "x.txt" of folders "/" whose (size of it > 100)',
-    expectBadges: "dialect: client parse: ok types: error",
+    expectBadges: "dialect: client parse: ok types: error fix: none",
   },
   {
     // `files`/`folders` are client-only, `bes computers` is session-only, so
     // no engine evaluates this. The text classifier calls it session on the
     // strength of the `bes ` prefix alone.
     text: '(exists files of folders "/") AND (exists bes computers)',
-    expectBadges: "dialect: uncertain (client and session) parse: ok types: ok",
+    expectBadges: "dialect: uncertain (client and session) parse: ok types: ok fix: none",
+  },
+  {
+    // `setting` is a singular spelling mid-chain, which autofix rewrites to
+    // `settings`; the only case here with a fix to offer.
+    text: 'exists values of setting "_BESClient_Resource_SleepIdle" of client',
+    expectBadges: "dialect: client parse: ok types: ok fix: available",
   },
 ];
