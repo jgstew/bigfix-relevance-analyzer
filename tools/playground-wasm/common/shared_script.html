@@ -100,12 +100,23 @@ function dialectBadge(dialect) {
   return { state: "", label: "undetermined" };
 }
 
+// Red like parse/types when there is something to fix, since a fix is only
+// offered for a diagnostic the statement has. "partial" when fixable
+// diagnostics are still standing in the fixed text.
+function fixBadge(payload) {
+  if (!payload.parse.ok) return { state: "", label: "n/a" };
+  if (!payload.autofix) return { state: "ok", label: "none" };
+  if (payload.autofix.unapplied.length) return { state: "bad", label: "partial" };
+  return { state: "bad", label: "available" };
+}
+
 function renderPayload(payload) {
   outputEl.replaceChildren();
 
   // "types" is omitted entirely when parsing failed.
   const dialect = dialectBadge(payload.dialect);
   const typesOk = payload.types?.ok === true;
+  const fix = fixBadge(payload);
   outputEl.appendChild(
     el("p", null, [
       el("span", { class: `badge ${dialect.state}`, text: `dialect: ${dialect.label}` }),
@@ -113,6 +124,8 @@ function renderPayload(payload) {
       el("span", { class: `badge ${payload.parse.ok ? "ok" : "bad"}`, text: `parse: ${payload.parse.ok ? "ok" : "error"}` }),
       document.createTextNode(" "),
       el("span", { class: `badge ${typesOk ? "ok" : "bad"}`, text: `types: ${payload.types ? (typesOk ? "ok" : "error") : "n/a"}` }),
+      document.createTextNode(" "),
+      el("span", { class: `badge ${fix.state}`, text: `fix: ${fix.label}` }),
     ])
   );
 
@@ -174,31 +187,47 @@ function renderPayload(payload) {
     );
   }
 
-  // Ordered by likely usefulness: probes, parse tree, it-bindings, references, raw JSON.
+  // Ordered by likely usefulness: autofix, references, it-bindings, probes,
+  // parse tree, raw JSON.
 
-  if (payload.levels?.length) {
-    outputEl.appendChild(el("h2", { text: "probes" }));
+  // `autofix` is null unless a fix changed the text, so its presence alone
+  // means there is a fixed version to offer.
+  if (payload.autofix) {
+    const fix = payload.autofix;
+    const tally = (entries) => entries.map((entry) => `${entry.code} (${entry.rule}) x${entry.count}`).join(", ");
+    outputEl.appendChild(el("h2", { text: "suggested fix" }));
     outputEl.appendChild(
       el("p", { class: "hint" }, [
         document.createTextNode(
-          "One ready-to-run relevance statement per level of the expression -- paste into the Fixlet Debugger or QnA to count matches at that level."
+          "The whole statement with every safe fix applied -- no fix was kept that adds warnings or errors, or changes the dialect, types or plurality."
         ),
       ])
     );
-    for (const level of payload.levels) {
-      outputEl.appendChild(
-        el("p", { class: "hint" }, [
-          document.createTextNode(`${level.label} `),
-          el("span", { text: `(line ${level.line}, column ${level.column})` }),
-        ])
-      );
-      outputEl.appendChild(el("pre", { text: level.probe }));
-    }
+    outputEl.appendChild(el("pre", { text: fix.fixed }));
+    const rows = [
+      ["applied", tally(fix.applied)],
+      ["rounds", fix.rounds],
+    ];
+    if (fix.unapplied.length) rows.push(["still unfixed", tally(fix.unapplied)]);
+    outputEl.appendChild(factsTable(rows));
   }
 
-  if (payload.parse.ok) {
-    outputEl.appendChild(el("h2", { text: "s-expression" }));
-    outputEl.appendChild(el("pre", { text: payload.parse.sexpr }));
+  if (payload.references.length) {
+    outputEl.appendChild(el("h2", { text: "references" }));
+    const table = el("table");
+    table.appendChild(
+      el("tr", null, [el("th", { text: "phrase" }), el("th", { text: "known" }), el("th", { text: "return type(s)" })])
+    );
+    for (const ref of payload.references) {
+      table.appendChild(
+        el("tr", null, [
+          el("td", { text: ref.phrase }),
+          el("td", { text: String(ref.known) }),
+          el("td", { text: ref.return_types.join(", ") }),
+        ])
+      );
+    }
+    outputEl.appendChild(table);
   }
 
   if (payload.it_bindings?.length) {
@@ -225,22 +254,29 @@ function renderPayload(payload) {
     outputEl.appendChild(table);
   }
 
-  if (payload.references.length) {
-    outputEl.appendChild(el("h2", { text: "references" }));
-    const table = el("table");
-    table.appendChild(
-      el("tr", null, [el("th", { text: "phrase" }), el("th", { text: "known" }), el("th", { text: "return type(s)" })])
+  if (payload.levels?.length) {
+    outputEl.appendChild(el("h2", { text: "probes" }));
+    outputEl.appendChild(
+      el("p", { class: "hint" }, [
+        document.createTextNode(
+          "One ready-to-run relevance statement per level of the expression -- paste into the Fixlet Debugger or QnA to count matches at that level."
+        ),
+      ])
     );
-    for (const ref of payload.references) {
-      table.appendChild(
-        el("tr", null, [
-          el("td", { text: ref.phrase }),
-          el("td", { text: String(ref.known) }),
-          el("td", { text: ref.return_types.join(", ") }),
+    for (const level of payload.levels) {
+      outputEl.appendChild(
+        el("p", { class: "hint" }, [
+          document.createTextNode(`${level.label} `),
+          el("span", { text: `(line ${level.line}, column ${level.column})` }),
         ])
       );
+      outputEl.appendChild(el("pre", { text: level.probe }));
     }
-    outputEl.appendChild(table);
+  }
+
+  if (payload.parse.ok) {
+    outputEl.appendChild(el("h2", { text: "s-expression" }));
+    outputEl.appendChild(el("pre", { text: payload.parse.sexpr }));
   }
 
   const details = el("details", null, [
