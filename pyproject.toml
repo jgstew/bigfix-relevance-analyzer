@@ -46,7 +46,7 @@ Repository = "https://github.com/JGStew/bigfix-relevance-analyzer"
 # which CPython ends up inside the component, and
 # tools/playground-wasm/componentize-py/build-playground/build_playground.py
 # cross-checks this pin against its own so the two cannot drift.
-wasm = ["componentize-py==0.25.0"]
+wasm = ["componentize-py==0.25.1"]
 dev = [
     "pytest>=8",
     "pytest-cov>=5",
