@@ -44,7 +44,7 @@ import embed
 # Keep in step with the "pyodide" version pinned in
 # tools/playground-wasm/pyodide/smoke/package.json -- checked against that file below so the
 # two can't silently drift into embedding different Pyodide releases.
-PYODIDE_VERSION = "314.0.6"
+PYODIDE_VERSION = "314.0.7"
 
 DEFAULT_TEMPLATE = Path(__file__).parent / "template.html"
 PACKAGE_JSON = Path(__file__).parent.parent / "smoke" / "package.json"

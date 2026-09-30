@@ -55,7 +55,7 @@ import embed
 # against it below so the two can't silently drift into building the component
 # with a different toolchain (and therefore a different embedded CPython) than
 # the one recorded.
-COMPONENTIZE_PY_VERSION = "0.25.0"
+COMPONENTIZE_PY_VERSION = "0.25.1"
 
 HERE = Path(__file__).parent
 DEFAULT_TEMPLATE = HERE / "template.html"
