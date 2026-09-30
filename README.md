@@ -167,7 +167,9 @@ The default output is Markdown, and compact: the statement, a summary table,
 and - only when `lint.py`'s rules found something worth flagging (a parse
 error, an unbound `it`, a type error, an unknown inspector, or complexity /
 evaluation cost past its default ceiling) - an `Issues` section, one
-grep-able line per finding, the same wording `--check` prints. A clean
+grep-able line per finding, the same wording `--check` prints - and, when
+a fix exists, a `Suggested fix` section with the fully fixed statement and how
+many of each fix went into it (see [Auto-fix](#auto-fix)). A clean
 statement's report ends after the summary; there is nothing to say about
 something that isn't wrong. `--verbose` adds one heading per further analysis
 (Lexing, Parse tree, Platforms, Inspectors, `it` bindings, Breakdown probes,
@@ -532,6 +534,56 @@ A `Finding` carries only its `code`; serve the catalog once and join on it,
 rather than repeating two sentences of prose on every finding. Both CLIs can
 print it: `python -m bigfix_relevance_analyzer --rules` and
 `bigfix-relevance-lint --list-rules` (add `--json` to either).
+
+### Auto-fix
+
+The analyzer works out the fully fixed statement itself, as one final result,
+so a hook only has to print it (auto-fix off) or swap it in (auto-fix on):
+
+```python
+from bigfix_relevance_analyzer import autofix_relevance
+
+result = autofix_relevance(
+    'number of names of files of folder "etc" of folder "private" of folder "/"'
+)
+result.fixed  # 'number of names of files of folders "etc" of folders "private" of folder "/"'
+result.applied  # {'singular-spelling-mid-chain': 2}
+result.rounds  # 2
+result.unapplied  # {} - fixable diagnostics still standing in `fixed`
+```
+
+Only `singular-spelling-mid-chain` (`plural-preferred`) carries a fix today:
+the checker attaches a `TypeFix` to the diagnostic - the written property name
+and its plural spelling - and the fix layer applies it only when the text in
+that range really is the name, case-insensitively and whitespace-normalized
+(`of  Setting  "x"` becomes `of  settings  "x"`). `filtered-singular-spelling`
+stays unfixable: it fires in singular contexts, where the plural would only
+trade it for a `non-unique-risk`.
+
+Fixes cascade - pluralizing `folder "etc"` above makes `folder "private"`
+fire next - so they are applied in rounds, until nothing more is accepted, the
+text stops changing or repeats, or `max_rounds` (16) is reached. Every
+candidate is held against the *original* statement: no parse or lex error,
+unknown name or checker diagnostic may become more common (with
+`guard="errors"`, only the ones whose lint rule defaults to an error count),
+and the resolved dialect and the result's types and plurality must not change.
+A round that fails is retried one edit at a time, keeping the edits that pass.
+The result must then also pass a full check that counts fix-carrying
+diagnostics and refuses any the edits introduced, so a round limit reached
+mid-cascade falls back to the last state that fully passes - often the
+original - rather than reporting half a fix.
+
+The same result is on `RelevanceAnalysis.autofix()`, under `"autofix"` in
+`to_dict()` (`null` when nothing fixes), and on every fixable lint `Finding`
+as `Finding.autofix` - the site's whole result, not the finding's own edit,
+because only a rewrite worked out over every fix at once is safe to swap in.
+`AutofixResult.to_dict()` names each code's lint rule:
+
+```json
+{"original": "...", "fixed": "...", "changed": true, "rounds": 2,
+ "applied": [{"code": "singular-spelling-mid-chain", "rule": "plural-preferred", "count": 2}],
+ "unapplied": []}
+```
 
 ### Finding an inspector you cannot name
 

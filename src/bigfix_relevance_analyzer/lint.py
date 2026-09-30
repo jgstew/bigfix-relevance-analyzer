@@ -102,13 +102,16 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from bigfix_relevance_analyzer._serialize import _path
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis, analyze
 from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 from bigfix_relevance_analyzer.extract import RelevanceSite, extract_relevance_from_file
 from bigfix_relevance_analyzer.typecheck import Plurality
+
+if TYPE_CHECKING:
+    from bigfix_relevance_analyzer.autofix import AutofixResult
 
 __all__ = [
     "DEFAULT_MAX_DEPTH",
@@ -572,6 +575,20 @@ class Finding:
     parse prose back out of it.
     """
 
+    autofix: AutofixResult | None = None
+    """The whole statement with every safe fix applied, on a finding a fix
+    resolves.
+
+    Deliberately the *site's* result rather than this finding's own edit:
+    fixes cascade and interact, so the only rewrite worth offering is the one
+    worked out over all of them at once. Every fixable finding from the same
+    site therefore carries the same result -- a hook swaps the site's text for
+    :attr:`~bigfix_relevance_analyzer.autofix.AutofixResult.fixed` once, not
+    once per finding. ``None`` on every other finding, and on a fixable one
+    whose fix the guard refused, so ``is not None`` means there is a fixed
+    version to offer.
+    """
+
     def __str__(self) -> str:
         where = f"{self.path}:{self.line}" if self.path is not None else f"line {self.line}"
         return f"{where}: {self.severity.value} [{self.code}] {self.message}"
@@ -597,6 +614,7 @@ class Finding:
             "line": self.line,
             "site": None if self.site is None else self.site.to_dict(),
             "suggestions": list(self.suggestions),
+            "autofix": None if self.autofix is None else self.autofix.to_dict(),
             "text": str(self),
         }
 
@@ -893,7 +911,13 @@ def lint_analysis(
     """
     findings: list[Finding] = []
 
-    def emit(code: str, message: str, line: int, suggestions: tuple[str, ...] = ()) -> None:
+    def emit(
+        code: str,
+        message: str,
+        line: int,
+        suggestions: tuple[str, ...] = (),
+        autofix: AutofixResult | None = None,
+    ) -> None:
         severity = config.severity_for(code)
         if severity is Severity.IGNORE:
             return
@@ -906,6 +930,7 @@ def lint_analysis(
                 line=base_line + line - 1,
                 site=site,
                 suggestions=suggestions,
+                autofix=autofix,
             )
         )
 
@@ -920,6 +945,13 @@ def lint_analysis(
         emit("unbound-it", "`it` used with no context to bind to", binding.it.span.line)
 
     if report.check is not None:
+        # Worked out once for the site, and only when something could use it.
+        fixed = (
+            report.autofix()
+            if any(diagnostic.fix is not None for diagnostic in report.check.diagnostics)
+            else None
+        )
+        site_fix = fixed if fixed is not None and fixed.changed else None
         for diagnostic in report.check.diagnostics:
             # `used-without-context` is the checker's own independent detection
             # of the same unbound `it` the loop above already reports -- see
@@ -931,6 +963,7 @@ def lint_analysis(
                 _CHECK_RULES.get(diagnostic.code, "type-error"),
                 diagnostic.message,
                 diagnostic.span.line,
+                autofix=site_fix if diagnostic.fix is not None else None,
             )
 
     # Statement-level, like `unknown-inspector` below: the mismatch is between

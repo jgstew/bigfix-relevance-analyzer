@@ -34,7 +34,7 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from bigfix_relevance_analyzer import inspectors
 from bigfix_relevance_analyzer._serialize import _span
@@ -51,6 +51,9 @@ from bigfix_relevance_analyzer.nodes import Node, Reference, Span, to_mermaid, t
 from bigfix_relevance_analyzer.parser import ParseError, _try_parse_lexed
 from bigfix_relevance_analyzer.tokenizer import Token, TokenKind, _lex
 from bigfix_relevance_analyzer.typecheck import CheckResult, TypeEnvironment, check
+
+if TYPE_CHECKING:
+    from bigfix_relevance_analyzer.autofix import AutofixResult, Guard
 
 __all__ = [
     "ReferenceReport",
@@ -453,6 +456,26 @@ class RelevanceAnalysis:
         """Occurrences of ``it`` with no context to bind to."""
         return tuple(entry for entry in self.it_bindings if entry.context is None)
 
+    def autofix(self, *, guard: Guard = "warnings", max_rounds: int | None = None) -> AutofixResult:
+        """This statement with every safe fix applied, as one final result.
+
+        Re-analyses under the same requested dialect and platform this
+        analysis ran with. See :func:`~bigfix_relevance_analyzer.autofix.autofix`
+        for what "safe" means, and for ``guard`` and ``max_rounds``. Not
+        memoized: this object is frozen, and a statement with nothing to fix
+        -- the common case -- costs one pass over its diagnostics.
+        """
+        # Imported here: `autofix` builds on this module.
+        from bigfix_relevance_analyzer.autofix import DEFAULT_MAX_ROUNDS, _autofix
+
+        return _autofix(
+            self,
+            self.requested_dialect,
+            self.environment.platform,
+            guard,
+            DEFAULT_MAX_ROUNDS if max_rounds is None else max_rounds,
+        )
+
     def to_dict(self, *, mermaid: bool = False) -> dict[str, Any]:
         """The whole analysis as JSON-serializable plain data.
 
@@ -550,6 +573,10 @@ class RelevanceAnalysis:
             for entry in self.it_bindings
         ]
         report["levels"] = [level.to_dict() for level in self.levels]
+        # `None` rather than an unchanged result: the question a consumer asks
+        # is "is there a fixed version to offer", and no is the common answer.
+        fixed = self.autofix()
+        report["autofix"] = fixed.to_dict() if fixed.changed else None
         return report
 
 

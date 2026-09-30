@@ -281,6 +281,36 @@ def _render_complexity(report: RelevanceAnalysis, level: int) -> list[str]:
     return lines
 
 
+def _render_autofix(
+    report: RelevanceAnalysis, findings: tuple[Finding, ...], level: int
+) -> list[str]:
+    """The statement with every safe fix applied, when there is one.
+
+    Shown in compact output too: a fixed statement is the most actionable line
+    a report can carry, and a hook with auto-fix off prints exactly this.
+    Reuses the result a finding already carries rather than working it out
+    twice; a finding configured off leaves nothing to reuse, so the analysis
+    is asked directly.
+    """
+    fixed = next((finding.autofix for finding in findings if finding.autofix), None)
+    if fixed is None:
+        fixed = report.autofix()
+    if not fixed.changed:
+        return []
+    lines = [_heading(level, "Suggested fix"), ""]
+    lines.extend(_fence(fixed.fixed))
+    lines.append("")
+    rounds = f"{fixed.rounds} round{'' if fixed.rounds == 1 else 's'}"
+    for entry in fixed.to_dict()["applied"]:
+        lines.append(
+            f"- applied {entry['count']} `{entry['code']}` (`{entry['rule']}`) over {rounds}"
+        )
+    for entry in fixed.to_dict()["unapplied"]:
+        lines.append(f"- left {entry['count']} `{entry['code']}` (`{entry['rule']}`) unfixed")
+    lines.append("")
+    return lines
+
+
 def render(
     report: RelevanceAnalysis,
     *,
@@ -299,8 +329,10 @@ def render(
     Compact by default (``verbose=False``): just the ``Summary`` table, plus
     an ``Issues`` section listing ``findings`` -- one grep-able line each, in
     :class:`~bigfix_relevance_analyzer.lint.Finding`'s own wording -- when
-    there are any. Nothing to flag means nothing further to print; a clean
-    statement's report ends after the summary.
+    there are any, and a ``Suggested fix`` section with the auto-fixed
+    statement and what was applied, when a fix exists. Nothing to flag means
+    nothing further to print; a clean statement's report ends after the
+    summary.
 
     ``verbose=True`` additionally renders every other section this analysis
     can produce (Lexing, Parse tree, Platforms, Inspectors, ``it`` bindings,
@@ -315,6 +347,7 @@ def render(
     lines.append("")
     lines.extend(_render_summary(report, level + 1))
     lines.extend(_render_issues(findings, level + 1))
+    lines.extend(_render_autofix(report, findings, level + 1))
     if not verbose:
         return "\n".join(lines).rstrip() + "\n"
     lines.extend(_render_lexing(report, level + 1))

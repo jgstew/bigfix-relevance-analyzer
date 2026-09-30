@@ -116,6 +116,7 @@ __all__ = [
     "RelevanceValue",
     "TypeDiagnostic",
     "TypeEnvironment",
+    "TypeFix",
     "check",
     "resolve_property",
 ]
@@ -184,6 +185,31 @@ class RelevanceValue:
 
 
 @dataclass(frozen=True, slots=True)
+class TypeFix:
+    """A textual rewrite that resolves one diagnostic, as the checker sees it.
+
+    The checker has no source text -- only spans -- so this is a proposal, not
+    an edit: :mod:`~bigfix_relevance_analyzer.autofix` trims whitespace off
+    ``text[start:end]`` and applies :attr:`replacement` only when what is left
+    reads as :attr:`expected` (case-insensitively, whitespace-normalized), so
+    a span that does not cover the name it claims to -- a comment between two
+    words of a phrase -- is skipped rather than mangled.
+    """
+
+    start: int
+    """0-based offset of the range to replace, inclusive."""
+
+    end: int
+    """0-based offset of the range to replace, exclusive. May include trailing
+    whitespace; see the class docstring."""
+
+    replacement: str
+
+    expected: str
+    """The phrase the range is expected to hold, as the checker read it."""
+
+
+@dataclass(frozen=True, slots=True)
 class TypeDiagnostic:
     """One finding, in the engine's own wording."""
 
@@ -192,6 +218,18 @@ class TypeDiagnostic:
 
     message: str
     span: Span
+
+    fix: TypeFix | None = None
+    """How to rewrite the text so this diagnostic goes away, when that is
+    mechanical and meaning-preserving. Only `singular-spelling-mid-chain` sets
+    one: the plural spelling answers the same values where the singular
+    answers, and answers empty where it errors. `filtered-singular-spelling`
+    deliberately does not -- it fires in singular contexts, where the plural
+    spelling would trade it for `singular-over-plural-object` or worse.
+
+    Not part of :meth:`to_dict`; the analysis payload's ``autofix`` key is the
+    rewrite a consumer should read, worked out over every fix at once.
+    """
 
     def to_dict(self) -> dict[str, Any]:
         """This diagnostic as JSON-serializable plain data."""
@@ -756,6 +794,16 @@ def _diagnostic(code: str, span: Span, **fields: object) -> TypeDiagnostic:
     return TypeDiagnostic(code=code, message=entry.format(**fields), span=span)
 
 
+def _respelling(written: Reference, spelling: str) -> TypeFix:
+    """Replace the name ``written`` was spelled with -- and only the name.
+
+    The range runs from the reference's start to its index, when it has one
+    (`setting "x"` keeps its `"x"`), else to the reference's end.
+    """
+    end = written.span.end if written.index is None else written.index.span.start
+    return TypeFix(start=written.span.start, end=end, replacement=spelling, expected=written.phrase)
+
+
 _VISIBLE_ROWS_CACHE_SIZE: Final = 4096
 """How many ``(name, environment, indexed)`` slices :func:`_visible_rows` keeps.
 
@@ -1038,7 +1086,9 @@ class _Checker:
         # with the fields to report them by. Nothing is wrong with one alone;
         # `report_mid_chain` reports it once its consumer turns out to be
         # building a plural (a plural property of it, or a direct `exists`).
-        self.mid_chain: dict[int, tuple[str, str]] = {}
+        # The fix rides along because only `combine_of` still has the
+        # reference whose written name it replaces.
+        self.mid_chain: dict[int, tuple[str, str, TypeFix]] = {}
 
     def run(self, root: Node) -> RelevanceValue:
         work: list[_Work] = [_Descend(root)]
@@ -1074,13 +1124,17 @@ class _Checker:
         """Report ``node`` as `singular-spelling-mid-chain`, if it is one."""
         fields = self.mid_chain.get(id(node))
         if fields is not None:
-            phrase, plural_phrase = fields
-            self.report(
+            phrase, plural_phrase, fix = fields
+            # Attached here rather than passed through `report`, whose keyword
+            # arguments are message placeholders -- `version-truncating-compare`
+            # already has one called `{fix}`.
+            diagnostic = _diagnostic(
                 "singular-spelling-mid-chain",
                 node.span,
                 phrase=phrase,
                 plural_phrase=plural_phrase,
             )
+            self.diagnostics.append(replace(diagnostic, fix=fix))
 
     def unknown(self) -> RelevanceValue:
         return RelevanceValue(types=None, platforms=self.env.universe)
@@ -1707,7 +1761,11 @@ class _Checker:
                 # singular that is consumed singularly is the author asserting
                 # one. Only a consumer building a plural reports it -- see
                 # `report_mid_chain`.
-                self.mid_chain[id(node)] = (written.phrase, spelling)
+                self.mid_chain[id(node)] = (
+                    written.phrase,
+                    spelling,
+                    _respelling(written, spelling),
+                )
             if plurality is Plurality.PLURAL:
                 # A plural taken of a singular spelling distributes over its
                 # error rather than hiding it, so even `exists values of

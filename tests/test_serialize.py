@@ -81,6 +81,14 @@ CASES: tuple[tuple[str, str, Dialect | None, bool], ...] = (
         Dialect.CLIENT,
         True,
     ),
+    # The one fixable case: every other payload pins `autofix` as null, which
+    # leaves the shape a consumer reads off a real fix unguarded.
+    (
+        "client_autofix",
+        'exists values of setting "_BESClient_Resource_SleepIdle" of client',
+        Dialect.CLIENT,
+        False,
+    ),
     # Unparsable on purpose: the error branches of `lexing` and `parse` carry
     # their own keys, and a payload that only ever pins successes leaves the
     # shape a consumer sees on bad input completely unguarded.
@@ -113,7 +121,7 @@ def test_the_analysis_payload_is_unchanged() -> None:
     # Python object, and it is the array that is the API. `test_no_tuples`
     # below is what holds the pre-encode side to the same shape.
     payloads = json.loads(json.dumps(payloads))
-    # Compare case by case: a whole-payload assert prints all four on any
+    # Compare case by case: a whole-payload assert prints every case on any
     # failure, which buries the one that actually moved.
     for name in expected:
         assert payloads[name] == expected[name], f"payload for {name!r} changed"

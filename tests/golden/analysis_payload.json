@@ -1,5 +1,6 @@
 {
   "client": {
+    "autofix": null,
     "complexity": {
       "contributions": [
         {
@@ -203,7 +204,234 @@
     },
     "unknown_references": []
   },
+  "client_autofix": {
+    "autofix": {
+      "applied": [
+        {
+          "code": "singular-spelling-mid-chain",
+          "count": 1,
+          "rule": "plural-preferred"
+        }
+      ],
+      "changed": true,
+      "fixed": "exists values of settings \"_BESClient_Resource_SleepIdle\" of client",
+      "original": "exists values of setting \"_BESClient_Resource_SleepIdle\" of client",
+      "rounds": 1,
+      "unapplied": []
+    },
+    "complexity": {
+      "contributions": [
+        {
+          "metric": "token_count",
+          "weighted": 7.0
+        },
+        {
+          "metric": "max_of_chain",
+          "weighted": 4.0
+        },
+        {
+          "metric": "unique_identifiers",
+          "weighted": 3.0
+        },
+        {
+          "metric": "of_count",
+          "weighted": 2.0
+        },
+        {
+          "metric": "string_literals",
+          "weighted": 0.5
+        }
+      ],
+      "cost_rules": [],
+      "costly_inspectors": [],
+      "evaluation_cost": 0.0,
+      "metrics": {
+        "boolean_operators": 0,
+        "conditional_branches": 0,
+        "conditional_parens": 0,
+        "costly_inspectors": [],
+        "error_tokens": 0,
+        "evaluation_cost": 0.0,
+        "iteration_keywords": 0,
+        "max_conditional_depth": 0,
+        "max_of_chain": 2,
+        "max_paren_depth": 0,
+        "max_unfiltered_tuple_commas": 0,
+        "of_count": 2,
+        "semicolon_clauses": 0,
+        "string_literals": 1,
+        "token_count": 7,
+        "tuple_commas": 0,
+        "unfiltered_tuple_commas": 0,
+        "unique_identifiers": 3,
+        "whose_clauses": 0
+      },
+      "score": 16.5
+    },
+    "dialect": {
+      "assumed": false,
+      "classified": null,
+      "effective": "client",
+      "requested": "client",
+      "resolved": "client"
+    },
+    "it_bindings": [],
+    "levels": [
+      {
+        "column": 1,
+        "label": "exists values of setting \"_BESClient_Resource_SleepIdle\" of client",
+        "line": 1,
+        "probe": "(if exists true whose (exists number of (exists values of setting \"_BESClient_Resource_SleepIdle\" of client)) then number of (exists values of setting \"_BESClient_Resource_SleepIdle\" of client) else -1)",
+        "probe_kind": "count",
+        "unfiltered_probe": null
+      },
+      {
+        "column": 18,
+        "label": "setting \"_BESClient_Resource_SleepIdle\" of client",
+        "line": 1,
+        "probe": "(if exists it whose (exists number of (setting \"_BESClient_Resource_SleepIdle\" of it)) then number of (setting \"_BESClient_Resource_SleepIdle\" of it) else -1) of client",
+        "probe_kind": "count",
+        "unfiltered_probe": null
+      },
+      {
+        "column": 8,
+        "label": "values of setting \"_BESClient_Resource_SleepIdle\" of client",
+        "line": 1,
+        "probe": "(if exists it whose (exists number of (values of it)) then number of (values of it) else -1) of setting \"_BESClient_Resource_SleepIdle\" of client",
+        "probe_kind": "count",
+        "unfiltered_probe": null
+      }
+    ],
+    "lexing": {
+      "by_kind": {
+        "string": 1,
+        "whitespace": 6,
+        "word": 6
+      },
+      "code_tokens": 7,
+      "errors": [],
+      "tokens": 13
+    },
+    "parse": {
+      "error": null,
+      "node_count": 7,
+      "node_kinds": {
+        "Exists": 1,
+        "Of": 2,
+        "Reference": 3,
+        "StringLiteral": 1
+      },
+      "ok": true,
+      "sexpr": "(exists (of (ref \"values\") (of (ref \"setting\" (str \"_BESClient_Resource_SleepIdle\")) (ref \"client\"))))",
+      "tree_depth": 5
+    },
+    "platforms": {
+      "missing": [
+        "session:console",
+        "session:rest_api",
+        "session:web_reports"
+      ],
+      "universe": [
+        "debian",
+        "macos",
+        "rhel",
+        "session:console",
+        "session:rest_api",
+        "session:web_reports",
+        "ubuntu",
+        "windows"
+      ],
+      "viable": [
+        "debian",
+        "macos",
+        "rhel",
+        "ubuntu",
+        "windows"
+      ]
+    },
+    "references": [
+      {
+        "column": 61,
+        "known": true,
+        "line": 1,
+        "phrase": "client",
+        "platforms": [
+          "debian",
+          "macos",
+          "rhel",
+          "ubuntu",
+          "windows"
+        ],
+        "return_types": [
+          "client"
+        ],
+        "signatures": [
+          "client"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 18,
+        "known": true,
+        "line": 1,
+        "phrase": "setting",
+        "platforms": [
+          "debian",
+          "macos",
+          "rhel",
+          "ubuntu",
+          "windows"
+        ],
+        "return_types": [
+          "setting"
+        ],
+        "signatures": [
+          "setting <string> of <client>"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 8,
+        "known": true,
+        "line": 1,
+        "phrase": "values",
+        "platforms": [
+          "debian",
+          "macos",
+          "rhel",
+          "ubuntu",
+          "windows"
+        ],
+        "return_types": [
+          "string"
+        ],
+        "signatures": [
+          "value of <setting>"
+        ],
+        "visible_here": true
+      }
+    ],
+    "text": "exists values of setting \"_BESClient_Resource_SleepIdle\" of client",
+    "types": {
+      "diagnostics": [
+        {
+          "code": "singular-spelling-mid-chain",
+          "column": 18,
+          "line": 1,
+          "message": "'setting' is a singular spelling mid-chain and errors when nothing matches; prefer 'settings' and, where a singular is required, 'unique value of' at the end of the chain"
+        }
+      ],
+      "known": true,
+      "ok": true,
+      "plurality": "singular",
+      "types": [
+        "boolean"
+      ]
+    },
+    "unknown_references": []
+  },
   "client_with_mermaid": {
+    "autofix": null,
     "complexity": {
       "contributions": [
         {
@@ -456,6 +684,7 @@
     "unknown_references": []
   },
   "session": {
+    "autofix": null,
     "complexity": {
       "contributions": [
         {
@@ -845,6 +1074,7 @@
     "unknown_references": []
   },
   "unparsable": {
+    "autofix": null,
     "complexity": {
       "contributions": [
         {

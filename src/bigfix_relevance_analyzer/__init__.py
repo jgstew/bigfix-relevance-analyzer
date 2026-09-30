@@ -6,6 +6,8 @@ from importlib.metadata import PackageNotFoundError, version
 from bigfix_relevance_analyzer.analyzer import ReferenceReport, RelevanceAnalysis
 from bigfix_relevance_analyzer.analyzer import analyze as analyze_relevance
 from bigfix_relevance_analyzer.analyzer import analyze_to_dict as analyze_relevance_to_dict
+from bigfix_relevance_analyzer.autofix import AutofixResult
+from bigfix_relevance_analyzer.autofix import autofix as autofix_relevance
 from bigfix_relevance_analyzer.binding import Binder, ItBinding, resolve_it_bindings
 from bigfix_relevance_analyzer.breakdown import (
     Level,
@@ -103,6 +105,7 @@ __all__ = [
     "DIAGNOSTICS",
     "MAX_PARSE_DEPTH",
     "RULES",
+    "AutofixResult",
     "Binder",
     "CheckResult",
     "CostRule",
@@ -142,6 +145,7 @@ __all__ = [
     "analyze_relevance_complexity",
     "analyze_relevance_to_dict",
     "ancestors",
+    "autofix_relevance",
     "breakdown_probes",
     "check_types",
     "classify_relevance_dialect",
