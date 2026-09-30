@@ -1247,3 +1247,16 @@ def test_the_cache_key_covers_every_parameter_of_analyze() -> None:
     for kind in ProbeKind:
         _analyze_cached(CLIENT, Dialect.CLIENT, None, probe_kind=kind)
     assert _analyze_cached.cache_info().currsize == len(ProbeKind)
+
+
+def test_a_singular_spelling_mid_chain_is_plural_preferred() -> None:
+    """The reported statement: `exists` does not hide the singular's
+    `Singular expression refers to nonexistent object.` once a plural
+    property is taken of it, so it lands on `plural-preferred` (W602)."""
+    report = analyze(
+        'exists values of setting "_BESClient_Resource_SleepIdle" of client', Dialect.CLIENT
+    )
+    findings = lint_analysis(report, LintConfig())
+    assert [f.code for f in findings] == ["plural-preferred"]
+    assert findings[0].severity is Severity.WARNING
+    assert "'settings'" in findings[0].message

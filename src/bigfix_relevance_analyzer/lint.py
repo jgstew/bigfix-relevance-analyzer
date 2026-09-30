@@ -411,7 +411,7 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
             _rule(
                 "plural-preferred",
                 Severity.WARNING,
-                "a `whose` filter written on a singular spelling, where the plural reads safer",
+                "a singular spelling mid-chain, where the plural reads safer",
                 "The sibling of `non-unique-risk`, reported where that hazard cannot "
                 'fire. `pathname of file "x.bes" whose (...) of folder "c:\\\\"` cannot '
                 "match twice -- a folder holds one file of a given name -- but it "
@@ -419,6 +419,16 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "that makes the same shape raise wherever the name is dropped, and it "
                 "still raises `Singular expression refers to nonexistent object.` when "
                 "the filter matches nothing, where the plural spelling answers 0. "
+                "The same habit without a filter is reported too, wherever a plural "
+                'is built from the singular: `exists values of setting "x" of client` '
+                "raises the same error when the setting is absent, and `exists` does "
+                "not hide it -- the plural property distributes over the singular's "
+                'error (confirmed in qna; `settings "x"` answers False). A direct '
+                '`exists` over the singular (`exists setting "x" of client`, or a '
+                "filtered form) answers False today and is reported anyway, since it "
+                "errors again the moment the `exists` is dropped while the relevance is "
+                "expanded. Quiet left of an `|`, where the error is what trips the "
+                'fallback, and on a root spelling such as `folder "/tmp"`. '
                 "Best practice is to stay plural for as long as the chain runs and "
                 "collapse once at the end, with `unique value of` where a singular is "
                 'actually required: `unique value of pathnames of files "x.bes" whose '
@@ -677,6 +687,9 @@ _CHECK_RULES: Final = {
     # about hazards, and so a repo that does not want the style note can
     # silence it without silencing the errors-at-evaluation ones.
     "filtered-singular-spelling": "plural-preferred",
+    # The same habit without a filter: a singular spelling mid-chain where a
+    # plural is being built. Same rule, same rationale.
+    "singular-spelling-mid-chain": "plural-preferred",
     # Version comparison. Their own rules rather than `type-error`, because the
     # statement type-checks: the engine answers it, and the answer is wrong.
     # Separate from each other so a repo can silence the stylistic prefix-match

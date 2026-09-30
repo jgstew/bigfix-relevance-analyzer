@@ -407,7 +407,7 @@ same way instead of each inventing a description:
 | `unbound-it` | error | `it` is used where there is no context to bind it to | always on |
 | `mixed-dialect` | error | inspectors exclusive to client relevance and to session relevance in one statement | always on |
 | `non-unique-risk` | warning | a property written singular where more than one value may come back | always on |
-| `plural-preferred` | warning | a `whose` filter written on a singular spelling, where the plural reads safer | always on |
+| `plural-preferred` | warning | a singular spelling mid-chain, where the plural reads safer | always on |
 | `version-truncating-compare` | warning | a version comparison that truncates to the shorter operand's components | always on |
 | `version-like-string-compare` | warning | two version-looking strings compared as strings, not as versions | always on |
 | `unknown-inspector` | warning | a name no inspector dump defines | always on |

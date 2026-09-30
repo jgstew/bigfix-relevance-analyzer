@@ -346,10 +346,14 @@ def test_no_example_site_is_reported_broken(env: TypeEnvironment) -> None:
     `singular-over-plural-object` is exempt because it does not make that
     claim: it reports a risk the author may have ruled out, and shipped
     content takes it on deliberately -- see the test below.
-    `filtered-singular-spelling` is exempt for a stronger reason: it does not
-    even claim a risk, only that a plural spelling would read better.
+    `filtered-singular-spelling` and `singular-spelling-mid-chain` are exempt
+    for a stronger reason: they claim only that a plural spelling is safer.
     """
-    allowed = {"singular-over-plural-object", "filtered-singular-spelling"}
+    allowed = {
+        "singular-over-plural-object",
+        "filtered-singular-spelling",
+        "singular-spelling-mid-chain",
+    }
     offenders = [entry for entry in _corpus_diagnostics(env) if entry[2] not in allowed]
     assert offenders == []
 
@@ -373,9 +377,11 @@ def test_the_corpus_takes_the_non_unique_risk_deliberately(env: TypeEnvironment)
     whether it can actually collapse several into one.
 
     The corpus's `exists key "HKEY_LOCAL_MACHINE\\HARDWARE\\...\\BIOS" whose
-    (...) of registry` used to be pinned here too, and stopped firing when
-    the shape rule learned that a direct `exists` answers `False` where the
-    empty case would have erred (see `_FILTERED_SPELLING`).
+    (...) of registry` is back on the shape rule: a direct `exists` answers
+    `False` today, but the singular errors once the `exists` is dropped. The
+    rest are `singular-spelling-mid-chain` -- `files ... of folder "..." of
+    parent folder of client` and `exists node "..." of service plane ...`,
+    singular spellings a plural is built from.
     """
     risks = {(name, line, code) for name, line, code, _ in _corpus_diagnostics(env)}
     assert risks == {
@@ -385,6 +391,11 @@ def test_the_corpus_takes_the_non_unique_risk_deliberately(env: TypeEnvironment)
             114,
             "filtered-singular-spelling",
         ),
+        ("fixlet_description_relevance_via_javascript.bes", 33, "singular-spelling-mid-chain"),
+        ("fixlet_description_relevance_via_javascript.bes", 112, "singular-spelling-mid-chain"),
+        ("fixlet_description_relevance_via_javascript.bes", 119, "singular-spelling-mid-chain"),
+        ("task_power_management_sleep_when_idle.bes", 12, "filtered-singular-spelling"),
+        ("task_power_management_sleep_when_idle.bes", 12, "singular-spelling-mid-chain"),
     }
 
 
@@ -1190,28 +1201,90 @@ def test_the_shape_rule_is_withdrawn_left_of_a_pipe(env: TypeEnvironment) -> Non
     assert [d.code for d in check(parse(right), env).diagnostics] == ["filtered-singular-spelling"]
 
 
-def test_the_shape_rule_is_withdrawn_under_a_direct_exists(env: TypeEnvironment) -> None:
-    """The reported false positive: `exists name whose (length of it = 12 AND
-    it as lowercase ends with ".log") of it` inside a `files whose (...)`
-    predicate, from BES Client Info - Universal. Under a direct `exists`
-    neither thing the shape rule names holds -- the empty case answers `False`
-    rather than erroring, and `exists <singular> whose (P) of it` is the idiom
-    for testing a singular against a predicate. Confirmed live in qna::
+def test_the_shape_rule_holds_under_a_direct_exists(env: TypeEnvironment) -> None:
+    """Once exempt, now reported: under a direct `exists` the empty case
+    answers `False` rather than erroring, so nothing breaks *today* -- but the
+    singular spelling breaks the moment the `exists` is dropped while the
+    expression is expanded, which is the habit the shape rule is about. The
+    maintainer's call: stay plural mid-chain even here. Confirmed live in qna::
 
         Q: exists name whose (length of it = 99) of file "/etc/hosts"
         A: False
-
-    Exact-span, the same boundary `_FILTERED_RISK` walks: one cast between
-    the `exists` and the filtered form and the nonexistent error is back::
-
-        Q: exists ((name whose (length of it = 99) of file "/etc/hosts") as string)
+        Q: (name whose (length of it = 99) of file "/etc/hosts") as string
         E: Singular expression refers to nonexistent object.
     """
     direct = 'exists name whose (length of it = 12) of file "x" of folder "c:\\"'
-    assert [d.code for d in check(parse(direct), env).diagnostics] == []
+    assert [d.code for d in check(parse(direct), env).diagnostics] == ["filtered-singular-spelling"]
 
     cast = 'exists ((name whose (length of it = 12) of file "x" of folder "c:\\") as string)'
     assert [d.code for d in check(parse(cast), env).diagnostics] == ["filtered-singular-spelling"]
+
+
+_MID_CHAIN = "singular-spelling-mid-chain"
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        # The reported statement. `exists` does *not* hide this one -- the
+        # plural `values` distributes over the singular's error. Live in qna:
+        #   Q: exists values of setting "_zz_none" of client
+        #   E: Singular expression refers to nonexistent object.
+        #   Q: exists values of settings "_zz_none" of client
+        #   A: False
+        'exists values of setting "_BESClient_Resource_SleepIdle" of client',
+        # An aggregate over the plural does not guard it either:
+        #   Q: number of values of setting "_zz_none" of client
+        #   E: Singular expression refers to nonexistent object.
+        #   Q: number of values of settings "_zz_none" of client
+        #   A: 0
+        'number of values of setting "x" of client',
+        'values whose (it = "1") of setting "x" of client',
+        # A tuple element: the outer is plural already, so the rewrite does
+        # not change the tuple's plurality.
+        '(values of setting "x" of client, 1)',
+        # No plural property at all, but the maintainer's call: the singular
+        # breaks once the `exists` is dropped while expanding the relevance.
+        'exists setting "x" of client',
+    ],
+)
+def test_a_singular_spelling_mid_chain_prefers_the_plural(
+    env: TypeEnvironment, source: str
+) -> None:
+    result = check(parse(source), env)
+    assert [d.code for d in result.diagnostics] == [_MID_CHAIN]
+    assert "'settings'" in result.diagnostics[0].message
+    assert result.ok
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        # Already plural throughout.
+        'exists values of settings "x" of client',
+        # Singular throughout, with nothing distributing or hiding the error:
+        # the author asserting one.
+        'value of setting "x" of client',
+        # A root, not mid-chain.
+        'exists folder "/tmp"',
+        # Left of `|`, the error is what trips the fallback -- the plural
+        # would answer 0 instead of 7:
+        #   Q: (number of values of setting "_zz_none" of client) | 7
+        #   A: 7
+        '(number of values of setting "x" of client) | 7',
+    ],
+)
+def test_a_singular_spelling_mid_chain_is_quiet_where_it_should_be(
+    env: TypeEnvironment, source: str
+) -> None:
+    assert _MID_CHAIN not in [d.code for d in check(parse(source), env).diagnostics]
+
+
+def test_a_multivalued_singular_mid_chain_is_not_reported_twice(env: TypeEnvironment) -> None:
+    """`file of folder` already names the plural as the non-unique risk; the
+    shape rule would only repeat it on the same span."""
+    codes = [d.code for d in check(parse('names of file of folder "c:\\"'), env).diagnostics]
+    assert _MID_CHAIN not in codes
 
 
 def test_both_operands_of_a_pipe_must_be_singular(env: TypeEnvironment) -> None:
