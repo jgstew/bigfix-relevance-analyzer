@@ -4,7 +4,7 @@
   "description": "CI-only: proves the built wheel installs and runs under Pyodide (WASM CPython) in Node. Not part of the published package -- see .github/workflows/wasm-html.yaml.",
   "type": "module",
   "dependencies": {
-    "pyodide": "314.0.6"
+    "pyodide": "314.0.7"
   },
   "engines": {
     "npm": ">=11.10.0"
