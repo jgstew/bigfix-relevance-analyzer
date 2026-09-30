@@ -661,36 +661,37 @@ containing it. `|` does not rescue it either -- `((line whose (it contains
 the error, not the fallback.
 """
 
-_FILTERED_SPELLING: Final = frozenset({"filtered-singular-spelling"})
-"""The shape rule, retracted left of a `|` and under a direct `exists`.
+_FILTERED_SPELLING: Final = frozenset({"filtered-singular-spelling", "singular-spelling-mid-chain"})
+"""The shape rules, retracted left of a `|` -- and only there.
 
-The shape rule names two things against an indexed filtered singular: the
-mid-chain habit, and the *nonexistent* error where the filter matches nothing.
-Left of a `|`, that error is not a hazard -- it is the trigger the fallback is
-built on: `setting "X" whose (value of it = "1") of client | ERROR "disabled"`
-reaches the fallback *because* the empty case errors. The plural spelling
-would answer 0 rows without erroring, the fallback would never run, and the
-whole expression would answer nothing -- so here the plural rewrite changes
-what the expression means, and the singular is required, not a habit.
+`filtered-singular-spelling` names two things against an indexed filtered
+singular: the mid-chain habit, and the *nonexistent* error where the filter
+matches nothing. `singular-spelling-mid-chain` names the same pair for an
+unfiltered singular a plural is built from. Left of a `|`, that error is not a
+hazard -- it is the trigger the fallback is built on: `setting "X" whose
+(value of it = "1") of client | ERROR "disabled"` reaches the fallback
+*because* the empty case errors. The plural spelling would answer 0 rows
+without erroring, the fallback would never run, and the expression would
+answer something else -- so here the plural rewrite changes what the
+expression means, and the singular is required, not a habit.
 
-Under a direct `exists` neither thing holds either: the empty case answers
-`False` rather than erroring, and `exists name whose (length of it = 12) of
-it` is the idiom for testing a singular against a predicate, not a mid-chain
-collapse. Confirmed live in qna, and only *directly* -- one cast in between
-and the error is back, the same boundary `_FILTERED_RISK` walks::
+A direct `exists` used to retract these too, since the empty case answers
+`False` there rather than erroring. It no longer does, by the maintainer's
+call: the singular errors again the moment the `exists` is dropped while the
+relevance is expanded, one cast in between is enough::
 
     Q: exists name whose (length of it = 99) of file "/etc/hosts"
     A: False
-    Q: (name whose (length of it = 99) of file "/etc/hosts") as string
-    E: Singular expression refers to nonexistent object.
     Q: exists ((name whose (length of it = 99) of file "/etc/hosts") as string)
     E: Singular expression refers to nonexistent object.
 
-so `exists` uses :meth:`_Checker.retract_exact` where `|` may use containment
-(everything left of a `|` is forgiven an error -- that is what `|` is for).
+and with a plural property over the singular, `exists` never hid it at all::
 
-Only this code: `singular-of-filtered-collection` stays under `|`, because
-the non-unique error is one `|` genuinely does not rescue (see above).
+    Q: exists values of setting "_zz_none" of client
+    E: Singular expression refers to nonexistent object.
+
+`singular-of-filtered-collection` stays under `|`, because the non-unique
+error is one `|` genuinely does not rescue (see `_FILTERED_RISK`).
 """
 
 
@@ -1033,6 +1034,11 @@ class _Checker:
         self.tuple_items: dict[int, tuple[RelevanceValue, ...]] = {}
         # Which rows each reference resolved to. See `CheckResult.resolutions`.
         self.resolutions: dict[int, tuple[inspectors.Inspector, ...]] = {}
+        # `Of` nodes written as a bare singular spelling that has a plural one,
+        # with the fields to report them by. Nothing is wrong with one alone;
+        # `report_mid_chain` reports it once its consumer turns out to be
+        # building a plural (a plural property of it, or a direct `exists`).
+        self.mid_chain: dict[int, tuple[str, str]] = {}
 
     def run(self, root: Node) -> RelevanceValue:
         work: list[_Work] = [_Descend(root)]
@@ -1063,6 +1069,18 @@ class _Checker:
 
     def report(self, code: str, span: Span, **fields: object) -> None:
         self.diagnostics.append(_diagnostic(code, span, **fields))
+
+    def report_mid_chain(self, node: Node) -> None:
+        """Report ``node`` as `singular-spelling-mid-chain`, if it is one."""
+        fields = self.mid_chain.get(id(node))
+        if fields is not None:
+            phrase, plural_phrase = fields
+            self.report(
+                "singular-spelling-mid-chain",
+                node.span,
+                phrase=phrase,
+                plural_phrase=plural_phrase,
+            )
 
     def unknown(self) -> RelevanceValue:
         return RelevanceValue(types=None, platforms=self.env.universe)
@@ -1335,11 +1353,12 @@ class _Checker:
                 # `exists (line whose (...) of file "<f>")` is clean, and the
                 # same form under one cast raises the non-unique error again.
                 self.retract_exact(_FILTERED_RISK, node.operand.span)
-                # The shape rule at the same boundary: a direct `exists`
-                # answers `False` where the empty case would have erred, and
-                # `exists name whose (...) of it` is the predicate-testing
-                # idiom, not a mid-chain collapse (see `_FILTERED_SPELLING`).
-                self.retract_exact(_FILTERED_SPELLING, node.operand.span)
+                # The shape rule is *not* retracted here: a direct `exists`
+                # answers `False` where the empty case would have erred, but
+                # the singular spelling errors again the moment the `exists`
+                # is dropped (see `_FILTERED_SPELLING`). For the same reason
+                # a bare singular spelling mid-chain is reported here too.
+                self.report_mid_chain(node.operand)
                 # Boolean everywhere it can be asked, and it can only be asked
                 # where the operand resolves: `exists` swallows a *runtime*
                 # nonexistent object, not a missing inspector. Confirmed live
@@ -1672,6 +1691,28 @@ class _Checker:
                     phrase=written.phrase,
                     plural_phrase=spelling,
                 )
+            elif (
+                plurality is Plurality.SINGULAR
+                and not _is_aggregate(written.phrase)
+                and (
+                    spelling := _plural_spelling(
+                        written.phrase,
+                        _subject(obj),
+                        self.env,
+                        indexed=written.index is not None,
+                    )
+                )
+            ):
+                # The same habit without a filter, and not yet a finding: a
+                # singular that is consumed singularly is the author asserting
+                # one. Only a consumer building a plural reports it -- see
+                # `report_mid_chain`.
+                self.mid_chain[id(node)] = (written.phrase, spelling)
+            if plurality is Plurality.PLURAL:
+                # A plural taken of a singular spelling distributes over its
+                # error rather than hiding it, so even `exists values of
+                # setting "x" of client` raises when the setting is absent.
+                self.report_mid_chain(node.obj)
         else:
             plurality = _widen(prop.plurality, obj.plurality)
         return RelevanceValue(

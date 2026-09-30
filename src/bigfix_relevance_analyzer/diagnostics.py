@@ -285,6 +285,28 @@ _TYPE_CHECK: Final = [
         "'{plural_phrase} whose (...)' and, where a singular is required, "
         "'unique value of' at the end of the chain",
     ),
+    _entry(
+        "singular-spelling-mid-chain",
+        # The unfiltered sibling of `filtered-singular-spelling`: a singular
+        # spelling with a plural one available, sitting where a plural is
+        # being built -- a plural property taken of it, or a direct `exists`
+        # over it. With a plural property over it the error is not hidden by
+        # `exists`; the plural distributes over the singular's error instead.
+        # Confirmed in qna::
+        #
+        #     Q: exists values of setting "_zz_none" of client
+        #     E: Singular expression refers to nonexistent object.
+        #     Q: exists values of settings "_zz_none" of client
+        #     A: False
+        #
+        # A bare `exists setting "x" of client` answers `False` today; it is
+        # reported anyway, because the singular breaks the moment the `exists`
+        # is dropped while the expression is expanded.
+        Origin.RUNTIME,
+        "'{phrase}' is a singular spelling mid-chain and errors when nothing "
+        "matches; prefer '{plural_phrase}' and, where a singular is required, "
+        "'unique value of' at the end of the chain",
+    ),
     # Operators and casts.
     _entry(
         "operand-types-incompatible",
