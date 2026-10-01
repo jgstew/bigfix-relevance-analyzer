@@ -214,6 +214,14 @@
         }
       ],
       "changed": true,
+      "edits": [
+        {
+          "code": "singular-spelling-mid-chain",
+          "end": 24,
+          "replacement": "settings",
+          "start": 17
+        }
+      ],
       "fixed": "exists values of settings \"_BESClient_Resource_SleepIdle\" of client",
       "original": "exists values of setting \"_BESClient_Resource_SleepIdle\" of client",
       "rounds": 1,

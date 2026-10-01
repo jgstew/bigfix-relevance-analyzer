@@ -97,9 +97,33 @@ class AutofixResult:
     rounds: int = 0
     """How many rounds of edits :attr:`fixed` took. 0 when unchanged."""
 
+    edits: tuple[TextEdit, ...] = ()
+    """Every edit, measured against :attr:`original`, that turns it into :attr:`fixed`.
+
+    Each round's edits are measured against that round's text; these are
+    composed across rounds, so a consumer writing the fix back into a file
+    can map each one to where the original statement was written. Sorted,
+    and neither overlapping nor touching: a later round's edit that overlaps
+    or touches an earlier one is merged into it, keeping the earlier one's
+    :attr:`TextEdit.code`. Applying them right to left to :attr:`original`
+    gives :attr:`fixed`; empty when nothing changed.
+    """
+
     @property
     def changed(self) -> bool:
         return self.fixed != self.original
+
+    @property
+    def applied_rules(self) -> Mapping[str, int]:
+        """:attr:`applied`, tallied by the lint rule each code reports under.
+
+        What a consumer that disables rules by name -- a repo's hook config --
+        checks a fix against, without carrying the code-to-rule mapping.
+        """
+        tallies: Counter[str] = Counter()
+        for code, count in self.applied.items():
+            tallies[_rule_for(code)] += count
+        return dict(sorted(tallies.items()))
 
     def to_dict(self) -> dict[str, Any]:
         """This result as JSON-serializable plain data.
@@ -121,6 +145,15 @@ class AutofixResult:
             "rounds": self.rounds,
             "applied": entries(self.applied),
             "unapplied": entries(self.unapplied),
+            "edits": [
+                {
+                    "start": edit.start,
+                    "end": edit.end,
+                    "replacement": edit.replacement,
+                    "code": edit.code,
+                }
+                for edit in self.edits
+            ],
         }
 
 
@@ -205,6 +238,74 @@ def _map_back(start: int, end: int, edits: Sequence[TextEdit]) -> tuple[int, int
     return start - shift, end - shift
 
 
+def _compose(
+    original: str, earlier: Sequence[TextEdit], later: Sequence[TextEdit]
+) -> tuple[TextEdit, ...]:
+    """``earlier`` then ``later``, as one set of edits against ``original``.
+
+    ``earlier`` is against ``original`` -- sorted, disjoint, not touching, as
+    this returns -- and ``later`` is one round's edits against the text
+    ``earlier`` produced. A later edit that overlaps or touches an earlier
+    one, or another later one, is merged with it into one edit spanning both,
+    which keeps the leftmost earlier edit's code (else the leftmost later
+    one's): that is where the fix started.
+    """
+    current = _apply(original, earlier)
+
+    # Every edit's range in `current`, earlier ones tagged 0 so a tie sorts
+    # them first, along with how far each earlier one moved what follows it.
+    ranges: list[tuple[int, int, int, TextEdit]] = []
+    moved: list[tuple[int, int, int]] = []  # (current start, current end, shift after)
+    shift = 0
+    for edit in earlier:
+        start = edit.start + shift
+        end = start + len(edit.replacement)
+        shift += len(edit.replacement) - (edit.end - edit.start)
+        ranges.append((start, end, 0, edit))
+        moved.append((start, end, shift))
+    ranges += [(edit.start, edit.end, 1, edit) for edit in later]
+    ranges.sort(key=lambda item: (item[0], item[1], item[2]))
+
+    def to_original(position: int, *, at_start: bool) -> int:
+        shift_before = 0
+        for (start, end, shift_after), edit in zip(moved, earlier, strict=True):
+            if position < start or (position == start and at_start):
+                break
+            if position <= end:
+                # Only ever an edge of an earlier edit in the same cluster.
+                return edit.start if position == start and at_start else edit.end
+            shift_before = shift_after
+        return position - shift_before
+
+    composed: list[TextEdit] = []
+    index = 0
+    while index < len(ranges):
+        start, end, _, _ = ranges[index]
+        cluster = [ranges[index]]
+        index += 1
+        while index < len(ranges) and ranges[index][0] <= end:
+            end = max(end, ranges[index][1])
+            cluster.append(ranges[index])
+            index += 1
+        rewrites = [edit for _, _, tag, edit in cluster if tag == 1]
+        if not rewrites:
+            composed.append(cluster[0][3])
+            continue
+        replacement = _apply(
+            current[start:end],
+            [
+                TextEdit(edit.start - start, edit.end - start, edit.replacement, edit.code)
+                for edit in rewrites
+            ],
+        )
+        first = next((edit for _, _, tag, edit in cluster if tag == 0), rewrites[0])
+        original_start = to_original(start, at_start=True)
+        original_end = to_original(end, at_start=False)
+        if original[original_start:original_end] != replacement:
+            composed.append(TextEdit(original_start, original_end, replacement, first.code))
+    return tuple(composed)
+
+
 @dataclass(frozen=True, slots=True)
 class _State:
     """One accepted text, with how it was reached from the original."""
@@ -213,6 +314,8 @@ class _State:
     report: RelevanceAnalysis
     applied: Counter[str]
     rounds: tuple[tuple[TextEdit, ...], ...] = ()
+    edits: tuple[TextEdit, ...] = ()
+    """Every round's edits composed, against the original -- see :func:`_compose`."""
 
 
 class _Guard:
@@ -353,6 +456,7 @@ def _autofix(
                 report,
                 current.applied + Counter(edit.code for edit in accepted),
                 (*current.rounds, tuple(accepted)),
+                _compose(original.text, current.edits, accepted),
             )
         )
 
@@ -364,6 +468,7 @@ def _autofix(
         applied=dict(sorted(final.applied.items())),
         unapplied=dict(sorted(Counter(d.code for d in _fixable(final.report)).items())),
         rounds=len(final.rounds),
+        edits=final.edits,
     )
 
 

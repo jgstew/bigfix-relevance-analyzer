@@ -22,6 +22,7 @@ plural answers 0 -- which is the whole reason the plural is preferred.
 
 from __future__ import annotations
 
+import itertools
 import json
 
 import pytest
@@ -227,6 +228,104 @@ def test_an_unknown_guard_is_refused() -> None:
         autofix(SETTING, Dialect.CLIENT, guard="everything")  # type: ignore[arg-type]
 
 
+# -- edits against the original --------------------------------------------------
+
+
+def _assert_edits_rebuild_fixed(result: AutofixResult) -> None:
+    """The invariant a consumer writing the fix back relies on."""
+    assert autofix_module._apply(result.original, result.edits) == result.fixed
+    for left, right in itertools.pairwise(result.edits):
+        assert left.end < right.start, "edits are sorted, disjoint and not touching"
+
+
+def test_a_single_fix_has_one_edit_on_the_original() -> None:
+    result = autofix(SETTING, Dialect.CLIENT)
+    (edit,) = result.edits
+    assert SETTING[edit.start : edit.end] == "setting"
+    assert edit.replacement == "settings"
+    assert edit.code == MID_CHAIN
+    _assert_edits_rebuild_fixed(result)
+
+
+def test_a_cascade_reports_every_rounds_edit_against_the_original() -> None:
+    """The second round's edit sits after the first's, so its offsets moved;
+    reported against the original, both point at what was written."""
+    result = autofix(CASCADE, Dialect.CLIENT)
+    assert result.rounds == 2
+    assert [(CASCADE[edit.start : edit.end], edit.replacement) for edit in result.edits] == [
+        ("folder", "folders"),
+        ("folder", "folders"),
+    ]
+    _assert_edits_rebuild_fixed(result)
+
+
+def test_two_fixes_in_one_round_are_two_edits() -> None:
+    text = 'exists values of setting "x" of client or exists values of setting "y" of client'
+    result = autofix(text, Dialect.CLIENT)
+    assert len(result.edits) == 2
+    _assert_edits_rebuild_fixed(result)
+
+
+@pytest.mark.parametrize("text", ['exists values of settings "x" of client', "exists files ("])
+def test_nothing_fixed_has_no_edits(text: str) -> None:
+    assert autofix(text, Dialect.CLIENT).edits == ()
+
+
+def test_a_fallback_to_the_original_has_no_edits() -> None:
+    assert autofix(CASCADE, Dialect.CLIENT, max_rounds=1).edits == ()
+
+
+def test_a_later_edit_overlapping_an_earlier_one_merges_into_it() -> None:
+    """`setting` -> `settings`, then `settings` -> `settingz`: one edit."""
+    original = "a setting b"
+    first = (TextEdit(2, 9, "settings", "one"),)
+    second = (TextEdit(2, 10, "settingz", "two"),)
+    composed = autofix_module._compose(
+        original, autofix_module._compose(original, (), first), second
+    )
+    assert composed == (TextEdit(2, 9, "settingz", "one"),)
+    assert autofix_module._apply(original, composed) == "a settingz b"
+
+
+def test_a_later_edit_touching_an_earlier_one_merges_into_it() -> None:
+    original = "a setting b"
+    first = (TextEdit(2, 9, "settings", "one"),)
+    second = (TextEdit(10, 11, "_", "two"),)  # the space after `settings`
+    composed = autofix_module._compose(
+        original, autofix_module._compose(original, (), first), second
+    )
+    assert composed == (TextEdit(2, 10, "settings_", "one"),)
+    assert autofix_module._apply(original, composed) == "a settings_b"
+
+
+def test_composition_rebuilds_every_round_of_random_edits() -> None:
+    """Whatever the rounds, the composed edits turn the original into the last text."""
+    import random
+
+    rng = random.Random(1234)
+    for _ in range(500):
+        original = "".join(rng.choice("abc ") for _ in range(rng.randrange(1, 30)))
+        text = original
+        composed: tuple[TextEdit, ...] = ()
+        for _ in range(rng.randrange(1, 5)):
+            cuts = sorted(rng.sample(range(len(text) + 1), min(len(text) + 1, 4)))
+            edits = tuple(
+                TextEdit(start, end, rng.choice(["", "x", "yy", "zzz"]), "r")
+                for start, end in zip(cuts[::2], cuts[1::2], strict=False)
+                if end > start
+            )
+            text = autofix_module._apply(text, edits)
+            composed = autofix_module._compose(original, composed, edits)
+            assert autofix_module._apply(original, composed) == text, (original, composed)
+            for left, right in itertools.pairwise(composed):
+                assert left.end < right.start
+
+
+def test_applied_rules_names_the_lint_rule_of_each_applied_code() -> None:
+    assert autofix(CASCADE, Dialect.CLIENT).applied_rules == {"plural-preferred": 2}
+    assert autofix("exists files (", Dialect.CLIENT).applied_rules == {}
+
+
 # -- serialization ---------------------------------------------------------------
 
 
@@ -240,7 +339,12 @@ def test_to_dict_shape() -> None:
         "rounds": 2,
         "applied": [{"code": MID_CHAIN, "rule": "plural-preferred", "count": 2}],
         "unapplied": [],
+        "edits": [
+            {"start": edit.start, "end": edit.end, "replacement": "folders", "code": MID_CHAIN}
+            for edit in result.edits
+        ],
     }
+    assert len(payload["edits"]) == 2
     json.dumps(payload)
 
 

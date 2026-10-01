@@ -322,3 +322,82 @@ def test_list_rules_ignores_paths_rather_than_linting_them(
     assert main(["--list-rules", str(broken)]) == 0
     out = capsys.readouterr().out
     assert str(broken) not in out
+
+
+# -- --fix -------------------------------------------------------------------------
+
+SETTING_TASK = (
+    '<?xml version="1.0" encoding="UTF-8"?>\n<BES><Task>\n'
+    '<Relevance>exists values of setting "x" of client</Relevance>\n'
+    "</Task></BES>\n"
+)
+
+
+def test_without_fix_a_fixable_file_is_left_alone(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = tmp_path / "t.bes"
+    path.write_text(SETTING_TASK)
+    assert main([str(path)]) == 0
+    assert path.read_text() == SETTING_TASK
+    assert f"{path}:3: warning [plural-preferred]" in capsys.readouterr().out
+
+
+def test_fix_rewrites_the_file_reports_it_and_exits_one(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Non-zero when anything was fixed, so the fix is reviewed before it is committed."""
+    path = tmp_path / "t.bes"
+    path.write_text(SETTING_TASK)
+    assert main(["--fix", str(path)]) == 1
+    assert path.read_text() == SETTING_TASK.replace("setting ", "settings ")
+    captured = capsys.readouterr()
+    assert captured.out == f"{path}:3: fixed [plural-preferred] setting -> settings\n"
+    assert "1 fix(es) applied in 1 file(s)" in captured.err
+
+    assert main(["--fix", str(path)]) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_fix_reports_a_fix_it_could_not_apply(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = tmp_path / "t.rel"
+    path.write_text('exists values of setting "x" of client\n')
+    assert main(["--fix", str(path)]) == 0
+    out = capsys.readouterr().out
+    assert f"{path}:1: not fixed [plural-preferred] no source map" in out
+    assert f"{path}:1: warning [plural-preferred]" in out
+
+
+def test_fix_honours_ignore(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    path = tmp_path / "t.bes"
+    path.write_text(SETTING_TASK)
+    assert main(["--fix", "--ignore", "plural-preferred", str(path)]) == 0
+    assert path.read_text() == SETTING_TASK
+    assert capsys.readouterr().out == ""
+
+
+def test_fix_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    path = tmp_path / "t.bes"
+    path.write_text(SETTING_TASK)
+    assert main(["--fix", "--json", str(path)]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["changed"] == [str(path)]
+    assert [fix["line"] for fix in payload["applied"]] == [3]
+    assert payload["unapplied"] == []
+    assert payload["findings"] == []
+    assert payload["ok"] is True
+    assert payload["scope"] == "1 file(s)"
+
+
+def test_fix_with_no_paths_walks_the_current_directory(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "sub").mkdir()
+    path = tmp_path / "sub" / "t.bes"
+    path.write_text(SETTING_TASK)
+    monkeypatch.chdir(tmp_path)
+    assert main(["--fix"]) == 1
+    assert path.read_text() == SETTING_TASK.replace("setting ", "settings ")
+    assert "fixed [plural-preferred]" in capsys.readouterr().out

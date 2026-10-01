@@ -34,7 +34,7 @@ import os
 import re
 import xml.parsers.expat
 from collections.abc import Iterable, Iterator, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -48,6 +48,8 @@ __all__ = [
     "HtmlContext",
     "RelevanceSite",
     "SiteKind",
+    "SourceMap",
+    "SourceSpan",
     "extract_relevance_from_actionscript",
     "extract_relevance_from_bes_xml",
     "extract_relevance_from_file",
@@ -70,6 +72,81 @@ SiteKind = Literal[
     "plain-text",
     "markdown-codeblock",
 ]
+
+
+@dataclass(frozen=True, slots=True)
+class SourceSpan:
+    """One run of a site's text, and the bytes of the file it was decoded from."""
+
+    start: int
+    end: int
+    """The run's range in :attr:`RelevanceSite.text`."""
+
+    raw_start: int
+    raw_end: int
+    """The run's range in the file's bytes."""
+
+    atomic: bool
+    """Whether the bytes are not simply the text's UTF-8 encoding.
+
+    An entity or character reference (``&lt;`` for ``<``), or a CRLF or lone
+    CR line ending the XML parser folded to ``\n``. An edit may replace an
+    atomic run whole, but never part of one: there is no part of ``&lt;`` that
+    is part of ``<``. A run that is not atomic maps character by character.
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class SourceMap:
+    """Where each character of a site's text sits in the bytes of its file.
+
+    :attr:`RelevanceSite.text` is decoded and stripped, so it cannot be found in
+    the file by searching for it. This is what a fix needs to be written back
+    instead: :meth:`raw_range` turns a range of the text into the bytes that
+    hold it, keeping every entity, CDATA section and line ending as written.
+    """
+
+    text: str
+    """The text mapped: the site's :attr:`RelevanceSite.text`."""
+
+    spans: tuple[SourceSpan, ...]
+    """Runs covering the whole of :attr:`text`, in order, with no gaps."""
+
+    def _byte_offset(self, span: SourceSpan, position: int) -> int:
+        """Where ``position``, inside or at either end of ``span``, sits in the file."""
+        if position == span.start:
+            return span.raw_start
+        if position == span.end:
+            return span.raw_end
+        return span.raw_start + len(self.text[span.start : position].encode("utf-8"))
+
+    def raw_range(self, start: int, end: int) -> tuple[int, int] | None:
+        """The bytes holding ``text[start:end]``, or ``None`` if there are none.
+
+        ``None`` when the range splits an atomic run, or when its text is not
+        one unbroken stretch of the file -- ``cl<![CDATA[ient]]>`` is
+        ``client`` in the text, but no byte range holds exactly those six
+        characters.
+        """
+        if not 0 <= start < end <= len(self.text):
+            return None
+        raw_start: int | None = None
+        raw_end: int | None = None
+        for span in self.spans:
+            if span.end <= start:
+                continue
+            if span.start >= end:
+                break
+            if span.atomic and (start > span.start or end < span.end):
+                return None
+            if raw_start is None:
+                raw_start = self._byte_offset(span, max(start, span.start))
+            elif span.raw_start != raw_end:
+                return None
+            raw_end = self._byte_offset(span, min(end, span.end))
+        if raw_start is None or raw_end is None:
+            return None
+        return raw_start, raw_end
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +188,19 @@ class RelevanceSite:
     ``None`` means it had no opinion: nothing in the statement is specific to
     either dialect. See
     :func:`~bigfix_relevance_analyzer.dialect.classify_relevance_dialect`.
+    """
+
+    source_map: SourceMap | None = field(default=None, compare=False, hash=False, repr=False)
+    """Which bytes of the file each character of :attr:`text` came from.
+
+    What lets a fix be written back into the file
+    (:mod:`~bigfix_relevance_analyzer.fixfile`). Only BES XML read as bytes
+    (:func:`extract_relevance_from_bes_xml`, so also
+    :func:`extract_relevance_from_file` on a ``.bes``) has one so far; it is
+    ``None`` everywhere else, and for an element whose bytes are not its text
+    in UTF-8. Left out of equality, hashing and :meth:`to_dict`: it says
+    where a statement is, not what it is, and a site from lxml or from a
+    string must still compare equal to the same site read from bytes.
     """
 
     def to_dict(self) -> dict[str, Any]:
@@ -179,6 +269,7 @@ def _make_site(
     line: int,
     context: str,
     context_dialect: Dialect,
+    source_map: SourceMap | None = None,
 ) -> RelevanceSite:
     """Build a site, settling its dialect and keeping both opinions on record.
 
@@ -214,7 +305,74 @@ def _make_site(
         dialect=dialect,
         context_dialect=context_dialect,
         content_dialect=content_dialect,
+        source_map=source_map,
     )
+
+
+class _TextSource:
+    """Where each piece of an element's decoded text sits in the file's bytes.
+
+    Built from the pieces expat reports one at a time, each with its byte
+    index; :meth:`site_map` cuts out the part one site's text came from. The
+    spans are worked out on the first call, not up front: most elements a
+    walk collects -- a ``<Description>`` with no relevance in it, say --
+    never yield a site, and mapping every one of them cost about a third of
+    the extraction time over a real content repository.
+    """
+
+    def __init__(self, data: bytes, indexes: Sequence[int], chunks: Sequence[str]) -> None:
+        self.text = "".join(chunks)
+        self._data: bytes | None = data
+        self._pieces = tuple(zip(indexes, chunks, strict=True))
+        self._spans: tuple[SourceSpan, ...] | None = None
+
+    @property
+    def spans(self) -> tuple[SourceSpan, ...] | None:
+        """The element's spans, or ``None`` if its bytes are not recognizably its text."""
+        if self._data is not None:
+            self._spans = _text_spans(self._data, self._pieces)
+            self._data = None  # the spans are all that is needed from it now
+            self._pieces = ()
+        return self._spans
+
+    def site_map(self, offset: int, length: int) -> SourceMap | None:
+        """The map for ``text[offset:offset + length]``, re-based to start at 0.
+
+        ``None`` if the cut would split an atomic piece -- not something
+        stripping whitespace or cutting at a brace can do with the references
+        XML defines, but checked rather than assumed.
+        """
+        element_spans = self.spans
+        if element_spans is None:
+            return None
+        end = offset + length
+        spans: list[SourceSpan] = []
+        for span in element_spans:
+            if span.end <= offset:
+                continue
+            if span.start >= end:
+                break
+            start, stop = max(span.start, offset), min(span.end, end)
+            if span.atomic:
+                if (start, stop) != (span.start, span.end):
+                    return None
+                raw_start, raw_end = span.raw_start, span.raw_end
+            else:
+                raw_start = span.raw_start + len(self.text[span.start : start].encode("utf-8"))
+                raw_end = raw_start + len(self.text[start:stop].encode("utf-8"))
+            spans.append(SourceSpan(start - offset, stop - offset, raw_start, raw_end, span.atomic))
+        return SourceMap(self.text[offset:end], tuple(spans))
+
+
+def _site_map(source: _TextSource | None, offset: int, text: str) -> SourceMap | None:
+    return None if source is None else source.site_map(offset, len(text))
+
+
+def _stripped(text: str, start: int = 0, end: int | None = None) -> tuple[int, str]:
+    """``text[start:end].strip()``, and where in ``text`` it starts."""
+    chunk = text[start:end]
+    body = chunk.strip()
+    return start + len(chunk) - len(chunk.lstrip()), body
 
 
 # ---------------------------------------------------------------------------
@@ -237,9 +395,9 @@ _CONDITION_KEYWORD_RE = re.compile(
 )
 
 
-def _iter_substitution_spans(body: str) -> Iterator[tuple[int, str, bool]]:
-    """Yield ``(line, relevance_text, is_condition)`` for each `{...}`
-    substitution in ``body``.
+def _iter_substitution_spans(body: str) -> Iterator[tuple[int, int, str, bool]]:
+    """Yield ``(line, offset, relevance_text, is_condition)`` for each `{...}`
+    substitution in ``body``, ``offset`` being where the text starts in it.
 
     Handles `{{`/`}}` literal-brace escapes, ignores `}` inside a relevance
     string literal, and skips heredoc content entirely. ``is_condition`` is
@@ -285,10 +443,10 @@ def _iter_substitution_spans(body: str) -> Iterator[tuple[int, str, bool]]:
                 )
                 return
 
-            text = body[line_start + brace + 1 : end].strip()
+            offset, text = _stripped(body, line_start + brace + 1, end)
             if text:
                 is_condition = _CONDITION_KEYWORD_RE.search(line[:brace]) is not None
-                yield line_number, text, is_condition
+                yield line_number, offset, text, is_condition
             else:
                 logger.debug("empty relevance substitution at line %d", line_number)
 
@@ -333,6 +491,17 @@ def extract_relevance_from_actionscript(
     in a larger file. ActionScript runs on the endpoint, so substitutions in it
     are client relevance, which is what ``dialect`` says by default.
     """
+    return _actionscript_sites(body, context=context, dialect=dialect, line_offset=line_offset)
+
+
+def _actionscript_sites(
+    body: str,
+    *,
+    context: str,
+    dialect: Dialect,
+    line_offset: int,
+    source: _TextSource | None = None,
+) -> list[RelevanceSite]:
     return [
         _make_site(
             kind="actionscript-condition" if is_condition else "actionscript-substitution",
@@ -340,8 +509,9 @@ def extract_relevance_from_actionscript(
             line=line + line_offset,
             context=context,
             context_dialect=dialect,
+            source_map=_site_map(source, offset, text),
         )
-        for line, text, is_condition in _iter_substitution_spans(body)
+        for line, offset, text, is_condition in _iter_substitution_spans(body)
     ]
 
 
@@ -375,8 +545,8 @@ def _line_of(text: str, index: int) -> int:
     return text.count("\n", 0, index) + 1
 
 
-def _iter_pi_spans(text: str) -> Iterator[tuple[int, str]]:
-    """Yield ``(line, relevance_text)`` for each `<?Relevance ?>` in ``text``."""
+def _iter_pi_spans(text: str) -> Iterator[tuple[int, int, str]]:
+    """Yield ``(line, offset, relevance_text)`` for each `<?Relevance ?>` in ``text``."""
     for match in _PI_OPEN_RE.finditer(text):
         end = text.find("?>", match.end())
         if end == -1:
@@ -385,9 +555,9 @@ def _iter_pi_spans(text: str) -> Iterator[tuple[int, str]]:
                 _line_of(text, match.start()),
             )
             continue
-        body = text[match.end() : end].strip()
+        offset, body = _stripped(text, match.end(), end)
         if body:
-            yield _line_of(text, match.start()), body
+            yield _line_of(text, match.start()), offset, body
         else:
             logger.debug(
                 "empty <?Relevance ?> processing instruction at line %d",
@@ -415,8 +585,8 @@ def _read_js_string_literal(text: str, start: int) -> tuple[str, int] | None:
     return None
 
 
-def _iter_js_call_spans(text: str) -> Iterator[tuple[int, str]]:
-    """Yield ``(line, relevance_text)`` for each JS relevance call in ``text``.
+def _iter_js_call_spans(text: str) -> Iterator[tuple[int, int, str]]:
+    """Yield ``(line, offset, relevance_text)`` for each JS relevance call in ``text``.
 
     Only a call whose argument is one complete string literal is yielded. A
     call built from a variable, or concatenated with one, has no statement to
@@ -435,7 +605,7 @@ def _iter_js_call_spans(text: str) -> Iterator[tuple[int, str]]:
             )
             continue
 
-        body, end = literal
+        _, end = literal
         # Anything other than `)` or `,` after the literal means the argument
         # was an expression the literal is only part of (e.g. `'x ' + query`).
         tail = text[end:].lstrip(" \t")
@@ -446,9 +616,9 @@ def _iter_js_call_spans(text: str) -> Iterator[tuple[int, str]]:
             )
             continue
 
-        body = body.strip()
+        offset, body = _stripped(text, position + 1, end - 1)
         if body:
-            yield _line_of(text, match.start()), body
+            yield _line_of(text, match.start()), offset, body
 
 
 def extract_relevance_from_html_text(
@@ -473,6 +643,17 @@ def extract_relevance_from_html_text(
     ``line_offset`` is added to every line, for scanning a fragment embedded in
     a larger file.
     """
+    return _html_sites(text, context=context, line_offset=line_offset, label=label)
+
+
+def _html_sites(
+    text: str,
+    *,
+    context: HtmlContext,
+    line_offset: int,
+    label: str | None,
+    source: _TextSource | None = None,
+) -> list[RelevanceSite]:
     pi_spans = list(_iter_pi_spans(text))
     js_spans = list(_iter_js_call_spans(text))
 
@@ -507,8 +688,9 @@ def extract_relevance_from_html_text(
             line=line + line_offset,
             context=pi_label,
             context_dialect=pi_dialect,
+            source_map=_site_map(source, offset, body),
         )
-        for line, body in pi_spans
+        for line, offset, body in pi_spans
     ]
     sites += [
         _make_site(
@@ -517,8 +699,9 @@ def extract_relevance_from_html_text(
             line=line + line_offset,
             context=js_label,
             context_dialect=Dialect.SESSION,
+            source_map=_site_map(source, offset, body),
         )
-        for line, body in js_spans
+        for line, offset, body in js_spans
     ]
     return sorted(sites, key=lambda site: site.line)
 
@@ -649,6 +832,9 @@ class _Element:
     it wrong shifts every reported line in the file.
     """
 
+    source: _TextSource | None = None
+    """Where :attr:`text` sits in the file's bytes, when the parser said."""
+
     @property
     def tag(self) -> str:
         return self.path[-1]
@@ -661,7 +847,7 @@ def _sites_for_element(element: _Element) -> list[RelevanceSite]:
     context = "/".join(element.path)
 
     if tag == "Relevance":
-        body = text.strip()
+        offset, body = _stripped(text)
         if not body:
             return []
         return [
@@ -671,6 +857,7 @@ def _sites_for_element(element: _Element) -> list[RelevanceSite]:
                 line=element.line,
                 context=context,
                 context_dialect=Dialect.CLIENT,
+                source_map=_site_map(element.source, offset, body),
             )
         ]
 
@@ -679,7 +866,7 @@ def _sites_for_element(element: _Element) -> list[RelevanceSite]:
         # other options are fixed behaviors with an empty body.
         if element.attrib.get("Option") != "CustomRelevance":
             return []
-        body = text.strip()
+        offset, body = _stripped(text)
         if not body:
             return []
         return [
@@ -689,6 +876,7 @@ def _sites_for_element(element: _Element) -> list[RelevanceSite]:
                 line=element.line,
                 context=context,
                 context_dialect=Dialect.CLIENT,
+                source_map=_site_map(element.source, offset, body),
             )
         ]
 
@@ -697,7 +885,7 @@ def _sites_for_element(element: _Element) -> list[RelevanceSite]:
         # means something else elsewhere (e.g. inside a MIMEField).
         if "Analysis" not in element.path[:-1]:
             return []
-        body = text.strip()
+        offset, body = _stripped(text)
         if not body:
             return []
         name = element.attrib.get("Name")
@@ -708,6 +896,7 @@ def _sites_for_element(element: _Element) -> list[RelevanceSite]:
                 line=element.line,
                 context=f'{context}[Name="{name}"]' if name else context,
                 context_dialect=Dialect.CLIENT,
+                source_map=_site_map(element.source, offset, body),
             )
         ]
 
@@ -718,8 +907,12 @@ def _sites_for_element(element: _Element) -> list[RelevanceSite]:
                 "skipping ActionScript with MIMEType %r at line %d", mimetype, element.line
             )
             return []
-        return extract_relevance_from_actionscript(
-            text, context=context, line_offset=element.line - 1
+        return _actionscript_sites(
+            text,
+            context=context,
+            dialect=Dialect.CLIENT,
+            line_offset=element.line - 1,
+            source=element.source,
         )
 
     if tag == "Description":
@@ -728,8 +921,12 @@ def _sites_for_element(element: _Element) -> list[RelevanceSite]:
         # relevance, unlike everything else in a BES document.
         return [
             replace(site, context=f"{context}: {site.context}")
-            for site in extract_relevance_from_html_text(
-                text, context=HtmlContext.CONSOLE, line_offset=element.line - 1
+            for site in _html_sites(
+                text,
+                context=HtmlContext.CONSOLE,
+                line_offset=element.line - 1,
+                label=None,
+                source=element.source,
             )
         ]
 
@@ -748,11 +945,68 @@ def _sites_from_elements(elements: Iterable[_Element]) -> list[RelevanceSite]:
     return sites
 
 
-def _iter_elements_expat(data: bytes) -> Iterator[_Element]:
+_REFERENCES = {b"lt": "<", b"gt": ">", b"amp": "&", b"quot": '"', b"apos": "'"}
+
+
+def _reference(raw: bytes) -> str | None:
+    """What the XML reference ``raw`` (``&lt;``, ``&#60;``, ``&#x3C;``) stands for."""
+    name = raw[1:-1]
+    if name.startswith(b"#"):
+        try:
+            code = int(name[2:], 16) if name[1:2] in (b"x", b"X") else int(name[1:])
+            return chr(code)
+        except (ValueError, OverflowError):
+            return None
+    return _REFERENCES.get(name)
+
+
+def _raw_piece(data: bytes, index: int, text: str) -> tuple[int, bool] | None:
+    """How many bytes at ``index`` the piece ``text`` was decoded from, and
+    whether that piece is atomic (see :attr:`SourceSpan.atomic`).
+
+    ``None`` when the bytes there are not recognizably ``text``: then the
+    element gets no map at all, rather than one that might be wrong.
+    """
+    if index < 0:
+        return None
+    encoded = text.encode("utf-8")
+    if data.startswith(encoded, index):
+        return len(encoded), False
+    if text == "\n":
+        if data.startswith(b"\r\n", index):
+            return 2, True
+        if data.startswith(b"\r", index):
+            return 1, True
+    if data.startswith(b"&", index):
+        end = data.find(b";", index, index + 12)
+        if end != -1 and _reference(data[index : end + 1]) == text:
+            return end + 1 - index, True
+    return None
+
+
+def _text_spans(data: bytes, pieces: Sequence[tuple[int, str]]) -> tuple[SourceSpan, ...] | None:
+    """The spans of an element whose text arrived as ``pieces`` of ``(byte_index, text)``."""
+    spans: list[SourceSpan] = []
+    position = 0
+    for index, text in pieces:
+        if not text:
+            continue
+        raw = _raw_piece(data, index, text)
+        if raw is None:
+            return None
+        length, atomic = raw
+        spans.append(SourceSpan(position, position + len(text), index, index + length, atomic))
+        position += len(text)
+    return tuple(spans)
+
+
+def _iter_elements_expat(data: bytes, *, mapped: bool = True) -> Iterator[_Element]:
     """Walk ``data`` with stdlib expat, yielding the elements worth looking at.
 
     Character data arrives already decoded and with CDATA merged in, so a
-    body's text is whatever the parser accumulated between its tags.
+    body's text is whatever the parser accumulated between its tags. Each
+    piece arrives in its own callback, at its own byte index, which is what
+    :attr:`_Element.source` is built from when ``mapped``.
     """
     collected: list[_Element] = []
     path: list[str] = []
@@ -764,6 +1018,7 @@ def _iter_elements_expat(data: bytes) -> Iterator[_Element]:
             self.tag_line = tag_line
             self.attrib = attrib
             self.chunks: list[str] = []
+            self.indexes: list[int] = []
             self.body_line: int | None = None
 
     open_frames: list[_Frame] = []
@@ -788,6 +1043,7 @@ def _iter_elements_expat(data: bytes) -> Iterator[_Element]:
             # The first character-data event is at the body itself.
             frame.body_line = parser.CurrentLineNumber
         frame.chunks.append(data)
+        frame.indexes.append(parser.CurrentByteIndex)
 
     def end_element(name: str) -> None:
         if name in _RELEVANT_TAGS and open_frames:
@@ -799,6 +1055,7 @@ def _iter_elements_expat(data: bytes) -> Iterator[_Element]:
                     text="".join(frame.chunks),
                     # An empty element has no body to anchor to.
                     line=frame.body_line if frame.body_line is not None else frame.tag_line,
+                    source=(_TextSource(data, frame.indexes, frame.chunks) if mapped else None),
                 )
             )
         if path:
@@ -832,7 +1089,11 @@ def extract_relevance_from_bes_xml(data: str | bytes) -> list[RelevanceSite]:
     HTML. Returns an empty list, having logged a warning, if the document
     cannot be parsed.
     """
-    sites = _sites_from_elements(_iter_elements_expat(_as_bytes(data)))
+    # A `str` is encoded before parsing, so offsets into it would describe
+    # bytes the caller never had: only bytes get a map.
+    sites = _sites_from_elements(
+        _iter_elements_expat(_as_bytes(data), mapped=isinstance(data, bytes))
+    )
     return sorted(sites, key=lambda site: site.line)
 
 
@@ -927,6 +1188,11 @@ def _significant_suffixes(path: Path) -> Sequence[str]:
     return [suffix.lower() for suffix in path.suffixes]
 
 
+def _is_bes_xml(path: Path) -> bool:
+    """Whether :func:`extract_relevance_from_file` reads ``path`` as BES XML."""
+    return any(suffix in _BES_XML_SUFFIXES for suffix in _significant_suffixes(path))
+
+
 def extract_relevance_from_file(path: str | bytes | os.PathLike[str]) -> list[RelevanceSite]:
     """Extract every relevance statement from a file, keyed off its type.
 
@@ -948,7 +1214,7 @@ def extract_relevance_from_file(path: str | bytes | os.PathLike[str]) -> list[Re
     suffixes = _significant_suffixes(file_path)
     last = suffixes[-1] if suffixes else ""
 
-    if any(suffix in _BES_XML_SUFFIXES for suffix in suffixes):
+    if _is_bes_xml(file_path):
         return extract_relevance_from_bes_xml(file_path.read_bytes())
 
     if last in _CONSOLE_HTML_SUFFIXES:

@@ -20,6 +20,15 @@ than switching the rules on -- they are on by default. There is no CLI
 spelling to disable them entirely; a caller that wants that uses the library
 API directly.
 
+``--fix`` applies every safe fix in place first (see
+:mod:`~bigfix_relevance_analyzer.fixfile`), printing one line per fix --
+``path:line: fixed [rule] setting -> settings``, or ``not fixed [rule]`` and
+the reason -- and then the findings left standing. It exits ``1`` whenever it
+fixed anything, even if nothing is left to report: a rewritten file is a change
+the author has not seen yet, and pre-commit's convention is that a hook which
+modifies files fails, so the fix is reviewed and staged rather than committed
+unread.
+
 Called with no paths at all, this walks the current directory (see
 :func:`~bigfix_relevance_analyzer.lint.lint_directory`) instead of erroring --
 an *explicit* path, including ``.``, is never expanded this way; it is taken
@@ -40,6 +49,7 @@ import json
 import sys
 
 from bigfix_relevance_analyzer.dialect import Dialect
+from bigfix_relevance_analyzer.fixfile import FileFix, FixResult, fix_directory, fix_paths
 from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
     DEFAULT_MAX_EVALUATION_COST,
@@ -163,6 +173,14 @@ def main(argv: list[str] | None = None) -> int:
         help="narrow lookups to one evaluation context, e.g. windows or session:console",
     )
     parser.add_argument(
+        "--fix",
+        action="store_true",
+        help=(
+            "apply every safe fix in place, report each one, then lint what is left; "
+            "exits non-zero if anything was fixed"
+        ),
+    )
+    parser.add_argument(
         "--list-rules",
         action="store_true",
         help="print every rule, its default severity and what it means, then exit",
@@ -190,12 +208,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.max_evaluation_cost is not None:
         config = dataclasses.replace(config, max_evaluation_cost=args.max_evaluation_cost)
 
-    if args.paths:
+    scope = f"{len(args.paths)} file(s)" if args.paths else "the current directory"
+    fixes: FixResult | None = None
+    if args.fix:
+        fixes = (
+            fix_paths(args.paths, config)
+            if args.paths
+            else fix_directory(".", config, max_depth=args.max_depth)
+        )
+        findings = fixes.findings
+    elif args.paths:
         findings = lint_paths(args.paths, config)
-        scope = f"{len(args.paths)} file(s)"
     else:
         findings = lint_directory(".", config, max_depth=args.max_depth)
-        scope = "the current directory"
 
     # One tally, from `lint.counts`, feeding the summary, the exit status and
     # the JSON payload alike -- rather than each recounting the findings and
@@ -206,26 +231,50 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.quiet:
         if args.json:
-            json.dump(
-                {
+            payload = (
+                fixes.to_dict()
+                if fixes is not None
+                else {
                     "findings": [finding.to_dict() for finding in findings],
                     "counts": dict(tallies),
                     "ok": errors == 0,
-                    "scope": scope,
-                },
-                sys.stdout,
-                indent=2,
+                }
             )
+            json.dump({**payload, "scope": scope}, sys.stdout, indent=2)
             print()
         else:
+            if fixes is not None:
+                for fix in fixes.applied:
+                    print(_fix_line(fix))
+                for fix in fixes.unapplied:
+                    print(_fix_line(fix))
             for finding in findings:
                 print(finding)
 
-    print(_summary(errors, warnings, scope), file=sys.stderr)
+    summary = _summary(errors, warnings, scope)
+    if fixes is not None:
+        summary = (
+            f"{len(fixes.applied)} fix(es) applied in {len(fixes.changed)} file(s), "
+            f"{len(fixes.unapplied)} not applied; {summary}"
+        )
+    print(summary, file=sys.stderr)
 
-    if errors or (args.fail_on_warning and warnings):
+    if errors or (args.fail_on_warning and warnings) or (fixes is not None and fixes.changed):
         return 1
     return 0
+
+
+def _fix_line(fix: FileFix) -> str:
+    """``path:line: fixed [rule] old -> new``, or ``not fixed [rule] reason``."""
+    rules = ",".join(fix.autofix.applied_rules) or "autofix"
+    where = f"{fix.path}:{fix.line}"
+    if fix.reason is not None:
+        return f"{where}: not fixed [{rules}] {fix.reason}"
+    original = fix.autofix.original
+    changes = "; ".join(
+        f"{original[edit.start : edit.end]} -> {edit.replacement}" for edit in fix.autofix.edits
+    )
+    return f"{where}: fixed [{rules}] {changes}"
 
 
 def _summary(errors: int, warnings: int, scope: str) -> str:

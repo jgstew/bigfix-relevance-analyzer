@@ -1121,7 +1121,13 @@ def lint_file(path: str | bytes | os.PathLike[str], config: LintConfig) -> tuple
         sites = extract_relevance_from_file(file_path)
     except OSError as error:
         return _file_error(file_path, error.strerror or str(error), config)
+    return _lint_sites(file_path, sites, config)
 
+
+def _lint_sites(
+    file_path: Path, sites: Iterable[RelevanceSite], config: LintConfig
+) -> tuple[Finding, ...]:
+    """Judge sites already extracted from ``file_path``: :func:`lint_file`'s second half."""
     findings: list[Finding] = []
     for site in sites:
         dialect = _site_dialect(site, config.dialect)
@@ -1228,23 +1234,29 @@ def lint_directory(
     """
     root_path = Path(os.fsdecode(root))
     files, exceeded = _walk(root_path, max_depth)
-
-    findings: list[Finding] = []
-    for directory in exceeded:
-        severity = config.severity_for("max-depth-exceeded")
-        if severity is not Severity.IGNORE:
-            findings.append(
-                Finding(
-                    code="max-depth-exceeded",
-                    severity=severity,
-                    message=(
-                        f"more than {max_depth} directory levels below {root_path}; "
-                        f"not descending into {directory}"
-                    ),
-                    path=directory,
-                    line=1,
-                )
-            )
+    findings = list(_depth_findings(root_path, exceeded, max_depth, config))
     for file_path in files:
         findings.extend(lint_file(file_path, config))
     return tuple(findings)
+
+
+def _depth_findings(
+    root: Path, exceeded: Iterable[Path], max_depth: int, config: LintConfig
+) -> tuple[Finding, ...]:
+    """One ``max-depth-exceeded`` finding per directory :func:`_walk` stopped at."""
+    severity = config.severity_for("max-depth-exceeded")
+    if severity is Severity.IGNORE:
+        return ()
+    return tuple(
+        Finding(
+            code="max-depth-exceeded",
+            severity=severity,
+            message=(
+                f"more than {max_depth} directory levels below {root}; "
+                f"not descending into {directory}"
+            ),
+            path=directory,
+            line=1,
+        )
+        for directory in exceeded
+    )
