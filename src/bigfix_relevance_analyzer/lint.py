@@ -104,7 +104,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Final
 
-from bigfix_relevance_analyzer._serialize import _path
+from bigfix_relevance_analyzer._serialize import _as_path, _path
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis, analyze
 from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 from bigfix_relevance_analyzer.extract import RelevanceSite, extract_relevance_from_file
@@ -677,6 +677,59 @@ def counts(findings: Iterable[Finding]) -> Mapping[str, int]:
     return tallies
 
 
+def _passed(tallies: Mapping[str, int]) -> bool:
+    """The default gate, from :func:`counts`: nothing at error severity.
+
+    Takes the tallies rather than the findings so a caller that also prints
+    them counts once -- see :func:`counts` for why both CLIs share this.
+    """
+    return tallies[Severity.ERROR.value] == 0
+
+
+def _findings_dict(findings: Iterable[Finding]) -> dict[str, Any]:
+    """The ``findings``/``counts``/``ok`` envelope every JSON output here shares.
+
+    See :func:`lint_paths_to_dict` for why it is the envelope and not just the
+    list.
+    """
+    listed = tuple(findings)
+    tallies = counts(listed)
+    return {
+        "findings": [finding.to_dict() for finding in listed],
+        "counts": dict(tallies),
+        "ok": _passed(tallies),
+    }
+
+
+def _finding(
+    config: LintConfig,
+    code: str,
+    message: str,
+    *,
+    path: Path | None,
+    line: int,
+    site: RelevanceSite | None = None,
+    suggestions: tuple[str, ...] = (),
+    autofix: AutofixResult | None = None,
+) -> Finding | None:
+    """A :class:`Finding` at ``code``'s configured severity, or ``None`` when
+    that severity is :attr:`Severity.IGNORE` -- an ignored finding is never
+    built at all (see :func:`counts`)."""
+    severity = config.severity_for(code)
+    if severity is Severity.IGNORE:
+        return None
+    return Finding(
+        code=code,
+        severity=severity,
+        message=message,
+        path=path,
+        line=line,
+        site=site,
+        suggestions=suggestions,
+        autofix=autofix,
+    )
+
+
 def _complexity_detail(report: RelevanceAnalysis, limit: int = 3) -> str:
     metrics = report.complexity
     parts = []
@@ -688,7 +741,9 @@ def _complexity_detail(report: RelevanceAnalysis, limit: int = 3) -> str:
 
 def _site_dialect(site: RelevanceSite, forced: Dialect | None) -> Dialect | None:
     # A site the extractor already classified is a stronger signal than
-    # re-classifying the bare fragment -- mirrors __main__._analyze_site.
+    # re-classifying the bare fragment: a forced dialect (--dialect) still
+    # wins, but otherwise trust extraction's read of the surrounding document
+    # over guessing from the statement alone.
     return forced if forced is not None else (site.dialect if is_definite(site.dialect) else None)
 
 
@@ -722,6 +777,11 @@ _CHECK_RULES: Final = {
     # `device of <grub file location>`.
     "world-property-not-defined": "unknown-inspector",
 }
+
+
+def _rule_for(check_code: str) -> str:
+    """The lint rule a checker diagnostic code reports under; see :data:`_CHECK_RULES`."""
+    return _CHECK_RULES.get(check_code, "type-error")
 
 
 # What each kind of site requires of the value it holds. Only the slots the
@@ -918,21 +978,18 @@ def lint_analysis(
         suggestions: tuple[str, ...] = (),
         autofix: AutofixResult | None = None,
     ) -> None:
-        severity = config.severity_for(code)
-        if severity is Severity.IGNORE:
-            return
-        findings.append(
-            Finding(
-                code=code,
-                severity=severity,
-                message=message,
-                path=path,
-                line=base_line + line - 1,
-                site=site,
-                suggestions=suggestions,
-                autofix=autofix,
-            )
+        finding = _finding(
+            config,
+            code,
+            message,
+            path=path,
+            line=base_line + line - 1,
+            site=site,
+            suggestions=suggestions,
+            autofix=autofix,
         )
+        if finding is not None:
+            findings.append(finding)
 
     if report.parse_error is not None:
         error = report.parse_error
@@ -960,7 +1017,7 @@ def lint_analysis(
             if diagnostic.code == "used-without-context":
                 continue
             emit(
-                _CHECK_RULES.get(diagnostic.code, "type-error"),
+                _rule_for(diagnostic.code),
                 diagnostic.message,
                 diagnostic.span.line,
                 autofix=site_fix if diagnostic.fix is not None else None,
@@ -1048,18 +1105,8 @@ def lint_analysis(
 
 def _file_error(path: Path, detail: str, config: LintConfig) -> tuple[Finding, ...]:
     """One ``file-error`` finding about ``path`` itself, honouring its severity."""
-    severity = config.severity_for("file-error")
-    if severity is Severity.IGNORE:
-        return ()
-    return (
-        Finding(
-            code="file-error",
-            severity=severity,
-            message=f"cannot lint: {detail}",
-            path=path,
-            line=1,
-        ),
-    )
+    finding = _finding(config, "file-error", f"cannot lint: {detail}", path=path, line=1)
+    return () if finding is None else (finding,)
 
 
 _ANALYSIS_CACHE_SIZE: Final = 2048
@@ -1108,7 +1155,7 @@ def lint_file(path: str | bytes | os.PathLike[str], config: LintConfig) -> tuple
     only :func:`lint_directory` descends, so a directory argument is a no-op
     here by design rather than a failure to read something.
     """
-    file_path = Path(os.fsdecode(path))
+    file_path = _as_path(path)
     # Asked before extraction, not instead of it: a suffix the extractor does
     # not recognize never touches the filesystem, so a missing `notes.txt`
     # would otherwise raise nothing to notice.
@@ -1130,12 +1177,17 @@ def _lint_sites(
     """Judge sites already extracted from ``file_path``: :func:`lint_file`'s second half."""
     findings: list[Finding] = []
     for site in sites:
-        dialect = _site_dialect(site, config.dialect)
-        report = _analyze_cached(site.text, dialect, config.platform)
+        report = _analyze_site(site, config)
         findings.extend(
             lint_analysis(report, config, path=file_path, base_line=site.line, site=site)
         )
     return tuple(findings)
+
+
+def _analyze_site(site: RelevanceSite, config: LintConfig) -> RelevanceAnalysis:
+    """Analyse one extracted site the way linting it does: in the site's own
+    dialect unless one is forced, through the shared analysis cache."""
+    return _analyze_cached(site.text, _site_dialect(site, config.dialect), config.platform)
 
 
 def lint_paths(
@@ -1171,16 +1223,10 @@ def lint_paths_to_dict(
     it -- because that is the order a human reads a file in, and sorting by
     severity instead would scatter one file's findings across the report.
     """
-    findings = lint_paths(paths, config)
-    tallies = counts(findings)
-    return {
-        "findings": [finding.to_dict() for finding in findings],
-        "counts": dict(tallies),
-        "ok": tallies[Severity.ERROR.value] == 0,
-    }
+    return _findings_dict(lint_paths(paths, config))
 
 
-def _walk(root: Path, max_depth: int) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
+def _walk_files(root: Path, max_depth: int) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
     """Discover files under ``root`` up to ``max_depth`` levels deep.
 
     Returns ``(files, exceeded)``: every file found (default-excluded directories
@@ -1232,8 +1278,8 @@ def lint_directory(
     where descent stopped is reported as its own ``max-depth-exceeded`` finding,
     same as any other rule in this module, and everything below it is skipped.
     """
-    root_path = Path(os.fsdecode(root))
-    files, exceeded = _walk(root_path, max_depth)
+    root_path = _as_path(root)
+    files, exceeded = _walk_files(root_path, max_depth)
     findings = list(_depth_findings(root_path, exceeded, max_depth, config))
     for file_path in files:
         findings.extend(lint_file(file_path, config))
@@ -1243,20 +1289,15 @@ def lint_directory(
 def _depth_findings(
     root: Path, exceeded: Iterable[Path], max_depth: int, config: LintConfig
 ) -> tuple[Finding, ...]:
-    """One ``max-depth-exceeded`` finding per directory :func:`_walk` stopped at."""
-    severity = config.severity_for("max-depth-exceeded")
-    if severity is Severity.IGNORE:
-        return ()
-    return tuple(
-        Finding(
-            code="max-depth-exceeded",
-            severity=severity,
-            message=(
-                f"more than {max_depth} directory levels below {root}; "
-                f"not descending into {directory}"
-            ),
+    """One ``max-depth-exceeded`` finding per directory :func:`_walk_files` stopped at."""
+    findings = (
+        _finding(
+            config,
+            "max-depth-exceeded",
+            f"more than {max_depth} directory levels below {root}; not descending into {directory}",
             path=directory,
             line=1,
         )
         for directory in exceeded
     )
+    return tuple(finding for finding in findings if finding is not None)

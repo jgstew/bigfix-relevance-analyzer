@@ -130,10 +130,10 @@
     },
     "references": [
       {
-        "column": 44,
+        "column": 1,
         "known": true,
         "line": 1,
-        "phrase": "files",
+        "phrase": "windows",
         "platforms": [
           "debian",
           "macos",
@@ -142,12 +142,10 @@
           "windows"
         ],
         "return_types": [
-          "file"
+          "boolean"
         ],
         "signatures": [
-          "file <binary_string>",
-          "file <string>",
-          "file <symlink>"
+          "windows of <operating system>"
         ],
         "visible_here": true
       },
@@ -172,10 +170,10 @@
         "visible_here": true
       },
       {
-        "column": 1,
+        "column": 44,
         "known": true,
         "line": 1,
-        "phrase": "windows",
+        "phrase": "files",
         "platforms": [
           "debian",
           "macos",
@@ -184,10 +182,12 @@
           "windows"
         ],
         "return_types": [
-          "boolean"
+          "file"
         ],
         "signatures": [
-          "windows of <operating system>"
+          "file <binary_string>",
+          "file <string>",
+          "file <symlink>"
         ],
         "visible_here": true
       }
@@ -359,10 +359,10 @@
     },
     "references": [
       {
-        "column": 61,
+        "column": 8,
         "known": true,
         "line": 1,
-        "phrase": "client",
+        "phrase": "values",
         "platforms": [
           "debian",
           "macos",
@@ -371,10 +371,10 @@
           "windows"
         ],
         "return_types": [
-          "client"
+          "string"
         ],
         "signatures": [
-          "client"
+          "value of <setting>"
         ],
         "visible_here": true
       },
@@ -399,10 +399,10 @@
         "visible_here": true
       },
       {
-        "column": 8,
+        "column": 61,
         "known": true,
         "line": 1,
-        "phrase": "values",
+        "phrase": "client",
         "platforms": [
           "debian",
           "macos",
@@ -411,10 +411,10 @@
           "windows"
         ],
         "return_types": [
-          "string"
+          "client"
         ],
         "signatures": [
-          "value of <setting>"
+          "client"
         ],
         "visible_here": true
       }
@@ -604,24 +604,6 @@
     },
     "references": [
       {
-        "column": 73,
-        "known": true,
-        "line": 1,
-        "phrase": "registries",
-        "platforms": [
-          "macos",
-          "windows"
-        ],
-        "return_types": [
-          "dummy type",
-          "registry"
-        ],
-        "signatures": [
-          "registry"
-        ],
-        "visible_here": true
-      },
-      {
         "column": 50,
         "known": true,
         "line": 1,
@@ -668,6 +650,24 @@
           "values of <metabase key>",
           "values of <registry key>",
           "values of <smbios structure>"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 73,
+        "known": true,
+        "line": 1,
+        "phrase": "registries",
+        "platforms": [
+          "macos",
+          "windows"
+        ],
+        "return_types": [
+          "dummy type",
+          "registry"
+        ],
+        "signatures": [
+          "registry"
         ],
         "visible_here": true
       }
@@ -920,30 +920,7 @@
     },
     "references": [
       {
-        "column": 130,
-        "known": true,
-        "line": 1,
-        "phrase": "set",
-        "platforms": [
-          "debian",
-          "macos",
-          "rhel",
-          "session:console",
-          "session:rest_api",
-          "session:web_reports",
-          "ubuntu",
-          "windows"
-        ],
-        "return_types": [
-          "integer set"
-        ],
-        "signatures": [
-          "sets of <integer>"
-        ],
-        "visible_here": true
-      },
-      {
-        "column": 105,
+        "column": 2,
         "known": true,
         "line": 1,
         "phrase": "id",
@@ -957,78 +934,6 @@
         ],
         "signatures": [
           "id of <bes site>"
-        ],
-        "visible_here": true
-      },
-      {
-        "column": 89,
-        "known": true,
-        "line": 1,
-        "phrase": "bes sites",
-        "platforms": [
-          "session:console",
-          "session:rest_api",
-          "session:web_reports"
-        ],
-        "return_types": [
-          "bes site"
-        ],
-        "signatures": [
-          "bes sites"
-        ],
-        "visible_here": true
-      },
-      {
-        "column": 78,
-        "known": true,
-        "line": 1,
-        "phrase": "fixlets",
-        "platforms": [
-          "session:console",
-          "session:rest_api",
-          "session:web_reports"
-        ],
-        "return_types": [
-          "bes fixlet"
-        ],
-        "signatures": [
-          "fixlets of <bes site>"
-        ],
-        "visible_here": true
-      },
-      {
-        "column": 38,
-        "known": true,
-        "line": 1,
-        "phrase": "applicable computer count",
-        "platforms": [
-          "session:console",
-          "session:rest_api",
-          "session:web_reports"
-        ],
-        "return_types": [
-          "integer"
-        ],
-        "signatures": [
-          "applicable computer count of <bes fixlet>"
-        ],
-        "visible_here": true
-      },
-      {
-        "column": 24,
-        "known": true,
-        "line": 1,
-        "phrase": "id",
-        "platforms": [
-          "session:console",
-          "session:rest_api",
-          "session:web_reports"
-        ],
-        "return_types": [
-          "integer"
-        ],
-        "signatures": [
-          "id of <bes fixlet>"
         ],
         "visible_here": true
       },
@@ -1051,7 +956,79 @@
         "visible_here": true
       },
       {
-        "column": 2,
+        "column": 24,
+        "known": true,
+        "line": 1,
+        "phrase": "id",
+        "platforms": [
+          "session:console",
+          "session:rest_api",
+          "session:web_reports"
+        ],
+        "return_types": [
+          "integer"
+        ],
+        "signatures": [
+          "id of <bes fixlet>"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 38,
+        "known": true,
+        "line": 1,
+        "phrase": "applicable computer count",
+        "platforms": [
+          "session:console",
+          "session:rest_api",
+          "session:web_reports"
+        ],
+        "return_types": [
+          "integer"
+        ],
+        "signatures": [
+          "applicable computer count of <bes fixlet>"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 78,
+        "known": true,
+        "line": 1,
+        "phrase": "fixlets",
+        "platforms": [
+          "session:console",
+          "session:rest_api",
+          "session:web_reports"
+        ],
+        "return_types": [
+          "bes fixlet"
+        ],
+        "signatures": [
+          "fixlets of <bes site>"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 89,
+        "known": true,
+        "line": 1,
+        "phrase": "bes sites",
+        "platforms": [
+          "session:console",
+          "session:rest_api",
+          "session:web_reports"
+        ],
+        "return_types": [
+          "bes site"
+        ],
+        "signatures": [
+          "bes sites"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 105,
         "known": true,
         "line": 1,
         "phrase": "id",
@@ -1065,6 +1042,29 @@
         ],
         "signatures": [
           "id of <bes site>"
+        ],
+        "visible_here": true
+      },
+      {
+        "column": 130,
+        "known": true,
+        "line": 1,
+        "phrase": "set",
+        "platforms": [
+          "debian",
+          "macos",
+          "rhel",
+          "session:console",
+          "session:rest_api",
+          "session:web_reports",
+          "ubuntu",
+          "windows"
+        ],
+        "return_types": [
+          "integer set"
+        ],
+        "signatures": [
+          "sets of <integer>"
         ],
         "visible_here": true
       }

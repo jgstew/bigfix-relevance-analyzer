@@ -28,11 +28,12 @@ silently vanishing from the document.
 from __future__ import annotations
 
 import functools
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from typing import Final
 
 from bigfix_relevance_analyzer import grammar, inspectors
-from bigfix_relevance_analyzer.complexity import COST_RULES
+from bigfix_relevance_analyzer._markdown import capped, code_cell, escape_cell, table
+from bigfix_relevance_analyzer.complexity import cost_rules_for
 from bigfix_relevance_analyzer.diagnostics import DIAGNOSTICS, Origin
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.inspectors import Inspector, InspectorKind
@@ -156,32 +157,6 @@ _PRECEDENCE: Final[tuple[tuple[int, str], ...]] = (
 )
 
 
-def _escape(text: str) -> str:
-    """Make ``text`` safe inside a Markdown table cell.
-
-    ``|`` is a real relevance operator -- error fallback -- and would otherwise
-    be read as a column break even inside a code span, which is a GFM quirk
-    rather than an oversight here. ``__main__`` escapes it the same way.
-    """
-    return text.replace("|", "\\|")
-
-
-def _cell(text: str) -> str:
-    return f"`{_escape(text)}`"
-
-
-def _table(header: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
-    """One GFM table. Empty rows yield an empty string, not a headerless table."""
-    if not rows:
-        return ""
-    lines = [
-        "| " + " | ".join(header) + " |",
-        "| " + " | ".join("---" for _ in header) + " |",
-    ]
-    lines.extend("| " + " | ".join(row) + " |" for row in rows)
-    return "\n".join(lines)
-
-
 @functools.cache
 def operator_table() -> str:
     """Every operator spelling, its precedence, and the operator it really is.
@@ -216,10 +191,10 @@ def operator_table() -> str:
                 if form.swapped:
                     notes.append("operands swapped")
                 really = ", ".join(notes)
-            rows.append((_cell(spelling), really))
+            rows.append((code_cell(spelling), really))
         if rows:
             sections.append(f"**{label}** (binding power {power}, looser binds first)\n")
-            sections.append(_table(("Written", "Which operator this really is"), rows))
+            sections.append(table(("Written", "Which operator this really is"), rows))
             sections.append("")
 
     return "\n".join(sections).rstrip()
@@ -305,16 +280,15 @@ def starter_vocabulary(dialect: Dialect) -> str:
     rows: list[tuple[str, ...]] = []
     for name, entries in chosen:
         shortest = min(entries, key=lambda entry: (len(entry.signature), entry.signature))
-        returns = sorted({entry.return_type for entry in entries})
+        returns = inspectors._return_types_of(entries)
         rows.append(
             (
-                _cell(name),
-                _cell(shortest.signature),
-                ", ".join(_cell(item) for item in returns[:3])
-                + (" ..." if len(returns) > 3 else ""),
+                code_cell(name),
+                code_cell(shortest.signature),
+                capped(code_cell(item) for item in returns),
             )
         )
-    return _table(("Name", "Example signature", "Returns"), rows)
+    return table(("Name", "Example signature", "Returns"), rows)
 
 
 @functools.cache
@@ -341,12 +315,12 @@ def type_sketch(dialect: Dialect) -> str:
         parent = declared.parent if declared is not None and declared.parent else "-"
         rows.append(
             (
-                _cell(name),
-                _cell(parent) if parent != "-" else "-",
+                code_cell(name),
+                code_cell(parent) if parent != "-" else "-",
                 str(usage[name]),
             )
         )
-    return _table(("Type", "Parent type", "Uses in this dialect"), rows)
+    return table(("Type", "Parent type", "Uses in this dialect"), rows)
 
 
 @functools.cache
@@ -360,17 +334,17 @@ def expensive_constructs(dialect: Dialect) -> str:
     top tier on a client, which reads whole files, and near-free in session
     relevance, which cannot read a file at all.
     """
-    applicable = [rule for rule in COST_RULES if dialect in rule.dialects]
+    applicable = cost_rules_for(dialect)
     rows = [
         (
-            _cell(rule.label),
+            code_cell(rule.label),
             f"{rule.cost_for(dialect):.3g}",
             rule.why,
-            _cell(rule.example),
+            code_cell(rule.example),
         )
         for rule in sorted(applicable, key=lambda rule: (-rule.cost_for(dialect), rule.label))
     ]
-    return _table(("Construct", "Cost", "Why it is slow", "Example"), rows)
+    return table(("Construct", "Cost", "Why it is slow", "Example"), rows)
 
 
 @functools.cache
@@ -386,11 +360,11 @@ def engine_diagnostics() -> str:
     wording is reproduced as recovered rather than tidied.
     """
     rows = [
-        (_cell(entry.code), _escape(entry.template))
+        (code_cell(entry.code), escape_cell(entry.template))
         for entry in sorted(DIAGNOSTICS.values(), key=lambda entry: entry.code)
         if entry.origin is Origin.TYPE_CHECK
     ]
-    return _table(("Code", "What the type checker prints"), rows)
+    return table(("Code", "What the type checker prints"), rows)
 
 
 @functools.cache
@@ -409,10 +383,13 @@ def cast_examples(dialect: Dialect) -> str:
             targets.setdefault(entry.name, set()).update(entry.operands)
     ranked = sorted(targets, key=lambda name: (-len(targets[name]), name))[:TYPE_LIMIT]
     rows = [
-        (_cell(f"it as {name}"), ", ".join(_cell(item) for item in sorted(targets[name])[:3]))
+        (
+            code_cell(f"it as {name}"),
+            ", ".join(code_cell(item) for item in sorted(targets[name])[:3]),
+        )
         for name in ranked
     ]
-    return _table(("Cast", "Accepts"), rows)
+    return table(("Cast", "Accepts"), rows)
 
 
 def _kind_counts(dialect: Dialect) -> Mapping[str, int]:

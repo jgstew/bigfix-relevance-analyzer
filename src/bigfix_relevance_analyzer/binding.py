@@ -37,27 +37,8 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from typing import assert_never
 
-from bigfix_relevance_analyzer.nodes import (
-    Bar,
-    Binary,
-    Cast,
-    Collection,
-    Exists,
-    If,
-    It,
-    ItemOf,
-    Node,
-    NumberLiteral,
-    NumberOf,
-    Of,
-    Reference,
-    StringLiteral,
-    TupleExpr,
-    Unary,
-    Whose,
-)
+from bigfix_relevance_analyzer.nodes import It, Node, Of, Whose, children
 
 __all__ = [
     "Binder",
@@ -126,34 +107,13 @@ def resolve_it_bindings(node: Node) -> tuple[ItBinding, ...]:
             case Whose(collection=collection, predicate=predicate):
                 stack.append((predicate, collection, Binder.WHOSE))
                 stack.append((collection, context, binder))
-            case Reference(index=index):
-                if index is not None:
-                    stack.append((index, context, binder))
-            case Binary(left=left, right=right) | Bar(left=left, right=right):
-                # `|` is error fallback rather than an operator, but it is not a
-                # context either: both sides see the enclosing one.
-                stack.append((right, context, binder))
-                stack.append((left, context, binder))
-            case ItemOf(operand=operand) | NumberOf(operand=operand):
-                # Written with `of`, but neither introduces a context. A tuple
-                # index is an integer literal, so there is nothing in it to bind;
-                # aggregation measures its operand without rebinding it.
-                stack.append((operand, context, binder))
-            case Unary(operand=operand) | Exists(operand=operand) | Cast(operand=operand):
-                stack.append((operand, context, binder))
-            case If(condition=condition, then_branch=then_branch, else_branch=else_branch):
-                # `if` introduces no context of its own; all three branches see
-                # whatever encloses the `if`.
-                stack.append((else_branch, context, binder))
-                stack.append((then_branch, context, binder))
-                stack.append((condition, context, binder))
-            case TupleExpr(items=items) | Collection(items=items):
-                for item in reversed(items):
-                    stack.append((item, context, binder))
-            case NumberLiteral() | StringLiteral():
-                pass
-            case _:  # pragma: no cover - exhaustiveness over the Node union
-                assert_never(current)
+            case _:
+                # Nothing else introduces a context, so every child sees the
+                # enclosing one: `|` is error fallback, not a context; `item N
+                # of` and `number of` are written with `of` but neither rebinds;
+                # all three of an `if`'s branches see whatever encloses it.
+                # Reversed so the earliest text is popped first.
+                stack.extend((child, context, binder) for child in reversed(children(current)))
 
     # The traversal already yields source order; sorting says so rather than
     # leaving it as a property of the push order that a later edit could break.

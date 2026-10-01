@@ -25,10 +25,14 @@ from bigfix_relevance_analyzer.nodes import (
     NumberLiteral,
     NumberOf,
     Of,
+    Reference,
     StringLiteral,
     Unary,
+    children,
     to_mermaid,
     to_sexpr,
+    tree_depth,
+    walk,
 )
 from bigfix_relevance_analyzer.parser import (
     MAX_PARSE_DEPTH,
@@ -193,6 +197,53 @@ def test_to_sexpr_of_literals() -> None:
 def test_to_sexpr_escapes_quotes_and_backslashes_in_strings() -> None:
     assert to_sexpr(parse('"C:\\x"')) == '(str "C:\\\\x")'
     assert to_sexpr(parse('"a%22b"')) == '(str "a%22b")'
+
+
+# ---------------------------------------------------------------------------
+# Tree traversal
+# ---------------------------------------------------------------------------
+
+
+def test_children_are_in_source_order() -> None:
+    node = parse("if a then b else c")
+    assert [to_sexpr(child) for child in children(node)] == [
+        '(ref "a")',
+        '(ref "b")',
+        '(ref "c")',
+    ]
+
+
+def test_walk_is_pre_order_with_siblings_in_source_order() -> None:
+    """Parents first, then children left to right -- the order the source reads."""
+    phrases = [
+        node.phrase
+        for node in walk(parse("(alpha, beta, gamma of delta)"))
+        if isinstance(node, Reference)
+    ]
+    assert phrases == ["alpha", "beta", "gamma", "delta"]
+
+
+def test_tree_depth_counts_levels() -> None:
+    assert tree_depth(parse("it")) == 1
+    assert tree_depth(parse("size of it")) == 2
+    assert tree_depth(parse("a + b * c")) == 3
+
+
+# A left-associative chain is shallow to the parser's nesting guard but builds a
+# tree one level deeper per term -- far past CPython's recursion limit here.
+LONG_CHAIN = " or ".join(f"x = {i}" for i in range(3000))
+
+
+def test_a_long_left_associative_chain_parses_into_a_deep_tree() -> None:
+    assert tree_depth(parse(LONG_CHAIN)) > 3000
+
+
+def test_serializers_do_not_recurse_on_a_deep_tree() -> None:
+    """Wild content must never be a crash: a long ``or`` chain is ordinary."""
+    node = parse(LONG_CHAIN)
+    assert to_sexpr(node).startswith('(bin "or" (bin "or"')
+    assert to_mermaid(node).startswith("flowchart TD\n")
+    assert sum(1 for _ in walk(node)) == 3000 * 3 + 2999
 
 
 # ---------------------------------------------------------------------------

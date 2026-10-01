@@ -40,7 +40,7 @@ from bigfix_relevance_analyzer.inspectors import (
     unary_operators,
     written_form_of,
 )
-from bigfix_relevance_analyzer.nodes import Reference
+from bigfix_relevance_analyzer.nodes import Reference, walk
 from bigfix_relevance_analyzer.parser import try_parse
 
 
@@ -403,7 +403,7 @@ def test_every_reference_in_the_example_corpus_resolves() -> None:
         for path in corpus_files()
         for site in extract_relevance_from_file(path)
         if (parsed := try_parse(site.text)).ok and parsed.node is not None
-        for node in _walk(parsed.node)
+        for node in walk(parsed.node)
         if isinstance(node, Reference) and not lookup(node.phrase)
     }
     assert unresolved == set()
@@ -418,23 +418,6 @@ def test_ancestors_walks_to_the_root() -> None:
 def test_ancestors_of_an_unknown_type_is_just_itself() -> None:
     """Absence from the snapshot is never treated as a finding."""
     assert ancestors("no such type") == ("no such type",)
-
-
-def _walk(node: object) -> list[object]:
-    found: list[object] = []
-    stack = [node]
-    while stack:
-        current = stack.pop()
-        found.append(current)
-        for name in getattr(current, "__slots__", ()):
-            if name == "span":
-                continue
-            child = getattr(current, name, None)
-            if isinstance(child, tuple):
-                stack.extend(x for x in child if hasattr(x, "span"))
-            elif hasattr(child, "span"):
-                stack.append(child)
-    return found
 
 
 # ---------------------------------------------------------------------------

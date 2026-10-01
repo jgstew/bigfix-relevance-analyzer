@@ -11,12 +11,15 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from test_examples import corpus_files
 
 from bigfix_relevance_analyzer import RelevanceAnalysis, __version__, analyze_relevance, inspectors
 from bigfix_relevance_analyzer.__main__ import _cell, main
 from bigfix_relevance_analyzer.analyzer import ReferenceReport, analyze
 from bigfix_relevance_analyzer.binding import Binder
+from bigfix_relevance_analyzer.complexity import evaluation_cost_rules
 from bigfix_relevance_analyzer.dialect import Dialect
+from bigfix_relevance_analyzer.extract import extract_relevance_from_file
 from bigfix_relevance_analyzer.lint import LintConfig, lint_analysis
 from bigfix_relevance_analyzer.typecheck import Plurality
 
@@ -726,3 +729,14 @@ def test_analyze_reports_unlexable_input_once(caplog: pytest.LogCaptureFixture) 
 
     unlexable = [r for r in caplog.records if "unlexable input" in r.getMessage()]
     assert len(unlexable) == 1
+
+
+@pytest.mark.parametrize("dialect", [None, Dialect.CLIENT, Dialect.SESSION])
+def test_cost_rules_match_a_fresh_pattern_pass(dialect: Dialect | None) -> None:
+    """`analyze` derives `cost_rules` from the complexity pass's matched labels
+    instead of matching every pattern a second time. That is only sound while
+    the two agree, so hold them to it over every real site."""
+    for path in corpus_files():
+        for site in extract_relevance_from_file(path):
+            report = analyze(site.text, dialect)
+            assert report.cost_rules == evaluation_cost_rules(site.text, report.dialect), site.text

@@ -11,15 +11,17 @@ from __future__ import annotations
 
 from bigfix_relevance_analyzer.grammar import (
     CANONICAL_BINARY,
+    EXISTS_WORDS,
     GRAMMAR_LEVEL_BINARY,
     OPERATOR_FIRST_WORDS,
     PUNCT_INFIX,
     STRUCTURAL_WORDS,
+    TUPLE_INDEX_WORDS,
     WORD_INFIX,
     WORD_INFIX_TRIE,
 )
 from bigfix_relevance_analyzer.inspectors import all_inspectors, binary_operators, written_forms
-from bigfix_relevance_analyzer.tokenizer import PUNCTUATION
+from bigfix_relevance_analyzer.tokenizer import GRAMMAR_WORDS, PUNCTUATION
 
 # ---------------------------------------------------------------------------
 # The load-bearing assumption: names and grammar words do not collide
@@ -227,3 +229,10 @@ def test_every_punctuation_lexeme_has_a_consumer() -> None:
     structural = {"(", ")", ",", ";"}
     orphans = sorted(set(PUNCTUATION) - set(PUNCT_INFIX) - structural)
     assert orphans == []
+
+
+def test_the_tokenizers_grammar_words_cover_the_grammars() -> None:
+    """``tokenizer`` is the lower, table-free layer and so cannot derive its
+    ``GRAMMAR_WORDS`` from this module; it keeps its own copy, held here to
+    every word the grammar treats specially."""
+    assert STRUCTURAL_WORDS | EXISTS_WORDS | TUPLE_INDEX_WORDS <= GRAMMAR_WORDS

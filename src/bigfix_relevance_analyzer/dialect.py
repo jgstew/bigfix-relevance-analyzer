@@ -91,6 +91,8 @@ import enum
 import re
 from typing import TypeGuard
 
+from bigfix_relevance_analyzer.tokenizer import _normalize_phrase
+
 __all__ = ["Dialect", "classify_relevance_dialect", "is_definite"]
 
 
@@ -235,11 +237,6 @@ def _strip_non_code(text: str) -> str:
     return stripped[: min(ends)] if ends else stripped
 
 
-def _normalize(text: str) -> str:
-    """Lowercase ``text`` and collapse every whitespace run to one space."""
-    return " ".join(text.lower().split())
-
-
 def _has_session_evidence(normalized: str) -> bool:
     """Whether ``normalized`` uses an inspector only session relevance has."""
     if _SESSION_MARKER_RE.search(normalized):
@@ -263,7 +260,7 @@ def classify_relevance_dialect(text: str) -> Dialect | None:
     is available to both dialects needs the future relevance parser, not marker
     matching. See the module docstring for the traps the marker lists avoid.
     """
-    normalized = _normalize(_strip_non_code(text))
+    normalized = _normalize_phrase(_strip_non_code(text))
     session = _has_session_evidence(normalized)
     client = bool(_CLIENT_MARKER_RE.search(normalized))
     if session and client:

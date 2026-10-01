@@ -45,13 +45,14 @@ import difflib
 import enum
 import functools
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, Final
 
 from bigfix_relevance_analyzer import _inspector_data
 from bigfix_relevance_analyzer._serialize import _enums, _names
 from bigfix_relevance_analyzer.dialect import Dialect
+from bigfix_relevance_analyzer.tokenizer import _normalize_phrase
 
 __all__ = [
     "SIGNATURE_SAMPLE",
@@ -147,14 +148,40 @@ def _platforms_for(sources: frozenset[str]) -> frozenset[str]:
     )
 
 
+def _context_label(source: str) -> str | None:
+    """The evaluation context a dump source names, spelled the way
+    :attr:`Inspector.contexts` spells it -- a client platform by bare name
+    (``windows``), a session surface whole (``session:console``) -- or
+    ``None`` for a source that names no context."""
+    dialect, _, context = source.partition(":")
+    if not context:
+        return None
+    return context if dialect == "client" else source
+
+
 @functools.cache
 def _sampled_contexts_for(sources: frozenset[str]) -> frozenset[str]:
-    return frozenset(
-        context if dialect == "client" else source
-        for source in sources
-        for dialect, _, context in [source.partition(":")]
-        if context
-    )
+    return frozenset(label for source in sources if (label := _context_label(source)) is not None)
+
+
+def _contexts_of(rows: Iterable[Inspector]) -> frozenset[str]:
+    """Every evaluation context that defines any of ``rows``."""
+    return frozenset(context for entry in rows for context in entry.contexts)
+
+
+def _dialects_of(rows: Iterable[Inspector]) -> frozenset[Dialect]:
+    """Every dialect that defines any of ``rows``."""
+    return frozenset(dialect for entry in rows for dialect in entry.dialects)
+
+
+def _return_types_of(rows: Iterable[Inspector]) -> tuple[str, ...]:
+    """Every distinct type ``rows`` evaluate to, sorted."""
+    return tuple(sorted({entry.return_type for entry in rows}))
+
+
+def _signatures_of(rows: Iterable[Inspector]) -> tuple[str, ...]:
+    """Every distinct signature among ``rows``, sorted."""
+    return tuple(sorted({entry.signature for entry in rows}))
 
 
 @functools.cache
@@ -649,10 +676,9 @@ def _unsampled_contexts(kind: InspectorKind) -> frozenset[str]:
         source for entry in all_inspectors() if entry.kind is kind for source in entry.sources
     }
     return frozenset(
-        context if dialect == "client" else source
+        label
         for source in sources()
-        for dialect, _, context in [source.partition(":")]
-        if context and source not in sampled
+        if source not in sampled and (label := _context_label(source)) is not None
     )
 
 
@@ -848,12 +874,12 @@ class SearchResult:
     @property
     def signatures(self) -> tuple[str, ...]:
         """Every distinct signature behind this result, sorted."""
-        return tuple(sorted({entry.signature for entry in self.inspectors}))
+        return _signatures_of(self.inspectors)
 
     @property
     def return_types(self) -> tuple[str, ...]:
         """Every distinct type this can evaluate to, sorted."""
-        return tuple(sorted({entry.return_type for entry in self.inspectors}))
+        return _return_types_of(self.inspectors)
 
     @property
     def kinds(self) -> frozenset[InspectorKind]:
@@ -863,12 +889,12 @@ class SearchResult:
     @property
     def dialects(self) -> frozenset[Dialect]:
         """Every dialect that defines any row behind this result."""
-        return frozenset(dialect for entry in self.inspectors for dialect in entry.dialects)
+        return _dialects_of(self.inspectors)
 
     @property
     def contexts(self) -> frozenset[str]:
         """Every evaluation context that defines any row behind this result."""
-        return frozenset(context for entry in self.inspectors for context in entry.contexts)
+        return _contexts_of(self.inspectors)
 
     def to_dict(self) -> dict[str, Any]:
         """This result as JSON-serializable plain data, sized for a wire.
@@ -968,7 +994,7 @@ def _normalize_query(query: str) -> str:
     have to be the same question. :func:`lookup` stays literal because it
     answers about an exact name.
     """
-    return " ".join(query.split()).lower()
+    return _normalize_phrase(query)
 
 
 def _canonical_name(form: str, entries: tuple[Inspector, ...]) -> str:

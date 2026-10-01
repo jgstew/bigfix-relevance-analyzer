@@ -30,6 +30,7 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from bigfix_relevance_analyzer import grammar
+from bigfix_relevance_analyzer._serialize import _position
 from bigfix_relevance_analyzer.diagnostics import DIAGNOSTICS
 from bigfix_relevance_analyzer.nodes import (
     Bar,
@@ -80,8 +81,10 @@ a limit set close to that would be a crash waiting on a differently-configured
 consumer rather than a limit.
 
 Real content is nowhere near either number. This bound exists for truncated and
-hostile input, which is exactly what extraction turns up. It also protects the
-recursive consumers of the tree it returns, ``to_sexpr`` among them.
+hostile input, which is exactly what extraction turns up. It does not bound the
+*tree*'s depth -- a long left-associative chain parses at depth 1 -- which is
+why every whole-tree pass over the result, ``to_sexpr`` among them, is
+iterative.
 """
 
 
@@ -114,12 +117,7 @@ class ParseError(ValueError):
         prefixes it with the position: the position is already here as its own
         keys, and a consumer rendering both would print it twice.
         """
-        return {
-            "message": self.message,
-            "line": self.line,
-            "column": self.column,
-            "offset": self.offset,
-        }
+        return {"message": self.message, **_position(self)}
 
 
 @dataclass(frozen=True, slots=True)
@@ -258,21 +256,20 @@ class _Parser:
         if token is None:
             raise self.error_at(None, "expected an expression, found end of input")
 
-        if token.kind is TokenKind.NUMBER:
+        literal = _literal(token)
+        if literal is not None:
             self.advance()
-            return NumberLiteral(span=_token_span(token), text=token.text)
-
-        if token.kind is TokenKind.STRING:
-            self.advance()
-            return StringLiteral(span=_token_span(token), text=token.text)
+            return literal
 
         if token.kind is TokenKind.PUNCT and token.text == "(":
+            # Inline, not a shared `parse_group` method: a helper would add one
+            # stack frame per nesting level, and the index path is already the
+            # deepest one per level -- enough to hit `RecursionError` before
+            # MAX_PARSE_DEPTH does. Only the post-recursion half is shared.
             self.advance()
             inner = self.parse_expression(0)
             closing = self.expect_punct(")", "to close the group opened here")
-            grouped = _widen(inner, token, closing)
-            self.grouped.add(id(grouped))
-            return grouped
+            return self.mark_grouped(_widen(inner, token, closing))
 
         if token.kind is TokenKind.PUNCT and token.text == "-":
             self.advance()
@@ -280,9 +277,6 @@ class _Parser:
             return _unary("-", token, operand)
 
         if token.kind is TokenKind.WORD:
-            if token.normalized == "it":
-                self.advance()
-                return It(span=_token_span(token))
             # `exists` and `not` take a tight operand: a cast, `of` or `whose`
             # nests, but nothing looser -- not even `=` or `|`. Confirmed
             # live: `exists 1 + 2` fails on `exists 1`, `not 1 = 1` on
@@ -294,14 +288,14 @@ class _Parser:
                 if (
                     quantifier is not None
                     and quantifier.kind is TokenKind.WORD
-                    and quantifier.normalized in ("exists", "exist")
+                    and quantifier.normalized in grammar.EXISTS_WORDS
                 ):
                     self.advance()
                     operand = self.parse_expression(grammar.BP_PIPE)
                     return _exists(negated=True, op_token=token, operand=operand)
                 operand = self.parse_expression(grammar.BP_PIPE)
                 return _unary("not", token, operand)
-            if token.normalized in ("exists", "exist"):
+            if token.normalized in grammar.EXISTS_WORDS:
                 self.advance()
                 operand = self.parse_expression(grammar.BP_PIPE)
                 return _exists(negated=False, op_token=token, operand=operand)
@@ -321,13 +315,12 @@ class _Parser:
         then_branch = self.parse_expression(0)
         self.expect_word("else", "after the then branch of 'if'")
         else_branch = self.parse_expression(0)
-        span = Span(
-            start=if_token.offset,
-            end=else_branch.span.end,
-            line=if_token.line,
-            column=if_token.column,
+        return If(
+            span=_join_spans(_token_span(if_token), else_branch.span),
+            condition=condition,
+            then_branch=then_branch,
+            else_branch=else_branch,
         )
-        return If(span=span, condition=condition, then_branch=then_branch, else_branch=else_branch)
 
     def expect_word(self, word: str, context: str) -> Token:
         token = self.peek()
@@ -337,15 +330,23 @@ class _Parser:
 
     def parse_reference(self) -> Node:
         """A name phrase -- greedy words -- plus its optional index argument."""
-        first = self.advance()
-        words = [first]
+        words = [self.advance(), *self.read_phrase()]
+        index = self.parse_index()
+        last = index.span if index is not None else _token_span(words[-1])
+        span = _join_spans(_token_span(words[0]), last)
+        return Reference(span=span, phrase=_phrase(words), index=index)
+
+    def read_phrase(self) -> list[Token]:
+        """Consume words up to wherever the current name phrase ends."""
+        words: list[Token] = []
         while not self.phrase_ends_here():
             words.append(self.advance())
-        phrase = " ".join(word.normalized for word in words)
-        index = self.parse_index()
-        end = index.span.end if index is not None else _token_span(words[-1]).end
-        span = Span(start=first.offset, end=end, line=first.line, column=first.column)
-        return Reference(span=span, phrase=phrase, index=index)
+        return words
+
+    def mark_grouped(self, grouped: Node) -> Node:
+        """Remember ``grouped`` came out of its own parentheses (see :func:`_of`)."""
+        self.grouped.add(id(grouped))
+        return grouped
 
     def parse_index(self) -> Node | None:
         """The single argument a name may take: ``key "foo"``, ``item 0``,
@@ -353,22 +354,16 @@ class _Parser:
         token = self.peek()
         if token is None:
             return None
-        if token.kind is TokenKind.STRING:
+        literal = _literal(token)
+        if literal is not None:
             self.advance()
-            return StringLiteral(span=_token_span(token), text=token.text)
-        if token.kind is TokenKind.NUMBER:
-            self.advance()
-            return NumberLiteral(span=_token_span(token), text=token.text)
-        if token.kind is TokenKind.WORD and token.normalized == "it":
-            self.advance()
-            return It(span=_token_span(token))
+            return literal
         if token.kind is TokenKind.PUNCT and token.text == "(":
+            # Inline for the frame budget; see the same branch in parse_prefix.
             self.advance()
             inner = self.parse_expression(0)
             closing = self.expect_punct(")", "to close the argument opened here")
-            grouped = _widen(inner, token, closing)
-            self.grouped.add(id(grouped))
-            return grouped
+            return self.mark_grouped(_widen(inner, token, closing))
         return None
 
     def parse_infix(self, left: Node, min_bp: int) -> Node | None:
@@ -419,29 +414,16 @@ class _Parser:
                 self.expect_punct("(", "after 'whose'")
                 predicate = self.parse_expression(0)
                 closing = self.expect_punct(")", "to close the whose predicate")
-                span = Span(
-                    start=left.span.start,
-                    end=closing.offset + len(closing.text),
-                    line=left.span.line,
-                    column=left.span.column,
-                )
+                span = _join_spans(left.span, _token_span(closing))
                 return Whose(span=span, collection=left, predicate=predicate)
 
             if token.normalized == "as" and min_bp < grammar.BP_CAST:
                 self.advance()
-                target_words: list[Token] = []
-                while not self.phrase_ends_here():
-                    target_words.append(self.advance())
+                target_words = self.read_phrase()
                 if not target_words:
                     raise self.error_at(self.peek(), "expected a type name after 'as'")
-                span = Span(
-                    start=left.span.start,
-                    end=_token_span(target_words[-1]).end,
-                    line=left.span.line,
-                    column=left.span.column,
-                )
-                target = " ".join(word.normalized for word in target_words)
-                return Cast(span=span, operand=left, target=target)
+                span = _join_spans(left.span, _token_span(target_words[-1]))
+                return Cast(span=span, operand=left, target=_phrase(target_words))
 
             matched = self.match_word_infix()
             if matched is not None:
@@ -553,17 +535,31 @@ def _token_span(token: Token) -> Span:
 
 
 def _join_spans(start: Span, end: Span) -> Span:
+    """From the head of ``start`` to the end of ``end``: every compound node's span."""
     return Span(start=start.start, end=end.end, line=start.line, column=start.column)
+
+
+def _literal(token: Token) -> Node | None:
+    """The leaf a single token is on its own -- a number, a string or ``it`` --
+    or ``None`` when it is not one."""
+    span = _token_span(token)
+    if token.kind is TokenKind.NUMBER:
+        return NumberLiteral(span=span, text=token.text)
+    if token.kind is TokenKind.STRING:
+        return StringLiteral(span=span, text=token.text)
+    if token.kind is TokenKind.WORD and token.normalized == "it":
+        return It(span=span)
+    return None
+
+
+def _phrase(words: list[Token]) -> str:
+    """A name or type phrase: its words case-folded, joined by one space."""
+    return " ".join(word.normalized for word in words)
 
 
 def _widen(node: Node, opening: Token, closing: Token) -> Node:
     """Grow a node's span to cover the parens around it."""
-    span = Span(
-        start=opening.offset,
-        end=closing.offset + len(closing.text),
-        line=opening.line,
-        column=opening.column,
-    )
+    span = _join_spans(_token_span(opening), _token_span(closing))
     return dataclasses.replace(node, span=span)
 
 
@@ -606,7 +602,7 @@ def _of(prop: Node, obj: Node, *, grouped: bool = False) -> Node:
             # the same indexing said plurally, and resolving it as the
             # `item <string> of <folder>` property's plural spelling types it
             # as a filesystem object, which it is not.
-            prop.phrase in {"item", "items"}
+            prop.phrase in grammar.TUPLE_INDEX_WORDS
             and isinstance(prop.index, NumberLiteral)
             and prop.index.is_integer_literal
         ):
@@ -619,22 +615,13 @@ def _binary(op: str, left: Node, right: Node) -> Node:
 
 
 def _unary(op: str, op_token: Token, operand: Node) -> Node:
-    span = _prefix_span(op_token, operand)
+    span = _join_spans(_token_span(op_token), operand.span)
     return Unary(span=span, op=op, operand=operand)
 
 
 def _exists(negated: bool, op_token: Token, operand: Node) -> Node:
-    span = _prefix_span(op_token, operand)
+    span = _join_spans(_token_span(op_token), operand.span)
     return Exists(span=span, negated=negated, operand=operand)
-
-
-def _prefix_span(op_token: Token, operand: Node) -> Span:
-    return Span(
-        start=op_token.offset,
-        end=operand.span.end,
-        line=op_token.line,
-        column=op_token.column,
-    )
 
 
 def _chained_comparison_message(op: grammar.InfixOp, left: Binary) -> str:

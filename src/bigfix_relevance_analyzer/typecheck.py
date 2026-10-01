@@ -73,7 +73,7 @@ import enum
 import functools
 import itertools
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import Any, Final, assert_never
@@ -300,13 +300,10 @@ class CheckResult:
         type-check origin -- the dumps knowing a name only with a direct
         object does not prove it has no top-level definition in a context the
         dumps do not cover (proxy agent inspectors) -- so it is excluded by
-        code rather than by origin.
+        code rather than by origin. :func:`_is_type_error` is where that line
+        is drawn, so the ``if`` rule counting branch errors draws it too.
         """
-        return not any(
-            DIAGNOSTICS[diagnostic.code].origin is Origin.TYPE_CHECK
-            and diagnostic.code != "world-property-not-defined"
-            for diagnostic in self.diagnostics
-        )
+        return not any(_is_type_error(diagnostic) for diagnostic in self.diagnostics)
 
     @property
     def platforms(self) -> frozenset[str]:
@@ -374,37 +371,26 @@ class TypeEnvironment:
         return True
 
     def platforms_of(self, entries: list[inspectors.Inspector]) -> frozenset[str]:
-        found: frozenset[str] = frozenset()
-        for entry in entries:
-            found |= entry.contexts
-        return found & self.universe
+        return inspectors._contexts_of(entries) & self.universe
 
 
 def _client_platforms() -> frozenset[str]:
     """The client half of the context universe, for the one rule that reasons
     about "could one machine take both branches" -- see
-    :meth:`_Checker.branches_coexist`."""
-    return frozenset(
-        context
-        for source in inspectors.sources()
-        for dialect, _, context in [source.partition(":")]
-        if dialect == "client" and context
-    )
+    :meth:`_Checker.branches_coexist`. Derived, and cached, by the same
+    function that spells :attr:`~bigfix_relevance_analyzer.inspectors.Inspector.platforms`."""
+    return inspectors._platforms_for(frozenset(inspectors.sources()))
 
 
 def _platform_universe() -> frozenset[str]:
     """Every context the dumps name, spelled the way
     :attr:`~bigfix_relevance_analyzer.inspectors.Inspector.contexts` spells
-    them."""
-    return frozenset(
-        context if dialect == "client" else source
-        for source in inspectors.sources()
-        for dialect, _, context in [source.partition(":")]
-        if context
-    )
+    them -- by the function that spells those, so the two cannot drift."""
+    return inspectors._sampled_contexts_for(frozenset(inspectors.sources()))
 
 
-def _render(types: frozenset[str] | None) -> str:
+def _describe_types(types: frozenset[str] | None) -> str:
+    """A type set as a reader sees it: ``unknown``, ``none``, or ``a or b``."""
     if types is None:
         return "unknown"
     if not types:
@@ -473,6 +459,24 @@ def _ruled_out(value: RelevanceValue) -> bool:
     :attr:`CheckResult.ok` must keep saying so.
     """
     return value.types is not None and not value.types
+
+
+_RULED_OUT: Final = RelevanceValue(types=frozenset(), platforms=frozenset())
+"""The value of an expression whose every candidate was eliminated -- see
+:func:`_ruled_out`. Viable nowhere, since it never evaluates."""
+
+
+def _either(
+    first: RelevanceValue, second: RelevanceValue, *, platforms: frozenset[str]
+) -> RelevanceValue:
+    """A value that is one of two alternatives, never both: ``|``'s sides, or
+    an ``if``'s branches. Either's types, and a plurality only when they agree;
+    the caller says where it runs, since that differs between the two."""
+    return RelevanceValue(
+        types=(None if first.types is None or second.types is None else first.types | second.types),
+        plurality=first.plurality if first.plurality is second.plurality else Plurality.UNKNOWN,
+        platforms=platforms,
+    )
 
 
 UNTYPED: Final = "undefined"
@@ -764,13 +768,18 @@ def _written_reference(prop: Node) -> Reference | None:
 
 
 def _is_type_error(diagnostic: TypeDiagnostic) -> bool:
-    """Whether a diagnostic is a fault rather than a risk, by its origin.
+    """Whether a diagnostic is a fault rather than a risk.
 
-    The same line :attr:`CheckResult.ok` draws, and for the same reason: a
-    runtime risk is something the statement runs *with*, not something wrong
-    with it.
+    The one definition of the line :attr:`CheckResult.ok` draws, for the same
+    reason it gives: a runtime risk is something the statement runs *with*,
+    not something wrong with it. By origin, except
+    ``world-property-not-defined`` -- advisory despite its type-check origin;
+    see :attr:`CheckResult.ok`.
     """
-    return DIAGNOSTICS[diagnostic.code].origin is Origin.TYPE_CHECK
+    return (
+        DIAGNOSTICS[diagnostic.code].origin is Origin.TYPE_CHECK
+        and diagnostic.code != "world-property-not-defined"
+    )
 
 
 def _is_aggregate(phrase: str) -> bool:
@@ -885,15 +894,9 @@ def _plural_alternative(
     refers to non-unique object.`
     """
     matched = _matched_rows(name, subject, environment, indexed=indexed) or []
-    if not matched or not all(entry.multivalued for entry in matched):
+    if not all(entry.multivalued for entry in matched):
         return None
-    plurals = {entry.plural_name for entry in matched}
-    if len(plurals) != 1:
-        return None
-    (plural,) = plurals
-    if plural is None or plural.casefold() == name.casefold():
-        return None
-    return plural
+    return _sole_plural(matched, name)
 
 
 def _plural_spelling(
@@ -912,9 +915,13 @@ def _plural_spelling(
     hazard is not the question: `file "x" whose (...)` cannot collapse, and
     `files "x" whose (...)` is still the better shape.
     """
-    matched = _matched_rows(name, subject, environment, indexed=indexed) or []
-    if not matched:
-        return None
+    return _sole_plural(_matched_rows(name, subject, environment, indexed=indexed) or [], name)
+
+
+def _sole_plural(matched: list[inspectors.Inspector], name: str) -> str | None:
+    """The one plural name every row in ``matched`` agrees on, when it differs
+    from the ``name`` written; ``None`` for no rows, disagreeing rows, or a
+    name already plural."""
     plurals = {entry.plural_name for entry in matched}
     if len(plurals) != 1:
         return None
@@ -1168,6 +1175,24 @@ class _Checker:
     def rows(self, entries: tuple[inspectors.Inspector, ...]) -> list[inspectors.Inspector]:
         return [entry for entry in entries if self.env.visible(entry)]
 
+    def from_rows(
+        self,
+        rows: list[inspectors.Inspector],
+        *,
+        plurality: Plurality,
+        fallback_platforms: frozenset[str],
+        types: frozenset[str] | None = None,
+    ) -> RelevanceValue:
+        """The value an operator or cast yields through the table ``rows`` it
+        matched: their return types unless ``types`` overrides them, viable
+        where those rows are -- or, when the dumps place none of them, where
+        the operands were (``fallback_platforms``)."""
+        return RelevanceValue(
+            types=frozenset(entry.return_type for entry in rows) if types is None else types,
+            plurality=plurality,
+            platforms=self.env.platforms_of(rows) or fallback_platforms,
+        )
+
     def retract(self, codes: frozenset[str], span: Span) -> None:
         """Withdraw the already-emitted ``codes`` diagnostics inside ``span``.
 
@@ -1182,15 +1207,7 @@ class _Checker:
         this operand was appended after any mark that is still open, so no
         index below one ever moves.
         """
-        self.diagnostics[:] = [
-            diagnostic
-            for diagnostic in self.diagnostics
-            if not (
-                diagnostic.code in codes
-                and span.start <= diagnostic.span.start
-                and diagnostic.span.end <= span.end
-            )
-        ]
+        self.withdraw(codes, lambda found: span.start <= found.start and found.end <= span.end)
 
     def retract_exact(self, codes: frozenset[str], span: Span) -> None:
         """Withdraw ``codes`` reported on ``span`` itself, not merely inside it.
@@ -1199,14 +1216,15 @@ class _Checker:
         everything under it; `exists` is not one, forgiving only the collapse
         it flattens directly (see :data:`_FILTERED_RISK`).
         """
+        self.withdraw(codes, lambda found: (found.start, found.end) == (span.start, span.end))
+
+    def withdraw(self, codes: frozenset[str], where: Callable[[Span], bool]) -> None:
+        """Drop the ``codes`` diagnostics whose span satisfies ``where``, in place
+        -- see :meth:`retract` for why in place."""
         self.diagnostics[:] = [
             diagnostic
             for diagnostic in self.diagnostics
-            if not (
-                diagnostic.code in codes
-                and diagnostic.span.start == span.start
-                and diagnostic.span.end == span.end
-            )
+            if not (diagnostic.code in codes and where(diagnostic.span))
         ]
 
     def accept_collapse(self, span: Span) -> None:
@@ -1233,7 +1251,11 @@ class _Checker:
             return
         if "boolean" not in value.types or value.plurality is Plurality.PLURAL:
             self.report(
-                code, span, plurality=value.plurality.value, type=_render(value.types), **fields
+                code,
+                span,
+                plurality=value.plurality.value,
+                type=_describe_types(value.types),
+                **fields,
             )
 
     def require_singular(
@@ -1256,7 +1278,7 @@ class _Checker:
         """
         if not self.contexts:
             self.report("used-without-context", span, token="it")
-            return RelevanceValue(types=None, platforms=self.env.universe)
+            return self.unknown()
         context = self.contexts[-1]
         return RelevanceValue(
             types=context.types, plurality=Plurality.SINGULAR, platforms=context.platforms
@@ -1556,6 +1578,11 @@ class _Checker:
                 self.record(node, None)
                 return world
         if value.types is not None and not value.types:
+            index_fragment = (
+                ""
+                if index is None
+                else PROPERTY_INDEX_FRAGMENT.format(name=_describe_types(index.types))
+            )
             if subject is None:
                 # A bare world reference whose name the dumps know only with a
                 # direct object. That is not proof of a mistake: the dumps do
@@ -1569,22 +1596,14 @@ class _Checker:
                     "world-property-not-defined",
                     node.span,
                     phrase=node.phrase,
-                    index=(
-                        ""
-                        if index is None
-                        else PROPERTY_INDEX_FRAGMENT.format(name=_render(index.types))
-                    ),
+                    index=index_fragment,
                 )
                 return self.unknown()
             self.report(
                 "property-not-defined",
                 node.span,
                 phrase=node.phrase,
-                index=(
-                    ""
-                    if index is None
-                    else PROPERTY_INDEX_FRAGMENT.format(name=_render(index.types))
-                ),
+                index=index_fragment,
                 direct_object=(
                     ""
                     if subject is None
@@ -1594,7 +1613,7 @@ class _Checker:
                         # string>` -- would describe an object the source does
                         # not contain; the tuple spelling alone is what the
                         # tables call it, and how they write it.
-                        name=_render(self.contexts[-1].tuple_types or subject)
+                        name=_describe_types(self.contexts[-1].tuple_types or subject)
                     )
                 ),
             )
@@ -1636,7 +1655,7 @@ class _Checker:
         index = self.bad_tuple_index(node)
         if index is not None:
             self.report("tuple-index-not-literal", node.span, token=index.text)
-            return RelevanceValue(types=frozenset(), platforms=frozenset())
+            return _RULED_OUT
 
         # `resolve_property` already read the written form; it leaves plurality
         # `UNKNOWN` for a name it could not match, or one whose matched rows
@@ -1665,6 +1684,10 @@ class _Checker:
         filtered = written is not None and written is not node.prop
         if written is not None and prop.plurality is not Plurality.UNKNOWN:
             plurality = prop.plurality
+            # What every check below asks about the written name, worked out once.
+            aggregate = _is_aggregate(written.phrase)
+            subject = _subject(obj)
+            indexed = written.index is not None
             if (
                 plurality is Plurality.SINGULAR
                 and obj.plurality is Plurality.PLURAL
@@ -1676,7 +1699,7 @@ class _Checker:
                 # content site holds 45,000 of them -- and the `exists` does
                 # flatten the error away, but only for as long as the `exists`
                 # is there and only by luck about how many keys exist today.
-                and not _is_aggregate(written.phrase)
+                and not aggregate
             ):
                 self.report("singular-over-plural-object", node.span, phrase=written.phrase)
             elif (
@@ -1688,13 +1711,10 @@ class _Checker:
                 # bare singular form would not. Latent until now -- an `if`
                 # branch swallowed its own risks, and `if true then (unique
                 # value of "a") else "b"` was the case that hid here.
-                and not _is_aggregate(written.phrase)
+                and not aggregate
                 and (
                     alternative := _plural_alternative(
-                        written.phrase,
-                        _subject(obj),
-                        self.env,
-                        indexed=written.index is not None,
+                        written.phrase, subject, self.env, indexed=indexed
                     )
                 )
                 is not None
@@ -1721,14 +1741,9 @@ class _Checker:
                 )
             elif (
                 filtered
-                and not _is_aggregate(written.phrase)
+                and not aggregate
                 and (
-                    spelling := _plural_spelling(
-                        written.phrase,
-                        _subject(obj),
-                        self.env,
-                        indexed=written.index is not None,
-                    )
+                    spelling := _plural_spelling(written.phrase, subject, self.env, indexed=indexed)
                 )
             ):
                 # The non-unique error cannot fire here: an index makes `file
@@ -1747,14 +1762,9 @@ class _Checker:
                 )
             elif (
                 plurality is Plurality.SINGULAR
-                and not _is_aggregate(written.phrase)
+                and not aggregate
                 and (
-                    spelling := _plural_spelling(
-                        written.phrase,
-                        _subject(obj),
-                        self.env,
-                        indexed=written.index is not None,
-                    )
+                    spelling := _plural_spelling(written.phrase, subject, self.env, indexed=indexed)
                 )
             ):
                 # The same habit without a filter, and not yet a finding: a
@@ -1802,7 +1812,7 @@ class _Checker:
         if not isinstance(node.obj, TupleExpr) or not isinstance(node.prop, Reference):
             return None
         index = node.prop.index
-        if node.prop.phrase not in {"item", "items"} or not isinstance(
+        if node.prop.phrase not in grammar.TUPLE_INDEX_WORDS or not isinstance(
             index, NumberLiteral | StringLiteral
         ):
             return None
@@ -1851,7 +1861,9 @@ class _Checker:
             and "boolean" not in predicate.types
         ):
             self.report(
-                "whose-filter-not-boolean", node.predicate.span, type=_render(predicate.types)
+                "whose-filter-not-boolean",
+                node.predicate.span,
+                type=_describe_types(predicate.types),
             )
         return RelevanceValue(
             types=collection.types,
@@ -1908,15 +1920,13 @@ class _Checker:
             self.report(
                 "cast-not-defined",
                 node.span,
-                source_type=_render(operand.types),
+                source_type=_describe_types(operand.types),
                 token="as",
                 cast_name=node.target,
             )
-            return RelevanceValue(types=frozenset(), platforms=frozenset())
-        return RelevanceValue(
-            types=frozenset(entry.return_type for entry in rows),
-            plurality=operand.plurality,
-            platforms=self.env.platforms_of(rows) or operand.platforms,
+            return _RULED_OUT
+        return self.from_rows(
+            rows, plurality=operand.plurality, fallback_platforms=operand.platforms
         )
 
     def combine_binary(
@@ -1946,7 +1956,7 @@ class _Checker:
         self.require_singular(right, node.right.span, "right-operand-not-singular", token=node.op)
 
         if _ruled_out(left) or _ruled_out(right):
-            return RelevanceValue(types=frozenset(), platforms=frozenset())
+            return _RULED_OUT
 
         form = grammar.CANONICAL_BINARY.get(node.op)
         if form is None or left.types is None or right.types is None:
@@ -1970,16 +1980,16 @@ class _Checker:
                 "binary-operator-not-defined",
                 node.span,
                 token=node.op,
-                left_type=_render(left.types),
-                right_type=_render(right.types),
+                left_type=_describe_types(left.types),
+                right_type=_describe_types(right.types),
             )
-            return RelevanceValue(types=frozenset(), platforms=frozenset())
+            return _RULED_OUT
 
-        types = _BOOLEAN if form.negated else frozenset(entry.return_type for entry in rows)
-        return RelevanceValue(
-            types=types,
+        return self.from_rows(
+            rows,
             plurality=Plurality.SINGULAR,
-            platforms=self.env.platforms_of(rows) or (left.platforms & right.platforms),
+            fallback_platforms=left.platforms & right.platforms,
+            types=_BOOLEAN if form.negated else None,
         )
 
     def check_version_comparison(
@@ -2126,13 +2136,11 @@ class _Checker:
                 "unary-operator-not-defined",
                 node.span,
                 token=node.op,
-                argument_type=_render(operand.types),
+                argument_type=_describe_types(operand.types),
             )
-            return RelevanceValue(types=frozenset(), platforms=frozenset())
-        return RelevanceValue(
-            types=frozenset(entry.return_type for entry in rows),
-            plurality=operand.plurality,
-            platforms=self.env.platforms_of(rows) or operand.platforms,
+            return _RULED_OUT
+        return self.from_rows(
+            rows, plurality=operand.plurality, fallback_platforms=operand.platforms
         )
 
     def combine_bar(self, node: Bar, left: RelevanceValue, right: RelevanceValue) -> RelevanceValue:
@@ -2183,16 +2191,11 @@ class _Checker:
                 "operand-types-incompatible",
                 node.span,
                 token="|",
-                left_type=_render(left.types),
-                right_type=_render(right.types),
+                left_type=_describe_types(left.types),
+                right_type=_describe_types(right.types),
             )
-        types = None if left.types is None or right.types is None else left.types | right.types
-        return RelevanceValue(
-            types=types,
-            plurality=left.plurality if left.plurality is right.plurality else Plurality.UNKNOWN,
-            # Error fallback is an alternative: either side may be the one that runs.
-            platforms=left.platforms | right.platforms,
-        )
+        # Error fallback is an alternative: either side may be the one that runs.
+        return _either(left, right, platforms=left.platforms | right.platforms)
 
     def combine_item_of(self, node: ItemOf, operand: RelevanceValue) -> RelevanceValue:
         if node.index.kind is NumberKind.CONSTANT_TOO_LARGE:
@@ -2206,10 +2209,10 @@ class _Checker:
                 token=node.index.text,
                 max_value=MAX_LARGE_INTEGER,
             )
-            return RelevanceValue(types=frozenset(), platforms=frozenset())
+            return _RULED_OUT
         if node.index.kind is NumberKind.LARGE_INTEGER:
             self.report("tuple-index-unreasonable", node.span, token=node.index.text)
-            return RelevanceValue(types=frozenset(), platforms=frozenset())
+            return _RULED_OUT
         # A `whose` filters the tuples without changing what any one position
         # holds, so `items 1 of (a, b) whose (...)` indexes the same tuple.
         subscripted = node.operand
@@ -2224,7 +2227,7 @@ class _Checker:
             self.report(
                 "tuple-index-out-of-range", node.span, token=node.index.text, total=len(items)
             )
-            return RelevanceValue(types=frozenset(), platforms=frozenset())
+            return _RULED_OUT
         picked = items[index]
         # The plural spelling answers plurally whatever it indexed -- the
         # engine reads that off the phrase, not off the tuple (see
@@ -2280,28 +2283,19 @@ class _Checker:
             self.report(
                 "if-branch-types-incompatible",
                 node.span,
-                if_true_type=_render(then_value.types),
-                if_false_type=_render(else_value.types),
+                if_true_type=_describe_types(then_value.types),
+                if_false_type=_describe_types(else_value.types),
             )
 
-        types = (
-            None
-            if then_value.types is None or else_value.types is None
-            else then_value.types | else_value.types
-        )
-        return RelevanceValue(
-            types=types,
-            plurality=(
-                then_value.plurality
-                if then_value.plurality is else_value.plurality
-                else Plurality.UNKNOWN
-            ),
-            # Alternatives: only one branch ever runs, so the statement covers
-            # the union of what its branches cover -- qna on macOS, where
-            # `registry` does not exist: `if false then (exists key "x" of
-            # registry) else true` answers `True`, the untaken branch's missing
-            # inspector tolerated. The condition gets no such tolerance: it
-            # runs every time, so it narrows the union.
+        # Alternatives: only one branch ever runs, so the statement covers
+        # the union of what its branches cover -- qna on macOS, where
+        # `registry` does not exist: `if false then (exists key "x" of
+        # registry) else true` answers `True`, the untaken branch's missing
+        # inspector tolerated. The condition gets no such tolerance: it
+        # runs every time, so it narrows the union.
+        return _either(
+            then_value,
+            else_value,
             platforms=condition.platforms & (then_value.platforms | else_value.platforms),
         )
 

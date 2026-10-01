@@ -203,6 +203,18 @@ _NUMBER_RE = re.compile(r"\d+")
 _WORD_RE = re.compile(rf"[^\s{re.escape(''.join(sorted(_NOT_WORD_CHARS)))}]+")
 
 
+def _normalize_phrase(text: str, *, fold: bool = False) -> str:
+    """``text`` lowercased, with every whitespace run collapsed to one space.
+
+    The text-level counterpart of :attr:`Token.normalized`, for a name that
+    arrives as a string rather than as tokens -- a search query, a fix's
+    expected name, a classifier's input. ``fold`` uses :meth:`str.casefold`
+    instead of :meth:`str.lower`; the two differ only outside ASCII.
+    """
+    collapsed = " ".join(text.split())
+    return collapsed.casefold() if fold else collapsed.lower()
+
+
 def _scan(text: str, at: int) -> tuple[TokenKind, int]:
     """Lex one token starting at ``at``; return its kind and end offset.
 

@@ -23,9 +23,10 @@ Design decisions pinned here
 from __future__ import annotations
 
 import enum
+from collections.abc import Callable, Generator, Iterator
 from dataclasses import dataclass
 from itertools import count
-from typing import Final, NamedTuple
+from typing import Any, Final, NamedTuple, TypeVar, assert_never
 
 __all__ = [
     "MAX_INTEGER",
@@ -49,8 +50,11 @@ __all__ = [
     "TupleExpr",
     "Unary",
     "Whose",
+    "children",
     "to_mermaid",
     "to_sexpr",
+    "tree_depth",
+    "walk",
 ]
 
 MAX_INTEGER: Final = 2**63 - 1
@@ -410,12 +414,102 @@ Node = (
 )
 
 
+def children(node: Node) -> tuple[Node, ...]:
+    """The direct child nodes of ``node``, in source order.
+
+    An explicit ``match`` rather than reflection over dataclass fields, so the
+    node classes stay pure data and adding one is a type error here until it
+    is handled.
+    """
+    match node:
+        case NumberLiteral() | StringLiteral() | It():
+            return ()
+        case Reference(index=index):
+            return () if index is None else (index,)
+        case Of(prop=prop, obj=obj):
+            return (prop, obj)
+        case ItemOf(index=index, operand=operand):
+            return (index, operand)
+        case NumberOf(operand=operand) | Unary(operand=operand) | Exists(operand=operand):
+            return (operand,)
+        case Cast(operand=operand):
+            return (operand,)
+        case Bar(left=left, right=right) | Binary(left=left, right=right):
+            return (left, right)
+        case Whose(collection=collection, predicate=predicate):
+            return (collection, predicate)
+        case If(condition=condition, then_branch=then_branch, else_branch=else_branch):
+            return (condition, then_branch, else_branch)
+        case TupleExpr(items=items) | Collection(items=items):
+            return items
+        case _:
+            assert_never(node)
+
+
+def walk(node: Node) -> Iterator[Node]:
+    """Every node in the tree, pre-order: parents before children, siblings in
+    source order.
+
+    Iterative, as every whole-tree pass here is: a left-associative chain such
+    as a long ``or`` parses within the parser's nesting limit yet builds a tree
+    far deeper than CPython's recursion limit, and wild content must never be a
+    crash.
+    """
+    stack = [node]
+    while stack:
+        current = stack.pop()
+        yield current
+        stack.extend(reversed(children(current)))
+
+
+def tree_depth(node: Node) -> int:
+    """The height of the tree, iteratively; a lone leaf is 1."""
+    deepest = 0
+    stack: list[tuple[Node, int]] = [(node, 1)]
+    while stack:
+        current, level = stack.pop()
+        deepest = max(deepest, level)
+        stack.extend((child, level + 1) for child in children(current))
+    return deepest
+
+
+_R = TypeVar("_R")
+
+
+def _fold(root: Node, step: Callable[[Node], Generator[Node, _R, _R]]) -> _R:
+    """Run a recursive fold over the tree without recursing.
+
+    ``step`` is written as if it recursed: a generator that yields each
+    child it needs, is sent that child's result back, and returns its
+    own. This drives those generators from an explicit stack, so the fold keeps
+    the readable recursive shape -- and the exact order its side effects happen
+    in -- while surviving trees deeper than the recursion limit. See
+    :func:`walk` for why that depth is reachable.
+    """
+    stack = [step(root)]
+    # None primes a freshly pushed generator; otherwise it is the result of the
+    # child the top generator is waiting on.
+    sent: Any = None
+    while True:
+        try:
+            child = stack[-1].send(sent)
+        except StopIteration as done:
+            stack.pop()
+            value: _R = done.value
+            if not stack:
+                return value
+            sent = value
+        else:
+            stack.append(step(child))
+            sent = None
+
+
 def _quote(text: str) -> str:
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def to_sexpr(node: Node) -> str:
-    """Serialize a tree to the S-expression form the corpus is written in."""
+def _sexpr_step(node: Node) -> Generator[Node, str, str]:
+    """One node of :func:`to_sexpr`, as a :func:`_fold` step."""
     match node:
         case NumberLiteral(text=text):
             return f"(num {_quote(text)})"
@@ -427,33 +521,42 @@ def to_sexpr(node: Node) -> str:
             return f"(ref {_quote(phrase)})"
         case Reference(phrase=phrase, index=index):
             assert index is not None
-            return f"(ref {_quote(phrase)} {to_sexpr(index)})"
+            return f"(ref {_quote(phrase)} {(yield index)})"
         case Of(prop=prop, obj=obj):
-            return f"(of {to_sexpr(prop)} {to_sexpr(obj)})"
+            return f"(of {(yield prop)} {(yield obj)})"
         case ItemOf(index=index, operand=operand, plural=plural):
             head = "items-of" if plural else "item-of"
-            return f"({head} {to_sexpr(index)} {to_sexpr(operand)})"
+            return f"({head} {(yield index)} {(yield operand)})"
         case NumberOf(operand=operand):
-            return f"(number-of {to_sexpr(operand)})"
+            return f"(number-of {(yield operand)})"
         case Bar(left=left, right=right):
-            return f"(bar {to_sexpr(left)} {to_sexpr(right)})"
+            return f"(bar {(yield left)} {(yield right)})"
         case Binary(op=op, left=left, right=right):
-            return f"(bin {_quote(op)} {to_sexpr(left)} {to_sexpr(right)})"
+            return f"(bin {_quote(op)} {(yield left)} {(yield right)})"
         case Unary(op=op, operand=operand):
-            return f"(un {_quote(op)} {to_sexpr(operand)})"
+            return f"(un {_quote(op)} {(yield operand)})"
         case Exists(negated=negated, operand=operand):
             head = "not-exists" if negated else "exists"
-            return f"({head} {to_sexpr(operand)})"
+            return f"({head} {(yield operand)})"
         case Whose(collection=collection, predicate=predicate):
-            return f"(whose {to_sexpr(collection)} {to_sexpr(predicate)})"
+            return f"(whose {(yield collection)} {(yield predicate)})"
         case Cast(operand=operand, target=target):
-            return f"(cast {to_sexpr(operand)} {_quote(target)})"
+            return f"(cast {(yield operand)} {_quote(target)})"
         case If(condition=condition, then_branch=then_branch, else_branch=else_branch):
-            return f"(if {to_sexpr(condition)} {to_sexpr(then_branch)} {to_sexpr(else_branch)})"
-        case TupleExpr(items=items):
-            return f"(tuple {' '.join(to_sexpr(item) for item in items)})"
-        case Collection(items=items):
-            return f"(coll {' '.join(to_sexpr(item) for item in items)})"
+            return f"(if {(yield condition)} {(yield then_branch)} {(yield else_branch)})"
+        case TupleExpr(items=items) | Collection(items=items):
+            head = "tuple" if isinstance(node, TupleExpr) else "coll"
+            parts = []
+            for item in items:  # not a comprehension: `yield` is not allowed in one
+                parts.append((yield item))
+            return f"({head} {' '.join(parts)})"
+        case _:
+            assert_never(node)
+
+
+def to_sexpr(node: Node) -> str:
+    """Serialize a tree to the S-expression form the corpus is written in."""
+    return _fold(node, _sexpr_step)
 
 
 def _mermaid_escape(text: str) -> str:
@@ -629,12 +732,14 @@ def to_mermaid(node: Node) -> str:
             return None
         return "; ".join(text for text in texts if text is not None)
 
-    def walk(node: Node) -> _Rendered:
+    def step(node: Node) -> Generator[Node, _Rendered, _Rendered]:
+        # A _fold step: `(yield child)` renders `child` and hands back its
+        # _Rendered, in exactly the order a recursive walk would.
         match node:
-            case NumberLiteral(text=text):
+            case NumberLiteral() | StringLiteral():
+                text = _literal_text(node)
+                assert text is not None
                 return _plain(emit(text, "stadium"))
-            case StringLiteral():
-                return _plain(emit(f'"{node.content}"', "stadium"))
             case It():
                 return _plain(emit("it", "rounded"))
             case Reference(phrase=phrase, index=None):
@@ -645,84 +750,72 @@ def to_mermaid(node: Node) -> str:
                 if literal is not None:
                     return _plain(emit(f"{phrase} {literal}"))
                 me = emit(phrase)
-                edge(me, walk(index).result, "index")
+                edge(me, (yield index).result, "index")
                 return _plain(me)
             case Of(prop=prop, obj=obj) if isinstance(prop, Of):
                 # An explicit (a of b) of c: collapsing would hang two `of`
                 # edges off `a`, which is the shape of `a of b of c` instead.
                 me = emit("of", "hexagon")
-                edge(me, walk(prop).result, "prop")
-                edge(me, walk(obj).result, "obj")
+                edge(me, (yield prop).result, "prop")
+                edge(me, (yield obj).result, "obj")
                 return _plain(me)
             case Of(prop=prop, obj=obj):
                 # The object flows into the property's *sink*, which is the
                 # property itself unless a `whose` wraps it -- see _Rendered.
-                rendered_prop = walk(prop)
-                rendered_obj = walk(obj)
+                rendered_prop = yield prop
+                rendered_obj = yield obj
                 edge(rendered_prop.sink, rendered_obj.result, "of")
                 return _Rendered(result=rendered_prop.result, sink=rendered_obj.sink)
             case ItemOf(index=index, operand=operand, plural=plural):
                 me = emit("items of" if plural else "item of", "hexagon")
-                edge(me, walk(index).result, "index")
-                edge(me, walk(operand).result, "of")
+                edge(me, (yield index).result, "index")
+                edge(me, (yield operand).result, "of")
                 return _plain(me)
-            case NumberOf(operand=operand):
-                me = emit("number of", "hexagon")
-                edge(me, walk(operand).result)
+            case Bar(left=left, right=right) | Binary(left=left, right=right):
+                me = emit(node.op if isinstance(node, Binary) else "|", "hexagon")
+                edge(me, (yield left).result)
+                edge(me, (yield right).result)
                 return _plain(me)
-            case Bar(left=left, right=right):
-                me = emit("|", "hexagon")
-                edge(me, walk(left).result)
-                edge(me, walk(right).result)
-                return _plain(me)
-            case Binary(op=op, left=left, right=right):
-                me = emit(op, "hexagon")
-                edge(me, walk(left).result)
-                edge(me, walk(right).result)
-                return _plain(me)
-            case Unary(op=op, operand=operand):
-                me = emit(op, "hexagon")
-                edge(me, walk(operand).result)
-                return _plain(me)
-            case Exists(negated=negated, operand=operand):
-                me = emit("not exists" if negated else "exists", "hexagon")
-                edge(me, walk(operand).result)
+            case NumberOf(operand=operand) | Unary(operand=operand) | Exists(operand=operand):
+                match node:
+                    case NumberOf():
+                        label = "number of"
+                    case Unary(op=op):
+                        label = op
+                    case Exists(negated=negated):
+                        label = "not exists" if negated else "exists"
+                me = emit(label, "hexagon")
+                edge(me, (yield operand).result)
                 return _plain(me)
             case Whose(collection=collection, predicate=predicate):
                 # The filtered collection flows *through* here: an object
                 # arriving from an enclosing `of` belongs to what is being
                 # filtered, so this passes that collection's sink onward.
                 me = emit("whose", "rhombus")
-                rendered_collection = walk(collection)
+                rendered_collection = yield collection
                 edge(me, rendered_collection.result, "collection")
-                edge(me, walk(predicate).result, "predicate")
+                edge(me, (yield predicate).result, "predicate")
                 return _Rendered(result=me, sink=rendered_collection.sink)
             case Cast(operand=operand, target=target):
                 me = emit(f"as {target}", "hexagon")
-                edge(me, walk(operand).result)
+                edge(me, (yield operand).result)
                 return _plain(me)
             case If(condition=condition, then_branch=then_branch, else_branch=else_branch):
                 me = emit("if", "rhombus")
-                edge(me, walk(condition).result, "condition")
-                edge(me, walk(then_branch).result, "then")
-                edge(me, walk(else_branch).result, "else")
+                edge(me, (yield condition).result, "condition")
+                edge(me, (yield then_branch).result, "then")
+                edge(me, (yield else_branch).result, "else")
                 return _plain(me)
-            case TupleExpr(items=items):
+            case TupleExpr(items=items) | Collection(items=items):
                 group = literal_group(items)
                 if group is not None:
                     return _plain(emit(group, "subroutine"))
-                me = emit("tuple", "subroutine")
+                me = emit("tuple" if isinstance(node, TupleExpr) else ";", "subroutine")
                 for item in items:
-                    edge(me, walk(item).result)
+                    edge(me, (yield item).result)
                 return _plain(me)
-            case Collection(items=items):
-                group = literal_group(items)
-                if group is not None:
-                    return _plain(emit(group, "subroutine"))
-                me = emit(";", "subroutine")
-                for item in items:
-                    edge(me, walk(item).result)
-                return _plain(me)
+            case _:
+                assert_never(node)
 
-    walk(node)
+    _fold(node, step)
     return "\n".join(lines)

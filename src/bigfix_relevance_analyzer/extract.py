@@ -38,7 +38,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
-from bigfix_relevance_analyzer._serialize import _enum
+from bigfix_relevance_analyzer._serialize import _as_path, _enum
 from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect, is_definite
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -118,7 +118,7 @@ class SourceMap:
             return span.raw_start
         if position == span.end:
             return span.raw_end
-        return span.raw_start + len(self.text[span.start : position].encode("utf-8"))
+        return span.raw_start + _utf8_len(self.text, span.start, position)
 
     def raw_range(self, start: int, end: int) -> tuple[int, int] | None:
         """The bytes holding ``text[start:end]``, or ``None`` if there are none.
@@ -358,10 +358,15 @@ class _TextSource:
                     return None
                 raw_start, raw_end = span.raw_start, span.raw_end
             else:
-                raw_start = span.raw_start + len(self.text[span.start : start].encode("utf-8"))
-                raw_end = raw_start + len(self.text[start:stop].encode("utf-8"))
+                raw_start = span.raw_start + _utf8_len(self.text, span.start, start)
+                raw_end = raw_start + _utf8_len(self.text, start, stop)
             spans.append(SourceSpan(start - offset, stop - offset, raw_start, raw_end, span.atomic))
         return SourceMap(self.text[offset:end], tuple(spans))
+
+
+def _utf8_len(text: str, start: int, end: int) -> int:
+    """How many bytes ``text[start:end]`` takes in the UTF-8 file it came from."""
+    return len(text[start:end].encode("utf-8"))
 
 
 def _site_map(source: _TextSource | None, offset: int, text: str) -> SourceMap | None:
@@ -681,28 +686,23 @@ def _html_sites(
     )
     js_label = label or "JavaScript relevance call"
 
-    sites = [
-        _make_site(
-            kind="relevance-pi",
-            text=body,
-            line=line + line_offset,
-            context=pi_label,
-            context_dialect=pi_dialect,
-            source_map=_site_map(source, offset, body),
-        )
-        for line, offset, body in pi_spans
-    ]
-    sites += [
-        _make_site(
-            kind="javascript-call",
-            text=body,
-            line=line + line_offset,
-            context=js_label,
-            context_dialect=Dialect.SESSION,
-            source_map=_site_map(source, offset, body),
-        )
-        for line, offset, body in js_spans
-    ]
+    def sites_from(
+        spans: Iterable[tuple[int, int, str]], kind: SiteKind, context: str, dialect: Dialect
+    ) -> list[RelevanceSite]:
+        return [
+            _make_site(
+                kind=kind,
+                text=body,
+                line=line + line_offset,
+                context=context,
+                context_dialect=dialect,
+                source_map=_site_map(source, offset, body),
+            )
+            for line, offset, body in spans
+        ]
+
+    sites = sites_from(pi_spans, "relevance-pi", pi_label, pi_dialect)
+    sites += sites_from(js_spans, "javascript-call", js_label, Dialect.SESSION)
     return sorted(sites, key=lambda site: site.line)
 
 
@@ -789,14 +789,14 @@ def extract_relevance_from_markdown(text: str) -> list[RelevanceSite]:
 
 def _extract_plain_text(text: str, dialect: Dialect) -> list[RelevanceSite]:
     """Treat the whole of ``text`` as a single relevance statement."""
-    body = text.strip()
+    offset, body = _stripped(text)
     if not body:
         return []
     return [
         _make_site(
             kind="plain-text",
             text=body,
-            line=_line_of(text, len(text) - len(text.lstrip())),
+            line=_line_of(text, offset),
             context="whole file",
             context_dialect=dialect,
         )
@@ -840,6 +840,24 @@ class _Element:
         return self.path[-1]
 
 
+def _body_site(element: _Element, *, kind: SiteKind, context: str) -> list[RelevanceSite]:
+    """The one client-relevance site an element's whole (stripped) body is,
+    or none when the body is blank."""
+    offset, body = _stripped(element.text)
+    if not body:
+        return []
+    return [
+        _make_site(
+            kind=kind,
+            text=body,
+            line=element.line,
+            context=context,
+            context_dialect=Dialect.CLIENT,
+            source_map=_site_map(element.source, offset, body),
+        )
+    ]
+
+
 def _sites_for_element(element: _Element) -> list[RelevanceSite]:
     """The relevance sites, if any, that one XML element contributes."""
     tag = element.tag
@@ -847,58 +865,26 @@ def _sites_for_element(element: _Element) -> list[RelevanceSite]:
     context = "/".join(element.path)
 
     if tag == "Relevance":
-        offset, body = _stripped(text)
-        if not body:
-            return []
-        return [
-            _make_site(
-                kind="relevance",
-                text=body,
-                line=element.line,
-                context=context,
-                context_dialect=Dialect.CLIENT,
-                source_map=_site_map(element.source, offset, body),
-            )
-        ]
+        return _body_site(element, kind="relevance", context=context)
 
     if tag == "SuccessCriteria":
         # Only Option="CustomRelevance" carries a relevance statement; the
         # other options are fixed behaviors with an empty body.
         if element.attrib.get("Option") != "CustomRelevance":
             return []
-        offset, body = _stripped(text)
-        if not body:
-            return []
-        return [
-            _make_site(
-                kind="success-criteria",
-                text=body,
-                line=element.line,
-                context=context,
-                context_dialect=Dialect.CLIENT,
-                source_map=_site_map(element.source, offset, body),
-            )
-        ]
+        return _body_site(element, kind="success-criteria", context=context)
 
     if tag == "Property":
         # `<Property>` is an analysis property only inside an Analysis; it
         # means something else elsewhere (e.g. inside a MIMEField).
         if "Analysis" not in element.path[:-1]:
             return []
-        offset, body = _stripped(text)
-        if not body:
-            return []
         name = element.attrib.get("Name")
-        return [
-            _make_site(
-                kind="analysis-property",
-                text=body,
-                line=element.line,
-                context=f'{context}[Name="{name}"]' if name else context,
-                context_dialect=Dialect.CLIENT,
-                source_map=_site_map(element.source, offset, body),
-            )
-        ]
+        return _body_site(
+            element,
+            kind="analysis-property",
+            context=f'{context}[Name="{name}"]' if name else context,
+        )
 
     if tag == "ActionScript":
         mimetype = element.attrib.get("MIMEType")
@@ -1210,7 +1196,7 @@ def extract_relevance_from_file(path: str | bytes | os.PathLike[str]) -> list[Re
     the ClientUI treatment, and otherwise the document's own mechanism (a
     JavaScript relevance call, if any) or the content classifier decides.
     """
-    file_path = Path(os.fsdecode(path))
+    file_path = _as_path(path)
     suffixes = _significant_suffixes(file_path)
     last = suffixes[-1] if suffixes else ""
 

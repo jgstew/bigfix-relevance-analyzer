@@ -33,13 +33,20 @@ page.on("console", (msg) => {
 page.on("pageerror", (err) => consoleErrors.push(String(err)));
 
 await page.goto(pathToFileURL(htmlPath).href);
-await page.waitForFunction(() => document.getElementById("status")?.textContent === "Done.", {
-  timeout: 60_000,
-});
+// Wait for boot to finish *or* for the pre-flight check to refuse the browser.
+// A refused page calls window.stop() and never reaches "Done.", so waiting on
+// "Done." alone would turn a clear pre-flight message into a bare timeout.
+await page.waitForFunction(
+  () => window.__wasmProblem || document.getElementById("status")?.textContent === "Done.",
+  { timeout: 60_000 },
+);
 
 const wasmProblem = await page.evaluate(() => window.__wasmProblem);
 if (wasmProblem) {
-  console.error(`smoke check failed: WebAssembly unsupported in this browser: ${wasmProblem}`);
+  // The pre-flight check names what is missing (WebAssembly, or on the
+  // componentize-py page DecompressionStream too), so report it verbatim.
+  console.error(`smoke check failed: this browser can't run the page: ${wasmProblem}`);
+  await browser.close();
   process.exit(1);
 }
 

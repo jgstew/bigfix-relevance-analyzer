@@ -42,6 +42,7 @@ import enum
 import os
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Protocol
 
 from bigfix_relevance_analyzer.nodes import Span
 
@@ -72,6 +73,35 @@ def _path(path: Path | None) -> str | None:
     report the file, not die on it.
     """
     return None if path is None else os.fsdecode(path)
+
+
+def _as_path(path: str | bytes | os.PathLike[str]) -> Path:
+    """Any path argument the public API accepts, as a :class:`~pathlib.Path`.
+
+    The inverse of :func:`_path`: ``os.fsdecode`` so a ``bytes`` path that is
+    not valid text survives, rather than ``str()`` turning it into its repr.
+    """
+    return Path(os.fsdecode(path))
+
+
+class _Positioned(Protocol):
+    """Anything that knows where in the source it starts: a token, a parse error."""
+
+    @property
+    def line(self) -> int: ...
+    @property
+    def column(self) -> int: ...
+    @property
+    def offset(self) -> int: ...
+
+
+def _position(item: _Positioned) -> dict[str, int]:
+    """A token's or error's start as ``line``, ``column`` and ``offset``.
+
+    Unlike :func:`_span`, the offset is kept: these are single points a
+    consumer may want to place a cursor at, not one entry per tree node.
+    """
+    return {"line": item.line, "column": item.column, "offset": item.offset}
 
 
 def _span(span: Span) -> dict[str, int]:

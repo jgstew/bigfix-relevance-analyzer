@@ -44,11 +44,16 @@ still prints nothing on its own.
 from __future__ import annotations
 
 import argparse
-import dataclasses
-import json
 import sys
 
-from bigfix_relevance_analyzer.dialect import Dialect
+from bigfix_relevance_analyzer._cli_common import (
+    add_ceiling_args,
+    add_scope_args,
+    config_from_args,
+    emit_json,
+    emit_rules_json,
+    lint_targets,
+)
 from bigfix_relevance_analyzer.fixfile import FileFix, FixResult, fix_directory, fix_paths
 from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
@@ -56,9 +61,8 @@ from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_SCORE,
     LintConfig,
     Severity,
+    _findings_dict,
     counts,
-    lint_directory,
-    lint_paths,
     rules,
 )
 
@@ -77,12 +81,10 @@ def _print_rules(*, as_json: bool) -> int:
     aligned columns are built from the widest code present, so adding a rule
     does not leave the table crooked.
     """
-    listed = rules()
     if as_json:
-        json.dump([rule.to_dict() for rule in listed], sys.stdout, indent=2)
-        print()
-        return 0
+        return emit_rules_json()
 
+    listed = rules()
     defaults = LintConfig()
     width = max(len(rule.code) for rule in listed)
     for rule in listed:
@@ -111,27 +113,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "paths", nargs="*", help="files to lint; omit entirely to walk the current directory"
     )
-    parser.add_argument(
-        "--max-score",
-        type=float,
-        default=None,
-        help=f"fail a site scoring above this (default {DEFAULT_MAX_SCORE:g})",
-    )
-    parser.add_argument(
-        "--max-depth",
-        type=int,
-        default=DEFAULT_MAX_DEPTH,
-        help=(
-            f"with no paths given, how many directory levels to walk (default {DEFAULT_MAX_DEPTH})"
-        ),
-    )
-    parser.add_argument(
-        "--max-evaluation-cost",
-        type=float,
-        default=None,
-        help=(
+    add_ceiling_args(
+        parser,
+        max_score_help=f"fail a site scoring above this (default {DEFAULT_MAX_SCORE:g})",
+        max_evaluation_cost_help=(
             "fail a site whose evaluation cost is above this "
             f"(default {DEFAULT_MAX_EVALUATION_COST:g})"
+        ),
+        max_depth_help=(
+            f"with no paths given, how many directory levels to walk (default {DEFAULT_MAX_DEPTH})"
         ),
     )
     parser.add_argument(
@@ -163,14 +153,10 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="emit findings as one JSON object instead of one line each",
     )
-    parser.add_argument(
-        "--dialect",
-        choices=[Dialect.CLIENT.value, Dialect.SESSION.value],
-        help="force the dialect instead of trusting extraction",
-    )
-    parser.add_argument(
-        "--platform",
-        help="narrow lookups to one evaluation context, e.g. windows or session:console",
+    add_scope_args(
+        parser,
+        dialect_help="force the dialect instead of trusting extraction",
+        platform_help="narrow lookups to one evaluation context, e.g. windows or session:console",
     )
     parser.add_argument(
         "--fix",
@@ -195,18 +181,7 @@ def main(argv: list[str] | None = None) -> int:
     severities.update(_severity_map(args.error, Severity.ERROR))
     severities.update(_severity_map(args.ignore, Severity.IGNORE))
 
-    # Only override `max_score`/`max_evaluation_cost` when the flag was
-    # actually given -- omitting a flag means "use LintConfig's own default
-    # ceiling", not "pass None and disable the rule".
-    config = LintConfig(
-        severities=severities,
-        dialect=Dialect(args.dialect) if args.dialect else None,
-        platform=args.platform,
-    )
-    if args.max_score is not None:
-        config = dataclasses.replace(config, max_score=args.max_score)
-    if args.max_evaluation_cost is not None:
-        config = dataclasses.replace(config, max_evaluation_cost=args.max_evaluation_cost)
+    config = config_from_args(args, severities=severities)
 
     scope = f"{len(args.paths)} file(s)" if args.paths else "the current directory"
     fixes: FixResult | None = None
@@ -217,10 +192,8 @@ def main(argv: list[str] | None = None) -> int:
             else fix_directory(".", config, max_depth=args.max_depth)
         )
         findings = fixes.findings
-    elif args.paths:
-        findings = lint_paths(args.paths, config)
     else:
-        findings = lint_directory(".", config, max_depth=args.max_depth)
+        findings = lint_targets(args.paths, config, max_depth=args.max_depth)
 
     # One tally, from `lint.counts`, feeding the summary, the exit status and
     # the JSON payload alike -- rather than each recounting the findings and
@@ -231,17 +204,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.quiet:
         if args.json:
-            payload = (
-                fixes.to_dict()
-                if fixes is not None
-                else {
-                    "findings": [finding.to_dict() for finding in findings],
-                    "counts": dict(tallies),
-                    "ok": errors == 0,
-                }
-            )
-            json.dump({**payload, "scope": scope}, sys.stdout, indent=2)
-            print()
+            payload = fixes.to_dict() if fixes is not None else _findings_dict(findings)
+            emit_json({**payload, "scope": scope})
         else:
             if fixes is not None:
                 for fix in fixes.applied:

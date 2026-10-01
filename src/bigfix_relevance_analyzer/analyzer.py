@@ -31,23 +31,28 @@ error tokens positioned, and the complexity metrics, which are lexical.
 
 from __future__ import annotations
 
-import dataclasses
-from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from bigfix_relevance_analyzer import inspectors
-from bigfix_relevance_analyzer._serialize import _span
+from bigfix_relevance_analyzer._serialize import _enum, _position, _span
 from bigfix_relevance_analyzer.binding import ItBinding, resolve_it_bindings
 from bigfix_relevance_analyzer.breakdown import Level, ProbeKind, breakdown_probes
 from bigfix_relevance_analyzer.complexity import (
     CostRule,
     RelevanceComplexity,
     _analyze_lexed,
-    _evaluation_cost_rules_lexed,
+    cost_rules_for,
 )
 from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect, is_definite
-from bigfix_relevance_analyzer.nodes import Node, Reference, Span, to_mermaid, to_sexpr
+from bigfix_relevance_analyzer.nodes import (
+    Node,
+    Reference,
+    to_mermaid,
+    to_sexpr,
+    tree_depth,
+    walk,
+)
 from bigfix_relevance_analyzer.parser import ParseError, _try_parse_lexed
 from bigfix_relevance_analyzer.tokenizer import Token, TokenKind, _lex
 from bigfix_relevance_analyzer.typecheck import CheckResult, TypeEnvironment, check
@@ -60,54 +65,6 @@ __all__ = [
     "RelevanceAnalysis",
     "analyze",
 ]
-
-
-def _is_node(value: object) -> bool:
-    """Whether a field value is a child node.
-
-    A :class:`~bigfix_relevance_analyzer.nodes.Span` is a dataclass too but is
-    position, not structure; a dataclass *class* can reach here because
-    :func:`dataclasses.is_dataclass` accepts types as well as instances.
-    """
-    return dataclasses.is_dataclass(value) and not isinstance(value, Span | type)
-
-
-def _children(node: Node) -> list[Node]:
-    """The direct child nodes of ``node``, in field order."""
-    found: list[Node] = []
-    for field in dataclasses.fields(node):
-        value = getattr(node, field.name)
-        if isinstance(value, tuple):
-            found.extend(cast("Node", item) for item in value if _is_node(item))
-        elif _is_node(value):
-            found.append(cast("Node", value))
-    return found
-
-
-def _walk(node: Node) -> Iterator[Node]:
-    """Every node in the tree, parents before children.
-
-    Iterative for the same reason
-    :func:`~bigfix_relevance_analyzer.binding.resolve_it_bindings` is: relevance
-    permits trees deeper than CPython's recursion limit, and wild content must
-    never be a crash.
-    """
-    stack = [node]
-    while stack:
-        current = stack.pop()
-        yield current
-        stack.extend(_children(current))
-
-
-def _tree_depth(node: Node) -> int:
-    """The height of the tree, iteratively."""
-    deepest = 0
-    stack: list[tuple[Node, int]] = [(node, 1)]
-    while stack:
-        current, level = stack.pop()
-        deepest = max(deepest, level)
-        stack.extend((child, level + 1) for child in _children(current))
-    return deepest
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,21 +135,18 @@ class ReferenceReport:
         know about the name, which cannot depend on the environment the lookup
         already filtered by, or the answer would just restate the environment.
         """
-        return frozenset(dialect for entry in self.matches for dialect in entry.dialects)
+        return inspectors._dialects_of(self.matches)
 
     @property
     def return_types(self) -> tuple[str, ...]:
         """The distinct types this name can evaluate to, sorted."""
-        return tuple(sorted({entry.return_type for entry in self.resolved}))
+        return inspectors._return_types_of(self.resolved)
 
     @property
     def platforms(self) -> frozenset[str]:
         """Evaluation contexts defining any resolved row -- client platforms by
         name, session surfaces as ``session:<context>``."""
-        found: frozenset[str] = frozenset()
-        for entry in self.resolved:
-            found |= entry.contexts
-        return found
+        return inspectors._contexts_of(self.resolved)
 
 
 @dataclass(frozen=True, slots=True)
@@ -392,7 +346,7 @@ class RelevanceAnalysis:
     @property
     def nodes(self) -> tuple[Node, ...]:
         """Every node in the tree, parents first. Empty when it did not parse."""
-        return () if self.node is None else tuple(_walk(self.node))
+        return () if self.node is None else tuple(walk(self.node))
 
     @property
     def node_kinds(self) -> dict[str, int]:
@@ -406,7 +360,7 @@ class RelevanceAnalysis:
     @property
     def tree_depth(self) -> int:
         """The height of the tree; 0 when it did not parse."""
-        return 0 if self.node is None else _tree_depth(self.node)
+        return 0 if self.node is None else tree_depth(self.node)
 
     @property
     def sexpr(self) -> str | None:
@@ -491,9 +445,9 @@ class RelevanceAnalysis:
         report: dict[str, Any] = {
             "text": self.text,
             "dialect": {
-                "classified": self.classified_dialect.value if self.classified_dialect else None,
-                "resolved": self.resolved_dialect.value if self.resolved_dialect else None,
-                "requested": self.requested_dialect.value if self.requested_dialect else None,
+                "classified": _enum(self.classified_dialect),
+                "resolved": _enum(self.resolved_dialect),
+                "requested": _enum(self.requested_dialect),
                 "effective": self.dialect.value,
                 "assumed": self.dialect_assumed,
             },
@@ -501,15 +455,7 @@ class RelevanceAnalysis:
                 "tokens": len(self.tokens),
                 "code_tokens": len(self.code_tokens),
                 "by_kind": self.token_kinds,
-                "errors": [
-                    {
-                        "text": token.text,
-                        "line": token.line,
-                        "column": token.column,
-                        "offset": token.offset,
-                    }
-                    for token in self.error_tokens
-                ],
+                "errors": [{"text": token.text, **_position(token)} for token in self.error_tokens],
             },
             "parse": {
                 "ok": self.parsed,
@@ -548,7 +494,7 @@ class RelevanceAnalysis:
                 **_span(report_entry.reference.span),
                 "known": report_entry.known,
                 "visible_here": bool(report_entry.visible),
-                "signatures": sorted({entry.signature for entry in report_entry.resolved}),
+                "signatures": list(inspectors._signatures_of(report_entry.resolved)),
                 "return_types": list(report_entry.return_types),
                 "platforms": sorted(report_entry.platforms & self.environment.universe),
             }
@@ -560,9 +506,8 @@ class RelevanceAnalysis:
         # `to_dict(text=...)` would be a worse API than none at all.
         report["it_bindings"] = [
             {
-                "line": entry.it.span.line,
-                "column": entry.it.span.column,
-                "binder": entry.binder.value if entry.binder else None,
+                **_span(entry.it.span),
+                "binder": _enum(entry.binder),
                 "context": (
                     None
                     if entry.context is None
@@ -645,12 +590,13 @@ def analyze(
                 visible=tuple(entry for entry in matches if environment.visible(entry)),
                 narrowed=checked.resolutions.get(id(item), ()),
             )
-            for item in _walk(node)
+            for item in walk(node)
             if isinstance(item, Reference)
         )
         it_bindings = resolve_it_bindings(node)
         levels = breakdown_probes(text, node, kind=probe_kind)
 
+    complexity = _analyze_lexed(lexed.code, effective)
     return RelevanceAnalysis(
         text=text,
         classified_dialect=classified,
@@ -663,6 +609,11 @@ def analyze(
         references=references,
         it_bindings=it_bindings,
         levels=levels,
-        complexity=_analyze_lexed(lexed.code, effective),
-        cost_rules=_evaluation_cost_rules_lexed(lexed.code, effective),
+        complexity=complexity,
+        # The rules the complexity pass already matched, rather than a second
+        # pattern pass over the same words: labels are unique, and a rule
+        # contributes cost exactly when its pattern matches.
+        cost_rules=tuple(
+            rule for rule in cost_rules_for(effective) if rule.label in complexity.costly_inspectors
+        ),
     )

@@ -48,12 +48,22 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
-import json
 import sys
 from pathlib import Path
 
+from bigfix_relevance_analyzer._cli_common import (
+    add_ceiling_args,
+    add_scope_args,
+    config_from_args,
+    dialect_from_args,
+    emit_json,
+    emit_rules_json,
+    lint_targets,
+)
+from bigfix_relevance_analyzer._markdown import capped, code_cell, table
+from bigfix_relevance_analyzer._serialize import _path
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis, analyze
-from bigfix_relevance_analyzer.dialect import Dialect, is_definite
+from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.extract import RelevanceSite, extract_relevance_from_file
 from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
@@ -61,14 +71,13 @@ from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_SCORE,
     Finding,
     LintConfig,
-    Severity,
+    _analyze_site,
+    _passed,
     counts,
     lint_analysis,
-    lint_directory,
-    lint_paths,
     rules,
 )
-from bigfix_relevance_analyzer.typecheck import Plurality
+from bigfix_relevance_analyzer.typecheck import Plurality, _describe_types
 
 
 def _heading(level: int, text: str) -> str:
@@ -76,19 +85,8 @@ def _heading(level: int, text: str) -> str:
 
 
 def _cell(text: str, *, max_len: int = 72) -> str:
-    """Render arbitrary text as a table cell: collapsed, truncated, escaped.
-
-    Relevance source is table-hostile in two ways a fixed value never is: it
-    can run to hundreds of characters (a `whose` context can be the entire
-    outer expression), and `|` is a real operator (error fallback) that would
-    otherwise be read as a column break -- even inside the code span this
-    wraps it in, which is a GFM quirk, not an oversight. Collapsing whitespace
-    also flattens a source snippet's own embedded newlines onto one line.
-    """
-    collapsed = " ".join(text.split())
-    if len(collapsed) > max_len:
-        collapsed = collapsed[: max_len - 1] + "..."
-    return f"`{collapsed.replace('|', chr(92) + '|')}`"
+    """Arbitrary relevance text as a table cell: collapsed, truncated, escaped."""
+    return code_cell(text, max_len=max_len)
 
 
 def _fence(text: str, *, lang: str = "") -> list[str]:
@@ -114,13 +112,9 @@ def _render_summary(report: RelevanceAnalysis, level: int) -> list[str]:
     if report.check is not None:
         types = report.check.value.types
         plurality = report.check.value.plurality
-        if types is None:
-            rendered = "unknown"
-        elif not types:
-            rendered = "none"
-        else:
-            prefix = "" if plurality is Plurality.UNKNOWN else f"{plurality.value} "
-            rendered = prefix + " or ".join(sorted(types))
+        rendered = _describe_types(types)
+        if types and plurality is not Plurality.UNKNOWN:
+            rendered = f"{plurality.value} {rendered}"
         lines.append(f"| Type | {rendered} |")
     if report.parsed:
         lines.append(
@@ -368,80 +362,37 @@ def render(
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _lint_config(
-    forced: Dialect | None,
-    platform: str | None,
-    *,
-    max_score: float | None,
-    max_evaluation_cost: float | None,
-) -> LintConfig:
-    """Build a :class:`~bigfix_relevance_analyzer.lint.LintConfig` from CLI flags.
-
-    ``max_score``/``max_evaluation_cost`` come straight from ``argparse``,
-    which defaults each to ``None`` when its flag is omitted. Passing that
-    ``None`` straight through would override :class:`LintConfig`'s own
-    built-in ceiling to "disabled" -- the opposite of what an omitted flag
-    should mean. Only override a field when the caller actually gave a
-    value, so an omitted flag keeps the default ceiling instead of erasing
-    it.
-    """
-    config = LintConfig(dialect=forced, platform=platform)
-    if max_score is not None:
-        config = dataclasses.replace(config, max_score=max_score)
-    if max_evaluation_cost is not None:
-        config = dataclasses.replace(config, max_evaluation_cost=max_evaluation_cost)
-    return config
-
-
 def _site_heading(site: RelevanceSite) -> str:
     return f"{site.context} (line {site.line}, {site.kind})"
 
 
-def _analyze_site(
-    site: RelevanceSite, forced: Dialect | None, platform: str | None
-) -> RelevanceAnalysis:
-    # A site the extractor already classified is a stronger signal than
-    # re-classifying the bare fragment: --dialect still wins when the caller
-    # forced one, but otherwise trust extraction's read of the surrounding
-    # document over guessing from the statement alone.
-    dialect = (
-        forced if forced is not None else (site.dialect if is_definite(site.dialect) else None)
-    )
-    return analyze(site.text, dialect, platform)
-
-
 def _run_file(
     path: Path,
-    forced: Dialect | None,
-    platform: str | None,
+    config: LintConfig,
     *,
     as_json: bool,
     mermaid: bool,
     verbose: bool,
-    max_score: float | None,
-    max_evaluation_cost: float | None,
 ) -> int:
     sites = extract_relevance_from_file(path)
     if not sites:
         if as_json:
-            json.dump({"file": str(path), "sites": []}, sys.stdout, indent=2)
-            print()
+            emit_json({"file": _path(path), "sites": []})
         else:
             print(f"# Relevance Analysis: {path}\n\nNo relevance found.")
         return 0
 
-    config = _lint_config(
-        forced, platform, max_score=max_score, max_evaluation_cost=max_evaluation_cost
-    )
-    reports = [(site, _analyze_site(site, forced, platform)) for site in sites]
+    # Each site in its extracted dialect unless --dialect forced one, through
+    # the same analysis (and cache) `--check` and the lint CLI use.
+    reports = [(site, _analyze_site(site, config)) for site in sites]
     findings = [
         lint_analysis(report, config, path=path, base_line=site.line, site=site)
         for site, report in reports
     ]
     if as_json:
-        json.dump(
+        emit_json(
             {
-                "file": str(path),
+                "file": _path(path),
                 "sites": [
                     {
                         "kind": site.kind,
@@ -453,11 +404,8 @@ def _run_file(
                     }
                     for (site, report), site_findings in zip(reports, findings, strict=True)
                 ],
-            },
-            sys.stdout,
-            indent=2,
+            }
         )
-        print()
     else:
         print(f"# Relevance Analysis: {path}\n")
         print(f"{len(sites)} relevance site(s) found.\n")
@@ -477,15 +425,7 @@ def _run_file(
     return 0 if all(report.parsed for _site, report in reports) else 1
 
 
-def _run_check(
-    paths: list[str],
-    forced: Dialect | None,
-    platform: str | None,
-    *,
-    max_score: float | None,
-    max_evaluation_cost: float | None,
-    max_depth: int,
-) -> int:
+def _run_check(paths: list[str], config: LintConfig, *, max_depth: int) -> int:
     """Lint every path: one grep-able line per finding, for a hook or CI.
 
     Given no paths at all, walks the current directory (see
@@ -499,18 +439,12 @@ def _run_check(
     ``--quiet``) for a caller that needs them -- this flag exists so the same
     judgement is reachable without a second console script installed.
     """
-    config = _lint_config(
-        forced, platform, max_score=max_score, max_evaluation_cost=max_evaluation_cost
-    )
-    if paths:
-        findings = lint_paths(paths, config)
-    else:
-        findings = lint_directory(".", config, max_depth=max_depth)
+    findings = lint_targets(paths, config, max_depth=max_depth)
     for finding in findings:
         print(finding)
     # Same verdict `bigfix-relevance-lint` exits on, from the same tally -- see
     # :func:`~bigfix_relevance_analyzer.lint.counts`.
-    return 0 if counts(findings)[Severity.ERROR.value] == 0 else 1
+    return 0 if _passed(counts(findings)) else 1
 
 
 def _run_rules(*, as_json: bool) -> int:
@@ -520,22 +454,26 @@ def _run_rules(*, as_json: bool) -> int:
     this CLI's ``--check`` output too, and a code should be lookup-able with
     whichever entry point produced it.
     """
-    listed = rules()
     if as_json:
-        json.dump([rule.to_dict() for rule in listed], sys.stdout, indent=2)
-        print()
-        return 0
+        return emit_rules_json()
 
+    listed = rules()
     defaults = LintConfig()
     print("# Lint rules\n")
-    print("| Code | Default | Fires when | Ceiling |")
-    print("| --- | --- | --- | --- |")
-    for rule in listed:
-        if rule.threshold:
-            ceiling = f"`{rule.threshold}` (default {getattr(defaults, rule.threshold):g})"
-        else:
-            ceiling = "always on"
-        print(f"| `{rule.code}` | {rule.default_severity.value} | {rule.summary} | {ceiling} |")
+    rows = [
+        (
+            f"`{rule.code}`",
+            rule.default_severity.value,
+            rule.summary,
+            (
+                f"`{rule.threshold}` (default {getattr(defaults, rule.threshold):g})"
+                if rule.threshold
+                else "always on"
+            ),
+        )
+        for rule in listed
+    ]
+    print(table(("Code", "Default", "Fires when", "Ceiling"), rows))
     return 0
 
 
@@ -556,8 +494,7 @@ def _run_reference(slug: str, *, brief: bool, as_json: bool) -> int:
     document = reference.get_document(slug if slug == "dialects" else f"{slug}-relevance")
     detail = reference.Detail.BRIEF if brief else reference.Detail.STANDARD
     if as_json:
-        json.dump(document.to_dict(detail=detail), sys.stdout, indent=2)
-        print()
+        emit_json(document.to_dict(detail=detail))
     else:
         print(document.read(detail=detail), end="")
     return 0
@@ -579,12 +516,7 @@ def _run_search(query: str, dialect: Dialect | None, *, as_json: bool) -> int:
 
     results = inspectors.search(query, dialect=dialect)
     if as_json:
-        json.dump(
-            {"query": query, "results": [result.to_dict() for result in results]},
-            sys.stdout,
-            indent=2,
-        )
-        print()
+        emit_json({"query": query, "results": [result.to_dict() for result in results]})
         return 0
 
     if not results:
@@ -592,16 +524,17 @@ def _run_search(query: str, dialect: Dialect | None, *, as_json: bool) -> int:
         return 0
 
     print(f"# Inspector search: {query}\n")
-    print("| Match | Name | Found via | Overloads | Returns |")
-    print("| --- | --- | --- | --- | --- |")
-    for result in results:
-        returns = ", ".join(f"`{name}`" for name in result.return_types[:3])
-        if len(result.return_types) > 3:
-            returns += " ..."
-        print(
-            f"| {result.match.value} | {_cell(result.name)} | {_cell(result.matched)} "
-            f"| {len(result.inspectors)} | {returns} |"
+    rows = [
+        (
+            result.match.value,
+            _cell(result.name),
+            _cell(result.matched),
+            str(len(result.inspectors)),
+            capped(code_cell(name) for name in result.return_types),
         )
+        for result in results
+    ]
+    print(table(("Match", "Name", "Found via", "Overloads", "Returns"), rows))
     return 0
 
 
@@ -627,12 +560,11 @@ def main(argv: list[str] | None = None) -> int:
             "With --check, one or more files to lint"
         ),
     )
-    parser.add_argument(
-        "--dialect",
-        choices=[Dialect.CLIENT.value, Dialect.SESSION.value],
-        help="force the dialect instead of classifying it (or trusting extraction)",
+    add_scope_args(
+        parser,
+        dialect_help="force the dialect instead of classifying it (or trusting extraction)",
+        platform_help="narrow client lookups to one platform, e.g. windows",
     )
-    parser.add_argument("--platform", help="narrow client lookups to one platform, e.g. windows")
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -686,35 +618,24 @@ def main(argv: list[str] | None = None) -> int:
             "one grep-able line per finding, for a pre-commit hook or CI"
         ),
     )
-    parser.add_argument(
-        "--max-score",
-        type=float,
-        default=None,
-        help=(
+    add_ceiling_args(
+        parser,
+        max_score_help=(
             "raise the complexity ceiling above its default "
             f"({DEFAULT_MAX_SCORE:g}); a score over it is always reported"
         ),
-    )
-    parser.add_argument(
-        "--max-evaluation-cost",
-        type=float,
-        default=None,
-        help=(
+        max_evaluation_cost_help=(
             "raise the evaluation-cost ceiling above its default "
             f"({DEFAULT_MAX_EVALUATION_COST:g}); a cost over it is always reported"
         ),
-    )
-    parser.add_argument(
-        "--max-depth",
-        type=int,
-        default=DEFAULT_MAX_DEPTH,
-        help=(
+        max_depth_help=(
             "with --check and no paths, how many directory levels to walk "
             f"(default {DEFAULT_MAX_DEPTH})"
         ),
     )
     args = parser.parse_args(argv)
-    forced = Dialect(args.dialect) if args.dialect else None
+    forced = dialect_from_args(args)
+    config = config_from_args(args)
     # The parse tree section -- where the flowchart lives -- only renders in
     # verbose mode, so --mermaid without --verbose would otherwise do nothing.
     verbose = args.verbose or args.mermaid
@@ -732,14 +653,7 @@ def main(argv: list[str] | None = None) -> int:
         return _run_search(args.search, forced, as_json=args.json)
 
     if args.check:
-        return _run_check(
-            args.relevance,
-            forced,
-            args.platform,
-            max_score=args.max_score,
-            max_evaluation_cost=args.max_evaluation_cost,
-            max_depth=args.max_depth,
-        )
+        return _run_check(args.relevance, config, max_depth=args.max_depth)
 
     if len(args.relevance) > 1:
         parser.error("only one statement or file is accepted without --check")
@@ -755,14 +669,7 @@ def main(argv: list[str] | None = None) -> int:
             is_file = False
         if is_file:
             return _run_file(
-                candidate,
-                forced,
-                args.platform,
-                as_json=args.json,
-                mermaid=args.mermaid,
-                verbose=verbose,
-                max_score=args.max_score,
-                max_evaluation_cost=args.max_evaluation_cost,
+                candidate, config, as_json=args.json, mermaid=args.mermaid, verbose=verbose
             )
         text = args.relevance[0].strip()
     else:
@@ -772,23 +679,14 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("no relevance statement given")
 
     report = analyze(text, forced, args.platform)
-    config = _lint_config(
-        forced,
-        args.platform,
-        max_score=args.max_score,
-        max_evaluation_cost=args.max_evaluation_cost,
-    )
     findings = lint_analysis(report, config)
     if args.json:
-        json.dump(
+        emit_json(
             {
                 **report.to_dict(mermaid=args.mermaid),
                 "findings": [finding.to_dict() for finding in findings],
-            },
-            sys.stdout,
-            indent=2,
+            }
         )
-        print()
     else:
         print(render(report, mermaid=args.mermaid, findings=findings, verbose=verbose), end="")
     # Unparsable input is a finding, not a crash, but a hook wants to know.

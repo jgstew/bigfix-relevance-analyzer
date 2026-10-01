@@ -55,6 +55,7 @@ import functools
 from dataclasses import dataclass, field
 from typing import Any
 
+from bigfix_relevance_analyzer._serialize import _enum
 from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 
 __all__ = [
@@ -126,7 +127,7 @@ class ReferenceDocument:
             "slug": self.slug,
             "title": self.title,
             "summary": self.summary,
-            "dialect": None if self.dialect is None else self.dialect.value,
+            "dialect": _enum(self.dialect),
             "mime_type": MIME_TYPE,
             "detail": detail.value,
             "text": self.read(detail=detail),

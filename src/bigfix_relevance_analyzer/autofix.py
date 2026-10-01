@@ -40,6 +40,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Final, Literal
 
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis, analyze
+from bigfix_relevance_analyzer.tokenizer import _normalize_phrase
 
 if TYPE_CHECKING:
     from bigfix_relevance_analyzer.dialect import Dialect
@@ -160,13 +161,9 @@ class AutofixResult:
 def _rule_for(code: str) -> str:
     # Imported here, not at module scope: `lint` imports `analyzer`, which
     # reaches this module from `RelevanceAnalysis.autofix`.
-    from bigfix_relevance_analyzer.lint import _CHECK_RULES
+    from bigfix_relevance_analyzer.lint import _rule_for
 
-    return _CHECK_RULES.get(code, "type-error")
-
-
-def _normalized(phrase: str) -> str:
-    return " ".join(phrase.split()).casefold()
+    return _rule_for(code)
 
 
 def _anchored(text: str, fix: TypeFix, code: str) -> TextEdit | None:
@@ -179,7 +176,7 @@ def _anchored(text: str, fix: TypeFix, code: str) -> TextEdit | None:
     """
     written = text[fix.start : fix.end]
     name = written.strip()
-    if not name or _normalized(name) != _normalized(fix.expected):
+    if not name or _normalize_phrase(name, fold=True) != _normalize_phrase(fix.expected, fold=True):
         return None
     start = fix.start + len(written) - len(written.lstrip())
     return TextEdit(start, start + len(name), fix.replacement, code)
@@ -322,10 +319,11 @@ class _Guard:
     """Whether a candidate is no worse than the original."""
 
     def __init__(self, original: RelevanceAnalysis, guard: Guard) -> None:
-        from bigfix_relevance_analyzer.lint import DEFAULT_SEVERITIES, Severity
+        from bigfix_relevance_analyzer.lint import LintConfig, Severity
 
-        self._severities = DEFAULT_SEVERITIES
-        self._default = Severity.WARNING
+        # The default configuration's severities: the guard judges by what a
+        # plain lint run would report, not by any one caller's overrides.
+        self._config = LintConfig()
         self._counted = (
             {Severity.ERROR} if guard == "errors" else {Severity.ERROR, Severity.WARNING}
         )
@@ -339,7 +337,7 @@ class _Guard:
         }
 
     def _counts(self, rule: str) -> bool:
-        return self._severities.get(rule, self._default) in self._counted
+        return self._config.severity_for(rule) in self._counted
 
     def problems(self, report: RelevanceAnalysis, *, fixable: bool) -> Counter[str]:
         """Per-code problem counts, for the codes this guard counts.

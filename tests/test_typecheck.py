@@ -1747,6 +1747,19 @@ def test_a_risk_in_both_if_branches_is_not_a_type_error(env: TypeEnvironment) ->
     assert result.ok
 
 
+def test_an_advisory_in_both_if_branches_is_not_a_type_error(env: TypeEnvironment) -> None:
+    """`world-property-not-defined` leaves `ok` true on a bare statement, so it
+    must not count as a branch *error* either -- the `if` rule and `ok` share
+    one predicate, rather than two copies that had drifted apart."""
+    bare = check(parse("device"), env)
+    assert [d.code for d in bare.diagnostics] == ["world-property-not-defined"]
+    assert bare.ok
+
+    branched = check(parse("if true then device else device"), env)
+    assert [d.code for d in branched.diagnostics] == ["world-property-not-defined"] * 2
+    assert branched.ok
+
+
 def test_a_branches_risks_survive_it_even_though_its_errors_do_not(env: TypeEnvironment) -> None:
     """The tolerance is for *errors*: one branch may fail to type because it is
     the branch this platform never runs. A risk is about the code as written,

@@ -51,7 +51,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
 
-from bigfix_relevance_analyzer._serialize import _path
+from bigfix_relevance_analyzer._serialize import _as_path, _path
 from bigfix_relevance_analyzer.autofix import AutofixResult
 from bigfix_relevance_analyzer.extract import (
     RelevanceSite,
@@ -66,9 +66,9 @@ from bigfix_relevance_analyzer.lint import (
     Severity,
     _depth_findings,
     _file_error,
+    _findings_dict,
     _lint_sites,
-    _walk,
-    counts,
+    _walk_files,
     lint_file,
 )
 
@@ -179,14 +179,11 @@ class FixResult:
         ``counts`` and ``ok`` are :func:`~bigfix_relevance_analyzer.lint.lint_paths_to_dict`'s,
         over the findings left after fixing.
         """
-        tallies = counts(self.findings)
         return {
             "applied": [fix.to_dict() for fix in self.applied],
             "unapplied": [fix.to_dict() for fix in self.unapplied],
             "changed": [_path(path) for path in self.changed],
-            "findings": [finding.to_dict() for finding in self.findings],
-            "counts": dict(tallies),
-            "ok": tallies[Severity.ERROR.value] == 0,
+            **_findings_dict(self.findings),
         }
 
 
@@ -280,7 +277,7 @@ def fix_file(path: str | bytes | os.PathLike[str], config: LintConfig) -> FileFi
     readable file is reported the way :func:`~bigfix_relevance_analyzer.lint.lint_file`
     reports it.
     """
-    file_path = Path(os.fsdecode(path))
+    file_path = _as_path(path)
 
     def result(
         findings: tuple[Finding, ...],
@@ -377,8 +374,8 @@ def fix_directory(
     """:func:`fix_file` over every file under ``root``, walked as
     :func:`~bigfix_relevance_analyzer.lint.lint_directory` walks it, depth
     findings included."""
-    root_path = Path(os.fsdecode(root))
-    files, exceeded = _walk(root_path, max_depth)
+    root_path = _as_path(root)
+    files, exceeded = _walk_files(root_path, max_depth)
     combined = _combine([fix_file(file_path, config) for file_path in files])
     return FixResult(
         combined.applied,

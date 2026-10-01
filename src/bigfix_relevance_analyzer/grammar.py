@@ -18,12 +18,14 @@ from dataclasses import dataclass
 
 __all__ = [
     "CANONICAL_BINARY",
+    "EXISTS_WORDS",
     "GRAMMAR_LEVEL_BINARY",
     "OPERATOR_FIRST_WORDS",
     "PIPE_UNMIXABLE",
     "PUNCT_INFIX",
     "RELATIONAL",
     "STRUCTURAL_WORDS",
+    "TUPLE_INDEX_WORDS",
     "WORD_INFIX",
     "WORD_INFIX_TRIE",
     "InfixOp",
@@ -176,6 +178,15 @@ STRUCTURAL_WORDS: frozenset[str] = frozenset(
     {"of", "whose", "then", "else", "as", "it", "not", "exists", "exist", "if"}
 )
 
+EXISTS_WORDS: frozenset[str] = frozenset({"exists", "exist"})
+"""Both spellings of the existence quantifier; ``not`` may precede either."""
+
+TUPLE_INDEX_WORDS: frozenset[str] = frozenset({"item", "items"})
+"""The phrases that subscript a tuple when given an integer-literal index:
+``item 1 of (a, b)``, or the same indexing said plurally. The parser builds an
+``ItemOf`` from them, and the checker recognizes the same spellings when an
+index cannot subscript, so the two halves of the rule share one list."""
+
 # The words a word operator can begin with. NOT terminators in their own right:
 # an operator ends a phrase only when the trie matches it in *full*, so `starts`
 # is the plural `start` inspector in `starts of ranges` and the `starts with`
@@ -258,9 +269,10 @@ CANONICAL_BINARY: dict[str, OperatorForm] = {
     "is contained by": OperatorForm("contains", swapped=True),
 }
 
-PIPE_UNMIXABLE: frozenset[str] = frozenset(
-    op.canonical for op in (*PUNCT_INFIX.values(), *WORD_INFIX.values()) if op.rbp == BP_PIPE
-)
+_ALL_INFIX: tuple[InfixOp, ...] = (*PUNCT_INFIX.values(), *WORD_INFIX.values())
+"""Every infix operator, punctuation and word alike, for deriving classes of them."""
+
+PIPE_UNMIXABLE: frozenset[str] = frozenset(op.canonical for op in _ALL_INFIX if op.rbp == BP_PIPE)
 """The operators whose result the engine refuses as a `|` left operand
 without parentheses (`2 * 3 | 5` is a parse error; `(2 * 3) | 5` is not).
 Derived from the ``rbp`` markers so the two halves of the rule -- keep `|`
@@ -268,9 +280,7 @@ out of these operators' right side, refuse it after their result -- cannot
 drift apart."""
 
 
-RELATIONAL: frozenset[str] = frozenset(
-    op.canonical for op in (*PUNCT_INFIX.values(), *WORD_INFIX.values()) if op.lbp == BP_RELATIONAL
-)
+RELATIONAL: frozenset[str] = frozenset(op.canonical for op in _ALL_INFIX if op.lbp == BP_RELATIONAL)
 """The comparison operators, which the engine makes **non-associative**.
 
 A second comparison on the result of a first is a parse error -- `1 = 1 = true`,
