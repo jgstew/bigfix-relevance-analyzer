@@ -12,19 +12,16 @@ import json
 from pathlib import Path
 
 import pytest
+from _helpers import BROKEN, CLIENT, UNKNOWN_INSPECTOR, write
 
 from bigfix_relevance_analyzer._lint_cli import main
 from bigfix_relevance_analyzer.lint import RULES, rules
-
-CLIENT = 'exists file "C:\\foo.txt" whose (size of it > 100)'
-BROKEN = 'exists file "unterminated'
 
 
 def test_clean_files_exit_zero_and_print_nothing(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    clean = tmp_path / "clean.rel"
-    clean.write_text(CLIENT)
+    clean = write(tmp_path, "clean.rel", CLIENT)
 
     assert main([str(clean)]) == 0
     out = capsys.readouterr().out
@@ -34,8 +31,7 @@ def test_clean_files_exit_zero_and_print_nothing(
 def test_broken_file_exits_one_and_prints_a_grep_able_line(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    broken = tmp_path / "broken.rel"
-    broken.write_text(BROKEN)
+    broken = write(tmp_path, "broken.rel", BROKEN)
 
     assert main([str(broken)]) == 1
     out = capsys.readouterr().out
@@ -45,8 +41,7 @@ def test_broken_file_exits_one_and_prints_a_grep_able_line(
 def test_warning_only_exits_zero_by_default(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    path = tmp_path / "unknown.rel"
-    path.write_text("totally bogus made up inspector")
+    path = write(tmp_path, "unknown.rel", UNKNOWN_INSPECTOR)
 
     assert main([str(path)]) == 0
     out = capsys.readouterr().out
@@ -56,8 +51,7 @@ def test_warning_only_exits_zero_by_default(
 def test_fail_on_warning_promotes_exit_code(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    path = tmp_path / "unknown.rel"
-    path.write_text("totally bogus made up inspector")
+    path = write(tmp_path, "unknown.rel", UNKNOWN_INSPECTOR)
 
     assert main(["--fail-on-warning", str(path)]) == 1
 
@@ -65,8 +59,7 @@ def test_fail_on_warning_promotes_exit_code(
 def test_max_score_flag_is_wired_through(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    path = tmp_path / "client.rel"
-    path.write_text(CLIENT)
+    path = write(tmp_path, "client.rel", CLIENT)
 
     assert main([str(path)]) == 0  # no threshold configured: clean
     assert main(["--max-score=1", str(path)]) == 1
@@ -77,8 +70,7 @@ def test_max_score_flag_is_wired_through(
 def test_max_evaluation_cost_flag_is_wired_through(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    path = tmp_path / "descendants.rel"
-    path.write_text('exists descendants of folder "C:\\"')
+    path = write(tmp_path, "descendants.rel", 'exists descendants of folder "C:\\"')
 
     assert main([str(path)]) == 0
     assert main(["--max-evaluation-cost=1", str(path)]) == 1
@@ -87,8 +79,7 @@ def test_max_evaluation_cost_flag_is_wired_through(
 
 
 def test_ignore_flag_silences_a_rule(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    path = tmp_path / "unbound.rel"
-    path.write_text("size of it")
+    path = write(tmp_path, "unbound.rel", "size of it")
 
     assert main([str(path)]) == 1
     assert main(["--ignore=unbound-it", str(path)]) == 0
@@ -119,15 +110,13 @@ def test_the_file_error_rule_can_be_ignored(
 def test_error_flag_promotes_a_default_warning(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    path = tmp_path / "unknown.rel"
-    path.write_text("totally bogus made up inspector")
+    path = write(tmp_path, "unknown.rel", UNKNOWN_INSPECTOR)
 
     assert main(["--error=unknown-inspector", str(path)]) == 1
 
 
 def test_summary_line_goes_to_stderr(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    broken = tmp_path / "broken.rel"
-    broken.write_text(BROKEN)
+    broken = write(tmp_path, "broken.rel", BROKEN)
 
     main([str(broken)])
     captured = capsys.readouterr()
@@ -138,8 +127,7 @@ def test_summary_line_goes_to_stderr(tmp_path: Path, capsys: pytest.CaptureFixtu
 def test_quiet_suppresses_findings_but_keeps_exit_code(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    broken = tmp_path / "broken.rel"
-    broken.write_text(BROKEN)
+    broken = write(tmp_path, "broken.rel", BROKEN)
 
     assert main(["--quiet", str(broken)]) == 1
     out = capsys.readouterr().out
@@ -150,7 +138,7 @@ def test_no_paths_walks_the_current_directory(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "broken.rel").write_text(BROKEN)
+    write(tmp_path, "broken.rel", BROKEN)
 
     assert main([]) == 1
     out = capsys.readouterr().out
@@ -161,7 +149,7 @@ def test_explicit_dot_is_not_walked(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "broken.rel").write_text(BROKEN)
+    write(tmp_path, "broken.rel", BROKEN)
 
     # An explicit "." is a literal path argument, not a walk root: extract_relevance_from_file(".")
     # matches no recognized suffix, so this finds nothing -- same as any other explicit path.
@@ -195,7 +183,7 @@ def test_another_flag_with_no_paths_still_walks(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "client.rel").write_text(CLIENT)
+    write(tmp_path, "client.rel", CLIENT)
 
     assert main(["--max-score=1"]) == 1
     out = capsys.readouterr().out
@@ -203,10 +191,8 @@ def test_another_flag_with_no_paths_still_walks(
 
 
 def test_multiple_paths_all_get_linted(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    clean = tmp_path / "clean.rel"
-    clean.write_text(CLIENT)
-    broken = tmp_path / "broken.rel"
-    broken.write_text(BROKEN)
+    clean = write(tmp_path, "clean.rel", CLIENT)
+    broken = write(tmp_path, "broken.rel", BROKEN)
 
     assert main([str(clean), str(broken)]) == 1
     out = capsys.readouterr().out
@@ -223,8 +209,7 @@ def test_json_emits_one_object_with_findings_counts_and_verdict(
     parses -- a stray print alongside it would break the parse, not just look
     untidy.
     """
-    broken = tmp_path / "broken.rel"
-    broken.write_text(BROKEN)
+    broken = write(tmp_path, "broken.rel", BROKEN)
 
     assert main(["--json", str(broken)]) == 1
     payload = json.loads(capsys.readouterr().out)
@@ -244,8 +229,7 @@ def test_json_and_the_line_output_report_the_same_findings(
     The two modes are renderings of one result, not two code paths that happen
     to agree today.
     """
-    broken = tmp_path / "broken.rel"
-    broken.write_text(BROKEN)
+    broken = write(tmp_path, "broken.rel", BROKEN)
 
     main([str(broken)])
     lines = [line for line in capsys.readouterr().out.splitlines() if line]
@@ -263,8 +247,7 @@ def test_json_stays_clean_when_nothing_was_found(
     The default mode prints nothing at all, which a JSON consumer cannot tell
     from a crash; ``--json`` always emits the envelope.
     """
-    clean = tmp_path / "clean.rel"
-    clean.write_text(CLIENT)
+    clean = write(tmp_path, "clean.rel", CLIENT)
 
     assert main(["--json", str(clean)]) == 0
     payload = json.loads(capsys.readouterr().out)
@@ -278,8 +261,7 @@ def test_json_stays_clean_when_nothing_was_found(
 
 def test_quiet_beats_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``--quiet`` means print nothing, including no JSON. Exit code still set."""
-    broken = tmp_path / "broken.rel"
-    broken.write_text(BROKEN)
+    broken = write(tmp_path, "broken.rel", BROKEN)
 
     assert main(["--json", "--quiet", str(broken)]) == 1
     assert capsys.readouterr().out == ""
@@ -316,8 +298,7 @@ def test_list_rules_ignores_paths_rather_than_linting_them(
     Otherwise asking what the rules are could exit non-zero, which a script
     checking the tool's capabilities would read as a failure.
     """
-    broken = tmp_path / "broken.rel"
-    broken.write_text(BROKEN)
+    broken = write(tmp_path, "broken.rel", BROKEN)
 
     assert main(["--list-rules", str(broken)]) == 0
     out = capsys.readouterr().out
@@ -336,8 +317,7 @@ SETTING_TASK = (
 def test_without_fix_a_fixable_file_is_left_alone(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    path = tmp_path / "t.bes"
-    path.write_text(SETTING_TASK)
+    path = write(tmp_path, "t.bes", SETTING_TASK)
     assert main([str(path)]) == 0
     assert path.read_text() == SETTING_TASK
     assert f"{path}:3: warning [plural-preferred]" in capsys.readouterr().out
@@ -347,8 +327,7 @@ def test_fix_rewrites_the_file_reports_it_and_exits_one(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Non-zero when anything was fixed, so the fix is reviewed before it is committed."""
-    path = tmp_path / "t.bes"
-    path.write_text(SETTING_TASK)
+    path = write(tmp_path, "t.bes", SETTING_TASK)
     assert main(["--fix", str(path)]) == 1
     assert path.read_text() == SETTING_TASK.replace("setting ", "settings ")
     captured = capsys.readouterr()
@@ -362,8 +341,7 @@ def test_fix_rewrites_the_file_reports_it_and_exits_one(
 def test_fix_reports_a_fix_it_could_not_apply(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    path = tmp_path / "t.rel"
-    path.write_text('exists values of setting "x" of client\n')
+    path = write(tmp_path, "t.rel", 'exists values of setting "x" of client\n')
     assert main(["--fix", str(path)]) == 0
     out = capsys.readouterr().out
     assert f"{path}:1: not fixed [plural-preferred] no source map" in out
@@ -371,16 +349,14 @@ def test_fix_reports_a_fix_it_could_not_apply(
 
 
 def test_fix_honours_ignore(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    path = tmp_path / "t.bes"
-    path.write_text(SETTING_TASK)
+    path = write(tmp_path, "t.bes", SETTING_TASK)
     assert main(["--fix", "--ignore", "plural-preferred", str(path)]) == 0
     assert path.read_text() == SETTING_TASK
     assert capsys.readouterr().out == ""
 
 
 def test_fix_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    path = tmp_path / "t.bes"
-    path.write_text(SETTING_TASK)
+    path = write(tmp_path, "t.bes", SETTING_TASK)
     assert main(["--fix", "--json", str(path)]) == 1
     payload = json.loads(capsys.readouterr().out)
     assert payload["changed"] == [str(path)]

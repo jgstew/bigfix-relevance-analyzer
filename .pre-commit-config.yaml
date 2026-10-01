@@ -52,10 +52,13 @@ repos:
       # Comments throughout this repo cite GitHub URLs; a link to a branch
       # rather than a commit rots silently.
       - id: check-vcs-permalinks
-      # Every file under tests/ already follows test_*.py; this keeps a new one
-      # from being silently skipped by pytest's collection.
+      # Every test file under tests/ follows test_*.py; this keeps a new one
+      # from being silently skipped by pytest's collection. Shared helper
+      # modules are underscore-prefixed (tests/_corpus.py, tests/_helpers.py)
+      # and are deliberately not test files, so they are exempt.
       - id: name-tests-test
         args: ["--pytest-test-first"]
+        exclude: ^tests/_[^/]*\.py$
       # Block direct commits to the integration branches; work on a feature
       # branch and open a PR instead. Bypass for a deliberate exception with
       # `git commit --no-verify`.

@@ -27,15 +27,13 @@ the stage is *not* called ``build/``: ``.gitignore`` line 11 is a bare
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import shutil
 import subprocess
-import sys
 from pathlib import Path
-from types import ModuleType
 
 import pytest
+from _helpers import load_tool
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PLAYGROUND_WASM = REPO_ROOT / "tools" / "playground-wasm"
@@ -78,16 +76,6 @@ DEPENDABOT = REPO_ROOT / ".github" / "dependabot.yml"
 # published minutes ago is the likeliest to be a compromised one. Same number as
 # uv's and as dependabot's cooldown, on purpose -- one policy, not three.
 MIN_RELEASE_AGE_DAYS = 7
-
-
-def _load_script(path: Path, name: str) -> ModuleType:
-    """Import a ``tools/`` script by path, the way test_generate_client_dumps does."""
-    spec = importlib.util.spec_from_file_location(name, path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
 
 
 def _tracked_text_files() -> list[Path]:
@@ -153,7 +141,7 @@ def test_pyodide_build_script_finds_its_version_pin() -> None:
     answer, so calling it is the whole test.
     """
     script = PLAYGROUND_WASM / "pyodide" / "build-playground" / "build_playground.py"
-    module = _load_script(script, "_pyodide_build_playground")
+    module = load_tool(script, "_pyodide_build_playground")
 
     assert module.PACKAGE_JSON.is_file(), f"pin cross-check points at {module.PACKAGE_JSON}"
     module._check_pinned_version_matches()

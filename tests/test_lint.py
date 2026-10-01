@@ -15,7 +15,8 @@ import re
 from pathlib import Path
 
 import pytest
-from test_examples import corpus_files
+from _corpus import corpus_files
+from _helpers import BES_EXAMPLE, BROKEN, CLIENT, MIXED_DIALECT, UNKNOWN_INSPECTOR
 
 from bigfix_relevance_analyzer.analyzer import analyze
 from bigfix_relevance_analyzer.dialect import Dialect
@@ -35,12 +36,7 @@ from bigfix_relevance_analyzer.lint import (
     rules,
 )
 
-CLIENT = 'exists file "C:\\foo.txt" whose (size of it > 100)'
-BROKEN = 'exists file "unterminated'
 UNBOUND_IT = "size of it"  # `it` with nothing to bind to
-MIXED_DIALECT = '(exists files of folders "/") AND (exists bes computers)'
-UNKNOWN_INSPECTOR = "totally bogus made up inspector"
-BES_EXAMPLE = Path("tests/examples/mixed_context/task_with_client_and_session_relevance.bes")
 # A real type mismatch, not merely an unbound `it` (which the type checker
 # also reports, under `used-without-context` -- deliberately excluded from
 # `type-error`, see the `lint` module docstring).
@@ -318,6 +314,13 @@ def test_lint_file_on_real_bes_example_is_clean() -> None:
     assert codes(findings) <= {"unknown-inspector"}  # dumps may not cover everything
 
 
+def _lint_fixlet(tmp_path: Path, relevance: str, action: str = "// nothing") -> tuple[Finding, ...]:
+    """Lint :func:`_fixlet` written to a file, the way the extractor meets it."""
+    path = tmp_path / "t.bes"
+    path.write_text(_fixlet(relevance, action))
+    return lint_file(path, LintConfig())
+
+
 def _fixlet(relevance: str, action: str = "// nothing") -> str:
     """The smallest .bes the extractor recognises, for site-kind tests."""
     return (
@@ -338,31 +341,27 @@ def test_a_relevance_element_that_is_not_a_boolean_is_a_finding(tmp_path: Path) 
     `lint_analysis` took the `RelevanceSite` only to label findings with, and
     never asked whether the value fits the slot it came out of.
     """
-    path = tmp_path / "stringy.bes"
-    path.write_text(_fixlet("name of operating system"))
-    assert "site-type-mismatch" in codes(lint_file(path, LintConfig()))
+    assert "site-type-mismatch" in codes(_lint_fixlet(tmp_path, "name of operating system"))
 
 
 def test_a_boolean_relevance_element_is_silent(tmp_path: Path) -> None:
     """The negative that sizes the rule: 50,901 shipped clauses are this shape."""
-    path = tmp_path / "fine.bes"
-    path.write_text(_fixlet('exists file "/etc/hosts"'))
-    assert "site-type-mismatch" not in codes(lint_file(path, LintConfig()))
+    assert "site-type-mismatch" not in codes(_lint_fixlet(tmp_path, 'exists file "/etc/hosts"'))
 
 
 def test_a_plural_actionscript_substitution_is_a_finding(tmp_path: Path) -> None:
     """A `{...}` substitution has one hole to fill, so it needs one value."""
-    path = tmp_path / "plural.bes"
-    path.write_text(_fixlet("true", action='run {names of files of folder "/tmp"}'))
-    assert "site-type-mismatch" in codes(lint_file(path, LintConfig()))
+    assert "site-type-mismatch" in codes(
+        _lint_fixlet(tmp_path, "true", action='run {names of files of folder "/tmp"}')
+    )
 
 
 def test_a_boolean_actionscript_substitution_is_silent(tmp_path: Path) -> None:
     """Booleans coerce to a string in a substitution, and content relies on it:
     50,513 substitutions in one shipped content site are exactly this."""
-    path = tmp_path / "boolsub.bes"
-    path.write_text(_fixlet("true", action='run {exists file "/etc/hosts"}'))
-    assert "site-type-mismatch" not in codes(lint_file(path, LintConfig()))
+    assert "site-type-mismatch" not in codes(
+        _lint_fixlet(tmp_path, "true", action='run {exists file "/etc/hosts"}')
+    )
 
 
 def test_a_plural_substitution_is_reported_even_when_its_type_is_unknown(
@@ -400,9 +399,11 @@ def test_a_plural_non_boolean_relevance_reports_the_type_too(tmp_path: Path) -> 
     message has to name the type problem whenever it is real, plurality
     finding or not.
     """
-    path = tmp_path / "plural_and_wrong_type.bes"
-    path.write_text(_fixlet("unique values of names of drives"))
-    findings = [f for f in lint_file(path, LintConfig()) if f.code == "site-type-mismatch"]
+    findings = [
+        f
+        for f in _lint_fixlet(tmp_path, "unique values of names of drives")
+        if f.code == "site-type-mismatch"
+    ]
     assert len(findings) == 1
     assert "must be a `boolean`" in findings[0].message
     assert "plural" in findings[0].message
@@ -410,18 +411,18 @@ def test_a_plural_non_boolean_relevance_reports_the_type_too(tmp_path: Path) -> 
 
 def test_an_if_condition_may_be_boolean(tmp_path: Path) -> None:
     """`if`/`elseif`/`continue if` accept a boolean condition, same as ever."""
-    path = tmp_path / "if_boolean.bes"
-    path.write_text(_fixlet("true", action='if {exists file "/etc/hosts"}\nendif'))
-    assert "site-type-mismatch" not in codes(lint_file(path, LintConfig()))
+    assert "site-type-mismatch" not in codes(
+        _lint_fixlet(tmp_path, "true", action='if {exists file "/etc/hosts"}\nendif')
+    )
 
 
 def test_an_if_condition_may_also_be_a_string(tmp_path: Path) -> None:
     """The one way this slot is *more* permissive than `<Relevance>`: a
     string is fine here, confirmed by testing against a live client, where a
     string is never acceptable for a `<Relevance>` element's boolean slot."""
-    path = tmp_path / "if_string.bes"
-    path.write_text(_fixlet("true", action="if {name of operating system}\nendif"))
-    assert "site-type-mismatch" not in codes(lint_file(path, LintConfig()))
+    assert "site-type-mismatch" not in codes(
+        _lint_fixlet(tmp_path, "true", action="if {name of operating system}\nendif")
+    )
 
 
 def test_an_if_condition_that_is_neither_boolean_nor_string_is_a_finding(
@@ -430,9 +431,11 @@ def test_an_if_condition_that_is_neither_boolean_nor_string_is_a_finding(
     """`size of file "..."` is an `integer` -- neither of the two types this
     slot accepts -- so it is exactly as broken here as a plural or a string
     is in a `<Relevance>` element."""
-    path = tmp_path / "if_integer.bes"
-    path.write_text(_fixlet("true", action='if {size of file "/etc/hosts"}\nendif'))
-    findings = [f for f in lint_file(path, LintConfig()) if f.code == "site-type-mismatch"]
+    findings = [
+        f
+        for f in _lint_fixlet(tmp_path, "true", action='if {size of file "/etc/hosts"}\nendif')
+        if f.code == "site-type-mismatch"
+    ]
     assert len(findings) == 1
     assert "must be" in findings[0].message
     assert "`boolean`" in findings[0].message
@@ -442,9 +445,9 @@ def test_an_if_condition_that_is_neither_boolean_nor_string_is_a_finding(
 def test_a_plural_if_condition_still_reports_plurality(tmp_path: Path) -> None:
     """The new kind shares the plurality axis with every other slot; adding
     it must not disturb that shared check."""
-    path = tmp_path / "if_plural.bes"
-    path.write_text(_fixlet("true", action='if {names of files of folder "/tmp"}\nendif'))
-    assert "site-type-mismatch" in codes(lint_file(path, LintConfig()))
+    assert "site-type-mismatch" in codes(
+        _lint_fixlet(tmp_path, "true", action='if {names of files of folder "/tmp"}\nendif')
+    )
 
 
 def test_an_elseif_and_continue_if_condition_are_judged_the_same_way(
@@ -488,9 +491,13 @@ def test_an_elseif_and_continue_if_condition_are_judged_the_same_way(
 
 
 def test_a_substitution_of_an_opaque_object_is_a_warning(tmp_path: Path) -> None:
-    path = tmp_path / "dictionary_substitution.bes"
-    path.write_text(_fixlet("true", action='run echo {dictionaries of files "/etc/hosts"}'))
-    findings = [f for f in lint_file(path, LintConfig()) if f.code == "non-renderable-substitution"]
+    findings = [
+        f
+        for f in _lint_fixlet(
+            tmp_path, "true", action='run echo {dictionaries of files "/etc/hosts"}'
+        )
+        if f.code == "non-renderable-substitution"
+    ]
     assert len(findings) == 1
     assert findings[0].severity is Severity.WARNING
     assert "`dictionary`" in findings[0].message
@@ -499,17 +506,17 @@ def test_a_substitution_of_an_opaque_object_is_a_warning(tmp_path: Path) -> None
 def test_ordinary_scalar_substitutions_are_silent(tmp_path: Path) -> None:
     """The common case this rule must never touch."""
     for relevance in ("true", "name of operating system", "1 + 1", "version of operating system"):
-        path = tmp_path / "scalar.bes"
-        path.write_text(_fixlet("true", action=f"run echo {{{relevance}}}"))
-        assert "non-renderable-substitution" not in codes(lint_file(path, LintConfig()))
+        assert "non-renderable-substitution" not in codes(
+            _lint_fixlet(tmp_path, "true", action=f"run echo {{{relevance}}}")
+        )
 
 
 def test_a_folder_substitution_is_silent(tmp_path: Path) -> None:
     """`folder` is an object too, but it renders via its pathname -- proof
     the blocklist is curated, not "anything without a sampled cast."""
-    path = tmp_path / "folder_substitution.bes"
-    path.write_text(_fixlet("true", action='run echo {folder "/tmp"}'))
-    assert "non-renderable-substitution" not in codes(lint_file(path, LintConfig()))
+    assert "non-renderable-substitution" not in codes(
+        _lint_fixlet(tmp_path, "true", action='run echo {folder "/tmp"}')
+    )
 
 
 def test_a_substitution_that_might_be_renderable_is_silent(tmp_path: Path) -> None:
@@ -1120,7 +1127,7 @@ def test_an_inspector_missing_only_on_this_platform_is_not_mixed() -> None:
 
 
 def test_an_unknown_name_is_not_a_dialect_conflict() -> None:
-    codes = _codes("totally bogus made up inspector")
+    codes = _codes(UNKNOWN_INSPECTOR)
 
     assert "mixed-dialect" not in codes
     assert "unknown-inspector" in codes

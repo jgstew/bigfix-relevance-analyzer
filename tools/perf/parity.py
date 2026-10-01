@@ -34,8 +34,7 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_ROOT / "tests"))
 
-from test_examples import corpus_files  # noqa: E402
-from test_parser_corpus import corpus_cases  # noqa: E402
+from _corpus import corpus_cases, corpus_files  # noqa: E402
 
 from bigfix_relevance_analyzer.analyzer import analyze  # noqa: E402
 from bigfix_relevance_analyzer.extract import extract_relevance_from_file  # noqa: E402

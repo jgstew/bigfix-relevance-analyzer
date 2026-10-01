@@ -13,15 +13,15 @@ import pathlib
 import re
 
 import pytest
-from test_examples import corpus_files
+from _corpus import parsed_corpus_sites
+from _helpers import MID_CHAIN
 
 from bigfix_relevance_analyzer import inspectors, typecheck
 from bigfix_relevance_analyzer.binding import resolve_it_bindings
 from bigfix_relevance_analyzer.diagnostics import DIAGNOSTICS, Origin
 from bigfix_relevance_analyzer.dialect import Dialect, is_definite
-from bigfix_relevance_analyzer.extract import extract_relevance_from_file
 from bigfix_relevance_analyzer.nodes import If, Node
-from bigfix_relevance_analyzer.parser import parse, try_parse
+from bigfix_relevance_analyzer.parser import parse
 from bigfix_relevance_analyzer.typecheck import (
     Plurality,
     TypeEnvironment,
@@ -329,10 +329,8 @@ def test_session_branches_still_answer_for_their_types(session_env: TypeEnvironm
 def _corpus_diagnostics(env: TypeEnvironment) -> list[tuple[str, int, str, str]]:
     return [
         (path.name, site.line, diagnostic.code, diagnostic.message)
-        for path in corpus_files()
-        for site in extract_relevance_from_file(path)
-        if (parsed := try_parse(site.text)).ok and parsed.node is not None
-        for diagnostic in check(parsed.node, env).diagnostics
+        for path, site, node in parsed_corpus_sites()
+        for diagnostic in check(node, env).diagnostics
     ]
 
 
@@ -422,11 +420,9 @@ def test_operand_incompatibility_holds_across_the_corpus_under_each_sites_own_di
     watched = {"operand-types-incompatible", "if-branch-types-incompatible"}
     offenders = [
         (path.name, site.line, diagnostic.code, diagnostic.message)
-        for path in corpus_files()
-        for site in extract_relevance_from_file(path)
-        if (parsed := try_parse(site.text)).ok and parsed.node is not None
+        for path, site, node in parsed_corpus_sites()
         for diagnostic in check(
-            parsed.node,
+            node,
             TypeEnvironment.create(site.dialect if is_definite(site.dialect) else Dialect.CLIENT),
         ).diagnostics
         if diagnostic.code in watched
@@ -454,12 +450,7 @@ def test_the_corpus_really_does_contain_platform_divergent_branches() -> None:
                     stack.append(child)
         return found
 
-    total = sum(
-        branches(parsed.node)
-        for path in corpus_files()
-        for site in extract_relevance_from_file(path)
-        if (parsed := try_parse(site.text)).ok and parsed.node is not None
-    )
+    total = sum(branches(node) for _path, _site, node in parsed_corpus_sites())
     assert total >= 12
 
 
@@ -1220,9 +1211,6 @@ def test_the_shape_rule_holds_under_a_direct_exists(env: TypeEnvironment) -> Non
     assert [d.code for d in check(parse(cast), env).diagnostics] == ["filtered-singular-spelling"]
 
 
-_MID_CHAIN = "singular-spelling-mid-chain"
-
-
 @pytest.mark.parametrize(
     "source",
     [
@@ -1252,7 +1240,7 @@ def test_a_singular_spelling_mid_chain_prefers_the_plural(
     env: TypeEnvironment, source: str
 ) -> None:
     result = check(parse(source), env)
-    assert [d.code for d in result.diagnostics] == [_MID_CHAIN]
+    assert [d.code for d in result.diagnostics] == [MID_CHAIN]
     assert "'settings'" in result.diagnostics[0].message
     assert result.ok
 
@@ -1277,14 +1265,14 @@ def test_a_singular_spelling_mid_chain_prefers_the_plural(
 def test_a_singular_spelling_mid_chain_is_quiet_where_it_should_be(
     env: TypeEnvironment, source: str
 ) -> None:
-    assert _MID_CHAIN not in [d.code for d in check(parse(source), env).diagnostics]
+    assert MID_CHAIN not in [d.code for d in check(parse(source), env).diagnostics]
 
 
 def test_a_multivalued_singular_mid_chain_is_not_reported_twice(env: TypeEnvironment) -> None:
     """`file of folder` already names the plural as the non-unique risk; the
     shape rule would only repeat it on the same span."""
     codes = [d.code for d in check(parse('names of file of folder "c:\\"'), env).diagnostics]
-    assert _MID_CHAIN not in codes
+    assert MID_CHAIN not in codes
 
 
 def test_both_operands_of_a_pipe_must_be_singular(env: TypeEnvironment) -> None:

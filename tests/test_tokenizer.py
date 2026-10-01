@@ -8,9 +8,8 @@ here pins a specific lexical decision so it cannot drift silently.
 from __future__ import annotations
 
 import pytest
-from test_examples import corpus_files
+from _corpus import corpus_sites
 
-from bigfix_relevance_analyzer.extract import extract_relevance_from_file
 from bigfix_relevance_analyzer.tokenizer import (
     GRAMMAR_WORDS,
     Token,
@@ -331,15 +330,6 @@ def test_a_realistic_statement() -> None:
 # ---------------------------------------------------------------------------
 # Corpus: every real relevance string the extractor finds must lex cleanly
 # ---------------------------------------------------------------------------
-
-
-def corpus_sites() -> list[tuple[str, str]]:
-    """Every extracted relevance statement in the example corpus."""
-    return [
-        (f"{path.name}:{site.line}", site.text)
-        for path in corpus_files()
-        for site in extract_relevance_from_file(path)
-    ]
 
 
 def test_the_corpus_yields_relevance_to_tokenize() -> None:

@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 import pytest
+from _helpers import SETTING
 
 from bigfix_relevance_analyzer import fixfile
 from bigfix_relevance_analyzer.autofix import AutofixResult, TextEdit
@@ -26,7 +27,6 @@ from bigfix_relevance_analyzer.fixfile import (
 )
 from bigfix_relevance_analyzer.lint import LintConfig, Severity, lint_file
 
-SETTING = 'exists values of setting "x" of client'
 SETTINGS = 'exists values of settings "x" of client'
 
 HEAD = (

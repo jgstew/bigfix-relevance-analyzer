@@ -12,13 +12,12 @@ reference data rather than fixtures.
 
 from __future__ import annotations
 
-import importlib.util
 import re
-import sys
 from pathlib import Path
 from types import ModuleType
 
 import pytest
+from _helpers import load_tool
 
 from bigfix_relevance_analyzer import _inspector_data
 
@@ -39,12 +38,7 @@ _PERCENT_ENCODED_RE = re.compile(r"%[0-9A-Fa-f]{2}")
 
 def _load_generator() -> ModuleType:
     """Import the generator script, which lives outside any package."""
-    spec = importlib.util.spec_from_file_location("_generate_inspector_data", GENERATOR)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    return load_tool(GENERATOR, "_generate_inspector_data")
 
 
 def test_the_generated_module_matches_the_dumps() -> None:

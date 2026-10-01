@@ -11,7 +11,7 @@ from __future__ import annotations
 from itertools import pairwise
 
 import pytest
-from test_examples import corpus_files
+from _corpus import corpus_sites, extracted_sites
 
 from bigfix_relevance_analyzer import inspectors
 from bigfix_relevance_analyzer.complexity import (
@@ -29,7 +29,6 @@ from bigfix_relevance_analyzer.complexity import (
     score,
 )
 from bigfix_relevance_analyzer.dialect import Dialect
-from bigfix_relevance_analyzer.extract import extract_relevance_from_file
 from bigfix_relevance_analyzer.tokenizer import code_tokens
 
 # ---------------------------------------------------------------------------
@@ -180,14 +179,6 @@ def test_score_is_never_negative() -> None:
 # ---------------------------------------------------------------------------
 
 
-def corpus_sites() -> list[tuple[str, str]]:
-    return [
-        (f"{path.name}:{site.line}", site.text)
-        for path in corpus_files()
-        for site in extract_relevance_from_file(path)
-    ]
-
-
 def test_every_corpus_site_scores() -> None:
     for label, text in corpus_sites():
         result = analyze(text)
@@ -319,9 +310,8 @@ def test_every_rule_has_a_rationale() -> None:
 
 
 def test_corpus_costs_are_non_negative() -> None:
-    for path in corpus_files():
-        for site in extract_relevance_from_file(path):
-            assert analyze(site.text).evaluation_cost >= 0.0
+    for _path, site in extracted_sites():
+        assert analyze(site.text).evaluation_cost >= 0.0
 
 
 # ---------------------------------------------------------------------------

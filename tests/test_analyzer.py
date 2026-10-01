@@ -11,7 +11,8 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from test_examples import corpus_files
+from _corpus import extracted_sites
+from _helpers import BES_EXAMPLE, BROKEN, CLIENT, MIXED_DIALECT, UNKNOWN_INSPECTOR, write
 
 from bigfix_relevance_analyzer import RelevanceAnalysis, __version__, analyze_relevance, inspectors
 from bigfix_relevance_analyzer.__main__ import _cell, main
@@ -19,15 +20,10 @@ from bigfix_relevance_analyzer.analyzer import ReferenceReport, analyze
 from bigfix_relevance_analyzer.binding import Binder
 from bigfix_relevance_analyzer.complexity import evaluation_cost_rules
 from bigfix_relevance_analyzer.dialect import Dialect
-from bigfix_relevance_analyzer.extract import extract_relevance_from_file
 from bigfix_relevance_analyzer.lint import LintConfig, lint_analysis
 from bigfix_relevance_analyzer.typecheck import Plurality
 
-CLIENT = 'exists file "C:\\foo.txt" whose (size of it > 100)'
 SESSION = "names of bes computers"
-BES_EXAMPLE = Path("tests/examples/mixed_context/task_with_client_and_session_relevance.bes")
-BROKEN = 'exists file "unterminated'
-UNKNOWN_INSPECTOR = "totally bogus made up inspector"
 
 
 def inspectors_sources_as_contexts() -> set[str]:
@@ -423,8 +419,7 @@ def test_cli_json_for_a_file_carries_each_sites_own_dialect(
 def test_cli_reports_a_file_with_no_relevance_sites(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    plain = tmp_path / "notes.txt"
-    plain.write_text("just some notes, no relevance here\n")
+    plain = write(tmp_path, "notes.txt", "just some notes, no relevance here\n")
 
     assert main([str(plain)]) == 0
     assert "No relevance found." in capsys.readouterr().out
@@ -488,10 +483,8 @@ def test_cli_check_lints_files_instead_of_analysing_a_single_statement(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    clean = tmp_path / "clean.rel"
-    clean.write_text(CLIENT)
-    broken = tmp_path / "broken.rel"
-    broken.write_text(BROKEN)
+    clean = write(tmp_path, "clean.rel", CLIENT)
+    broken = write(tmp_path, "broken.rel", BROKEN)
 
     assert main(["--check", str(clean), str(broken)]) == 1
     out = capsys.readouterr().out
@@ -502,10 +495,8 @@ def test_cli_check_lints_files_instead_of_analysing_a_single_statement(
 def test_cli_check_accepts_multiple_paths(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    clean_a = tmp_path / "a.rel"
-    clean_a.write_text(CLIENT)
-    clean_b = tmp_path / "b.rel"
-    clean_b.write_text(CLIENT)
+    clean_a = write(tmp_path, "a.rel", CLIENT)
+    clean_b = write(tmp_path, "b.rel", CLIENT)
 
     assert main(["--check", str(clean_a), str(clean_b)]) == 0
 
@@ -514,7 +505,7 @@ def test_cli_check_with_no_paths_walks_the_current_directory(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "broken.rel").write_text(BROKEN)
+    write(tmp_path, "broken.rel", BROKEN)
 
     assert main(["--check"]) == 1
     out = capsys.readouterr().out
@@ -525,7 +516,7 @@ def test_cli_check_explicit_dot_is_not_walked(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "broken.rel").write_text(BROKEN)
+    write(tmp_path, "broken.rel", BROKEN)
 
     assert main(["--check", "."]) == 0
     out = capsys.readouterr().out
@@ -546,8 +537,7 @@ def test_cli_check_fails_on_a_path_that_does_not_exist(
 def test_cli_check_still_lints_the_paths_that_do_exist(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    clean = tmp_path / "clean.rel"
-    clean.write_text(CLIENT)
+    clean = write(tmp_path, "clean.rel", CLIENT)
     missing = tmp_path / "does-not-exist.rel"
 
     assert main(["--check", str(clean), str(missing)]) == 1
@@ -557,8 +547,7 @@ def test_cli_check_still_lints_the_paths_that_do_exist(
 
 
 def test_cli_check_wires_max_score_flag(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    path = tmp_path / "client.rel"
-    path.write_text(CLIENT)
+    path = write(tmp_path, "client.rel", CLIENT)
 
     assert main(["--check", "--max-score=1", str(path)]) == 1
     out = capsys.readouterr().out
@@ -657,9 +646,6 @@ def test_narrowing_does_not_change_what_visible_here_means() -> None:
 # ---------------------------------------------------------------------------
 
 
-MIXED = '(exists files of folders "/") AND (exists bes computers)'
-
-
 def test_a_contradicted_classification_is_not_a_finding() -> None:
     """`assumed` must not stay False when the references refute the classifier.
 
@@ -669,7 +655,7 @@ def test_a_contradicted_classification_is_not_a_finding() -> None:
     nothing can evaluate this. Analysis still has to pick a dialect to run as,
     but reporting that pick as a conclusion states a fact that is not one.
     """
-    report = analyze(MIXED)
+    report = analyze(MIXED_DIALECT)
 
     assert report.classified_dialect is Dialect.SESSION
     assert report.resolved_dialect is Dialect.UNCERTAIN
@@ -686,7 +672,7 @@ def test_a_classification_the_references_agree_with_is_still_definite() -> None:
 
 def test_a_forced_dialect_is_never_an_assumption() -> None:
     """The caller said so; the tables do not get a vote on that."""
-    assert not analyze(MIXED, Dialect.CLIENT).dialect_assumed
+    assert not analyze(MIXED_DIALECT, Dialect.CLIENT).dialect_assumed
 
 
 # ---------------------------------------------------------------------------
@@ -736,7 +722,6 @@ def test_cost_rules_match_a_fresh_pattern_pass(dialect: Dialect | None) -> None:
     """`analyze` derives `cost_rules` from the complexity pass's matched labels
     instead of matching every pattern a second time. That is only sound while
     the two agree, so hold them to it over every real site."""
-    for path in corpus_files():
-        for site in extract_relevance_from_file(path):
-            report = analyze(site.text, dialect)
-            assert report.cost_rules == evaluation_cost_rules(site.text, report.dialect), site.text
+    for _path, site in extracted_sites():
+        report = analyze(site.text, dialect)
+        assert report.cost_rules == evaluation_cost_rules(site.text, report.dialect), site.text

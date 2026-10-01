@@ -8,15 +8,13 @@ table against drifting from the dumps.
 from __future__ import annotations
 
 import json
-import subprocess
-import sys
 from collections.abc import Callable, Sequence
 
 import pytest
-from test_examples import corpus_files
+from _corpus import parsed_corpus_sites
+from _helpers import run_fresh_python
 
 from bigfix_relevance_analyzer.dialect import Dialect
-from bigfix_relevance_analyzer.extract import extract_relevance_from_file
 from bigfix_relevance_analyzer.inspectors import (
     _LOOKUP_CACHE_SIZE,
     SIGNATURE_SAMPLE,
@@ -41,7 +39,6 @@ from bigfix_relevance_analyzer.inspectors import (
     written_form_of,
 )
 from bigfix_relevance_analyzer.nodes import Reference, walk
-from bigfix_relevance_analyzer.parser import try_parse
 
 
 def only(name: str, signature: str) -> Inspector:
@@ -400,10 +397,8 @@ def test_every_reference_in_the_example_corpus_resolves() -> None:
     all of them real inspectors, keyed under a spelling `lookup` never saw."""
     unresolved = {
         node.phrase
-        for path in corpus_files()
-        for site in extract_relevance_from_file(path)
-        if (parsed := try_parse(site.text)).ok and parsed.node is not None
-        for node in walk(parsed.node)
+        for _path, _site, tree in parsed_corpus_sites()
+        for node in walk(tree)
         if isinstance(node, Reference) and not lookup(node.phrase)
     }
     assert unresolved == set()
@@ -783,11 +778,7 @@ def test_the_search_index_is_not_built_at_import() -> None:
         "assert inspectors.lookup.cache_info().currsize == 1, 'lookup not cached'\n"
         "print('ok')\n"
     )
-    result = subprocess.run(
-        [sys.executable, "-c", script], capture_output=True, text=True, check=False
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.strip() == "ok"
+    run_fresh_python(script)
 
 
 # --------------------------------------------------------------------------

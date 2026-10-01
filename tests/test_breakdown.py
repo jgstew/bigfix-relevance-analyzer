@@ -14,7 +14,7 @@ same as having asked the engine again.
 from __future__ import annotations
 
 import pytest
-from test_examples import corpus_files
+from _corpus import parsed_corpus_sites
 
 from bigfix_relevance_analyzer.breakdown import (
     Outcome,
@@ -22,8 +22,7 @@ from bigfix_relevance_analyzer.breakdown import (
     breakdown_probes,
     interpret_count_results,
 )
-from bigfix_relevance_analyzer.extract import extract_relevance_from_file
-from bigfix_relevance_analyzer.parser import parse, try_parse
+from bigfix_relevance_analyzer.parser import parse
 
 # The worked example from findings section 5.2. Ground truth from the engine:
 # 25 files in the folder, 21 of them over 1000 bytes, 21 names.
@@ -338,10 +337,8 @@ def test_no_site_in_the_example_corpus_gets_an_unusable_context() -> None:
     """
     offenders = [
         (path.name, level.probe.measured, level.probe.context)
-        for path in corpus_files()
-        for site in extract_relevance_from_file(path)
-        if (parsed := try_parse(site.text)).ok and parsed.node is not None
-        for level in breakdown_probes(site.text, parsed.node)
+        for path, site, node in parsed_corpus_sites()
+        for level in breakdown_probes(site.text, node)
         if level.probe.context is not None and level.probe.context.strip() in ("", "it")
     ]
     assert offenders == []

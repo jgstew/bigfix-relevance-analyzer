@@ -12,14 +12,12 @@ cannot silently match the wrong statement.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
 import pytest
+from _corpus import EXAMPLES, corpus_files
 
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.extract import extract_relevance_from_file
-
-EXAMPLES = Path(__file__).parent / "examples"
 
 CLIENT = Dialect.CLIENT
 SESSION = Dialect.SESSION
@@ -299,19 +297,6 @@ EXPECTED: dict[str, Expected] = {
         note="One file, both dialects: a session PI in the Description, client applicability.",
     ),
 }
-
-
-def corpus_files() -> list[Path]:
-    return sorted(
-        path
-        for path in EXAMPLES.rglob("*")
-        if path.is_file()
-        and path.name != "README.md"
-        # Raw inspector-name dumps for the analyzer's inspector tables, not
-        # documents with embedded relevance to extract - see
-        # relevance_inspectors/README.md.
-        and "relevance_inspectors" not in path.relative_to(EXAMPLES).parts
-    )
 
 
 def test_every_example_file_has_an_expectation() -> None:

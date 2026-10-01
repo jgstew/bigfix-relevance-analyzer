@@ -27,6 +27,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from _helpers import run_fresh_python
 
 from bigfix_relevance_analyzer import reference
 from bigfix_relevance_analyzer.complexity import COST_RULES
@@ -486,11 +487,7 @@ def test_importing_the_package_does_not_build_a_reference() -> None:
         "assert 'bigfix_relevance_analyzer.reference._tables' in sys.modules\n"
         "print('ok')\n"
     )
-    result = subprocess.run(
-        [sys.executable, "-c", script], capture_output=True, text=True, check=False
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.strip() == "ok"
+    run_fresh_python(script)
 
 
 # ---------------------------------------------------------------------------

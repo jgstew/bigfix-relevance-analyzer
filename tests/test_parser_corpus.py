@@ -14,77 +14,17 @@ Record format (``tests/corpus/*.rlvcorpus``)::
 
 The expected side is compared structurally, so it can be indented freely.
 An expected side of ``ERROR line L column C`` pins a ParseError position
-instead of a tree.
+instead of a tree. The reader for this format lives in ``tests/_corpus.py``.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
-
 import pytest
+from _corpus import CorpusCase, corpus_cases
 
 from bigfix_relevance_analyzer.nodes import to_mermaid, to_sexpr
 from bigfix_relevance_analyzer.parser import ParseError, parse, try_parse
 from bigfix_relevance_analyzer.tokenizer import code_tokens
-
-CORPUS_DIR = Path(__file__).parent / "corpus"
-
-# ---------------------------------------------------------------------------
-# Corpus loading
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class CorpusCase:
-    file: Path
-    index: int
-    title: str
-    source: str
-    expected: str
-
-    @property
-    def id(self) -> str:
-        return f"{self.file.stem}:{self.index}:{self.title}"
-
-
-def load_corpus_file(path: Path) -> list[CorpusCase]:
-    cases: list[CorpusCase] = []
-    title: str | None = None
-    source_lines: list[str] = []
-    expected_lines: list[str] = []
-    in_expected = False
-
-    def flush() -> None:
-        nonlocal title, source_lines, expected_lines, in_expected
-        if title is None:
-            return
-        assert in_expected, f"{path.name}: record {title!r} has no ---- separator"
-        source = "\n".join(source_lines).strip()
-        expected = "\n".join(expected_lines).strip()
-        assert source, f"{path.name}: record {title!r} has an empty source"
-        assert expected, f"{path.name}: record {title!r} has an empty expected side"
-        cases.append(CorpusCase(path, len(cases), title, source, expected))
-        title, source_lines, expected_lines, in_expected = None, [], [], False
-
-    for line in path.read_text().splitlines():
-        if line.startswith("===="):
-            flush()
-            title = line.removeprefix("====").strip() or "untitled"
-        elif line.startswith("----"):
-            assert title is not None, f"{path.name}: ---- before any ===="
-            in_expected = True
-        elif title is not None:
-            (expected_lines if in_expected else source_lines).append(line)
-    flush()
-    return cases
-
-
-def corpus_cases() -> list[CorpusCase]:
-    files = sorted(CORPUS_DIR.glob("*.rlvcorpus"))
-    assert files, "no corpus files found"
-    return [case for path in files for case in load_corpus_file(path)]
-
 
 # ---------------------------------------------------------------------------
 # A tiny S-expression reader, so expected trees can be written free-form

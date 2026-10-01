@@ -9,19 +9,10 @@ relevance worth knowing about -- never something to silence.
 from __future__ import annotations
 
 import pytest
-from test_examples import corpus_files
+from _corpus import corpus_sites
 
-from bigfix_relevance_analyzer.extract import extract_relevance_from_file
 from bigfix_relevance_analyzer.parser import try_parse
 from bigfix_relevance_analyzer.tokenizer import code_tokens
-
-
-def corpus_sites() -> list[tuple[str, str]]:
-    return [
-        (f"{path.name}:{site.line}", site.text)
-        for path in corpus_files()
-        for site in extract_relevance_from_file(path)
-    ]
 
 
 def test_the_corpus_yields_relevance_to_parse() -> None:

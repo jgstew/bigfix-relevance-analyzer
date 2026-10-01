@@ -26,6 +26,7 @@ import itertools
 import json
 
 import pytest
+from _helpers import MID_CHAIN, SETTING
 
 from bigfix_relevance_analyzer import autofix as autofix_module
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis, analyze
@@ -33,9 +34,6 @@ from bigfix_relevance_analyzer.autofix import AutofixResult, TextEdit, autofix
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.lint import LintConfig, lint_analysis
 
-MID_CHAIN = "singular-spelling-mid-chain"
-
-SETTING = 'exists values of setting "x" of client'
 CASCADE = 'number of names of files of folder "etc" of folder "private" of folder "/"'
 CASCADE_FIXED = 'number of names of files of folders "etc" of folders "private" of folder "/"'
 

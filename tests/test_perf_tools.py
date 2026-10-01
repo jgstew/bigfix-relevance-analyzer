@@ -12,8 +12,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from test_examples import corpus_files
-from test_parser_corpus import corpus_cases
+from _corpus import corpus_cases, corpus_files
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "tools" / "perf"))
 
