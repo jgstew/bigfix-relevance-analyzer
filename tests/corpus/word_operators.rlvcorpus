@@ -74,3 +74,28 @@ it contains "a" and it contains "b"
 (it as trimmed string) whose(it != "")
 ----
 (whose (cast it "trimmed string") (bin "!=" it (str "")))
+
+==== does not equal is one negated operator (issue 51)
+1 does not equal 2
+----
+(bin "does not equal" (num "1") (num "2"))
+
+==== is not greater than is one operator, not is-not around an inspector (issue 51)
+1 is not greater than 2
+----
+(bin "is not greater than" (num "1") (num "2"))
+
+==== is not greater than or equal to takes the longest match (issue 51)
+1 is not greater than or equal to 2
+----
+(bin "is not greater than or equal to" (num "1") (num "2"))
+
+==== is not less than (issue 51)
+1 is not less than 2
+----
+(bin "is not less than" (num "1") (num "2"))
+
+==== is not less than or equal to (issue 51)
+1 is not less than or equal to 2
+----
+(bin "is not less than or equal to" (num "1") (num "2"))

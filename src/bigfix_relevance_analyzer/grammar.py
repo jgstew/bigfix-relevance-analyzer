@@ -119,6 +119,7 @@ WORD_INFIX: dict[tuple[str, ...], InfixOp] = {
     ("ends", "with"): InfixOp("ends with", BP_RELATIONAL),
     ("does", "not", "end", "with"): InfixOp("does not end with", BP_RELATIONAL),
     ("equals",): InfixOp("equals", BP_RELATIONAL),
+    ("does", "not", "equal"): InfixOp("does not equal", BP_RELATIONAL),
     ("is",): InfixOp("is", BP_RELATIONAL),
     ("is", "not"): InfixOp("is not", BP_RELATIONAL),
     ("is", "equal", "to"): InfixOp("is equal to", BP_RELATIONAL),
@@ -131,6 +132,14 @@ WORD_INFIX: dict[tuple[str, ...], InfixOp] = {
     ),
     ("is", "less", "than"): InfixOp("is less than", BP_RELATIONAL),
     ("is", "less", "than", "or", "equal", "to"): InfixOp("is less than or equal to", BP_RELATIONAL),
+    ("is", "not", "greater", "than"): InfixOp("is not greater than", BP_RELATIONAL),
+    ("is", "not", "greater", "than", "or", "equal", "to"): InfixOp(
+        "is not greater than or equal to", BP_RELATIONAL
+    ),
+    ("is", "not", "less", "than"): InfixOp("is not less than", BP_RELATIONAL),
+    ("is", "not", "less", "than", "or", "equal", "to"): InfixOp(
+        "is not less than or equal to", BP_RELATIONAL
+    ),
 }
 
 
@@ -255,6 +264,7 @@ CANONICAL_BINARY: dict[str, OperatorForm] = {
     "!=": OperatorForm("=", negated=True),
     "is not": OperatorForm("=", negated=True),
     "is not equal to": OperatorForm("=", negated=True),
+    "does not equal": OperatorForm("=", negated=True),
     "does not contain": OperatorForm("contains", negated=True),
     "does not start with": OperatorForm("starts with", negated=True),
     "does not end with": OperatorForm("ends with", negated=True),
@@ -267,6 +277,11 @@ CANONICAL_BINARY: dict[str, OperatorForm] = {
     "is less than": OperatorForm("<"),
     "is less than or equal to": OperatorForm("<="),
     "is contained by": OperatorForm("contains", swapped=True),
+    # Negated orderings: `a is not greater than b` is `not (b < a)`.
+    "is not greater than": OperatorForm("<", negated=True, swapped=True),
+    "is not greater than or equal to": OperatorForm("<=", negated=True, swapped=True),
+    "is not less than": OperatorForm("<", negated=True),
+    "is not less than or equal to": OperatorForm("<=", negated=True),
 }
 
 _ALL_INFIX: tuple[InfixOp, ...] = (*PUNCT_INFIX.values(), *WORD_INFIX.values())

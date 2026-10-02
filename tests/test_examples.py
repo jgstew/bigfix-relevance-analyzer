@@ -262,11 +262,8 @@ EXPECTED: dict[str, Expected] = {
             # many of them -- a curl command line alone accounts for eight.
             # The embedded BES document on line 105 sits inside a
             # `createfile until END_OF_FILE` heredoc, so its braces are
-            # deliberately NOT extracted.
-            (SUB, CLIENT, 55),
-            (SUB, CLIENT, 56),
-            (SUB, CLIENT, 57),
-            (SUB, CLIENT, 58),
+            # deliberately NOT extracted. Nor are lines 55-58: they are
+            # `// appendfile {...}` comments, which never run (issue 53).
             *((SUB, CLIENT, 85),) * 2,
             *((SUB, CLIENT, 88),) * 3,
             (COND, CLIENT, 92),

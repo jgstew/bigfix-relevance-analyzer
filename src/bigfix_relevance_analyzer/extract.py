@@ -405,7 +405,7 @@ def _iter_substitution_spans(body: str) -> Iterator[tuple[int, int, str, bool]]:
     substitution in ``body``, ``offset`` being where the text starts in it.
 
     Handles `{{`/`}}` literal-brace escapes, ignores `}` inside a relevance
-    string literal, and skips heredoc content entirely. ``is_condition`` is
+    string literal, and skips heredoc content and `//` comment lines entirely. ``is_condition`` is
     whether the substitution is the condition of an `if`/`elseif`/`continue
     if` command, which the type checker holds to a different requirement than
     an ordinary substitution -- see `_SLOT_REQUIREMENTS` in `lint.py`.
@@ -429,6 +429,12 @@ def _iter_substitution_spans(body: str) -> Iterator[tuple[int, int, str, bool]]:
         heredoc_match = _HEREDOC_RE.match(line)
         if heredoc_match:
             heredoc_terminator = heredoc_match.group(1)
+            continue
+
+        # A `//` line is an ActionScript comment: it never runs, so its
+        # substitutions are never evaluated. Checked after the heredoc test,
+        # because inside a heredoc `//` is file content.
+        if line.lstrip().startswith("//"):
             continue
 
         column = 0

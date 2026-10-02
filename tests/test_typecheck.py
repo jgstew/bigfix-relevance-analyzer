@@ -493,6 +493,26 @@ def test_a_swapped_operator_resolves_through_its_defined_form(env: TypeEnvironme
 
 
 @pytest.mark.parametrize(
+    "source",
+    [
+        # Issue 51: each evaluates to a boolean on every platform QnA was run
+        # on (Windows 9.5/10.0/11.0, macOS, Debian, Ubuntu, RHEL, Amazon, SUSE).
+        "1 does not equal 2",
+        "1 is not greater than 2",
+        "1 is not greater than or equal to 2",
+        "1 is not less than 2",
+        "1 is not less than or equal to 2",
+        '"a" does not equal "b"',
+        'version of client is not less than "9"',
+    ],
+)
+def test_negated_comparison_spellings_are_clean_booleans(source: str, env: TypeEnvironment) -> None:
+    result = check(parse(source), env)
+    assert result.diagnostics == ()
+    assert result.value.types == frozenset({"boolean"})
+
+
+@pytest.mark.parametrize(
     ("source", "code"),
     [
         pytest.param('1 + "a"', "binary-operator-not-defined", id="no-such-overload"),

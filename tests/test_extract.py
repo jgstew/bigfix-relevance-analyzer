@@ -176,6 +176,37 @@ def test_actionscript_heredoc_terminator_must_match_exactly() -> None:
     assert extract_relevance_from_actionscript(body) == []
 
 
+# Issue 53: a `//` line is an ActionScript comment. It never runs, so its
+# substitutions are never evaluated and are not relevance sites.
+
+
+def test_actionscript_comment_line_substitutions_are_excluded() -> None:
+    body = '// wait cmd /c echo {names of files of folder "C:\\x"}\nwait cmd /c echo {name of it}'
+    sites = extract_relevance_from_actionscript(body)
+    assert texts(sites) == ["name of it"]
+    assert sites[0].line == 2
+
+
+def test_actionscript_indented_comment_line_is_excluded() -> None:
+    assert extract_relevance_from_actionscript("   \t// appendfile {name of it}") == []
+
+
+def test_actionscript_unterminated_brace_in_a_comment_does_not_end_the_scan() -> None:
+    body = "// TODO: {\nappendfile {name of it}"
+    assert texts(extract_relevance_from_actionscript(body)) == ["name of it"]
+
+
+def test_actionscript_double_slash_mid_line_is_not_a_comment() -> None:
+    body = "download http://example.invalid/{name of it}"
+    assert texts(extract_relevance_from_actionscript(body)) == ["name of it"]
+
+
+def test_actionscript_comment_inside_a_heredoc_is_still_content() -> None:
+    """Inside a heredoc `//` is file content; the heredoc still ends on its terminator."""
+    body = "createfile until END\n// {nope}\nEND\nappendfile {name of it}"
+    assert texts(extract_relevance_from_actionscript(body)) == ["name of it"]
+
+
 def test_actionscript_unterminated_substitution_warns_and_yields_nothing(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
