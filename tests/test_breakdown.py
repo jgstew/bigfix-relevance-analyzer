@@ -189,11 +189,11 @@ def test_the_specialised_of_forms_are_still_measured_as_levels() -> None:
 
 
 def test_a_tuple_subscript_is_a_level() -> None:
-    source = "item 0 of (a, b)"
+    source = "item 0 of (w, b)"
     levels = breakdown_probes(source, parse(source))
     assert [(level.probe.measured, level.probe.context) for level in levels] == [
         (source, None),
-        ("item 0 of it", "(a, b)"),
+        ("item 0 of it", "(w, b)"),
     ]
 
 
@@ -267,7 +267,7 @@ def test_a_context_is_never_a_bare_it() -> None:
 def test_a_context_keeps_its_own_direct_object() -> None:
     """Probing `b` without the `c` it is written against gives
     `The operator "b" is not defined.` -- section 5.1's failure, one level in."""
-    source = "(a of b) of c"
+    source = "(w of b) of c"
     assert [level.probe.context for level in breakdown_probes(source, parse(source))] == [
         None,
         "c",
@@ -379,8 +379,8 @@ def test_an_absolute_sub_expression_is_not_composed_onto_its_context(
 
 def test_a_sub_expression_applied_to_an_object_is_composed_onto_it() -> None:
     """Below an `of`'s property the opposite holds: everything there *is*
-    applied to the object, so `b` in `(a of b) of c` really is `b of c`."""
-    source = "(a of b) of c"
+    applied to the object, so `b` in `(w of b) of c` really is `b of c`."""
+    source = "(w of b) of c"
     assert [level.probe.context for level in breakdown_probes(source, parse(source))] == [
         None,
         "c",
@@ -396,7 +396,7 @@ def test_a_free_it_is_replaced_by_the_context_rather_than_composed_onto_it() -> 
     contexts = [level.probe.context for level in breakdown_probes(source, parse(source))]
     assert contexts == [None, "files", "parent folder of files"]
 
-    source = "(a of b of it) of c"
+    source = "(w of b of it) of c"
     contexts = [level.probe.context for level in breakdown_probes(source, parse(source))]
     assert contexts == [None, "c", "c", "b of c"]
 

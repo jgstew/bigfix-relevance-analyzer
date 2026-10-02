@@ -205,9 +205,9 @@ def test_to_sexpr_escapes_quotes_and_backslashes_in_strings() -> None:
 
 
 def test_children_are_in_source_order() -> None:
-    node = parse("if a then b else c")
+    node = parse("if w then b else c")
     assert [to_sexpr(child) for child in children(node)] == [
-        '(ref "a")',
+        '(ref "w")',
         '(ref "b")',
         '(ref "c")',
     ]
@@ -226,7 +226,7 @@ def test_walk_is_pre_order_with_siblings_in_source_order() -> None:
 def test_tree_depth_counts_levels() -> None:
     assert tree_depth(parse("it")) == 1
     assert tree_depth(parse("size of it")) == 2
-    assert tree_depth(parse("a + b * c")) == 3
+    assert tree_depth(parse("w + b * c")) == 3
 
 
 # A left-associative chain is shallow to the parser's nesting guard but builds a
@@ -316,14 +316,14 @@ def test_to_mermaid_routes_an_object_past_a_whose_to_what_it_filters() -> None:
 
 
 def test_to_mermaid_keeps_an_explicit_of_of_as_its_own_box() -> None:
-    """`(a of b) of c` is not the same tree as `a of (b of c)` and must not
-    collapse as if it were -- collapsing would hang two `of` edges off `a`."""
-    rendered = to_mermaid(parse("(a of b) of c"))
+    """`(w of b) of c` is not the same tree as `w of (b of c)` and must not
+    collapse as if it were -- collapsing would hang two `of` edges off `w`."""
+    rendered = to_mermaid(parse("(w of b) of c"))
 
     assert rendered.count('{{"of"}}') == 1
     assert '-- "prop" -->' in rendered
     assert '-- "obj" -->' in rendered
-    # `a` only has one outgoing `of` edge -- to `b` -- not two.
+    # `w` only has one outgoing `of` edge -- to `b` -- not two.
     assert rendered.count('-- "of" -->') == 1
 
 

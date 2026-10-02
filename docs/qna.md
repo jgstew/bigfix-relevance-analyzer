@@ -279,6 +279,11 @@ A: say "hi"
 **Case does not matter, and leading whitespace is tolerated.** `NAME OF
 OPERATING SYSTEM` and `    1+1   ` both answer normally.
 
+**Articles are ignored.** Whole-word `a`, `an` and `the`, in any case, are
+skipped like whitespace: `"x" as a string`, `exists the current site`, `the 1`
+and even `number of (1;2) a` all answer, while `exists (the)` fails to parse just
+as `exists ()` does. `thename` is not split, so it is an unknown operator.
+
 ## A batch probe script
 
 What this project used to gather the findings in

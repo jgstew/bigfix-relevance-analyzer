@@ -28,6 +28,9 @@ same way.
 
 Guarantees
 ----------
+**Articles are trivia.** A whole-word ``a``/``an``/``the`` lexes as
+:attr:`TokenKind.ARTICLE`, which the engine ignores exactly like whitespace.
+
 **Roundtrip.** ``"".join(t.text for t in tokenize(s)) == s`` for every input,
 valid or not. Whitespace and comments are emitted as trivia tokens rather than
 skipped, which is what makes a future formatter or auto-fixer possible.
@@ -89,6 +92,9 @@ class TokenKind(enum.Enum):
     WHITESPACE = "whitespace"
     """A run of whitespace. Trivia."""
 
+    ARTICLE = "article"
+    """A whole-word ``a``, ``an`` or ``the``, any case. Trivia: the engine skips it."""
+
     ERROR = "error"
     """Text no rule accepts: a stray character, or an unterminated construct."""
 
@@ -120,8 +126,8 @@ class Token:
         return self.text.lower() if self.kind is TokenKind.WORD else self.text
 
     def is_trivia(self) -> bool:
-        """Whether this token carries no meaning: whitespace or a comment."""
-        return self.kind is TokenKind.COMMENT or self.kind is TokenKind.WHITESPACE
+        """Whether this token carries no meaning: whitespace, a comment, an article."""
+        return self.kind in _TRIVIA
 
 
 # ---------------------------------------------------------------------------
@@ -177,6 +183,16 @@ GRAMMAR_WORDS: frozenset[str] = frozenset(
         "whose",
     }
 )
+
+_TRIVIA = frozenset({TokenKind.COMMENT, TokenKind.WHITESPACE, TokenKind.ARTICLE})
+
+# The engine drops these wherever they stand, like whitespace -- confirmed in
+# QnA: `"x" as a string`, `exists the current site`, `THE name of operating
+# system` and even a trailing `number of (1;2) a` all evaluate, `the 1` is 1,
+# and `exists (the)` fails to parse exactly as `exists ()` does. Only a whole
+# word counts (`thename` is an unknown operator), and no dumped inspector name
+# contains one, so lexing them as trivia never splits a real name.
+_ARTICLES = frozenset({"a", "an", "the"})
 
 # Characters that can never appear in a word: whitespace, the string delimiter,
 # every punctuation character, `!` (only ever participates in `!=`), and `.`.
@@ -247,6 +263,8 @@ def _scan(text: str, at: int) -> tuple[TokenKind, int]:
             return TokenKind.PUNCT, at + len(lexeme)
 
     if word := _WORD_RE.match(text, at):
+        if word.end() - at <= 3 and word.group().lower() in _ARTICLES:
+            return TokenKind.ARTICLE, word.end()
         return TokenKind.WORD, word.end()
 
     return TokenKind.ERROR, at + 1
@@ -279,7 +297,7 @@ def _iter_tokens(text: str, *, skip_trivia: bool) -> Iterator[Token]:
         if kind is TokenKind.ERROR:
             logger.debug("unlexable input at offset %d: %r", at, text[at : min(end, at + 40)])
 
-        if not (skip_trivia and (kind is TokenKind.WHITESPACE or kind is TokenKind.COMMENT)):
+        if not (skip_trivia and kind in _TRIVIA):
             yield Token(
                 kind=kind,
                 text=text[at:end],

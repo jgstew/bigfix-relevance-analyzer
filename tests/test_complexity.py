@@ -809,12 +809,12 @@ def test_unbalanced_conditional_parens_are_scored_not_raised() -> None:
 @pytest.mark.parametrize(
     ("statement", "expected"),
     [
-        ("((a) and (b and (c)))", 35.5885),
+        ("((w) and (b and (c)))", 35.5885),
         # 27.5 before WEIGHT_WHOSE_CLAUSE dropped 5.0 -> 1.5, so that filtering
         # a cross product stops costing more than leaving it unfiltered.
         ('exists files whose (name of it starts with "bes")', 24.0),
-        ("(a and b) or (c and d)", 24.0),
-        ("a) b) c", 8.0),
+        ("(w and b) or (c and d)", 24.0),
+        ("w) b) c", 8.0),
     ],
 )
 def test_pinned_scores(statement: str, expected: float) -> None:

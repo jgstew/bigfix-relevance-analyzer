@@ -65,9 +65,10 @@ Eleven rules, nine of them always on and two tunable:
   silent about it. Pass ``None`` for either (via the library API; there is no
   CLI spelling for it) to disable the rule entirely.
 - ``file-error`` -- a path given to :func:`lint_file` / :func:`lint_paths` that
-  does not exist or could not be read. Always an error: it yields no sites, so
-  left unreported it is indistinguishable from a clean file, and a typo'd path
-  in a hook would pass CI having linted nothing. An existing directory is
+  does not exist, could not be read, or has a suffix no extractor reads.
+  Always an error: it yields no sites, so left unreported it is
+  indistinguishable from a clean file, and a typo'd path in a hook would pass
+  CI having linted nothing. An existing directory is
   exempt -- a path is taken literally and only :func:`lint_directory` recurses.
 - ``max-depth-exceeded`` -- only from :func:`lint_directory`: a directory tree
   deeper than its ``max_depth`` was not fully walked. Always an error, because
@@ -107,7 +108,12 @@ from typing import TYPE_CHECKING, Any, Final
 from bigfix_relevance_analyzer._serialize import _as_path, _path
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis, analyze
 from bigfix_relevance_analyzer.dialect import Dialect, is_definite
-from bigfix_relevance_analyzer.extract import RelevanceSite, extract_relevance_from_file
+from bigfix_relevance_analyzer.extract import (
+    _RECOGNIZED_SUFFIXES,
+    RelevanceSite,
+    _is_recognized,
+    extract_relevance_from_file,
+)
 from bigfix_relevance_analyzer.typecheck import Plurality
 
 if TYPE_CHECKING:
@@ -496,7 +502,8 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
             _rule(
                 "file-error",
                 Severity.ERROR,
-                "a path given to the linter does not exist or could not be read",
+                "a path given to the linter does not exist, could not be read, "
+                "or is a file type it does not lint",
                 "A path that is not there yields no sites, which reads exactly like a clean "
                 "file unless it is reported -- so a misspelled path in a pre-commit hook would "
                 "otherwise pass CI having linted nothing. Always an error: the caller named "
@@ -1145,30 +1152,59 @@ Wrapping keys on the arguments actually passed, so it cannot drift.
 def lint_file(path: str | bytes | os.PathLike[str], config: LintConfig) -> tuple[Finding, ...]:
     """Extract and judge every relevance site in one file.
 
-    A file type :func:`~bigfix_relevance_analyzer.extract.extract_relevance_from_file`
-    does not recognize yields no sites and, therefore, no findings -- the same
-    "unknown, skip" policy the extractor itself uses.
-
-    A path that is not a readable file is reported rather than skipped, under
-    ``file-error`` -- a missing file yields no sites either, and the two must
-    not look alike. The one path that stays silent is an existing directory:
-    only :func:`lint_directory` descends, so a directory argument is a no-op
-    here by design rather than a failure to read something.
+    The path is taken as named on purpose, so anything that stops it being
+    linted is reported rather than skipped, under ``file-error``: a missing
+    path, an unreadable one, and a file type
+    :func:`~bigfix_relevance_analyzer.extract.extract_relevance_from_file` does
+    not recognize. Each of those yields no sites, and none may look like a
+    clean file. The one path that stays silent is an existing directory: only
+    :func:`lint_directory` descends, so a directory argument is a no-op here by
+    design rather than a failure to read something.
     """
-    file_path = _as_path(path)
-    # Asked before extraction, not instead of it: a suffix the extractor does
-    # not recognize never touches the filesystem, so a missing `notes.txt`
-    # would otherwise raise nothing to notice.
-    if not file_path.is_file():
-        if file_path.is_dir():
-            return ()
-        return _file_error(file_path, "no such file", config)
+    return _lint_file(_as_path(path), config, explicit=True)
 
+
+def _lint_file(file_path: Path, config: LintConfig, *, explicit: bool) -> tuple[Finding, ...]:
+    """:func:`lint_file`, or the directory walk's quieter version of it."""
+    blocked = _unlintable(file_path, config, explicit=explicit)
+    if blocked is not None:
+        return blocked
     try:
         sites = extract_relevance_from_file(file_path)
     except OSError as error:
         return _file_error(file_path, error.strerror or str(error), config)
     return _lint_sites(file_path, sites, config)
+
+
+def _unlintable(
+    file_path: Path, config: LintConfig, *, explicit: bool
+) -> tuple[Finding, ...] | None:
+    """What to report instead of linting ``file_path``, or ``None`` to go ahead.
+
+    Asked before extraction, from the name and the filesystem entry alone: an
+    unrecognized suffix never reaches the filesystem in the extractor, so a
+    missing `notes.txt` would otherwise raise nothing to notice.
+
+    Not ``is_file()``: that is true only of a *regular* file, so a piped
+    `/dev/stdin` -- a FIFO that reads fine -- came out as `no such file`.
+
+    An unrecognized type is reported only for a path named ``explicitly``. The
+    directory walk meets every `.py` and `.json` in a repository, and skipping
+    those is its job; a named path is a statement that it should be linted, so
+    `0 errors in 1 file` over a file nothing read would be a false pass (#16).
+    """
+    if file_path.is_dir():
+        return ()
+    if not file_path.exists():
+        return _file_error(file_path, "no such file", config)
+    if not _is_recognized(file_path):
+        if not explicit:
+            return ()
+        expected = ", ".join(_RECOGNIZED_SUFFIXES)
+        return _file_error(
+            file_path, f"unrecognised file type; nothing was linted (expected {expected})", config
+        )
+    return None
 
 
 def _lint_sites(
@@ -1282,7 +1318,7 @@ def lint_directory(
     files, exceeded = _walk_files(root_path, max_depth)
     findings = list(_depth_findings(root_path, exceeded, max_depth, config))
     for file_path in files:
-        findings.extend(lint_file(file_path, config))
+        findings.extend(_lint_file(file_path, config, explicit=False))
     return tuple(findings)
 
 

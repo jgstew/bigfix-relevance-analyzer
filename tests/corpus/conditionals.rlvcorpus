@@ -19,19 +19,19 @@ if 1 then 2 else 3 + 4
 (if (num "1") (num "2") (bin "+" (num "3") (num "4")))
 
 ==== else if chains by nesting
-if a then "x" else if b then "p" else "q"
+if w then "x" else if b then "p" else "q"
 ----
-(if (ref "a") (str "x") (if (ref "b") (str "p") (str "q")))
+(if (ref "w") (str "x") (if (ref "b") (str "p") (str "q")))
 
 ==== a parenthesized conditional is an of operand
-a of (if 1 then b else c)
+w of (if 1 then b else c)
 ----
-(of (ref "a") (if (num "1") (ref "b") (ref "c")))
+(of (ref "w") (if (num "1") (ref "b") (ref "c")))
 
 ==== a conditional inside a whose predicate
-files whose(if exists a then b else true)
+files whose(if exists w then b else true)
 ----
-(whose (ref "files") (if (exists (ref "a")) (ref "b") (ref "true")))
+(whose (ref "files") (if (exists (ref "w")) (ref "b") (ref "true")))
 
 ==== a conditional missing its else is an error
 if 1 then 2

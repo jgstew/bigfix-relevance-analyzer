@@ -16,7 +16,7 @@ import pytest
 from _corpus import parsed_corpus_sites
 from _helpers import MID_CHAIN
 
-from bigfix_relevance_analyzer import inspectors, typecheck
+from bigfix_relevance_analyzer import analyze_relevance, inspectors, typecheck
 from bigfix_relevance_analyzer.binding import resolve_it_bindings
 from bigfix_relevance_analyzer.diagnostics import DIAGNOSTICS, Origin
 from bigfix_relevance_analyzer.dialect import Dialect, is_definite
@@ -2292,3 +2292,25 @@ def test_a_check_result_survives_a_round_trip_through_pickle() -> None:
     # Still read-only on the far side -- the guarantee must survive the trip.
     with pytest.raises(TypeError):
         restored.resolutions[0] = ()
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        'concatenation "," of (item 1 of it) of ((1, "a"); (2, "b")) = "a,b"',
+        '"x" & concatenation "," of (item 1 of it) of ((1, "a"); (2, "b"))',
+        '"x" & concatenation "," of (item 1 of it as string) of ((1, "a"); (2, "b"))',
+    ],
+)
+def test_aggregate_over_untyped_tuple_items_is_singular(text: str) -> None:
+    """qna answers `a,b` for each: the aggregate's spelling settles plurality
+    even when its object's type is unknown (#58)."""
+    result = analyze_relevance(text)
+    assert result.check is not None
+    assert not result.check.diagnostics, result.check.diagnostics
+
+
+def test_plural_aggregate_over_untyped_tuple_items_stays_plural() -> None:
+    result = analyze_relevance('concatenations "," of (item 1 of it) of ((1, "a"); (2, "b"))')
+    assert result.check is not None
+    assert result.check.value.plurality is Plurality.PLURAL

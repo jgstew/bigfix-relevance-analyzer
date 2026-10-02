@@ -39,9 +39,9 @@ set of (2; 78; 80)
 (of (ref "set") (coll (num "2") (num "78") (num "80")))
 
 ==== a tuple is an of operand
-(a, b) of c
+(w, b) of c
 ----
-(of (tuple (ref "a") (ref "b")) (ref "c"))
+(of (tuple (ref "w") (ref "b")) (ref "c"))
 
 ==== a collection of of-chains
 (packages "docker-ce" of it; packages "docker" of it)

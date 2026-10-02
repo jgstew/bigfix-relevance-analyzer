@@ -80,8 +80,8 @@ def test_words_numbers_and_punctuation() -> None:
 
 
 def test_whitespace_is_trivia_but_still_emitted() -> None:
-    assert kinds_and_texts("a b") == [(WORD, "a"), (WHITESPACE, " "), (WORD, "b")]
-    assert [token.is_trivia() for token in tokenize("a b")] == [False, True, False]
+    assert kinds_and_texts("w b") == [(WORD, "w"), (WHITESPACE, " "), (WORD, "b")]
+    assert [token.is_trivia() for token in tokenize("w b")] == [False, True, False]
 
 
 def test_underscored_words_lex_as_one_word() -> None:
@@ -192,7 +192,7 @@ def test_slash_alone_is_division_not_a_comment() -> None:
 
 @pytest.mark.parametrize("operator", ["!=", "<=", ">="])
 def test_two_character_operators_win_over_one(operator: str) -> None:
-    assert code(f"a {operator} b") == [(WORD, "a"), (PUNCT, operator), (WORD, "b")]
+    assert code(f"w {operator} b") == [(WORD, "w"), (PUNCT, operator), (WORD, "b")]
 
 
 @pytest.mark.parametrize("operator", ["(", ")", ",", ";", "&", "+", "-", "*", "/", "=", "<", ">"])
@@ -202,11 +202,11 @@ def test_single_character_punctuation(operator: str) -> None:
 
 def test_pipe_lexes_as_punctuation() -> None:
     """`|` is the error-fallback operator and appears in real relevance."""
-    assert code("a | b") == [(WORD, "a"), (PUNCT, "|"), (WORD, "b")]
+    assert code("w | b") == [(WORD, "w"), (PUNCT, "|"), (WORD, "b")]
 
 
 def test_lone_bang_is_an_error_token() -> None:
-    assert code("a ! b") == [(WORD, "a"), (ERROR, "!"), (WORD, "b")]
+    assert code("w ! b") == [(WORD, "w"), (ERROR, "!"), (WORD, "b")]
 
 
 def test_error_token_does_not_swallow_the_rest() -> None:
@@ -268,7 +268,7 @@ def test_code_tokens_reports_unlexable_input_once_per_error(
     so this pins that the record survived the split -- once, not twice.
     """
     with caplog.at_level("DEBUG", logger="bigfix_relevance_analyzer.tokenizer"):
-        tokens = list(code_tokens("a ! b"))
+        tokens = list(code_tokens("w ! b"))
 
     assert [t.kind for t in tokens] == [WORD, ERROR, WORD]
     unlexable = [r for r in caplog.records if "unlexable input" in r.getMessage()]
@@ -359,3 +359,17 @@ def test_tokenizing_the_corpus_is_silent(capsys: pytest.CaptureFixture[str]) -> 
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == ""
+
+
+@pytest.mark.parametrize("article", ["a", "an", "the", "A", "An", "THE"])
+def test_article_is_trivia(article: str) -> None:
+    """QnA skips a whole-word article like whitespace (#55)."""
+    text = f"name of {article} operating system"
+    assert "".join(token.text for token in tokenize(text)) == text
+    assert (TokenKind.ARTICLE, article) in kinds_and_texts(text)
+    assert code(text) == code("name of operating system")
+
+
+@pytest.mark.parametrize("word", ["thename", "theme", "ant", "a_b", "abc"])
+def test_article_must_be_a_whole_word(word: str) -> None:
+    assert code(word) == [(WORD, word)]

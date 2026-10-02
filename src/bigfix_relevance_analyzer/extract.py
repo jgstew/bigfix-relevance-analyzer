@@ -36,7 +36,7 @@ import xml.parsers.expat
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Final, Literal
 
 from bigfix_relevance_analyzer._serialize import _as_path, _enum
 from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect, is_definite
@@ -1183,6 +1183,28 @@ def _significant_suffixes(path: Path) -> Sequence[str]:
 def _is_bes_xml(path: Path) -> bool:
     """Whether :func:`extract_relevance_from_file` reads ``path`` as BES XML."""
     return any(suffix in _BES_XML_SUFFIXES for suffix in _significant_suffixes(path))
+
+
+_TEXT_SUFFIXES = (
+    _CONSOLE_HTML_SUFFIXES
+    | _CLIENTUI_HTML_SUFFIXES
+    | _SESSION_TEXT_SUFFIXES
+    | _UNTYPED_TEXT_SUFFIXES
+    | _MARKDOWN_SUFFIXES
+)
+
+_RECOGNIZED_SUFFIXES: Final = tuple(sorted(_BES_XML_SUFFIXES | _TEXT_SUFFIXES))
+"""Every suffix :func:`extract_relevance_from_file` reads, for messages."""
+
+
+def _is_recognized(path: Path) -> bool:
+    """Whether :func:`extract_relevance_from_file` has an extractor for ``path``.
+
+    Decided from the name alone, so asking never opens the file -- which
+    matters for a FIFO, where opening blocks until a writer appears.
+    """
+    suffixes = _significant_suffixes(path)
+    return _is_bes_xml(path) or (bool(suffixes) and suffixes[-1] in _TEXT_SUFFIXES)
 
 
 def extract_relevance_from_file(path: str | bytes | os.PathLike[str]) -> list[RelevanceSite]:

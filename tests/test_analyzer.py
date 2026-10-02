@@ -725,3 +725,20 @@ def test_cost_rules_match_a_fresh_pattern_pass(dialect: Dialect | None) -> None:
     for _path, site in extracted_sites():
         report = analyze(site.text, dialect)
         assert report.cost_rules == evaluation_cost_rules(site.text, report.dialect), site.text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '"x" as a string',
+        "exists the current site",
+        "the name of an operating system",
+        "number of (1;2) a",
+    ],
+)
+def test_articles_are_ignored_like_the_engine(text: str) -> None:
+    """QnA evaluates every one of these; articles are noise words (#55)."""
+    result = analyze_relevance(text)
+    assert result.parsed
+    findings = lint_analysis(result, LintConfig())
+    assert not findings, [f.to_dict() for f in findings]

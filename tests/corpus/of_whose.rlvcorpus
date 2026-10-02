@@ -19,9 +19,9 @@ windows of operating system
 (of (ref "windows") (ref "operating system"))
 
 ==== of is right-associative
-a of b of c
+w of b of c
 ----
-(of (ref "a") (of (ref "b") (ref "c")))
+(of (ref "w") (of (ref "b") (ref "c")))
 
 ==== a string index binds to the name before any of
 key "foo" of registry
@@ -49,9 +49,9 @@ name of it = "x"
 (bin "+" (num "1") (number-of (ref "processors")))
 
 ==== a phrase stops at a word operator
-a b and c
+w b and c
 ----
-(bin "and" (ref "a b") (ref "c"))
+(bin "and" (ref "w b") (ref "c"))
 
 ==== whose filters the collection before it
 files whose (name of it = "x")
@@ -71,9 +71,9 @@ files whose (name of it = "a") of folder "/tmp"
   (ref "folder" (str "/tmp")))
 
 ==== whose binds tighter than of on the right
-a of b whose (it = 1)
+w of b whose (it = 1)
 ----
-(of (ref "a") (whose (ref "b") (bin "=" it (num "1"))))
+(of (ref "w") (whose (ref "b") (bin "=" it (num "1"))))
 
 ==== exists takes a reference
 exists files
@@ -101,14 +101,14 @@ exists files whose (name of it = "x")
 (exists (whose (ref "files") (bin "=" (of (ref "name") it) (str "x"))))
 
 ==== exists does not swallow a boolean operator
-exists a and exists b
+exists w and exists b
 ----
-(bin "and" (exists (ref "a")) (exists (ref "b")))
+(bin "and" (exists (ref "w")) (exists (ref "b")))
 
 ==== [unverified] exists does not swallow a comparison
-exists a = 2
+exists w = 2
 ----
-(bin "=" (exists (ref "a")) (num "2"))
+(bin "=" (exists (ref "w")) (num "2"))
 
 ==== exists accepts a parenthesized operand
 exists (files of folder "/tmp")

@@ -291,12 +291,6 @@ def test_severity_override_can_silence_a_rule() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_lint_file_finds_no_relevance_in_an_unrecognized_suffix(tmp_path: Path) -> None:
-    path = tmp_path / "notes.txt"
-    path.write_text(CLIENT)
-    assert lint_file(path, LintConfig()) == ()
-
-
 def test_lint_file_reports_absolute_line_numbers(tmp_path: Path) -> None:
     path = tmp_path / "broken.rel"
     # .rel is whole-file plain text relevance (Dialect.UNCERTAIN per extractor).
@@ -369,17 +363,18 @@ def test_a_plural_substitution_is_reported_even_when_its_type_is_unknown(
 ) -> None:
     """Plurality and type are separate evidence, and this is the case that proves it.
 
-    The one real instance in a 160,249-site content corpus is a
-    `concatenation " & " of (...) of (...)` over a filtered key set: the
-    checker cannot name its type, but it is quite certain the value is plural,
-    because the written spelling says so. Gating the plurality check on the
+    The checker cannot name the type of `(bogus of it) of ("a";"b")`, but it
+    is quite certain the value is plural. Gating the plurality check on the
     type being known lost exactly the finding the rule exists for.
+
+    The plural `concatenations` spelling, not `concatenation`: the singular
+    one is a single string over any object (`a, b` in qna; #58).
     """
     path = tmp_path / "unknown_plural.bes"
     path.write_text(
-        _fixlet("true", action='run {concatenation ", " of (bogus of it) of ("a";"b")}')
+        _fixlet("true", action='run {concatenations ", " of (bogus of it) of ("a";"b")}')
     )
-    analysis = analyze('concatenation ", " of (bogus of it) of ("a";"b")')
+    analysis = analyze('concatenations ", " of (bogus of it) of ("a";"b")')
     assert analysis.check is not None
     assert analysis.check.value.types is None, "fixture no longer exercises the unknown-type path"
     assert "site-type-mismatch" in codes(lint_file(path, LintConfig()))
@@ -610,6 +605,59 @@ def test_the_file_error_rule_can_be_silenced(tmp_path: Path) -> None:
     missing = tmp_path / "does-not-exist.rel"
     config = LintConfig(severities={"file-error": Severity.IGNORE})
     assert lint_paths([missing], config) == ()
+
+
+def test_an_explicit_file_of_unrecognised_type_is_reported(tmp_path: Path) -> None:
+    """Same bytes as a `.rel` that errors; a `.txt` must not pass clean (#16).
+
+    An explicit argument says "lint this", so a file the extractor never looked
+    at is a finding -- `0 errors in 1 file` read as "that file is clean".
+    """
+    path = tmp_path / "notes.txt"
+    path.write_text(UNBOUND_IT)
+    findings = lint_paths([path], LintConfig())
+    assert codes(findings) == {"file-error"}
+    assert "unrecognised file type" in findings[0].message
+    assert ".rel" in findings[0].message
+
+
+def test_the_directory_walk_skips_unrecognised_files_quietly(tmp_path: Path) -> None:
+    (tmp_path / "notes.txt").write_text(UNBOUND_IT)
+    (tmp_path / "data.json").write_text("{}")
+    assert lint_directory(tmp_path, LintConfig()) == ()
+
+
+def test_a_recognised_file_with_no_sites_is_still_clean(tmp_path: Path) -> None:
+    path = tmp_path / "readme.md"
+    path.write_text("# no relevance fences here\n")
+    assert lint_file(path, LintConfig()) == ()
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="needs POSIX FIFOs")
+def test_a_fifo_is_read_rather_than_reported_missing(tmp_path: Path) -> None:
+    """`echo ... | lint /dev/stdin` used to say `no such file` (#16). A FIFO
+    with a recognised suffix is linted like the regular file it stands for."""
+    import threading
+
+    fifo = tmp_path / "piped.rel"
+    os.mkfifo(fifo)
+    writer = threading.Thread(target=fifo.write_text, args=(UNBOUND_IT,), daemon=True)
+    writer.start()
+    try:
+        findings = lint_file(fifo, LintConfig())
+    finally:
+        writer.join(timeout=5)
+    assert codes(findings) == {"unbound-it"}
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="needs POSIX FIFOs")
+def test_a_suffixless_fifo_names_its_real_problem(tmp_path: Path) -> None:
+    fifo = tmp_path / "stdin"
+    os.mkfifo(fifo)
+    findings = lint_file(fifo, LintConfig())
+    assert codes(findings) == {"file-error"}
+    assert "no such file" not in findings[0].message
+    assert "unrecognised file type" in findings[0].message
 
 
 def test_lint_paths_never_expands_a_directory_argument(tmp_path: Path) -> None:

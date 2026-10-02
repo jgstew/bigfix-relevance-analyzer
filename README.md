@@ -353,6 +353,8 @@ real content without touching the counting.
 and the front end the future parser will sit on. It turns text into a lossless
 stream of tokens: joining their texts reproduces the input exactly, whitespace
 and comments included, which is what a formatter or auto-fixer would need later.
+The articles `a`, `an` and `the` (whole words, any case) are trivia too: the
+engine skips them wherever they stand, so `"x" as a string` is `"x" as string`.
 It never raises - malformed relevance yields error tokens, because content
 extracted from the wild is regularly truncated or broken and a scorer still has
 to produce a number for it.
@@ -401,7 +403,7 @@ same way instead of each inventing a description:
 | `complexity` | error | the complexity score is above the ceiling | `max_score` (default 550) |
 | `error-token` | error | the statement contains text that could not be lexed | always on |
 | `evaluation-cost` | error | the evaluation cost is above the ceiling | `max_evaluation_cost` (default 50) |
-| `file-error` | error | a path given to the linter does not exist or could not be read | always on |
+| `file-error` | error | a path given to the linter does not exist, could not be read, or is a file type it does not lint | always on |
 | `max-depth-exceeded` | error | a directory tree was deeper than the walk's limit, so it was not fully scanned | always on |
 | `parse-error` | error | the statement could not be parsed | always on |
 | `type-error` | error | the type checker reported a problem beyond an unbound `it` | always on |
@@ -467,8 +469,9 @@ directory instead of erroring - `bigfix-relevance-lint` on its own, or
 `--check` with nothing after it. This is only for the argument-less case: an
 *explicit* path, including `.`, is never expanded - it's taken literally, the
 same as any other path, so `bigfix-relevance-lint .` finds nothing rather than
-walking (`.` matches no recognized suffix, same as any other unrecognized
-file). The walk skips `.git`, `__pycache__`, `node_modules`, `dist`, `build`,
+walking (a directory argument is a no-op). A *file* named explicitly whose
+suffix no extractor reads is a `file-error`, not a silent pass; the walk skips
+such files quietly. The walk skips `.git`, `__pycache__`, `node_modules`, `dist`, `build`,
 `venv`, `env`, and any other dot-prefixed directory - a fixed list rather than
 `.gitignore`-awareness, since honoring `.gitignore` would mean depending on a
 `git` binary and a repository actually being present, and this package stays

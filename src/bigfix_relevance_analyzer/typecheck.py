@@ -73,7 +73,7 @@ import enum
 import functools
 import itertools
 import re
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import Any, Final, assert_never
@@ -978,18 +978,21 @@ def resolve_property(
     if matched is None:
         return RelevanceValue(types=None, platforms=environment.universe)
 
-    plurality = Plurality.UNKNOWN
-    forms = {inspectors.written_form_of(entry, name) for entry in matched}
-    if forms == {inspectors.WrittenForm.PLURAL}:
-        plurality = Plurality.PLURAL
-    elif forms == {inspectors.WrittenForm.SINGULAR}:
-        plurality = Plurality.SINGULAR
-
     return RelevanceValue(
         types=frozenset(entry.return_type for entry in matched),
-        plurality=plurality,
+        plurality=_written_plurality(name, matched),
         platforms=environment.platforms_of(matched),
     )
+
+
+def _written_plurality(name: str, rows: Iterable[inspectors.Inspector]) -> Plurality:
+    """The plurality ``name`` is spelled with, when every row agrees on it."""
+    forms = {inspectors.written_form_of(entry, name) for entry in rows}
+    if forms == {inspectors.WrittenForm.PLURAL}:
+        return Plurality.PLURAL
+    if forms == {inspectors.WrittenForm.SINGULAR}:
+        return Plurality.SINGULAR
+    return Plurality.UNKNOWN
 
 
 def check(node: Node, environment: TypeEnvironment) -> CheckResult:
@@ -1567,7 +1570,18 @@ class _Checker:
         subject = None if world_only else (_subject(self.contexts[-1]) if self.contexts else None)
         if not world_only and self.contexts and subject is None:
             # The context itself is unresolved, so nothing can be concluded
-            # about a property of it.
+            # about a property of it -- except that a singular-spelled
+            # aggregate is one value whatever it consumes. Without this the
+            # plural object decides in `combine_of`, and `concatenation "," of
+            # (item 1 of it) of <tuples>` -- `a,b` in qna -- reads plural.
+            # Only the singular spelling: `concatenations` is statically plural
+            # (`"x" & concatenations "" of "a"` is `A singular expression is
+            # required.`), but asserting that here cascades through whatever
+            # untyped property sits over it, so it keeps deferring to the object.
+            if _is_aggregate(node.phrase):
+                rows = inspectors.lookup(node.phrase, kind=inspectors.InspectorKind.PROPERTY)
+                if _written_plurality(node.phrase, rows) is Plurality.SINGULAR:
+                    return replace(self.unknown(), plurality=Plurality.SINGULAR)
             return self.unknown()
         value = resolve_property(node.phrase, subject, self.env, indexed=node.index is not None)
         self.record(node, subject)

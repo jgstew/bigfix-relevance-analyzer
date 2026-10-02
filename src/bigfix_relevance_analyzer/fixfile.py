@@ -68,6 +68,7 @@ from bigfix_relevance_analyzer.lint import (
     _file_error,
     _findings_dict,
     _lint_sites,
+    _unlintable,
     _walk_files,
     lint_file,
 )
@@ -277,7 +278,11 @@ def fix_file(path: str | bytes | os.PathLike[str], config: LintConfig) -> FileFi
     readable file is reported the way :func:`~bigfix_relevance_analyzer.lint.lint_file`
     reports it.
     """
-    file_path = _as_path(path)
+    return _fix_file(_as_path(path), config, explicit=True)
+
+
+def _fix_file(file_path: Path, config: LintConfig, *, explicit: bool) -> FileFixResult:
+    """:func:`fix_file`, or the directory walk's quieter version of it."""
 
     def result(
         findings: tuple[Finding, ...],
@@ -289,7 +294,11 @@ def fix_file(path: str | bytes | os.PathLike[str], config: LintConfig) -> FileFi
         ordered = sorted(unapplied, key=lambda fix: fix.line)
         return FileFixResult(file_path, tuple(applied), tuple(ordered), findings, changed)
 
+    blocked = _unlintable(file_path, config, explicit=explicit)
+    if blocked is not None:
+        return result(blocked)
     if not file_path.is_file():
+        # A FIFO or device reads once and cannot take the edit back.
         return result(lint_file(file_path, config))
     try:
         data = file_path.read_bytes()
@@ -376,7 +385,7 @@ def fix_directory(
     findings included."""
     root_path = _as_path(root)
     files, exceeded = _walk_files(root_path, max_depth)
-    combined = _combine([fix_file(file_path, config) for file_path in files])
+    combined = _combine([_fix_file(file_path, config, explicit=False) for file_path in files])
     return FixResult(
         combined.applied,
         combined.unapplied,
