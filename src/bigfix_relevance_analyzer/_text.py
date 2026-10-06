@@ -127,12 +127,11 @@ def _returns(report: RelevanceAnalysis) -> str | None:
 
 
 def _ceiling(value: float, limit: float | None, style: Style) -> str:
+    """``value``, in red past ``limit``. The limit itself is not printed: past
+    it, the ``complexity``/``evaluation-cost`` issue already says so, and under
+    it the number means nothing to a reader."""
     text = f"{value:.3g}"
-    if limit is None:
-        return text
-    if value > limit:
-        text = style.bad(text)
-    return f"{text} {style.dim(f'(limit {limit:g})')}"
+    return style.bad(text) if limit is not None and value > limit else text
 
 
 def _summary(
@@ -151,12 +150,71 @@ def _summary(
         lines.append(_row("Platforms", ", ".join(viable) or style.bad("none"), style))
         if missing and viable:
             lines.append(_continuation(style.dim(f"not available: {', '.join(missing)}")))
+        lines += _inspector_rows(report, style)
+        lines += _binding_rows(report, style)
+        lines.append(_row("Structure", _structure(report, style), style))
     metrics = report.complexity
     lines.append(_row("Complexity", _ceiling(metrics.score, config.max_score, style), style))
     if metrics.evaluation_cost:
         cost = _ceiling(metrics.evaluation_cost, config.max_evaluation_cost, style)
         lines.append(_row("Eval cost", cost, style))
     return lines
+
+
+_STRUCTURE_WIDTH = 100
+"""Where the one-line S-expression is cut; ``--verbose`` always prints it whole."""
+
+
+def _structure(report: RelevanceAnalysis, style: Style) -> str:
+    assert report.sexpr is not None
+    sexpr = report.sexpr
+    size = f"{len(report.nodes)} nodes, depth {report.tree_depth}"
+    if len(sexpr) > _STRUCTURE_WIDTH:
+        sexpr = sexpr[: _STRUCTURE_WIDTH - 3] + "..."
+        size += "; --verbose for all of it"
+    return f"{sexpr} {style.dim(f'({size})')}"
+
+
+def _inspector_rows(report: RelevanceAnalysis, style: Style) -> list[str]:
+    """One ``name -> returns`` per distinct inspector, in the order they appear.
+
+    The compact form of ``--verbose``'s Inspectors section, like the web
+    playground's references table: what each name resolved to is usually the
+    first thing to check when a result type surprises. An unknown name is
+    marked here as well as reported under Issues.
+    """
+    seen: dict[str, str] = {}
+    for entry in report.references:
+        if entry.phrase in seen:
+            continue
+        if not entry.known:
+            seen[entry.phrase] = style.bad("unknown")
+        else:
+            seen[entry.phrase] = ", ".join(entry.return_types) or "?"
+    if not seen:
+        return []
+    width = max(len(phrase) for phrase in seen)
+    rows = [f"{phrase.ljust(width)}  -> {returns}" for phrase, returns in seen.items()]
+    return [_row("Inspectors", rows[0], style), *(_continuation(row) for row in rows[1:])]
+
+
+def _binding_rows(report: RelevanceAnalysis, style: Style) -> list[str]:
+    """What each ``it`` refers to, grouped: ``it -> operating systems (of, 2 uses)``."""
+    if not report.it_bindings:
+        return []
+    groups: dict[tuple[str, str], int] = {}
+    for entry in report.it_bindings:
+        if entry.context is None:
+            key = ("?", style.bad("UNBOUND - used with no context"))
+        else:
+            text = report.text[entry.context.span.start : entry.context.span.end]
+            key = (entry.binder.value if entry.binder else "?", " ".join(text.split()))
+        groups[key] = groups.get(key, 0) + 1
+    rows = []
+    for (binder, context), uses in groups.items():
+        detail = f"{binder}, {_plural(uses, 'use')}" if binder != "?" else _plural(uses, "use")
+        rows.append(f"{context} {style.dim(f'({detail})')}")
+    return [_row("it", rows[0], style), *(_continuation(row) for row in rows[1:])]
 
 
 def _caret(report: RelevanceAnalysis, line: int, column: int, style: Style) -> list[str]:

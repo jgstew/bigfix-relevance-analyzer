@@ -754,7 +754,7 @@ def test_cli_default_output_is_plain_text_with_a_verdict(
 
     assert out.startswith(f"{CLIENT}\n")
     assert "OK" in out
-    assert "Complexity" in out and "(limit 550)" in out
+    assert "Complexity    " in out and "limit" not in out
     assert out.rstrip().endswith("No issues found.")
     # Not Markdown, and no colour when stdout is not a terminal.
     assert "## " not in out and "| |" not in out and ":white_check_mark:" not in out
@@ -834,3 +834,29 @@ def test_cli_lists_rules_under_the_lint_commands_flag_and_the_old_one(
 def test_cli_lists_rules_as_markdown_only_when_asked(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["--list-rules", "--markdown"]) == 0
     assert capsys.readouterr().out.startswith("# Lint rules\n")
+
+
+def test_cli_text_shows_inspectors_it_bindings_and_structure_by_default(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    statement = "(versions of client, names of it, versions of it) of operating systems"
+    assert main([statement]) == 0
+    out = capsys.readouterr().out
+
+    # Each distinct inspector once, in order, with what it returns.
+    assert "Inspectors    versions           -> version" in out
+    assert out.count("-> version\n") == 1
+    assert "operating systems  -> operating system" in out
+    # Both `it`s bind to the same context, so they are one grouped row.
+    assert "it            operating systems (of, 2 uses)" in out
+    assert "Structure     (of (tuple " in out and "(12 nodes, depth 4" in out
+
+
+def test_cli_text_cuts_a_long_structure_line_and_points_at_verbose(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    statement = 'names of files whose (name of it contains "x" and size of it > 0) of folder "/tmp"'
+    assert main([statement]) == 0
+    structure = next(line for line in capsys.readouterr().out.splitlines() if "Structure" in line)
+
+    assert "... (18 nodes, depth 7; --verbose for all of it)" in structure

@@ -175,7 +175,9 @@ There are three output formats:
 - **Plain text** (the default) is for a person at a terminal. It starts with a
   verdict (`OK`, `Parses, with warnings`, or `Problems found`) and the
   dialect. Then come aligned rows: the result type, the platforms the
-  statement can evaluate on, and the complexity score against its ceiling. If
+  statement can evaluate on, each inspector and what it returns, what each
+  `it` refers to, the parse tree as a one-line S-expression (cut at 100
+  characters), and the complexity score. If
   `lint.py`'s rules found anything (a parse error, an unbound `it`, a type
   error, an unknown inspector with "did you mean" suggestions, or complexity /
   evaluation cost past its default ceiling), an `Issues` list follows, with a
