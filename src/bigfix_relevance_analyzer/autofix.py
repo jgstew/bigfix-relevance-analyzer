@@ -21,7 +21,11 @@ Nothing is applied that makes the statement worse. The guard compares every
 candidate against the *original* -- never the previous round, or a sequence of
 individually tolerable steps could drift arbitrarily far -- and rejects one
 that raises the count of any problem, changes the resolved dialect, or changes
-what the statement evaluates to (its types or plurality). Fix-carrying
+what the statement evaluates to (its types or plurality). One exception, the
+repair of a plural where the engine requires a singular (see
+:data:`~bigfix_relevance_analyzer.typecheck.SINGULAR_REQUIRED`): the original
+never runs, so there is no meaning to keep, and a candidate with fewer of
+those diagnostics may change its plurality and narrow its types. Fix-carrying
 diagnostics are left out of that count during rounds, since a cascade moves
 one down the chain by design; the final result is then held to a full check
 that counts them, and that also refuses a fix-carrying diagnostic the edits
@@ -41,6 +45,7 @@ from typing import TYPE_CHECKING, Any, Final, Literal
 
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis, analyze
 from bigfix_relevance_analyzer.tokenizer import _normalize_phrase
+from bigfix_relevance_analyzer.typecheck import _UNIQUE_VALUE, SINGULAR_REQUIRED
 
 if TYPE_CHECKING:
     from bigfix_relevance_analyzer.dialect import Dialect
@@ -59,7 +64,8 @@ Guard = Literal["warnings", "errors"]
 ``"warnings"`` (the default) counts every problem whose lint rule defaults to
 an error or a warning; ``"errors"`` counts only the ones defaulting to an
 error, so a fix may trade a style note for a risk. Either way the dialect and
-the result's types and plurality must not change.
+the result's types and plurality must not change -- except while repairing a
+plural where a singular is required; see the module docstring.
 """
 
 _GUARDS: Final = frozenset({"warnings", "errors"})
@@ -215,12 +221,32 @@ def _apply(text: str, edits: Iterable[TextEdit]) -> str:
     return text
 
 
-def _map_back(start: int, end: int, edits: Sequence[TextEdit]) -> tuple[int, int] | None:
+def _kept(edit: TextEdit, before: str) -> int | None:
+    """Where ``edit``'s replacement keeps the text it replaced, verbatim, if
+    it is a `unique value of` wrap -- else ``None``.
+
+    A wrap replaces a whole operand to keep each fix one range (see
+    :class:`~bigfix_relevance_analyzer.typecheck.TypeFix`), but the operand
+    survives inside it unchanged, and so do the positions within it.
+    """
+    old = before[edit.start : edit.end]
+    if edit.replacement == _UNIQUE_VALUE + old:
+        return len(_UNIQUE_VALUE)
+    if edit.replacement == f"{_UNIQUE_VALUE}({old})":
+        return len(_UNIQUE_VALUE) + 1
+    return None
+
+
+def _map_back(
+    start: int, end: int, edits: Sequence[TextEdit], before: str | None = None
+) -> tuple[int, int] | None:
     """Where ``[start, end)`` after ``edits`` sat before them.
 
-    ``edits`` are one round's, sorted and disjoint, in pre-round offsets.
-    ``None`` when the range touches replaced text: that range did not exist
-    before the round.
+    ``edits`` are one round's, sorted and disjoint, in pre-round offsets, and
+    ``before`` is the text they were applied to. ``None`` when the range
+    touches replaced text: that range did not exist before the round -- unless
+    it lies within the operand a wrap kept verbatim (see :func:`_kept`), which
+    did.
     """
     shift = 0
     for edit in edits:
@@ -231,7 +257,13 @@ def _map_back(start: int, end: int, edits: Sequence[TextEdit]) -> tuple[int, int
         if start >= new_end:
             shift += len(edit.replacement) - (edit.end - edit.start)
             continue
-        return None
+        kept = None if before is None else _kept(edit, before)
+        if kept is None:
+            return None
+        inner = new_start + kept
+        if not (inner <= start and end <= inner + (edit.end - edit.start)):
+            return None
+        return edit.start + start - inner, edit.start + end - inner
     return start - shift, end - shift
 
 
@@ -311,6 +343,8 @@ class _State:
     report: RelevanceAnalysis
     applied: Counter[str]
     rounds: tuple[tuple[TextEdit, ...], ...] = ()
+    round_texts: tuple[str, ...] = ()
+    """The text each of :attr:`rounds` was applied to, in step with it."""
     edits: tuple[TextEdit, ...] = ()
     """Every round's edits composed, against the original -- see :func:`_compose`."""
 
@@ -335,6 +369,7 @@ class _Guard:
             for diagnostic in _fixable(original)
             if diagnostic.fix is not None
         }
+        self._required = _singular_required(original)
 
     def _counts(self, rule: str) -> bool:
         return self._config.severity_for(rule) in self._counted
@@ -371,10 +406,14 @@ class _Guard:
             return False
         if report.check is None or original.check is None:
             return True
-        return (
-            report.check.value.types == original.check.value.types
-            and report.check.value.plurality is original.check.value.plurality
-        )
+        before, after = original.check.value, report.check.value
+        if after.types == before.types and after.plurality is before.plurality:
+            return True
+        # The one licensed change: a plural where the engine requires a
+        # singular is being repaired. The original never runs, so its
+        # plurality is nothing to keep. Licensed by the count going down, not
+        # by which edit made the change -- every other check still applies.
+        return _singular_required(report) < self._required and _narrowed(before.types, after.types)
 
     def accepts(self, report: RelevanceAnalysis) -> bool:
         """The per-round check: fix-carrying diagnostics are not counted."""
@@ -393,13 +432,38 @@ class _Guard:
         for diagnostic in _fixable(state.report):
             assert diagnostic.fix is not None
             span: tuple[int, int] | None = (diagnostic.fix.start, diagnostic.fix.end)
-            for edits in reversed(state.rounds):
+            for edits, before in zip(
+                reversed(state.rounds), reversed(state.round_texts), strict=True
+            ):
                 if span is None:
                     break
-                span = _map_back(*span, edits)
+                span = _map_back(*span, edits, before)
             if span not in self._original_fixes:
                 return False
         return True
+
+
+def _singular_required(report: RelevanceAnalysis) -> int:
+    """How many plurals ``report`` has where the engine requires a singular."""
+    if report.check is None:
+        return 0
+    return sum(diagnostic.code in SINGULAR_REQUIRED for diagnostic in report.check.diagnostics)
+
+
+def _narrowed(before: frozenset[str] | None, after: frozenset[str] | None) -> bool:
+    """Whether ``after`` claims nothing ``before`` did not, give or take
+    multiplicity.
+
+    `unique value of X` answers `<type> with multiplicity` -- the engine's own
+    type for it, qna's `I:` line -- which every operator takes as `<type>`, so
+    that spelling of a type ``before`` had is not a new type. An undetermined
+    ``before`` constrains nothing.
+    """
+    if before is None:
+        return True
+    if after is None:
+        return False
+    return after <= before | {f"{name} with multiplicity" for name in before}
 
 
 def _autofix(
@@ -454,6 +518,7 @@ def _autofix(
                 report,
                 current.applied + Counter(edit.code for edit in accepted),
                 (*current.rounds, tuple(accepted)),
+                (*current.round_texts, current.text),
                 _compose(original.text, current.edits, accepted),
             )
         )

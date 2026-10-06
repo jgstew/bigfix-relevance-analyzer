@@ -2,8 +2,9 @@
 
 The analyzer works out the fully fixed statement itself, as one final result,
 so a hook only has to print it (auto-fix off) or swap it in (auto-fix on).
-Only `singular-spelling-mid-chain` carries a fix today; everything else here is
-the machinery that keeps a fix from making a statement worse.
+`singular-spelling-mid-chain` and the singular-required codes (#66) carry a
+fix; everything else here is the machinery that keeps a fix from making a
+statement worse.
 
 The engine facts these lean on were confirmed live in qna::
 
@@ -379,6 +380,260 @@ def test_lint_attaches_nothing_to_filtered_singular_spelling() -> None:
     assert finding.code == "plural-preferred"
     assert finding.autofix is None
     assert finding.to_dict()["autofix"] is None
+
+
+# -- a plural where a singular is required (#66) --------------------------------
+#
+# The engine refuses a plural operand before evaluating anything -- `A
+# singular expression is required.` -- so the original can never run. The fix
+# respells a plural aggregate as its singular, else wraps the operand in
+# `unique value of`. Engine evidence for every pair here is on #66.
+
+LEFT = "left-operand-not-singular"
+RIGHT = "right-operand-not-singular"
+ARGUMENT = "argument-not-singular"
+
+NIRCMD = (
+    '(integer values of selects "CurrentBrightness FROM WmiMonitorBrightness WHERE Active=True"'
+    ' of wmis "ROOT/WMI") != ( maxima of (it; 5) ) of ( minima of (it; 100) ) of'
+    ' ( ((it as integer) of (parameter "iDesiredBrightness")) | 0 )'
+)
+"""`fixlet/NirCmd - setbrightness - Windows.bes:41` in bigfix-content: a
+SuccessCriteria that can never evaluate, plural on both sides of `!=`. The
+right side is plural too, though it holds at most one value: the grouped
+`maxima` is written plural, and qna refuses `7 != ( maxima of (it; 5) ) of
+...` with `A singular expression is required.`"""
+
+
+@pytest.mark.parametrize(
+    ("text", "dialect", "fixed", "applied"),
+    [
+        pytest.param(
+            'pathnames of files "x" | pathnames of files "y"',
+            Dialect.CLIENT,
+            'unique value of pathnames of files "x" | unique value of pathnames of files "y"',
+            {LEFT: 1, RIGHT: 1},
+            id="both-operands-one-round",
+        ),
+        pytest.param(
+            'pathnames of files "x" | "y"',
+            Dialect.CLIENT,
+            'unique value of pathnames of files "x" | "y"',
+            {LEFT: 1},
+            id="left-only",
+        ),
+        pytest.param(
+            '"y" | pathnames of files "x"',
+            Dialect.CLIENT,
+            '"y" | unique value of pathnames of files "x"',
+            {RIGHT: 1},
+            id="right-only",
+        ),
+        pytest.param(
+            '"x" & pathnames of files "y"',
+            Dialect.CLIENT,
+            '"x" & unique value of pathnames of files "y"',
+            {RIGHT: 1},
+            id="ampersand",
+        ),
+        pytest.param(
+            '(sizes of files "x") + 1',
+            Dialect.CLIENT,
+            'unique value of (sizes of files "x") + 1',
+            {LEFT: 1},
+            id="plus",
+        ),
+        pytest.param(
+            '- sizes of files "x"',
+            Dialect.CLIENT,
+            '- unique value of sizes of files "x"',
+            {ARGUMENT: 1},
+            id="unary-minus",
+        ),
+        pytest.param(
+            '(concatenations ", " of pathnames of files "x") | "y"',
+            Dialect.CLIENT,
+            '(concatenation ", " of pathnames of files "x") | "y"',
+            {LEFT: 1},
+            id="aggregate-respelled",
+        ),
+        pytest.param(
+            'pathnames /* keep me */ of files "x" | "y"',
+            Dialect.CLIENT,
+            'unique value of pathnames /* keep me */ of files "x" | "y"',
+            {LEFT: 1},
+            id="comment-kept",
+        ),
+        pytest.param(
+            'pathnames of files "x" as lowercase = "y"',
+            Dialect.CLIENT,
+            'unique value of (pathnames of files "x" as lowercase) = "y"',
+            {LEFT: 1},
+            id="cast-parenthesized",
+        ),
+        pytest.param(
+            "(bes computers) | (unique value of bes computers)",
+            Dialect.SESSION,
+            "unique value of (bes computers) | (unique value of bes computers)",
+            {LEFT: 1},
+            id="session-bes-computers-accepted",
+        ),
+        pytest.param(
+            NIRCMD,
+            Dialect.CLIENT,
+            "unique value of " + NIRCMD.replace(" != ", " != unique value of ", 1),
+            {LEFT: 1, RIGHT: 1},
+            id="corpus-nircmd",
+        ),
+    ],
+)
+def test_a_plural_in_a_singular_position_is_fixed(
+    text: str, dialect: Dialect, fixed: str, applied: dict[str, int]
+) -> None:
+    result = autofix(text, dialect)
+    assert result.fixed == fixed
+    assert result.applied == applied
+    assert result.unapplied == {}
+    assert result.rounds == 1
+    _assert_edits_rebuild_fixed(result)
+    after = analyze(result.fixed, dialect).check
+    assert after is not None
+    assert not [d.code for d in after.diagnostics if d.code in (LEFT, RIGHT, ARGUMENT)]
+
+
+def test_a_wrap_whose_range_no_longer_holds_the_operand_is_skipped() -> None:
+    """The anchoring rule, for a whole-operand fix: the range has to read as
+    the operand the checker saw, or nothing is edited."""
+    text = 'pathnames of files "x" | "y"'
+    report = analyze(text, Dialect.CLIENT)
+    assert report.check is not None
+    (diagnostic,) = report.check.diagnostics
+    fix = diagnostic.fix
+    assert fix is not None
+    assert autofix_module._anchored(text, fix, diagnostic.code) is not None
+    moved = 'pathnames of files "z" | "y"'  # same length, different operand
+    assert autofix_module._anchored(moved, fix, diagnostic.code) is None
+
+
+def test_a_wrap_that_adds_property_not_defined_is_rejected() -> None:
+    """Client `unique value of` takes no `file`: qna `exists unique value of
+    (files of folders "zz_none")` is `The operator "unique value" is not
+    defined.` The guard sees the new `property-not-defined` and keeps the
+    original, counting the fix as unapplied."""
+    text = '(files "hosts" of folders "/etc") | file "/etc/hosts"'
+    wrapped = analyze("unique value of " + text, Dialect.CLIENT).check
+    assert wrapped is not None
+    assert "property-not-defined" in [d.code for d in wrapped.diagnostics]
+
+    result = autofix(text, Dialect.CLIENT)
+    assert result.fixed == text
+    assert result.applied == {}
+    assert result.unapplied == {LEFT: 1}
+    assert result.edits == ()
+
+
+def test_a_tuple_operand_is_left_alone() -> None:
+    """No aggregate is defined on a tuple (qna: `unique value of ("a", "b")`
+    is `The operator "unique value" is not defined.`), so nothing is offered."""
+    text = '(pathnames of files "x", 1) = ("a", 1)'
+    result = autofix(text, Dialect.CLIENT)
+    assert result.fixed == text
+    assert result.applied == {}
+
+
+def test_the_wrap_changes_plurality_and_adds_only_with_multiplicity() -> None:
+    """What the relaxed guard has to allow, pinned rather than assumed. The
+    engine types `unique value of X` as `<type> with multiplicity` (qna `I:`
+    line: `unique value of (1;1)` is `integer with multiplicity`, `maximum of
+    (1;2)` is `integer`), and the checker agrees -- so a wrap does not merely
+    narrow, it adds that one spelling of each type it already had."""
+    text = 'pathnames of files "x" | pathnames of files "y"'
+    before = analyze(text, Dialect.CLIENT).check
+    after = analyze(autofix(text, Dialect.CLIENT).fixed, Dialect.CLIENT).check
+    assert before is not None and after is not None
+    assert before.value.types == frozenset({"string"})
+    # Both sides wrapped, so every candidate is the multiplicity spelling.
+    assert after.value.types == frozenset({"string with multiplicity"})
+    assert before.value.plurality.value == "plural"
+    assert after.value.plurality.value == "singular"
+
+
+def test_a_respelling_keeps_the_type() -> None:
+    text = '(concatenations ", " of pathnames of files "x") | "y"'
+    before = analyze(text, Dialect.CLIENT).check
+    after = analyze(autofix(text, Dialect.CLIENT).fixed, Dialect.CLIENT).check
+    assert before is not None and after is not None
+    assert after.value.types is not None and before.value.types is not None
+    assert after.value.types <= before.value.types
+
+
+def test_a_plurality_change_elsewhere_is_still_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The relaxation is for the repair, not for any edit in a statement that
+    happens to need one: this edit changes the result's plurality and leaves
+    the singular-required diagnostic standing, so the strict check applies."""
+    text = 'if (pathnames of files "x" | "y") = "z" then name of file "a" else "b"'
+    _force(monkeypatch, "name of file", "names of file", only_if="name of file")
+    report = analyze(text.replace("name of file", "names of file"), Dialect.CLIENT)
+    assert report.check is not None
+    assert [d.code for d in report.check.diagnostics] == [LEFT]
+    original = analyze(text, Dialect.CLIENT).check
+    assert original is not None
+    assert report.check.value.plurality is not original.value.plurality
+
+    result = autofix(text, Dialect.CLIENT)
+    assert result.fixed == text
+    assert result.applied == {}
+
+
+def test_a_repair_may_not_change_the_type(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fewer singular-required diagnostics licenses a plurality change, not a
+    new type: this rewrite repairs both operands and adds no problem, but
+    answers integers where the original answered strings."""
+    text = 'pathnames of files "x" | pathnames of files "y"'
+    other = 'unique value of sizes of files "x" | unique value of sizes of files "y"'
+    _force(monkeypatch, text, other, only_if="pathnames")
+    report = analyze(other, Dialect.CLIENT)
+    assert report.check is not None
+    assert report.check.diagnostics == ()
+    assert report.check.value.types == frozenset({"integer with multiplicity"})
+
+    result = autofix(text, Dialect.CLIENT)
+    assert result.fixed == text
+    assert result.applied == {}
+
+
+def test_no_back_and_forth_with_the_mid_chain_plural_fix() -> None:
+    """Both fixes in one statement: the wrap goes first (it starts first and
+    the inner respelling overlaps it), the respelling the round after, and
+    neither undoes the other -- a loop would spend every round."""
+    text = '"x" & values of setting "y" of client'
+    report = analyze(text, Dialect.CLIENT)
+    assert report.check is not None
+    assert sorted(d.code for d in report.check.diagnostics) == [RIGHT, MID_CHAIN]
+
+    result = autofix(text, Dialect.CLIENT, max_rounds=8)
+    assert result.fixed == '"x" & unique value of values of settings "y" of client'
+    assert result.applied == {RIGHT: 1, MID_CHAIN: 1}
+    assert result.unapplied == {}
+    assert result.rounds == 2
+    _assert_edits_rebuild_fixed(result)
+
+
+def test_a_wrap_survives_a_round_limit_before_the_respelling_inside_it() -> None:
+    """The mid-chain diagnostic still standing after round one is the original
+    one, carried inside the wrapped operand -- not one the wrap introduced --
+    so the wrap is a final result on its own."""
+    text = '"x" & values of setting "y" of client'
+    result = autofix(text, Dialect.CLIENT, max_rounds=1)
+    assert result.fixed == '"x" & unique value of values of setting "y" of client'
+    assert result.applied == {RIGHT: 1}
+    assert result.unapplied == {MID_CHAIN: 1}
+    assert result.rounds == 1
+
+
+def test_the_new_rule_names_itself_in_to_dict() -> None:
+    payload = autofix('pathnames of files "x" | "y"', Dialect.CLIENT).to_dict()
+    assert payload["applied"] == [{"code": LEFT, "rule": "singular-required", "count": 1}]
 
 
 # -- CLI and package surface -----------------------------------------------------

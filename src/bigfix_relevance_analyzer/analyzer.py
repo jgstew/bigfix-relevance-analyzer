@@ -582,7 +582,7 @@ def analyze(
     levels: tuple[Level, ...] = ()
     checked: CheckResult | None = None
     if node is not None:
-        checked = check(node, environment)
+        checked = check(node, environment, source=text)
         references = tuple(
             ReferenceReport(
                 reference=item,
