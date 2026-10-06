@@ -174,7 +174,10 @@ class _Parser:
         # Nodes that came out of explicit parentheses, by identity. `|` needs
         # this: the engine accepts `(2 * 3) | 5` but refuses `2 * 3 | 5`, and
         # by the time the Bar is built the two lefts are the same tree shape.
-        self.grouped: set[int] = set()
+        # The dict holds each node too: a bare id() set let a freed node's
+        # address go to a later, unparenthesized one, which inherited the mark
+        # (issue #57: `name of operating system` W600'd as if `(name)`).
+        self.grouped: dict[int, Node] = {}
 
     # -- token stream -------------------------------------------------------
 
@@ -345,7 +348,7 @@ class _Parser:
 
     def mark_grouped(self, grouped: Node) -> Node:
         """Remember ``grouped`` came out of its own parentheses (see :func:`_of`)."""
-        self.grouped.add(id(grouped))
+        self.grouped[id(grouped)] = grouped
         return grouped
 
     def parse_index(self) -> Node | None:

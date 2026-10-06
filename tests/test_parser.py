@@ -26,6 +26,7 @@ from bigfix_relevance_analyzer.nodes import (
     NumberOf,
     Of,
     Reference,
+    Span,
     StringLiteral,
     Unary,
     children,
@@ -741,3 +742,20 @@ def test_a_parse_error_survives_a_round_trip_through_pickle() -> None:
         original.column,
     )
     assert str(restored) == str(original)
+
+
+def test_parenthesized_marks_survive_address_reuse() -> None:
+    """Issue #57: "came out of parentheses" was keyed on bare ``id()``. A
+    marked node freed mid-parse let a later node land at the same address and
+    inherit the mark -- `name of operating system` then parsed as if `(name)`
+    and W600'd. Force the reuse deterministically instead of hoping for it."""
+    parser = _Parser("x", tuple(code_tokens("x")))
+
+    def node() -> Reference:
+        return Reference(span=Span(0, 1, 1, 1), phrase="x", index=None)
+
+    for _ in range(1000):
+        parser.mark_grouped(node())  # marked, then immediately unreferenced
+    # CPython hands freed slots straight back to new same-size objects.
+    reused = [node() for _ in range(1000)]
+    assert not any(id(node) in parser.grouped for node in reused)

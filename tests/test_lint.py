@@ -117,6 +117,38 @@ def test_unknown_inspector_is_reported_as_warning() -> None:
     assert unknown.severity is Severity.WARNING
 
 
+# Issue #57's clause, from a real Windows power-management Task. Engine-verified
+# valid: `False` on every Linux, macOS and Windows client tried, no error.
+POWER_HISTORY_CLAUSE = (
+    '(if (name of operating system starts with "Win") then (exists (folder "Power '
+    'Management" of parent folder of regapp "besclient.exe") AND exists (file '
+    '"SystemHistory.dat" of (folder "Power Management" of parent folder of regapp '
+    '"besclient.exe")) AND exists (file "MonitorHistory.dat" of (folder "Power Management"'
+    ' of parent folder of regapp "besclient.exe")) AND ( ((exists file (pathname of parent'
+    ' folder of regapp "besclient.exe" & "\\Power Management\\BESPower.exe")) AND (exists '
+    'file (pathname of parent folder of regapp "besclient.exe" & '
+    '"\\BESClientLoggingService\\lib\\StandbyPowerTracker.dll")) AND (exists running service '
+    '"BESClientLoggingService") AND (exists key '
+    '"HKEY_LOCAL_MACHINE\\SOFTWARE\\BigFix\\LoggingService\\Plugins\\Locations" whose (exists '
+    'value "BF_PM" whose (it = (pathname of parent folder of regapp "besclient.exe" & '
+    '"\\BESClientLoggingService\\lib\\StandbyPowerTracker.dll") of it) of it) of registry))) '
+    ') else (false)) OR ((((name of operating system starts with "Win") AND (version of '
+    'client >= "8")) OR ((name of operating system as lowercase contains "mac") AND '
+    '(version of client >= "8.1"))) AND ((exists setting '
+    '"_BESClient_PowerHistory_EnablePowerHistory" whose (exists value whose (it = "1") of '
+    "it) of client)))"
+)
+
+
+def test_name_of_operating_system_is_not_unknown_inside_a_long_clause() -> None:
+    """`name of operating system` lints clean alone, and must inside this
+    clause too. It used to W600 as `name` with no direct object, because a
+    freed parenthesized node's address leaked its mark onto `name`."""
+    for _ in range(5):  # the leak depended on memory layout, so vary it a little
+        report = analyze(POWER_HISTORY_CLAUSE, Dialect.CLIENT)
+        assert "unknown-inspector" not in codes(lint_analysis(report, LintConfig()))
+
+
 def test_a_world_name_known_only_with_a_direct_object_is_a_warning_not_an_error() -> None:
     """The MDM Devices false positive, end to end. `devices` and `management
     statuses` are proxy agent inspectors no dump covers; `devices` also

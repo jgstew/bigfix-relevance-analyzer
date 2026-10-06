@@ -20,9 +20,9 @@ instead of a tree. The reader for this format lives in ``tests/_corpus.py``.
 from __future__ import annotations
 
 import pytest
-from _corpus import CorpusCase, corpus_cases
+from _corpus import CorpusCase, corpus_cases, parsed_corpus_sites
 
-from bigfix_relevance_analyzer.nodes import to_mermaid, to_sexpr
+from bigfix_relevance_analyzer.nodes import Node, Of, Reference, to_mermaid, to_sexpr, walk
 from bigfix_relevance_analyzer.parser import ParseError, parse, try_parse
 from bigfix_relevance_analyzer.tokenizer import code_tokens
 
@@ -139,3 +139,41 @@ def test_try_parse_never_raises_on_corpus_inputs_or_their_truncations() -> None:
             end = len(case.source) if cut == len(tokens) else tokens[cut].offset
             result = try_parse(case.source[:end])
             assert result.ok is (result.error is None), case.id
+
+
+def _misgrouped(text: str, root: Node) -> list[str]:
+    """Each ``Of`` whose parenthesized flag disagrees with the source.
+
+    A parenthesized ``prop``'s span is widened to its parentheses, so it must
+    start with `(`. And a bare name can only start with `(` if it was
+    parenthesized. Issue #57 broke the first rule: a freed node's address
+    passed its mark to `name`, and `name of operating system` W600'd."""
+    wrong: list[str] = []
+    for node in walk(root):
+        if not isinstance(node, Of):
+            continue
+        starts_with_paren = text[node.prop.span.start] == "("
+        if node.prop_grouped and not starts_with_paren:
+            wrong.append(f"marked grouped but bare: {text[node.span.start : node.span.end]!r}")
+        if isinstance(node.prop, Reference) and starts_with_paren and not node.prop_grouped:
+            wrong.append(f"parenthesized but unmarked: {text[node.span.start : node.span.end]!r}")
+    return wrong
+
+
+def test_corpus_parenthesized_props_match_the_source() -> None:
+    wrong = [
+        f"{case.id}: {problem}"
+        for case in corpus_cases()
+        if not case.expected.startswith("ERROR")
+        for problem in _misgrouped(case.source, parse(case.source))
+    ]
+    assert not wrong, "\n".join(wrong)
+
+
+def test_example_parenthesized_props_match_the_source() -> None:
+    wrong = [
+        f"{path.name}:{site.line}: {problem}"
+        for path, site, node in parsed_corpus_sites()
+        for problem in _misgrouped(site.text, node)
+    ]
+    assert not wrong, "\n".join(wrong)
