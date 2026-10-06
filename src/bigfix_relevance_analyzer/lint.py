@@ -105,6 +105,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Final
 
+from bigfix_relevance_analyzer._actionscript_keywords import ACTIONSCRIPT_KEYWORDS
 from bigfix_relevance_analyzer._serialize import _as_path, _path
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis, analyze
 from bigfix_relevance_analyzer.dialect import Dialect, is_definite
@@ -352,6 +353,21 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "to the whole value, and `tuple string items <n>` of such a value. "
                 "`if`/`elseif`/`continue if` conditions were not part of that "
                 "experiment and stay with `site-type-mismatch`.",
+            ),
+            _rule(
+                "actionscript-keyword",
+                Severity.ERROR,
+                "an ActionScript command word used as a relevance name",
+                "Usually an ActionScript line pasted or doubled into relevance, as in "
+                '`elseif {elseif (exists package "glibc" ...)}`. The words come from '
+                "the console's ActionScript grammar, minus every inspector name in any "
+                "dialect (`parameter`, `setting`, `wait` and `set` are everyday "
+                "relevance) and minus relevance's own grammar words (`if`, `else`, "
+                "already parse errors). Every remaining word answers `The operator "
+                '"<word>" is not defined.` on every client platform and qna version '
+                "tested and in session relevance, so unlike `unknown-inspector` this is "
+                "not a gap in the dumps: an error, and the word is not reported again "
+                "as an unknown inspector.",
             ),
             _rule(
                 "unknown-inspector",
@@ -1122,8 +1138,25 @@ def lint_analysis(
             1,
         )
 
-    if report.unknown_references:
-        names = ", ".join(f"`{name}`" for name in report.unknown_references)
+    # Matched on the parsed phrase, so only a whole name counts: `run` is a
+    # keyword, the `run` in a longer inspector phrase is not.
+    # One finding per word, on the line of its first use. The parser has
+    # already lowercased the phrase, so `ElseIf` matches too.
+    keyword_lines: dict[str, int] = {}
+    for entry in report.references:
+        word = entry.reference.phrase
+        if word in ACTIONSCRIPT_KEYWORDS:
+            keyword_lines.setdefault(word, entry.reference.span.line)
+    for word, line in keyword_lines.items():
+        emit(
+            "actionscript-keyword",
+            f"ActionScript keyword `{word}` inside a relevance expression",
+            line,
+        )
+
+    unknown = tuple(name for name in report.unknown_references if name not in keyword_lines)
+    if unknown:
+        names = ", ".join(f"`{name}`" for name in unknown)
         message = f"no dump defines {names}"
         # Imported here rather than at module scope: `inspectors` is only needed
         # on this one opt-in branch, and `lint` is otherwise reachable without
@@ -1134,11 +1167,7 @@ def lint_analysis(
 
             dialect = config.dialect or (report.dialect if not report.dialect_assumed else None)
             leads = tuple(
-                dict.fromkeys(
-                    lead
-                    for name in report.unknown_references
-                    for lead in _suggest(name, dialect=dialect)
-                )
+                dict.fromkeys(lead for name in unknown for lead in _suggest(name, dialect=dialect))
             )
             if leads:
                 quoted = [f"`{lead}`" for lead in leads]

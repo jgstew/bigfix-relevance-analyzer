@@ -434,6 +434,7 @@ same way instead of each inventing a description:
 | `plural-preferred` | warning | a singular spelling mid-chain, where the plural reads safer | always on |
 | `version-truncating-compare` | warning | a version comparison that truncates to the shorter operand's components | always on |
 | `version-like-string-compare` | warning | two version-looking strings compared as strings, not as versions | always on |
+| `actionscript-keyword` | error | an ActionScript command word used as a relevance name | always on |
 | `unknown-inspector` | warning | a name no inspector dump defines | always on |
 | `plural-substitution` | warning | an ordinary ActionScript substitution's value may be more than one value | always on |
 | `non-renderable-substitution` | warning | an ordinary ActionScript substitution's value is an opaque object with no text form | always on |

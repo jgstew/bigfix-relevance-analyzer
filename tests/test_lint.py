@@ -41,6 +41,9 @@ UNBOUND_IT = "size of it"  # `it` with nothing to bind to
 # also reports, under `used-without-context` -- deliberately excluded from
 # `type-error`, see the `lint` module docstring).
 TYPE_MISMATCH = '1 + "a"'
+# An ActionScript command doubled into its own condition, as in CommunityContent
+# `2368-Log4j logpresso scanner WIP 008 (26903).bes:123` (#56).
+ACTIONSCRIPT_KEYWORD = 'elseif (exists file "b")'
 # Non-zero evaluation cost, so the `evaluation-cost` ceiling has something to
 # exceed: hashing a file is the `COST_EXTREME` tier on the client.
 COSTLY = 'sha1 of file "/tmp/x" = "abc"'
@@ -653,6 +656,90 @@ def test_non_renderable_substitution_does_not_apply_to_other_slots(tmp_path: Pat
     assert "non-renderable-substitution" not in codes(lint_file(path, LintConfig()))
 
 
+# ---------------------------------------------------------------------------
+# An ActionScript command word inside relevance (#56)
+# ---------------------------------------------------------------------------
+#
+# Every word in `ACTIONSCRIPT_KEYWORDS` gives `E: The operator "<word>" is not
+# defined.` as `exists <word>` on 20 client targets (macOS, Windows, nine
+# Linux images; qna 9.5 through 11.0.7) and in session relevance -- see the
+# engine evidence on #56. The list is what makes this an error with no false
+# positives; the engine's answer alone could not, since `exists wait` fails the
+# same way and `wait` is an inspector.
+
+
+def _keyword_findings(text: str) -> list[Finding]:
+    return [
+        f for f in lint_analysis(analyze(text), LintConfig()) if f.code == "actionscript-keyword"
+    ]
+
+
+def test_an_actionscript_keyword_in_relevance_is_an_error() -> None:
+    [finding] = _keyword_findings(ACTIONSCRIPT_KEYWORD)
+    assert finding.severity is Severity.ERROR
+    assert "`elseif`" in finding.message
+    assert "ActionScript" in finding.message
+
+
+def test_an_actionscript_keyword_is_not_also_an_unknown_inspector() -> None:
+    """One problem, one finding: the keyword is no longer a W600 lead."""
+    findings = lint_analysis(analyze(ACTIONSCRIPT_KEYWORD), LintConfig())
+    assert "unknown-inspector" not in codes(findings)
+
+
+def test_a_real_unknown_name_beside_a_keyword_is_still_reported() -> None:
+    findings = lint_analysis(analyze(f"exists endif and exists {UNKNOWN_INSPECTOR}"), LintConfig())
+    [unknown] = [f for f in findings if f.code == "unknown-inspector"]
+    assert UNKNOWN_INSPECTOR in unknown.message
+    assert "endif" not in unknown.message
+    assert len(_keyword_findings(f"exists endif and exists {UNKNOWN_INSPECTOR}")) == 1
+
+
+def test_an_actionscript_keyword_is_matched_case_insensitively() -> None:
+    """The agent accepts `ElseIf`, so an author can write it that way too."""
+    assert len(_keyword_findings("exists ElseIf")) == 1
+
+
+def test_each_keyword_is_reported_once_per_statement() -> None:
+    [finding] = _keyword_findings('exists run of file "a" and exists run of file "b"')
+    assert "`run`" in finding.message
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        'parameter "x"',  # the everyday action-parameter read
+        'value of setting "x" of client',
+        "exists wait",  # an inspector name, though it fails bare
+        "exists set of bes computers",
+        'exists file "b"',
+    ],
+)
+def test_an_actionscript_word_that_is_also_an_inspector_is_silent(text: str) -> None:
+    assert _keyword_findings(text) == []
+
+
+def test_the_keyword_list_never_names_an_inspector() -> None:
+    """Pins the generated list against the tables, in every dialect.
+
+    A future dump that defines, say, a `download` inspector fails here rather
+    than becoming a false error. Every spelling counts, not just the written
+    one: `set` is the singular of the `sets` aggregate.
+    """
+    from bigfix_relevance_analyzer._actionscript_keywords import ACTIONSCRIPT_KEYWORDS
+    from bigfix_relevance_analyzer.inspectors import all_inspectors
+
+    names = {
+        name
+        for row in all_inspectors()
+        for name in (row.name, row.singular_name, row.plural_name, row.usual_name, row.written_name)
+        if name
+    }
+    assert ACTIONSCRIPT_KEYWORDS
+    assert ACTIONSCRIPT_KEYWORDS.isdisjoint(names)
+    assert all(word == word.lower() and " " not in word for word in ACTIONSCRIPT_KEYWORDS)
+
+
 def test_a_statement_with_no_site_is_not_judged_against_a_slot(tmp_path: Path) -> None:
     """The bare-statement path has no slot to conform to.
 
@@ -891,6 +978,7 @@ def _every_emitted_code() -> set[str]:
         VERSION_TRUNCATING,
         VERSION_LIKE_STRING,
         MIXED_DIALECT,
+        ACTIONSCRIPT_KEYWORD,
     ):
         for config in (LintConfig(), thresholds):
             emitted.update(finding.code for finding in lint_analysis(analyze(text), config))
