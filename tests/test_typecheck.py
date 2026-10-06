@@ -2505,3 +2505,240 @@ def test_an_index_mismatch_does_not_cascade(env: TypeEnvironment) -> None:
     """The value is ruled out, so nothing downstream reports on it again --
     the `= 1` would otherwise be a string-to-integer comparison finding."""
     assert codes_of('name of folder ("a", "b") = 1', env) == [INDEX_MISMATCH]
+
+
+# ---------------------------------------------------------------------------
+# The fix a singular-required diagnostic carries (#66)
+# ---------------------------------------------------------------------------
+# The engine rejects a plural operand up front -- `A singular expression is
+# required.` -- so the statement never runs, and the checker proposes the
+# rewrite: the exact singular spelling of a plural aggregate, else the operand
+# wrapped in `unique value of`. Engine evidence (12 client targets plus
+# session) is on #66; the tuple and aggregate rows are restated beside the
+# tests that rely on them.
+
+_SINGULAR_REQUIRED = (
+    "left-operand-not-singular",
+    "right-operand-not-singular",
+    "argument-not-singular",
+)
+
+
+def _singular_fixes(
+    source: str, environment: TypeEnvironment
+) -> list[tuple[str, str, str] | tuple[str, None]]:
+    """``(code, replaced text, replacement)`` for every singular-required
+    diagnostic, or ``(code, None)`` for one that carries no fix."""
+    found: list[tuple[str, str, str] | tuple[str, None]] = []
+    for diagnostic in check(parse(source), environment, source=source).diagnostics:
+        if diagnostic.code not in _SINGULAR_REQUIRED:
+            continue
+        fix = diagnostic.fix
+        if fix is None:
+            found.append((diagnostic.code, None))
+        else:
+            found.append((diagnostic.code, source[fix.start : fix.end].strip(), fix.replacement))
+    return found
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        pytest.param(
+            'pathnames of files "x" | pathnames of files "y"',
+            [
+                (
+                    "left-operand-not-singular",
+                    'pathnames of files "x"',
+                    'unique value of pathnames of files "x"',
+                ),
+                (
+                    "right-operand-not-singular",
+                    'pathnames of files "y"',
+                    'unique value of pathnames of files "y"',
+                ),
+            ],
+            id="both-sides-of-bar",
+        ),
+        pytest.param(
+            '"x" & pathnames of files "y"',
+            [
+                (
+                    "right-operand-not-singular",
+                    'pathnames of files "y"',
+                    'unique value of pathnames of files "y"',
+                )
+            ],
+            id="right-of-ampersand",
+        ),
+        pytest.param(
+            '(sizes of files "x") + 1',
+            [
+                (
+                    "left-operand-not-singular",
+                    '(sizes of files "x")',
+                    'unique value of (sizes of files "x")',
+                )
+            ],
+            id="left-of-plus",
+        ),
+        pytest.param(
+            '- sizes of files "x"',
+            [("argument-not-singular", 'sizes of files "x"', 'unique value of sizes of files "x"')],
+            id="unary-argument",
+        ),
+    ],
+)
+def test_each_singular_required_code_carries_a_wrap(
+    source: str, expected: list[tuple[str, str, str]], env: TypeEnvironment
+) -> None:
+    assert _singular_fixes(source, env) == expected
+
+
+@pytest.mark.parametrize(
+    ("source", "written", "singular"),
+    [
+        # Exact on every input: one value even over nothing, qna
+        # `number of concatenations ", " of ("a";"b") whose (false)` is 1.
+        ('(concatenations ", " of ("a";"b")) | "x"', "concatenations", "concatenation"),
+        (
+            '(html concatenations of (html "a"; html "b")) | html "x"',
+            "html concatenations",
+            "html concatenation",
+        ),
+        ("(sums of (1;2)) + 1", "sums", "sum"),
+        ("(conjunctions of (true;false)) = true", "conjunctions", "conjunction"),
+        # Not exact where a plural is wanted -- `maxima` answers nothing over
+        # nothing, `maximum` errors -- but this position needs a singular, and
+        # there the singular and `unique value of maxima` agree on every input.
+        # qna, macOS (and the same on the 12 targets on #66 for the bare forms):
+        #     Q: maximum of (1;2) whose (it > 5) | 9
+        #     A: 9
+        #     Q: unique value of maxima of (1;2) whose (it > 5) | 9
+        #     A: 9
+        #     Q: (maxima of (1;2)) | 9
+        #     E: A singular expression is required.
+        ("(maxima of (1;2)) | 5", "maxima", "maximum"),
+        ("(minima of (1;2)) | 5", "minima", "minimum"),
+        # The same argument: `unique value of unique values of X` is
+        # `unique value of X`.
+        ("(unique values of (1;1)) | 5", "unique values", "unique value"),
+    ],
+)
+def test_a_plural_aggregate_is_respelled_not_wrapped(
+    source: str, written: str, singular: str, env: TypeEnvironment
+) -> None:
+    ((code, replaced, replacement),) = _singular_fixes(source, env)  # type: ignore[misc]
+    assert code == "left-operand-not-singular"
+    assert (replaced, replacement) == (written, singular)
+
+
+@pytest.mark.parametrize(
+    ("source", "operand", "replacement"),
+    [
+        pytest.param(
+            'pathnames of files "x" | "y"',
+            'pathnames of files "x"',
+            'unique value of pathnames of files "x"',
+            id="bare-chain",
+        ),
+        pytest.param(
+            'pathnames of files "x" as lowercase = "y"',
+            'pathnames of files "x" as lowercase',
+            'unique value of (pathnames of files "x" as lowercase)',
+            id="cast",
+        ),
+        pytest.param(
+            '(pathnames of files "x" as lowercase) | "y"',
+            '(pathnames of files "x" as lowercase)',
+            'unique value of (pathnames of files "x" as lowercase)',
+            id="cast-already-parenthesized",
+        ),
+        pytest.param(
+            # Starts with a paren but is not one group: unparenthesized, the
+            # wrap would still parse -- as `(unique value of (...)) as
+            # lowercase`, the cast moved outside it.
+            '(pathnames of files "x") as lowercase = "y"',
+            '(pathnames of files "x") as lowercase',
+            'unique value of ((pathnames of files "x") as lowercase)',
+            id="cast-of-a-group",
+        ),
+        pytest.param(
+            # A paren inside a string literal is not a group boundary.
+            '(pathnames of files "x)") as lowercase = "y"',
+            '(pathnames of files "x)") as lowercase',
+            'unique value of ((pathnames of files "x)") as lowercase)',
+            id="paren-in-a-string",
+        ),
+        pytest.param(
+            '(if true then pathnames of files "x" else pathnames of files "y") | "z"',
+            '(if true then pathnames of files "x" else pathnames of files "y")',
+            'unique value of (if true then pathnames of files "x" else pathnames of files "y")',
+            id="if",
+        ),
+        pytest.param(
+            '("a";"b") | "x"',
+            '("a";"b")',
+            'unique value of ("a";"b")',
+            id="collection",
+        ),
+        pytest.param(
+            'pathnames /* keep me */ of files "x" | "y"',
+            'pathnames /* keep me */ of files "x"',
+            'unique value of pathnames /* keep me */ of files "x"',
+            id="comment-inside",
+        ),
+    ],
+)
+def test_the_wrap_parenthesizes_only_what_needs_it(
+    source: str, operand: str, replacement: str, env: TypeEnvironment
+) -> None:
+    ((_, replaced, written),) = _singular_fixes(source, env)  # type: ignore[misc]
+    assert (replaced, written) == (operand, replacement)
+    # Whatever the parentheses, the replacement has to parse as one operand.
+    assert parse(replacement) is not None
+
+
+def test_a_tuple_operand_is_not_wrapped(env: TypeEnvironment) -> None:
+    """`unique value of` is not defined on a tuple, and no other aggregate is.
+    qna, macOS::
+
+        Q: unique value of (names of files "hosts" of folder "/etc", 1) = ("hosts", 1)
+        E: The operator "unique value" is not defined.
+        Q: unique value of ("a", "b")
+        E: The operator "unique value" is not defined.
+
+    The checker resolves a property of a tuple against its elements as well,
+    so it would not catch that itself; the fix is withheld instead."""
+    assert _singular_fixes('(pathnames of files "x", 1) = ("a", 1)', env) == [
+        ("left-operand-not-singular", None)
+    ]
+
+
+def test_a_session_operand_is_wrapped_too(session_env: TypeEnvironment) -> None:
+    """Session defines `unique value of <bes computer>`; whether a type takes
+    it is the autofix guard's question, not this one's."""
+    assert _singular_fixes("(bes computers) | (unique value of bes computers)", session_env) == [
+        ("left-operand-not-singular", "(bes computers)", "unique value of (bes computers)")
+    ]
+
+
+def test_without_the_source_text_no_wrap_is_proposed(env: TypeEnvironment) -> None:
+    """A wrap copies the operand as written, comments included, so it needs the
+    text; a respelling only needs spans and is proposed either way."""
+    wrap = 'pathnames of files "x" | "y"'
+    (diagnostic,) = check(parse(wrap), env).diagnostics
+    assert diagnostic.code == "left-operand-not-singular"
+    assert diagnostic.fix is None
+
+    respell = '(concatenations ", " of ("a";"b")) | "x"'
+    (diagnostic,) = check(parse(respell), env).diagnostics
+    assert diagnostic.fix is not None
+    assert diagnostic.fix.replacement == "concatenation"
+
+
+def test_the_singular_required_diagnostic_message_is_unchanged(env: TypeEnvironment) -> None:
+    """The fix's description belongs to the lint finding, not the checker."""
+    source = 'pathnames of files "x" | "y"'
+    (diagnostic,) = check(parse(source), env, source=source).diagnostics
+    assert diagnostic.message == "the left operand of '|' must be singular"

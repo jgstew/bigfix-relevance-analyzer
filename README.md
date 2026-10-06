@@ -427,6 +427,7 @@ same way instead of each inventing a description:
 | `max-depth-exceeded` | error | a directory tree was deeper than the walk's limit, so it was not fully scanned | always on |
 | `parse-error` | error | the statement could not be parsed | always on |
 | `type-error` | error | the type checker reported a problem beyond an unbound `it` | always on |
+| `singular-required` | error | a plural where the engine requires a single value | always on |
 | `site-type-mismatch` | error | the value does not fit the kind of site it was extracted from | always on |
 | `unbound-it` | error | `it` is used where there is no context to bind it to | always on |
 | `mixed-dialect` | error | inspectors exclusive to client relevance and to session relevance in one statement | always on |
@@ -603,13 +604,25 @@ result.rounds  # 2
 result.unapplied  # {} - fixable diagnostics still standing in `fixed`
 ```
 
-Only `singular-spelling-mid-chain` (`plural-preferred`) carries a fix today:
-the checker attaches a `TypeFix` to the diagnostic - the written property name
-and its plural spelling - and the fix layer applies it only when the text in
-that range really is the name, case-insensitively and whitespace-normalized
-(`of  Setting  "x"` becomes `of  settings  "x"`). `filtered-singular-spelling`
-stays unfixable: it fires in singular contexts, where the plural would only
-trade it for a `non-unique-risk`.
+Two kinds of diagnostic carry a fix today. The checker attaches a `TypeFix`
+to each, and the fix layer applies it only when the text in its range really
+is what the checker read, case-insensitively and whitespace-normalized.
+
+- `singular-spelling-mid-chain` (`plural-preferred`): the written property
+  name becomes its plural spelling (`of  Setting  "x"` becomes
+  `of  settings  "x"`). `filtered-singular-spelling` stays unfixable: it fires
+  in singular contexts, where the plural would only trade it for a
+  `non-unique-risk`.
+- `left-operand-not-singular`, `right-operand-not-singular` and
+  `argument-not-singular` (`singular-required`): a plural operand where the
+  engine requires a singular, which it refuses before evaluating anything. A
+  plural aggregate is respelled as its singular
+  (`(concatenations ", " of X) | "y"` becomes `(concatenation ", " of X) | "y"`);
+  anything else is wrapped whole, parenthesized where needed
+  (`pathnames of files "x" | "y"` becomes
+  `unique value of pathnames of files "x" | "y"`). A tuple is left alone,
+  since the engine defines `unique value of` on none. ActionScript `{...}`
+  substitutions are never touched: they join a plural rather than refusing it.
 
 Fixes cascade - pluralizing `folder "etc"` above makes `folder "private"`
 fire next - so they are applied in rounds, until nothing more is accepted, the
@@ -618,6 +631,9 @@ candidate is held against the *original* statement: no parse or lex error,
 unknown name or checker diagnostic may become more common (with
 `guard="errors"`, only the ones whose lint rule defaults to an error count),
 and the resolved dialect and the result's types and plurality must not change.
+The one exception is a candidate with fewer `singular-required` diagnostics
+than the original: its plurality may change, and its types may narrow or gain
+`<type> with multiplicity`, the engine's own type for `unique value of`.
 A round that fails is retried one edit at a time, keeping the edits that pass.
 The result must then also pass a full check that counts fix-carrying
 diagnostics and refuses any the edits introduced, so a round limit reached

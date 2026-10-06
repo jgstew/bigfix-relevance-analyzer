@@ -109,8 +109,10 @@ from bigfix_relevance_analyzer.nodes import (
     Unary,
     Whose,
 )
+from bigfix_relevance_analyzer.tokenizer import code_tokens
 
 __all__ = [
+    "SINGULAR_REQUIRED",
     "CheckResult",
     "Plurality",
     "RelevanceValue",
@@ -194,6 +196,17 @@ class TypeFix:
     reads as :attr:`expected` (case-insensitively, whitespace-normalized), so
     a span that does not cover the name it claims to -- a comment between two
     words of a phrase -- is skipped rather than mangled.
+
+    Two shapes, one record. A *respelling* replaces only a name: the range is
+    the name as written and :attr:`expected` is that name. A *wrap* -- the
+    `unique value of` fix for a :data:`SINGULAR_REQUIRED` diagnostic --
+    replaces the whole operand: the range is the operand, :attr:`expected` is
+    its text as written, and :attr:`replacement` is that same text behind
+    `unique value of`, parenthesized where it has to be. The whole-operand
+    form, rather than an insertion at either end, keeps a fix one range, so
+    anchoring, overlap and offsets work exactly as they do for a respelling;
+    the price is that the checker needs the source text to write one (see
+    :func:`check`).
     """
 
     start: int
@@ -221,11 +234,14 @@ class TypeDiagnostic:
 
     fix: TypeFix | None = None
     """How to rewrite the text so this diagnostic goes away, when that is
-    mechanical and meaning-preserving. Only `singular-spelling-mid-chain` sets
-    one: the plural spelling answers the same values where the singular
-    answers, and answers empty where it errors. `filtered-singular-spelling`
-    deliberately does not -- it fires in singular contexts, where the plural
-    spelling would trade it for `singular-over-plural-object` or worse.
+    mechanical and meaning-preserving. Two kinds set one.
+    `singular-spelling-mid-chain`: the plural spelling answers the same values
+    where the singular answers, and answers empty where it errors.
+    `filtered-singular-spelling` deliberately does not -- it fires in singular
+    contexts, where the plural spelling would trade it for
+    `singular-over-plural-object` or worse. And the :data:`SINGULAR_REQUIRED`
+    codes: the original never runs, the engine refusing it up front, so a
+    rewrite that runs whenever there is one value cannot be worse.
 
     Not part of :meth:`to_dict`; the analysis payload's ``autofix`` key is the
     rewrite a consumer should read, worked out over every fix at once.
@@ -845,6 +861,110 @@ def _respelling(written: Reference, spelling: str) -> TypeFix:
     return TypeFix(start=written.span.start, end=end, replacement=spelling, expected=written.phrase)
 
 
+SINGULAR_REQUIRED: Final = frozenset(
+    {"left-operand-not-singular", "right-operand-not-singular", "argument-not-singular"}
+)
+"""The engine's `A singular expression is required.`, which it raises before
+evaluating anything: an operator, or `|`, handed a plural operand.
+
+Each carries a fix (:func:`_singular_fix`), and the autofix guard lets that
+fix -- and only that fix -- change the statement's plurality. Deliberately not
+the `*-not-boolean` codes: those fire on a wrong *type* as well, which no
+rewrite of the operand's plurality repairs.
+"""
+
+_UNIQUE_VALUE: Final = "unique value of "
+
+
+def _aggregate_singular(phrase: str) -> str | None:
+    """The singular spelling of ``phrase``, when it is a plural-spelled
+    aggregate that has exactly one.
+
+    Every aggregate qualifies in a singular-required position, not just the
+    ones exact everywhere. `concatenations` is one value even over nothing, so
+    its singular is exact anywhere; `maxima` answers nothing over nothing where
+    `maximum` errors, which matters where a plural is wanted -- but here the
+    alternative is `unique value of maxima`, which errors on nothing too. qna::
+
+        Q: maximum of (1;2) whose (it > 5) | 9
+        A: 9
+        Q: unique value of maxima of (1;2) whose (it > 5) | 9
+        A: 9
+        Q: number of concatenations ", " of ("a";"b") whose (false)
+        A: 1
+
+    and `unique value of unique values of X` is `unique value of X`. The
+    singular is the shorter rewrite and keeps the aggregate's own type, where
+    `unique value of` answers `<type> with multiplicity`.
+    """
+    rows = [
+        entry
+        for entry in inspectors.lookup(phrase, kind=inspectors.InspectorKind.PROPERTY)
+        if entry.name in AGGREGATES
+    ]
+    if not rows or any(entry.name != phrase for entry in rows):
+        return None  # not an aggregate, or written in its singular already
+    singulars = {entry.singular_name for entry in rows}
+    if len(singulars) != 1:
+        return None
+    (singular,) = singulars
+    return singular
+
+
+def _parenthesized(text: str) -> bool:
+    """Whether ``text`` is one parenthesized group, outer parens to outer parens.
+
+    Tokenized rather than matched by character, so a paren inside a string
+    literal or a comment does not count: a string is one token, quotes and
+    all, and a comment is trivia `code_tokens` leaves out.
+    """
+    tokens = list(code_tokens(text))
+    depth = 0
+    for position, token in enumerate(tokens):
+        if token.text == "(":
+            depth += 1
+        elif token.text == ")":
+            depth -= 1
+            if depth == 0:
+                return position == len(tokens) - 1
+    return False
+
+
+def _singular_fix(operand: Node, value: RelevanceValue, source: str | None) -> TypeFix | None:
+    """The rewrite for a plural ``operand`` where a singular is required.
+
+    The exact singular spelling of a plural aggregate when the operand is one
+    (see :func:`_aggregate_singular`), else the operand behind `unique value
+    of`. That runs whenever the operand has one distinct value, and fails on
+    none or several just as the singular spelling would -- strictly more
+    forgiving, because repeats of one value still work. Whether the operand's
+    type takes `unique value of` is left to the autofix guard: a client `file`
+    does not and adds `property-not-defined`, a session `bes computer` does.
+
+    Parenthesized unless the operand is a name, an `of` chain or already one
+    parenthesized group, all of which `unique value of` takes whole. `None`
+    for a tuple, which the engine defines no aggregate on at all -- `unique
+    value of ("a", "b")` is `The operator "unique value" is not defined.` --
+    and which the checker would not catch, resolving a property of a tuple
+    against its elements too. `None` too without ``source``: a wrap copies
+    the operand as written.
+    """
+    if isinstance(operand, Of) and not operand.prop_grouped:
+        written = _written_reference(operand.prop)
+        if written is not None and (singular := _aggregate_singular(written.phrase)):
+            return _respelling(written, singular)
+    if source is None or value.tuple_types or isinstance(operand, TupleExpr):
+        return None
+    text = source[operand.span.start : operand.span.end]
+    bare = isinstance(operand, Reference | Of) or _parenthesized(text)
+    return TypeFix(
+        start=operand.span.start,
+        end=operand.span.end,
+        replacement=_UNIQUE_VALUE + (text if bare else f"({text})"),
+        expected=text,
+    )
+
+
 _VISIBLE_ROWS_CACHE_SIZE: Final = 4096
 """How many ``(name, environment, indexed)`` slices :func:`_visible_rows` keeps.
 
@@ -1027,14 +1147,18 @@ def _written_plurality(name: str, rows: Iterable[inspectors.Inspector]) -> Plura
     return Plurality.UNKNOWN
 
 
-def check(node: Node, environment: TypeEnvironment) -> CheckResult:
+def check(node: Node, environment: TypeEnvironment, *, source: str | None = None) -> CheckResult:
     """Type ``node``, reporting findings in the engine's own wording.
 
     A name the tables do not contain comes back with ``types=None`` rather than
     a guess, and ``None`` propagates without ever becoming an error. The checker
     is quiet about what it cannot reason about rather than wrong about it.
+
+    ``source`` is the text ``node`` was parsed from. Only fixes read it: a
+    wrap in `unique value of` copies its operand as written, comments and all,
+    and is not proposed without it. Every finding is the same either way.
     """
-    checker = _Checker(environment)
+    checker = _Checker(environment, source)
     value = checker.run(node)
     return CheckResult(
         value=value,
@@ -1100,8 +1224,9 @@ class _Checker:
     would overflow a recursive checker.
     """
 
-    def __init__(self, environment: TypeEnvironment) -> None:
+    def __init__(self, environment: TypeEnvironment, source: str | None = None) -> None:
         self.env = environment
+        self.source = source
         self.diagnostics: list[TypeDiagnostic] = []
         self.values: list[RelevanceValue] = []
         self.marks: list[int] = []
@@ -1294,16 +1419,22 @@ class _Checker:
             )
 
     def require_singular(
-        self, value: RelevanceValue, span: Span, code: str, **fields: object
+        self, value: RelevanceValue, operand: Node, code: str, **fields: object
     ) -> None:
         """The engine's `A singular expression is required.`, said precisely.
 
         Positive evidence only, the same as :meth:`require_singular_boolean`:
-        `Plurality.UNKNOWN` is not a finding.
+        `Plurality.UNKNOWN` is not a finding. Takes the operand itself rather
+        than its span, because the fix it attaches reads the node: an
+        aggregate is respelled where anything else is wrapped.
         """
-        self.accept_collapse(span)
+        self.accept_collapse(operand.span)
         if value.plurality is Plurality.PLURAL:
-            self.report(code, span, **fields)
+            diagnostic = _diagnostic(code, operand.span, **fields)
+            # Attached here rather than passed through `report`, as in
+            # `report_mid_chain`: its keyword arguments are message fields.
+            fix = _singular_fix(operand, value, self.source)
+            self.diagnostics.append(diagnostic if fix is None else replace(diagnostic, fix=fix))
 
     def context_value(self, span: Span) -> RelevanceValue:
         """What `it` refers to here, reporting the unbound case.
@@ -2056,8 +2187,8 @@ class _Checker:
         # engine's `A singular expression is required.`, and it is the
         # operator's own rule -- `sizes of it > 1000` inside a `whose` fails
         # here, not on the filter, which may itself be plural.
-        self.require_singular(left, node.left.span, "left-operand-not-singular", token=node.op)
-        self.require_singular(right, node.right.span, "right-operand-not-singular", token=node.op)
+        self.require_singular(left, node.left, "left-operand-not-singular", token=node.op)
+        self.require_singular(right, node.right, "right-operand-not-singular", token=node.op)
 
         if _ruled_out(left) or _ruled_out(right):
             return _RULED_OUT
@@ -2223,7 +2354,7 @@ class _Checker:
             # `not` evaluates its operand -- qna: `not (1 = 1/0)` errors rather
             # than answering -- so it runs only where the operand does.
             return self.literal("boolean", operand.platforms)
-        self.require_singular(operand, node.operand.span, "argument-not-singular", token=node.op)
+        self.require_singular(operand, node.operand, "argument-not-singular", token=node.op)
         if operand.types is None:
             return self.unknown()
         if _ruled_out(operand):
@@ -2269,8 +2400,8 @@ class _Checker:
         # folders | 0`. The right operand earns it for the plainer reason
         # every `require_singular` site does: a position that demands a
         # singular cannot also advise writing the plural.
-        self.require_singular(left, node.left.span, "left-operand-not-singular", token="|")
-        self.require_singular(right, node.right.span, "right-operand-not-singular", token="|")
+        self.require_singular(left, node.left, "left-operand-not-singular", token="|")
+        self.require_singular(right, node.right, "right-operand-not-singular", token="|")
         # The shape rule too, and only on the left: there the empty case
         # erroring is the mechanism the fallback runs on, and the suggested
         # plural spelling would answer 0 rows without tripping it (see

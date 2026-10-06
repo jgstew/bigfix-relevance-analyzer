@@ -53,6 +53,8 @@ NON_UNIQUE_RISK = "free space of drives of system folders"
 # A `whose` on a singular spelling that cannot collapse -- the index makes it
 # unique -- so only the style rule has anything to say about it.
 PLURAL_PREFERRED = 'pathname of file "x.bes" whose (size of it > 1) of folder "c:\\"'
+SINGULAR_REQUIRED = 'pathnames of files "x" | "y"'
+"""A plural where `|` requires a singular: never runs, and carries a fix (#66)."""
 # Two version-comparison gotchas, both read off a live engine. The engine
 # answers each cleanly and on purpose -- truncating equality in particular is
 # deliberate design, not a bug -- but the answer commonly differs from what an
@@ -975,6 +977,7 @@ def _every_emitted_code() -> set[str]:
         TYPE_MISMATCH,
         NON_UNIQUE_RISK,
         PLURAL_PREFERRED,
+        SINGULAR_REQUIRED,
         VERSION_TRUNCATING,
         VERSION_LIKE_STRING,
         MIXED_DIALECT,
@@ -1520,3 +1523,113 @@ def test_a_singular_spelling_mid_chain_is_plural_preferred() -> None:
     assert [f.code for f in findings] == ["plural-preferred"]
     assert findings[0].severity is Severity.WARNING
     assert "'settings'" in findings[0].message
+
+
+# ---------------------------------------------------------------------------
+# singular-required (#66)
+# ---------------------------------------------------------------------------
+
+
+def test_a_plural_where_a_singular_is_required_is_its_own_rule() -> None:
+    """Its own error, not `type-error`: the engine refuses the statement up
+    front, and the rule exists so a repo can turn the fix off by name."""
+    (finding,) = lint_analysis(analyze(SINGULAR_REQUIRED), LintConfig())
+    assert finding.code == "singular-required"
+    assert finding.severity is Severity.ERROR
+    assert RULES["singular-required"].default_severity is Severity.ERROR
+
+
+def test_the_singular_required_finding_carries_the_sites_fix() -> None:
+    (finding,) = lint_analysis(analyze(SINGULAR_REQUIRED), LintConfig())
+    assert finding.autofix is not None
+    assert finding.autofix.fixed == 'unique value of pathnames of files "x" | "y"'
+    assert finding.autofix.applied_rules == {"singular-required": 1}
+    assert finding.to_dict()["autofix"]["applied"] == [
+        {"code": "left-operand-not-singular", "rule": "singular-required", "count": 1}
+    ]
+
+
+@pytest.mark.parametrize(
+    ("text", "described"),
+    [
+        (SINGULAR_REQUIRED, "wrapped in `unique value of`: this position requires a single value"),
+        (
+            '(concatenations ", " of pathnames of files "x") | "y"',
+            "respelled `concatenations` as `concatenation`: this position requires a single value",
+        ),
+    ],
+)
+def test_the_singular_required_message_says_what_the_fix_does(text: str, described: str) -> None:
+    """Plain, and no hedging about a tighter index: that advice belongs to a
+    non-unique failure, if one ever comes."""
+    (finding,) = lint_analysis(analyze(text), LintConfig())
+    assert finding.message.startswith("the left operand of '|' must be singular")
+    assert described in finding.message
+    assert "index" not in finding.message
+
+
+def test_a_refused_singular_required_fix_is_not_described() -> None:
+    """Client `unique value of` takes no `file`, so the guard refuses the wrap;
+    the finding is the bare error, with no fix attached or described."""
+    text = '(files "hosts" of folders "/etc") | file "/etc/hosts"'
+    findings = lint_analysis(analyze(text), LintConfig())
+    (finding,) = (f for f in findings if f.code == "singular-required")
+    assert finding.autofix is None
+    assert finding.message == "the left operand of '|' must be singular"
+
+
+def test_singular_required_codes_no_longer_count_as_type_errors() -> None:
+    """Moved out of `type-error`, so a repo's `type-error` count drops by
+    exactly these -- one root cause is still one finding."""
+    for text in (SINGULAR_REQUIRED, '"x" & pathnames of files "y"', '- sizes of files "x"'):
+        found = codes(lint_analysis(analyze(text), LintConfig()))
+        assert found == {"singular-required"}, text
+
+
+def test_a_plural_actionscript_substitution_is_not_singular_required(tmp_path: Path) -> None:
+    """A `{...}` substitution joins a plural rather than refusing it (#68), so
+    there is nothing to repair -- and `unique value of` would break the two
+    cases that work today, zero values and two distinct ones."""
+    findings = _lint_fixlet(tmp_path, "true", action='run {names of files of folder "/tmp"}')
+    assert "singular-required" not in codes(findings)
+    assert all(f.autofix is None for f in findings)
+    assert "plural-substitution" in codes(findings)
+
+
+def test_only_the_applied_fix_is_described_and_attached() -> None:
+    """One site, two singular-required findings: the `file` wrap is refused
+    (client `unique value of` takes no `file`), the `pathnames` wrap applied.
+    Each finding speaks for its own fix -- `Finding.autofix` is `None` on one
+    whose fix the guard refused, as its docstring has always said."""
+    text = (
+        'exists ((files "hosts" of folders "/etc") | file "/etc/hosts")'
+        ' and (pathnames of files "x" | "y") = "z"'
+    )
+    refused, applied = lint_analysis(analyze(text), LintConfig())
+    assert (refused.code, applied.code) == ("singular-required", "singular-required")
+    assert refused.message == "the left operand of '|' must be singular"
+    assert refused.autofix is None
+    assert "wrapped in `unique value of`" in applied.message
+    assert applied.autofix is not None
+    assert applied.autofix.fixed == text.replace("(pathnames", "(unique value of pathnames")
+
+
+def test_a_fix_inside_a_wrap_is_not_taken_for_applied() -> None:
+    """The wrap's edit covers the whole operand, so it overlaps every fix
+    inside it -- but it kept that text verbatim, so an inner fix the round
+    limit stopped short of was not applied, and is not described as such."""
+    from bigfix_relevance_analyzer.autofix import autofix
+    from bigfix_relevance_analyzer.lint import _fix_applied
+
+    text = '"x" & values of setting "y" of client'
+    report = analyze(text, Dialect.CLIENT)
+    assert report.check is not None
+    by_code = {d.code: d for d in report.check.diagnostics}
+    one_round = autofix(text, Dialect.CLIENT, max_rounds=1)
+    assert one_round.applied == {"right-operand-not-singular": 1}
+    assert _fix_applied(by_code["right-operand-not-singular"], one_round)
+    assert not _fix_applied(by_code["singular-spelling-mid-chain"], one_round)
+
+    both = autofix(text, Dialect.CLIENT)
+    assert _fix_applied(by_code["right-operand-not-singular"], both)
+    assert _fix_applied(by_code["singular-spelling-mid-chain"], both)

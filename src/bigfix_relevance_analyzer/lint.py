@@ -35,6 +35,11 @@ Eleven rules, nine of them always on and two tunable:
   own independent detection of the same unbound ``it`` the ``unbound-it``
   rule above already reports, and including both would report one root cause
   twice.
+- ``singular-required`` -- a plural operand where the engine requires a
+  singular, which it refuses before evaluating anything. Always an error, and
+  the one error that carries a fix: `unique value of`, or the singular
+  spelling of a plural aggregate. Its own rule rather than ``type-error`` so a
+  repo can turn the fix off by name and keep these as plain failures.
 - ``mixed-dialect`` -- inspectors exclusive to client relevance and to session
   relevance in one statement, so no engine can evaluate it. Always an error:
   unlike ``unknown-inspector``, this is not a gap in the snapshot but two
@@ -116,7 +121,13 @@ from bigfix_relevance_analyzer.extract import (
     extract_relevance_from_file,
 )
 from bigfix_relevance_analyzer.nodes import Node, Of, Reference
-from bigfix_relevance_analyzer.typecheck import Plurality, _is_aggregate
+from bigfix_relevance_analyzer.typecheck import (
+    _UNIQUE_VALUE,
+    SINGULAR_REQUIRED,
+    Plurality,
+    TypeDiagnostic,
+    _is_aggregate,
+)
 
 if TYPE_CHECKING:
     from bigfix_relevance_analyzer.autofix import AutofixResult
@@ -312,6 +323,23 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "checking the parsed tree against the real inspector tables, not a "
                 "heuristic, so a genuine type error is as concrete a defect as a parse "
                 "error. Always an error, with nothing to configure.",
+            ),
+            _rule(
+                "singular-required",
+                Severity.ERROR,
+                "a plural where the engine requires a single value",
+                "An operator, or `|`, handed an operand that may be several values. The "
+                "engine refuses it before evaluating anything -- `A singular expression "
+                "is required.` -- so the statement can never run, which makes this an "
+                "error. The fix is `unique value of` around the operand, or the singular "
+                "spelling of a plural aggregate (`concatenations` -> `concatenation`): "
+                "either runs whenever there is one distinct value, and fails on none or "
+                "several just as the singular spelling would. The fix is refused where "
+                "it would add a problem, such as a type `unique value of` does not take. "
+                "Never applied to an ActionScript `{...}` substitution, which joins a "
+                "plural rather than refusing it (see `plural-substitution`). Reported as "
+                "`type-error` before this rule existed, so moving to it lowers a repo's "
+                "`type-error` count by exactly these.",
             ),
             _rule(
                 "site-type-mismatch",
@@ -806,6 +834,10 @@ _CHECK_RULES: Final = {
     # The same habit without a filter: a singular spelling mid-chain where a
     # plural is being built. Same rule, same rationale.
     "singular-spelling-mid-chain": "plural-preferred",
+    # The engine's up-front `A singular expression is required.`. An error like
+    # `type-error`, but its own rule because it carries a fix a repo may want
+    # off by name.
+    **dict.fromkeys(SINGULAR_REQUIRED, "singular-required"),
     # Version comparison. Their own rules rather than `type-error`, because the
     # statement type-checks: the engine answers it, and the answer is wrong.
     # Separate from each other so a repo can silence the stylistic prefix-match
@@ -820,6 +852,49 @@ _CHECK_RULES: Final = {
     # `device of <grub file location>`.
     "world-property-not-defined": "unknown-inspector",
 }
+
+
+def _fix_applied(diagnostic: TypeDiagnostic, fixed: AutofixResult | None) -> bool:
+    """Whether the site's fixed text includes ``diagnostic``'s own fix.
+
+    The site's result is one rewrite over every fix, so a fix the guard
+    refused can sit beside one it applied. Each composed edit is against the
+    original, as the fix's range is, so the fix was applied when an edit
+    overlaps that range -- overlap rather than containment, because a
+    respelling's range may run on into whitespace the edit trimmed off --
+    unless the edit is a `unique value of` wrap that kept this range verbatim
+    inside it, which is some other fix's.
+    """
+    from bigfix_relevance_analyzer.autofix import _kept
+
+    fix = diagnostic.fix
+    if fix is None or fixed is None:
+        return False
+    for edit in fixed.edits:
+        if not (edit.start < fix.end and fix.start < edit.end):
+            continue
+        own = (edit.start, edit.end) == (fix.start, fix.end)
+        if not own and _kept(edit, fixed.original) is not None:
+            continue
+        return True
+    return False
+
+
+def _with_fix(diagnostic: TypeDiagnostic, applied: bool) -> str:
+    """``diagnostic``'s message, plus what its fix did when it was ``applied``.
+
+    Only for the :data:`SINGULAR_REQUIRED` codes, where the rewrite is the
+    point of the finding. Plain on purpose: no advice about a tighter index,
+    which belongs to a non-unique failure if `unique value of` ever hits one.
+    """
+    fix = diagnostic.fix
+    if fix is None or not applied or diagnostic.code not in SINGULAR_REQUIRED:
+        return diagnostic.message
+    if fix.replacement.startswith(_UNIQUE_VALUE):
+        done = "wrapped in `unique value of`"
+    else:
+        done = f"respelled `{fix.expected}` as `{fix.replacement}`"
+    return f"{diagnostic.message}; {done}: this position requires a single value"
 
 
 def _rule_for(check_code: str) -> str:
@@ -1104,11 +1179,12 @@ def lint_analysis(
             # keeps one root cause from becoming two findings.
             if diagnostic.code == "used-without-context":
                 continue
+            applied = _fix_applied(diagnostic, site_fix)
             emit(
                 _rule_for(diagnostic.code),
-                diagnostic.message,
+                _with_fix(diagnostic, applied),
                 diagnostic.span.line,
-                autofix=site_fix if diagnostic.fix is not None else None,
+                autofix=site_fix if applied else None,
             )
 
     # Statement-level, like `unknown-inspector` below: the mismatch is between
