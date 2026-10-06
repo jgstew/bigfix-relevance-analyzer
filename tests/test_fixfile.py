@@ -164,7 +164,7 @@ def test_a_fix_with_an_ignored_rule_among_its_rules_is_not_applied(tmp_path: Pat
     data = task(f"<Relevance>{SETTING}</Relevance>")
     path = write(tmp_path, data)
     findings = lint_file(path, LintConfig())
-    (finding,) = [f for f in findings if f.autofix is not None]
+    (finding,) = (f for f in findings if f.autofix is not None)
     assert finding.autofix is not None
     blocked = fixfile._ignored_rules(
         finding.autofix, LintConfig(severities={"plural-preferred": Severity.IGNORE})

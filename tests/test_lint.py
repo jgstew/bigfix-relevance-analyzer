@@ -1573,7 +1573,7 @@ def test_a_refused_singular_required_fix_is_not_described() -> None:
     the finding is the bare error, with no fix attached or described."""
     text = '(files "hosts" of folders "/etc") | file "/etc/hosts"'
     findings = lint_analysis(analyze(text), LintConfig())
-    (finding,) = [f for f in findings if f.code == "singular-required"]
+    (finding,) = (f for f in findings if f.code == "singular-required")
     assert finding.autofix is None
     assert finding.message == "the left operand of '|' must be singular"
 
