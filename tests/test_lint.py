@@ -375,19 +375,49 @@ def test_a_boolean_relevance_element_is_silent(tmp_path: Path) -> None:
     assert "site-type-mismatch" not in codes(_lint_fixlet(tmp_path, 'exists file "/etc/hosts"'))
 
 
-def test_a_plural_actionscript_substitution_is_a_finding(tmp_path: Path) -> None:
-    """A `{...}` substitution has one hole to fill, so it needs one value."""
-    assert "site-type-mismatch" in codes(
-        _lint_fixlet(tmp_path, "true", action='run {names of files of folder "/tmp"}')
-    )
+def _plural_substitution_findings(tmp_path: Path, relevance: str) -> list[Finding]:
+    """The `plural-substitution` findings for ``relevance`` in a `run {...}`."""
+    return [
+        f
+        for f in _lint_fixlet(tmp_path, "true", action=f"run {{{relevance}}}")
+        if f.code == "plural-substitution"
+    ]
+
+
+def test_a_plural_actionscript_substitution_is_a_warning_not_a_slot_error(
+    tmp_path: Path,
+) -> None:
+    """A plural `{...}` substitution works; the engine joins its values (#68).
+
+    Real actions on a BES client (10.0.7.52) substituted `{("a";"b")}` as
+    `ab` and an empty plural as the empty string, so a plural here is a risk
+    about the author's intent, not content that cannot run -- a warning under
+    its own rule, not a `site-type-mismatch` error.
+    """
+    relevance = 'names of files of folder "/tmp"'
+    findings = _lint_fixlet(tmp_path, "true", action=f"run {{{relevance}}}")
+    assert "site-type-mismatch" not in codes(findings)
+    [finding] = _plural_substitution_findings(tmp_path, relevance)
+    assert finding.severity is Severity.WARNING
+
+
+def test_the_plural_substitution_message_describes_the_join_and_never_suggests_unique_value(
+    tmp_path: Path,
+) -> None:
+    """`unique value of` errors on zero values and on two distinct ones --
+    both of which substitute fine today -- so following that advice would
+    turn a working action into a failing one."""
+    [finding] = _plural_substitution_findings(tmp_path, 'names of files of folder "/tmp"')
+    assert "unique value" not in finding.message
+    assert "no separator" in finding.message
+    assert "concatenation" in finding.message
 
 
 def test_a_boolean_actionscript_substitution_is_silent(tmp_path: Path) -> None:
     """Booleans coerce to a string in a substitution, and content relies on it:
     50,513 substitutions in one shipped content site are exactly this."""
-    assert "site-type-mismatch" not in codes(
-        _lint_fixlet(tmp_path, "true", action='run {exists file "/etc/hosts"}')
-    )
+    findings = _lint_fixlet(tmp_path, "true", action='run {exists file "/etc/hosts"}')
+    assert {"site-type-mismatch", "plural-substitution"}.isdisjoint(codes(findings))
 
 
 def test_a_plural_substitution_is_reported_even_when_its_type_is_unknown(
@@ -398,18 +428,68 @@ def test_a_plural_substitution_is_reported_even_when_its_type_is_unknown(
     The checker cannot name the type of `(bogus of it) of ("a";"b")`, but it
     is quite certain the value is plural. Gating the plurality check on the
     type being known lost exactly the finding the rule exists for.
-
-    The plural `concatenations` spelling, not `concatenation`: the singular
-    one is a single string over any object (`a, b` in qna; #58).
     """
-    path = tmp_path / "unknown_plural.bes"
-    path.write_text(
-        _fixlet("true", action='run {concatenations ", " of (bogus of it) of ("a";"b")}')
-    )
-    analysis = analyze('concatenations ", " of (bogus of it) of ("a";"b")')
+    relevance = '(bogus of it) of ("a";"b")'
+    analysis = analyze(relevance)
     assert analysis.check is not None
     assert analysis.check.value.types is None, "fixture no longer exercises the unknown-type path"
-    assert "site-type-mismatch" in codes(lint_file(path, LintConfig()))
+    assert len(_plural_substitution_findings(tmp_path, relevance)) == 1
+
+
+# Each of these is spelled plural -- the checker is right to call it plural,
+# since the engine rejects every one as an operand of `&` -- but none can
+# answer more than one value. Counted in QnA (macOS):
+#
+#     number of concatenations ", " of ("a";"b")                        -> 1
+#     number of tuple string items 0 of concatenations ", " of ("a";"b") -> 1
+#     number of maxima of (1;2) whose (false)                            -> 0
+#     number of sums of (1;2)                                            -> 1
+@pytest.mark.parametrize(
+    "relevance",
+    [
+        'concatenations ", " of names of files of folder "/tmp"',
+        'tuple string items 0 of concatenations ", " of names of files of folder "/tmp"',
+        'tuple string item 0 of concatenations ", " of names of files of folder "/tmp"',
+        "maxima of (1;2)",
+        "sums of (1;2)",
+    ],
+)
+def test_a_plural_spelling_that_cannot_exceed_one_value_is_silent(
+    tmp_path: Path, relevance: str
+) -> None:
+    assert _plural_substitution_findings(tmp_path, relevance) == []
+
+
+# The negatives that keep the "at most one value" check honest. Counted in QnA:
+#
+#     number of (concatenations ", " of it) of ("a";"b")  -> 2
+#     number of unique values of ("a";"b")                -> 2
+#     number of tuple string items 0 of ("a, b";"c")      -> 2
+@pytest.mark.parametrize(
+    "relevance",
+    [
+        '(concatenations ", " of it) of ("a";"b")',
+        'unique values of ("a";"b")',
+        'tuple string items 0 of ("a, b";"c")',
+    ],
+)
+def test_an_aggregate_distributed_over_many_values_is_still_plural(
+    tmp_path: Path, relevance: str
+) -> None:
+    assert len(_plural_substitution_findings(tmp_path, relevance)) == 1
+
+
+def test_a_plural_if_condition_is_still_a_site_type_mismatch(tmp_path: Path) -> None:
+    """Conditions were not part of the real-action experiment, so they keep
+    the singular requirement and the error severity."""
+    plural = [
+        f
+        for f in _lint_fixlet(
+            tmp_path, "true", action='if {names of files of folder "/tmp"}\nendif'
+        )
+        if f.code in {"site-type-mismatch", "plural-substitution"}
+    ]
+    assert [(f.code, f.severity) for f in plural] == [("site-type-mismatch", Severity.ERROR)]
 
 
 def test_a_plural_non_boolean_relevance_reports_the_type_too(tmp_path: Path) -> None:
@@ -855,6 +935,11 @@ def test_every_rule_in_the_catalog_is_a_rule_that_fires(tmp_path: Path) -> None:
     substituted = tmp_path / "substituted.bes"
     substituted.write_text(_fixlet("true", action='run echo {dictionaries of files "/etc/hosts"}'))
     emitted.update(finding.code for finding in lint_file(substituted, LintConfig()))
+
+    # `plural-substitution` reads the same slot: a plural `{...}` value.
+    joined = tmp_path / "joined.bes"
+    joined.write_text(_fixlet("true", action='run echo {names of files of folder "/tmp"}'))
+    emitted.update(finding.code for finding in lint_file(joined, LintConfig()))
 
     assert emitted == set(RULES)
 

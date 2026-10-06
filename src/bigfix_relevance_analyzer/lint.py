@@ -114,7 +114,8 @@ from bigfix_relevance_analyzer.extract import (
     _is_recognized,
     extract_relevance_from_file,
 )
-from bigfix_relevance_analyzer.typecheck import Plurality
+from bigfix_relevance_analyzer.nodes import Node, Of, Reference
+from bigfix_relevance_analyzer.typecheck import Plurality, _is_aggregate
 
 if TYPE_CHECKING:
     from bigfix_relevance_analyzer.autofix import AutofixResult
@@ -322,17 +323,35 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "their value and are checked. A `<Relevance>` element decides "
                 "applicability, so a clause that is not a boolean makes the content "
                 "unable to apply anywhere. An `if`/`elseif`/`continue if` condition "
-                "branches on its answer, and -- confirmed by testing against a live "
-                "client -- accepts a `boolean` or a `string` but nothing else. An "
-                "ordinary ActionScript `{...}` substitution has one hole to fill and no "
-                "type requirement of its own: it just embeds text, so a plural value has "
-                "no single answer to put in it, but any singular type serves, a boolean "
-                "included, which shipped content relies on heavily. An error, not a "
+                "branches on its answer, takes one value, and -- confirmed by testing "
+                "against a live client -- accepts a `boolean` or a `string` but nothing "
+                "else. An ordinary ActionScript `{...}` substitution is not checked "
+                "here: it accepts any type and joins a plural value rather than "
+                "rejecting it, which `plural-substitution` reports. An error, not a "
                 "warning, because neither is a risk the author may have ruled out -- the "
                 "content cannot work. Positive evidence only, as everywhere else: an "
                 "undetermined type or plurality is not a finding, and neither is a value "
                 "some other rule already faulted. Analysis properties are deliberately "
                 "unlisted, being legitimately plural and of any renderable type.",
+            ),
+            _rule(
+                "plural-substitution",
+                Severity.WARNING,
+                "an ordinary ActionScript substitution's value may be more than one value",
+                "A `run`/`wait`/`parameter` `{...}` substitution does not reject a "
+                "plural: confirmed with real actions on a BES client, it joins every "
+                'value with no separator -- `{("a";"b")}` substitutes `ab`, and no '
+                "values at all substitute the empty string. So the content runs, but "
+                "probably not as meant, which makes this a warning rather than "
+                '`site-type-mismatch`\'s error. The fix is `concatenation "<sep>" of '
+                "(...)` when several values are possible, or a tighter filter when "
+                "exactly one is meant -- never `unique value of`, which errors on zero "
+                "values and on two distinct ones, both of which substitute fine as "
+                "written. A plural spelling that cannot answer more than one value is "
+                "not a finding: an aggregate like `concatenations` or `maxima` applied "
+                "to the whole value, and `tuple string items <n>` of such a value. "
+                "`if`/`elseif`/`continue if` conditions were not part of that "
+                "experiment and stay with `site-type-mismatch`.",
             ),
             _rule(
                 "unknown-inspector",
@@ -794,13 +813,12 @@ def _rule_for(check_code: str) -> str:
 
 # What each kind of site requires of the value it holds. Only the slots the
 # engine genuinely constrains are listed: an applicability clause decides yes
-# or no, an `if`/`elseif`/`continue if` condition needs an answer to branch
-# on, and an ordinary ActionScript substitution has one hole to fill but no
-# constraint of its own on the value's type -- confirmed by testing against a
-# live client, and the reason it is *more* permissive than a condition rather
-# than the reverse: a `run`/`wait`/`parameter` substitution just embeds text,
-# so any renderable value serves, where `if`/`elseif`/`continue if` actually
-# branch on the answer and only accept a `boolean` or a `string`. An analysis
+# or no, and an `if`/`elseif`/`continue if` condition needs an answer to
+# branch on and only accepts a `boolean` or a `string`. An ordinary
+# ActionScript substitution is deliberately absent: confirmed with real
+# actions (#68), it accepts any renderable type and joins a plural value
+# rather than rejecting it -- a risk `_plural_substitution` reports as a
+# warning, not a requirement this table could fail. An analysis
 # property may legitimately be plural and of any renderable type, a `.rel`
 # file or a markdown block is not a slot at all, and the remaining contexts
 # have not been confirmed -- an unlisted kind is judged on nothing.
@@ -810,7 +828,6 @@ def _rule_for(check_code: str) -> str:
 # single-name shape and a set shape both needing their own branch.
 _SLOT_REQUIREMENTS: Final = {
     "relevance": ("singular", frozenset({"boolean"})),
-    "actionscript-substitution": ("singular", None),
     "actionscript-condition": ("singular", frozenset({"boolean", "string"})),
 }
 
@@ -883,6 +900,53 @@ def _slot_mismatch(site: RelevanceSite | None, report: RelevanceAnalysis) -> str
             "an aggregate such as `unique value of` collapses it"
         )
     return None
+
+
+# `tuple string items <n>` of one string answers at most one value: confirmed
+# in QnA, `number of tuple string items 0 of concatenations ", " of ("a";"b")`
+# is 1 (and 0 over no values).
+_TUPLE_STRING_ITEMS: Final = frozenset({"tuple string item", "tuple string items"})
+
+
+def _at_most_one_value(node: Node) -> bool:
+    """Whether ``node``, though perhaps spelled plural, cannot answer more than one value.
+
+    Narrow and syntactic on purpose, covering the shapes shipped content uses:
+    an aggregate applied to the whole value (`concatenations ", " of X`) and
+    `tuple string items <n>` of such a value. An aggregate *distributed* over
+    a plural -- `(concatenations ", " of it) of ("a";"b")`, a property `Of`
+    whose own object is `it` -- answers once per element (2, in QnA), so only
+    a bare `Reference` as the property counts. `unique values` is not an
+    aggregate in this sense: it answers once per distinct value.
+    """
+    if not isinstance(node, Of) or not isinstance(node.prop, Reference):
+        return False
+    phrase = node.prop.phrase
+    if phrase in _TUPLE_STRING_ITEMS:
+        return _at_most_one_value(node.obj)
+    return phrase not in {"unique value", "unique values"} and _is_aggregate(phrase)
+
+
+def _plural_substitution(site: RelevanceSite | None, report: RelevanceAnalysis) -> str | None:
+    """Whether an ordinary substitution's value may be more than one value.
+
+    Positive evidence only, as in `_slot_mismatch`: the checker has to be sure
+    the value is plural, and a value some other rule already ruled out (an
+    empty type set) is skipped.
+    """
+    if site is None or site.kind != "actionscript-substitution" or report.check is None:
+        return None
+    value = report.check.value
+    if value.plurality is not Plurality.PLURAL or (value.types is not None and not value.types):
+        return None
+    if report.node is not None and _at_most_one_value(report.node):
+        return None
+    return (
+        f"{site.context} is plural: the values are joined with no separator "
+        '(`("a";"b")` gives `ab`, no values give an empty string) -- use '
+        '`concatenation "<sep>" of (...)` if more than one is possible, or a tighter '
+        "filter if exactly one is meant"
+    )
 
 
 # Object types with no meaningful text form when substituted -- curated by
@@ -1037,6 +1101,10 @@ def lint_analysis(
     mismatch = _slot_mismatch(site, report)
     if mismatch is not None:
         emit("site-type-mismatch", mismatch, 1)
+
+    plural = _plural_substitution(site, report)
+    if plural is not None:
+        emit("plural-substitution", plural, 1)
 
     non_renderable = _non_renderable_substitution(site, report)
     if non_renderable is not None:
