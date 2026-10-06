@@ -377,12 +377,13 @@ class _Parser:
             return None
 
         if token.kind is TokenKind.PUNCT:
-            # `,` and `;` build flat sequence nodes rather than Binary chains:
-            # relevance has no nested tuple type (see nodes.py).
+            # `,` and `;` build flat sequence nodes rather than Binary chains.
+            # A parenthesized tuple is one item of the tuple around it, not
+            # spliced into it (see nodes.py).
             if token.text == "," and min_bp < grammar.BP_COMMA:
                 self.advance()
                 right = self.parse_expression(grammar.BP_COMMA)
-                return _sequence(TupleExpr, left, right)
+                return _sequence(TupleExpr, left, right, nested=self.grouped)
             if token.text == ";" and min_bp < grammar.BP_SEMICOLON:
                 self.advance()
                 right = self.parse_expression(grammar.BP_SEMICOLON)
@@ -566,11 +567,23 @@ def _widen(node: Node, opening: Token, closing: Token) -> Node:
     return dataclasses.replace(node, span=span)
 
 
-def _sequence(kind: type[TupleExpr] | type[Collection], left: Node, right: Node) -> Node:
-    """Extend or start a flat tuple/collection from one `,` or `;` step."""
+def _sequence(
+    kind: type[TupleExpr] | type[Collection],
+    left: Node,
+    right: Node,
+    *,
+    nested: dict[int, Node] | None = None,
+) -> Node:
+    """Extend or start a flat tuple/collection from one `,` or `;` step.
+
+    ``nested`` holds the nodes that came out of their own parentheses; one of
+    those is kept whole as a single item rather than spliced in.
+    """
 
     def items_of(node: Node) -> tuple[Node, ...]:
-        return node.items if isinstance(node, kind) else (node,)
+        if isinstance(node, kind) and (nested is None or id(node) not in nested):
+            return node.items
+        return (node,)
 
     return kind(
         span=_join_spans(left.span, right.span),

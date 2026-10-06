@@ -16,8 +16,11 @@ Design decisions pinned here
   strips a string's delimiting quotes for readability, nothing more.
 * Operators keep their **written spelling**: ``a is b`` is ``Binary("is")``,
   not a canonicalized ``=``. Canonicalization is a later, separate pass.
-* Tuples (``,``) and collections (``;``) are **flattened**: relevance has no
-  nested tuple type, ``((a, b), c)`` and ``(a, b, c)`` are the same value.
+* Collections (``;``) are **flattened**: ``((a; b); c)`` and ``(a; b; c)``
+  pool the same values. Tuples (``,``) are flat too, except that a
+  parenthesized tuple is one item of the tuple around it: the engine types
+  ``((1, "a"), true)`` as ``( ( integer, string ), boolean )``, and its
+  ``item 1`` is ``True``.
 """
 
 from __future__ import annotations

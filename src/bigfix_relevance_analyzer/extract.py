@@ -385,8 +385,12 @@ def _stripped(text: str, start: int = 0, end: int | None = None) -> tuple[int, s
 # ---------------------------------------------------------------------------
 
 # `createfile until X` / `appendfile until X` open a heredoc: every following
-# line up to a line that is exactly `X` is literal file content, so braces in
-# it are not relevance substitutions.
+# line up to a line that is exactly `X` is file content. The action engine
+# still substitutes relevance in it -- the official `createfile until`
+# reference uses `{name of operating system}` in a block body as its example,
+# and it is why heredoc payloads escape a literal brace as `{{` -- so the body
+# is scanned for substitutions, just not as ActionScript: `//` is not a
+# comment there, and `if {...}` is text, not a condition (issue 52).
 _HEREDOC_RE = re.compile(r"^\s*(?:create|append)file\s+until\s+(\S+)\s*$", re.IGNORECASE)
 
 # `if`, `elseif`, `continue if` write their condition directly against the
@@ -405,7 +409,8 @@ def _iter_substitution_spans(body: str) -> Iterator[tuple[int, int, str, bool]]:
     substitution in ``body``, ``offset`` being where the text starts in it.
 
     Handles `{{`/`}}` literal-brace escapes, ignores `}` inside a relevance
-    string literal, and skips heredoc content and `//` comment lines entirely. ``is_condition`` is
+    string literal, and skips `//` comment lines entirely -- except inside
+    heredoc content, where `//` is file content. ``is_condition`` is
     whether the substitution is the condition of an `if`/`elseif`/`continue
     if` command, which the type checker holds to a different requirement than
     an ordinary substitution -- see `_SLOT_REQUIREMENTS` in `lint.py`.
@@ -413,29 +418,29 @@ def _iter_substitution_spans(body: str) -> Iterator[tuple[int, int, str, bool]]:
     lines = body.split("\n")
     heredoc_terminator: str | None = None
 
-    # Offset of the start of each line within `body`, so a substitution that
-    # spans lines can be scanned as one string while still reporting the line
-    # it opened on.
+    # Offset of the start of each line within `body`, so each site's text can
+    # be mapped back to its position in the source.
     index = 0
     for line_number, line in enumerate(lines, start=1):
         line_start = index
         index += len(line) + 1
 
-        if heredoc_terminator is not None:
+        in_heredoc = heredoc_terminator is not None
+        if in_heredoc:
             if line.strip() == heredoc_terminator:
                 heredoc_terminator = None
-            continue
+                continue
+        else:
+            heredoc_match = _HEREDOC_RE.match(line)
+            if heredoc_match:
+                heredoc_terminator = heredoc_match.group(1)
+                continue
 
-        heredoc_match = _HEREDOC_RE.match(line)
-        if heredoc_match:
-            heredoc_terminator = heredoc_match.group(1)
-            continue
-
-        # A `//` line is an ActionScript comment: it never runs, so its
-        # substitutions are never evaluated. Checked after the heredoc test,
-        # because inside a heredoc `//` is file content.
-        if line.lstrip().startswith("//"):
-            continue
+            # A `//` line is an ActionScript comment: it never runs, so its
+            # substitutions are never evaluated. Only outside a heredoc,
+            # where `//` is file content.
+            if line.lstrip().startswith("//"):
+                continue
 
         column = 0
         while column < len(line):
@@ -446,34 +451,43 @@ def _iter_substitution_spans(body: str) -> Iterator[tuple[int, int, str, bool]]:
                 column = brace + 2
                 continue
 
-            end = _find_substitution_end(body, line_start + brace + 1)
+            # Line by line: a `}` on a later line never closes this one.
+            end = _find_substitution_end(body, line_start + brace + 1, line_start + len(line))
             if end is None:
-                logger.warning(
-                    "unterminated relevance substitution opened at line %d; skipping it",
-                    line_number,
-                )
-                return
+                # A `{` that is the line's very last character is written
+                # literally (`try {`); one with anything after it, even
+                # whitespace, fails the action (real actions, issue 52).
+                if brace == len(line) - 1:
+                    logger.debug("literal `{` at the end of line %d", line_number)
+                else:
+                    logger.warning(
+                        "unterminated relevance substitution opened at line %d; skipping it",
+                        line_number,
+                    )
+                break
 
             offset, text = _stripped(body, line_start + brace + 1, end)
             if text:
-                is_condition = _CONDITION_KEYWORD_RE.search(line[:brace]) is not None
+                is_condition = (
+                    not in_heredoc and _CONDITION_KEYWORD_RE.search(line[:brace]) is not None
+                )
                 yield line_number, offset, text, is_condition
             else:
                 logger.debug("empty relevance substitution at line %d", line_number)
 
-            if end < line_start + len(line):
-                column = end + 1 - line_start
-            else:
-                # The substitution ran past this line; resume scanning from the
-                # line the closing brace landed on.
-                break
+            column = end + 1 - line_start
 
 
-def _find_substitution_end(body: str, start: int) -> int | None:
-    """Index of the `}` closing a substitution opened just before ``start``."""
+def _find_substitution_end(body: str, start: int, stop: int) -> int | None:
+    """Index of the `}` closing a substitution opened just before ``start``.
+
+    Only ``body[start:stop]`` -- the rest of the opening line -- is searched:
+    the action engine substitutes line by line, so a substitution split over
+    lines never closes (real actions, issue 52).
+    """
     position = start
     in_string = False
-    while position < len(body):
+    while position < stop:
         char = body[position]
         if in_string:
             if char == '"':

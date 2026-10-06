@@ -8,10 +8,10 @@
 ----
 (tuple (num "1") (num "2") (num "3"))
 
-==== [unverified] parens do not nest a tuple inside a tuple
+==== parens nest a tuple inside a tuple (qna: item 1 of ((1, 2), 3) is 3)
 (1, 2), 3
 ----
-(tuple (num "1") (num "2") (num "3"))
+(tuple (tuple (num "1") (num "2")) (num "3"))
 
 ==== a semicolon builds a collection
 1; 2; 3

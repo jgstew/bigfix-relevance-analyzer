@@ -1076,7 +1076,7 @@
       "ok": true,
       "plurality": "plural",
       "types": [
-        "integer"
+        "( integer, integer, integer )"
       ]
     },
     "unknown_references": []

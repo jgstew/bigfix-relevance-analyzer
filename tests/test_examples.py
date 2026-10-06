@@ -260,14 +260,16 @@ EXPECTED: dict[str, Expected] = {
             (REL, CLIENT, 33),
             # Client relevance: ActionScript substitutions. Several lines carry
             # many of them -- a curl command line alone accounts for eight.
-            # The embedded BES document on line 105 sits inside a
-            # `createfile until END_OF_FILE` heredoc, so its braces are
-            # deliberately NOT extracted. Nor are lines 55-58: they are
-            # `// appendfile {...}` comments, which never run (issue 53).
+            # Lines 55-58 are NOT extracted: they are `// appendfile {...}`
+            # comments, which never run (issue 53).
             *((SUB, CLIENT, 85),) * 2,
             *((SUB, CLIENT, 88),) * 3,
             (COND, CLIENT, 92),
             *((SUB, CLIENT, 95),) * 8,
+            # The embedded BES document on line 105 sits inside a
+            # `createfile until END_OF_FILE` heredoc, and the action engine
+            # substitutes there too (issue 52): it generates the tasks.
+            (SUB, CLIENT, 105),
             (COND, CLIENT, 112),
             *((SUB, CLIENT, 114),) * 9,
             (COND, CLIENT, 119),

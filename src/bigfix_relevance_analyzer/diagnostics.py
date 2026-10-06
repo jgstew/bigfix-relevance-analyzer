@@ -97,10 +97,12 @@ PROPERTY_DIRECT_OBJECT_FRAGMENT: Final = " of <{name}>"
 
 FIELDS: Final = frozenset(
     {
+        "accepted",
         "argument_type",
         "cast_name",
         "direct_object",
         "fix",
+        "hint",
         "if_false_type",
         "if_true_type",
         "index",
@@ -442,6 +444,15 @@ _TYPE_CHECK: Final = [
         "property-not-defined",
         Origin.TYPE_CHECK,
         "the property '{phrase}{index}{direct_object}' is not defined",
+    ),
+    # The engine's wording for this is the generic `The operator "<name>" is
+    # not defined.`, which says nothing about the argument. This names it, and
+    # what the name takes instead (#14). {hint} is empty unless a `;` list
+    # would plausibly fix it -- see `STRING_LIST_HINT` in `typecheck`.
+    _entry(
+        "index-type-not-accepted",
+        Origin.TYPE_CHECK,
+        "the operator '{phrase}' is not defined for <{index}>: it takes {accepted}{hint}",
     ),
     # The world-scope sibling, in this catalog's own words rather than the
     # engine's. The engine would print the `property-not-defined` text here

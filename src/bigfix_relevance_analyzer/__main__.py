@@ -84,7 +84,7 @@ from bigfix_relevance_analyzer.lint import (
     counts,
     lint_analysis,
 )
-from bigfix_relevance_analyzer.typecheck import Plurality, _describe_types
+from bigfix_relevance_analyzer.typecheck import Plurality, _describe_value
 
 
 def _heading(level: int, text: str) -> str:
@@ -119,7 +119,7 @@ def _render_summary(report: RelevanceAnalysis, level: int) -> list[str]:
     if report.check is not None:
         types = report.check.value.types
         plurality = report.check.value.plurality
-        rendered = _describe_types(types)
+        rendered = _describe_value(report.check.value)
         if types and plurality is not Plurality.UNKNOWN:
             rendered = f"{plurality.value} {rendered}"
         lines.append(f"| Type | {rendered} |")

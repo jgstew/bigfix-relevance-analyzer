@@ -2314,3 +2314,194 @@ def test_plural_aggregate_over_untyped_tuple_items_stays_plural() -> None:
     result = analyze_relevance('concatenations "," of (item 1 of it) of ((1, "a"); (2, "b"))')
     assert result.check is not None
     assert result.check.value.plurality is Plurality.PLURAL
+
+
+# ---------------------------------------------------------------------------
+# A tuple's own type, and its plurality (#69)
+# ---------------------------------------------------------------------------
+#
+# Engine types are QnA's own `I:` line, identical on 20 client targets (macOS,
+# Windows, Linux; qna 9.5 through 11.0.7) -- see the evidence on #69.
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        (
+            "(version of client, name of it, version of it) of operating system",
+            "( version, string, version )",
+        ),
+        (
+            "(versions of client, names of it, versions of it) of operating systems",
+            "( version, string, version )",
+        ),
+        ('(1, "a")', "( integer, string )"),
+        ('((1, "a"), true)', "( ( integer, string ), boolean )"),
+    ],
+)
+def test_a_tuple_is_described_by_its_ordered_spelling(
+    source: str, expected: str, env: TypeEnvironment
+) -> None:
+    """Ordered, duplicates kept, nested -- not the set of member types."""
+    value = check(parse(source), env).value
+    assert typecheck._describe_value(value) == expected
+
+
+def test_a_non_tuple_is_still_described_by_its_type_set(env: TypeEnvironment) -> None:
+    value = check(parse("name of operating system"), env).value
+    assert typecheck._describe_value(value) == "string"
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ('(("a";"b"), 1)', Plurality.PLURAL),  # 2 answers in the engine
+        ("(name of operating system, (1;2))", Plurality.PLURAL),  # 2 answers
+        ('(1, "a")', Plurality.SINGULAR),
+    ],
+)
+def test_a_tuple_with_a_plural_member_is_plural(
+    source: str, expected: Plurality, env: TypeEnvironment
+) -> None:
+    """A plural item multiplies the tuples out -- the cross product."""
+    assert check(parse(source), env).value.plurality is expected
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ('number of (("a";"b"), (1;2;3))', {"integer"}),
+        ('item 1 of (1, "a")', {"string"}),
+    ],
+)
+def test_what_reads_a_tuple_keeps_its_types(
+    source: str, expected: set[str], env: TypeEnvironment
+) -> None:
+    assert types_of(source, env) == expected
+
+
+# ---------------------------------------------------------------------------
+# An index argument that no row of the name takes (#14)
+# ---------------------------------------------------------------------------
+#
+# The engine says `The operator "<name>" is not defined.` for each error case
+# below, on 20 client targets and in session relevance (besapi and a BigFix
+# MCP server agree) -- see the evidence on #14. The clean cases evaluate.
+
+INDEX_MISMATCH = "index-type-not-accepted"
+
+
+def _index_mismatches(source: str, env: TypeEnvironment) -> list[str]:
+    return [
+        diagnostic.message
+        for diagnostic in check(parse(source), env).diagnostics
+        if diagnostic.code == INDEX_MISMATCH
+    ]
+
+
+@pytest.mark.parametrize(
+    "source",
+    ['exists folders ("a", "b")', 'exists files ("a", "b")', 'exists folder ("a", "b")'],
+)
+def test_a_comma_list_to_a_string_index_is_reported_with_the_semicolon_hint(
+    source: str, env: TypeEnvironment
+) -> None:
+    """`,` built a tuple where a list of strings was meant -- the fix is `;`."""
+    [message] = _index_mismatches(source, env)
+    assert "( string, string )" in message
+    assert "`;`" in message
+
+
+@pytest.mark.parametrize(
+    "source", ['exists bes properties ("a", "b")', 'base64 encodes ("a", "b")']
+)
+def test_the_same_mistake_is_reported_in_session_relevance(
+    source: str, session_env: TypeEnvironment
+) -> None:
+    [message] = _index_mismatches(source, session_env)
+    assert "`;`" in message
+
+
+def test_a_tuple_of_the_wrong_shape_lists_what_the_name_takes(env: TypeEnvironment) -> None:
+    """`integers in` takes only integer tuples, so no `;` hint: qna says
+    `integers in ("a", "b")` is `not defined`, `integers in (1, 4)` is 1-4."""
+    [message] = _index_mismatches('integers in ("a", "b")', env)
+    assert "( integer, integer )" in message
+    assert "`;`" not in message
+
+
+def test_a_name_with_both_a_tuple_and_a_string_row_gets_both_and_the_hint(
+    env: TypeEnvironment,
+) -> None:
+    """`substring` takes `( integer, integer )`, and its spelling also reaches
+    the `<string>` row: qna answers `substring "b" of "abc"` (`b`) and
+    `substrings ("a"; "b") of "abcdef"` (`a`, `b`). So the `;` hint is right."""
+    [message] = _index_mismatches('substring ("a", "b") of "abcdef"', env)
+    assert "( integer, integer )" in message
+    assert "<string>" in message
+    assert "`;`" in message
+
+
+def test_an_index_mismatch_is_the_only_finding_for_its_reference(
+    env: TypeEnvironment,
+) -> None:
+    """Ruling the value out must not also trip `property-not-defined`."""
+    assert codes_of('substring ("a", "b") of "abcdef"', env) == [INDEX_MISMATCH]
+
+
+def test_a_scalar_where_only_a_tuple_is_taken_is_reported(
+    session_env: TypeEnvironment,
+) -> None:
+    """At the root, session `private variable` takes only `( string, string )`:
+    `private variable "a"` is `not defined` on the server. Not a `,`-for-`;`
+    mistake, so no hint."""
+    [message] = _index_mismatches('exists private variable "a"', session_env)
+    assert "( string, string )" in message
+    assert "`;`" not in message
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'exists folders ("a"; "b")',
+        'exists folders "a"',
+        'substring (1, 2) of "abcdef"',
+        'substrings ((1, 2); (0, 1)) of "abcdef"',
+        "integers in (1, 4)",
+        'exists folders (zz_unknown, "b")',  # untyped member: positive evidence only
+        'exists file "c:\\windows"',
+    ],
+)
+def test_an_index_a_row_takes_is_silent(source: str, env: TypeEnvironment) -> None:
+    assert _index_mismatches(source, env) == []
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'exists private variable ("a", "b")',  # `False` on the server
+        'exists bes properties ("a"; "b")',
+    ],
+)
+def test_a_session_index_a_row_takes_is_silent(source: str, session_env: TypeEnvironment) -> None:
+    assert _index_mismatches(source, session_env) == []
+
+
+def test_item_of_a_nested_tuple_reads_the_outer_position(env: TypeEnvironment) -> None:
+    """`item 1 of ((1, "a"), true)` is `True` in the engine, and `item 2` is
+    out of range: the inner tuple is one item."""
+    assert types_of('item 1 of ((1, "a"), true)', env) == {"boolean"}
+    assert "tuple-index-out-of-range" in codes_of('item 2 of ((1, "a"), true)', env)
+
+
+def test_an_index_mismatch_is_caught_on_a_world_name_inside_a_context(
+    env: TypeEnvironment,
+) -> None:
+    """Inside `whose`, `folders` falls back to the world -- same check there."""
+    assert len(_index_mismatches('exists "x" whose (exists folders ("a", "b"))', env)) == 1
+
+
+def test_an_index_mismatch_does_not_cascade(env: TypeEnvironment) -> None:
+    """The value is ruled out, so nothing downstream reports on it again --
+    the `= 1` would otherwise be a string-to-integer comparison finding."""
+    assert codes_of('name of folder ("a", "b") = 1', env) == [INDEX_MISMATCH]

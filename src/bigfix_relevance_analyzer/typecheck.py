@@ -321,7 +321,14 @@ class CheckResult:
         platforms are *missing*.
         """
         return {
-            "types": None if self.value.types is None else sorted(self.value.types),
+            # A tuple is typed by its own spelling, as the engine types it (#69).
+            "types": (
+                sorted(self.value.tuple_types)
+                if self.value.tuple_types
+                else None
+                if self.value.types is None
+                else sorted(self.value.types)
+            ),
             "plurality": self.value.plurality.value,
             "known": self.value.known,
             "ok": self.ok,
@@ -398,6 +405,28 @@ def _describe_types(types: frozenset[str] | None) -> str:
     return " or ".join(sorted(types))
 
 
+_STRING_INDEXES: Final = frozenset({"string", "binary_string"})
+"""Index types a `;`-separated list of strings can fill, one string at a time."""
+
+STRING_LIST_HINT: Final = (
+    ' -- the `,` built one tuple; to pass several values use `;`, as in {phrase} ("a"; "b")'
+)
+"""Renders the ``{hint}`` slot of ``index-type-not-accepted``."""
+
+
+def _describe_value(value: RelevanceValue) -> str:
+    """A value's type as a reader sees it -- a tuple by its own spelling.
+
+    The engine types a tuple as one ordered, positional thing that keeps
+    duplicates and nests: `( version, string, version )`, `( ( integer, string
+    ), boolean )`. Its member types, :attr:`RelevanceValue.types`, read as a
+    union -- `string or version` -- which is not what it answers (#69).
+    """
+    if value.tuple_types:
+        return " or ".join(sorted(value.tuple_types))
+    return _describe_types(value.types)
+
+
 MAX_TUPLE_SPELLINGS: Final = 8
 """How many tuple spellings one tuple may be given before none is.
 
@@ -420,19 +449,22 @@ def _tuple_spellings(values: Sequence[RelevanceValue]) -> frozenset[str]:
     computer, bes user )>` / `<( bes user, bes computer )>` rows are separate
     entries precisely because the engine distinguishes them.
 
+    A nested tuple is spelled as a tuple, not as its members: the engine types
+    `((1, "a"), true)` as `( ( integer, string ), boolean )`.
+
     Empty when any element is untyped, or when the product would exceed
     :data:`MAX_TUPLE_SPELLINGS`.
     """
     if not values or any(not value.types for value in values):
         return frozenset()
+    names = [sorted(value.tuple_types or value.types or ()) for value in values]
     total = 1
-    for value in values:
-        total *= len(value.types or ())
+    for spellings in names:
+        total *= len(spellings)
         if total > MAX_TUPLE_SPELLINGS:
             return frozenset()
     return frozenset(
-        "( " + ", ".join(combination) + " )"
-        for combination in itertools.product(*(sorted(value.types or ()) for value in values))
+        "( " + ", ".join(combination) + " )" for combination in itertools.product(*names)
     )
 
 
@@ -1514,7 +1546,13 @@ class _Checker:
             platforms &= value.platforms
         return RelevanceValue(
             types=types,
-            plurality=Plurality.PLURAL if isinstance(node, Collection) else Plurality.SINGULAR,
+            # A tuple with a plural member is the cross product of its members:
+            # `(("a";"b"), 1)` answers twice in the engine (#69).
+            plurality=(
+                Plurality.PLURAL
+                if isinstance(node, Collection)
+                else _widen(*(value.plurality for value in values))
+            ),
             tuple_types=tuple_types,
             platforms=platforms,
         )
@@ -1590,7 +1628,7 @@ class _Checker:
             world = resolve_property(node.phrase, None, self.env, indexed=node.index is not None)
             if world.types:
                 self.record(node, None)
-                return world
+                return self.check_index(node, index, None, world)
         if value.types is not None and not value.types:
             index_fragment = (
                 ""
@@ -1643,7 +1681,59 @@ class _Checker:
             # runtime error about the same mistake -- the object here is the
             # world rather than a plural expression.
             self.report("singular-over-plural-object", node.span, phrase=node.phrase)
-        return value
+        return self.check_index(node, index, subject, value)
+
+    def check_index(
+        self,
+        node: Reference,
+        index: RelevanceValue | None,
+        subject: frozenset[str] | None,
+        value: RelevanceValue,
+    ) -> RelevanceValue:
+        """``value``, ruled out when no matched row takes ``index``'s shape (#14).
+
+        Only the tuple-versus-scalar shape is compared, never a scalar's type:
+        a string literal satisfies a `<binary_string>` index through a
+        conversion this package does not model (see :func:`resolve_property`).
+        A tuple has to match a row's tuple spelling exactly -- the engine
+        rejects `folders ("a", "b")` and `substring ("a", "b") of "x"` alike
+        with `The operator "<name>" is not defined.` -- and a scalar cannot
+        fill a row that takes only a tuple (session `private variable "a"`).
+        Positive evidence only: an untyped index, or a tuple too ambiguous to
+        spell, decides nothing.
+        """
+        if index is None or index.types is None or not value.types:
+            return value
+        given = index.tuple_types | {name for name in index.types if name.startswith("(")}
+        rows = _matched_rows(node.phrase, subject, self.env, indexed=True) or []
+        if not rows:
+            return value
+
+        def takes(row: inspectors.Inspector) -> bool:
+            assert row.index_type is not None
+            if given:
+                return row.index_type in given
+            return not row.index_type.startswith("(")
+
+        if any(takes(row) for row in rows):
+            return value
+        accepted = sorted({row.index_type for row in rows if row.index_type is not None})
+        # The `,`-for-`;` reading is only justified when a row takes a list
+        # element the comma list was presumably meant to supply.
+        hint = (
+            STRING_LIST_HINT.format(phrase=node.phrase)
+            if given and any(row.index_type in _STRING_INDEXES for row in rows)
+            else ""
+        )
+        self.report(
+            "index-type-not-accepted",
+            node.span,
+            phrase=node.phrase,
+            index=" or ".join(sorted(given)) if given else _describe_types(index.types),
+            accepted=" or ".join(f"<{name}>" for name in accepted),
+            hint=hint,
+        )
+        return replace(value, types=frozenset())
 
     def combine_of(self, node: Of, prop: RelevanceValue, obj: RelevanceValue) -> RelevanceValue:
         """`A of B` -- the property's own type, and the written form's plurality.

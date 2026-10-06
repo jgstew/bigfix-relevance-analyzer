@@ -860,3 +860,25 @@ def test_cli_text_cuts_a_long_structure_line_and_points_at_verbose(
     structure = next(line for line in capsys.readouterr().out.splitlines() if "Structure" in line)
 
     assert "... (18 nodes, depth 7; --verbose for all of it)" in structure
+
+
+# #69: a tuple's type is its ordered spelling in every output format.
+TUPLE_STATEMENT = "(version of client, name of it, version of it) of operating system"
+
+
+def test_cli_text_returns_a_tuple_by_its_spelling(capsys: pytest.CaptureFixture[str]) -> None:
+    main([TUPLE_STATEMENT])
+    out = capsys.readouterr().out
+    assert "singular ( version, string, version )" in out
+    assert "string or version" not in out
+
+
+def test_cli_markdown_types_a_tuple_by_its_spelling(capsys: pytest.CaptureFixture[str]) -> None:
+    main(["--markdown", TUPLE_STATEMENT])
+    assert "| Type | singular ( version, string, version ) |" in capsys.readouterr().out
+
+
+def test_cli_json_types_a_tuple_by_its_spelling(capsys: pytest.CaptureFixture[str]) -> None:
+    main(["--json", TUPLE_STATEMENT])
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["types"]["types"] == ["( version, string, version )"]

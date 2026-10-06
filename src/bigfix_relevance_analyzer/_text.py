@@ -25,7 +25,7 @@ from typing import TextIO
 
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis
 from bigfix_relevance_analyzer.lint import Finding, LintConfig, Severity
-from bigfix_relevance_analyzer.typecheck import Plurality, _describe_types
+from bigfix_relevance_analyzer.typecheck import Plurality, _describe_value
 
 __all__: list[str] = []
 
@@ -120,7 +120,7 @@ def _returns(report: RelevanceAnalysis) -> str | None:
         return None
     types = report.check.value.types
     plurality = report.check.value.plurality
-    rendered = _describe_types(types)
+    rendered = _describe_value(report.check.value)
     if types and plurality is not Plurality.UNKNOWN:
         rendered = f"{plurality.value} {rendered}"
     return rendered

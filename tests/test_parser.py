@@ -759,3 +759,29 @@ def test_parenthesized_marks_survive_address_reuse() -> None:
     # CPython hands freed slots straight back to new same-size objects.
     reused = [node() for _ in range(1000)]
     assert not any(id(node) in parser.grouped for node in reused)
+
+
+# A parenthesized tuple inside a tuple stays a tuple. Confirmed in qna
+# (11.0.6.137), which types `((1, "a"), true)` as `( ( integer, string ),
+# boolean )` on 20 client targets (#69):
+#
+#     Q: item 1 of ((1, "a"), true)      A: True
+#     Q: item 0 of ((1, "a"), true)      A: 1, a
+#     Q: item 2 of ((1, "a"), true)      E: The tuple index 2 is out of range.
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ('((1, "a"), true)', '(tuple (tuple (num "1") (str "a")) (ref "true"))'),
+        ('(1, ("a", true))', '(tuple (num "1") (tuple (str "a") (ref "true")))'),
+        ('1, "a", true', '(tuple (num "1") (str "a") (ref "true"))'),
+    ],
+)
+def test_only_parentheses_nest_a_tuple(source: str, expected: str) -> None:
+    assert to_sexpr(parse(source)) == expected
+
+
+def test_a_collection_still_flattens() -> None:
+    """Pooling is flat: `((1; 2); 3)` is the same three values as `(1; 2; 3)`."""
+    assert to_sexpr(parse("((1; 2); 3)")) == '(coll (num "1") (num "2") (num "3"))'

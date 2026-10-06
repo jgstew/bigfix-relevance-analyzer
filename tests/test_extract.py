@@ -144,35 +144,118 @@ def test_actionscript_line_numbers_are_one_based_within_the_body() -> None:
     assert [site.line for site in sites] == [2, 4]
 
 
-def test_actionscript_multiline_substitution_reports_opening_line() -> None:
+# Substitution is line by line. Confirmed with real actions on two Windows
+# clients (BES 11.0.6.137, actions 39242-39248, issue 52): a substitution
+# split over two lines fails, inside a `createfile until` body and outside one,
+# while an unclosed `{` with nothing after it (`try {`, a lone `{`) and a lone
+# `}` are written literally.
+
+
+def test_actionscript_substitution_does_not_span_lines() -> None:
     body = "exit {\n  number of\n  folders of client\n}\nappendfile {name of it}"
     sites = extract_relevance_from_actionscript(body)
-    assert [site.line for site in sites] == [1, 5]
-    assert sites[0].text == "number of\n  folders of client"
+    assert texts(sites) == ["name of it"]
+    assert sites[0].line == 5
 
 
-def test_actionscript_createfile_heredoc_content_is_excluded() -> None:
+def test_actionscript_closing_brace_on_a_later_line_is_not_joined() -> None:
+    body = 'parameter "p" = "{"a" &\n"b"}"\nexit {name of it}'
+    assert texts(extract_relevance_from_actionscript(body)) == ["name of it"]
+
+
+def test_actionscript_unclosed_brace_does_not_end_the_scan() -> None:
+    body = "exit {number of folders of client\nappendfile {name of it}"
+    sites = extract_relevance_from_actionscript(body)
+    assert texts(sites) == ["name of it"]
+    assert sites[0].line == 2
+
+
+def test_actionscript_heredoc_unclosed_braces_are_literal() -> None:
+    """The PowerShell shape from `Get Azure Metadata - Universal.bes`: its
+    `try {` / `} catch {` lines are written as-is, so only the real
+    substitution on its own line is a site."""
     body = "\n".join(
         [
             "createfile until END_OF_FILE",
-            "{ not a substitution, this is heredoc content }",
+            "try {",
+            '$r = Invoke-RestMethod -Uri "{parameter "MetadataURL"}"',
+            "} catch {",
+            "    exit 1",
+            "}",
+            "END_OF_FILE",
+        ]
+    )
+    sites = extract_relevance_from_actionscript(body)
+    assert texts(sites) == ['parameter "MetadataURL"']
+    assert sites[0].line == 3
+
+
+# Issue 52: the action engine substitutes relevance inside `createfile until`
+# / `appendfile until` content too -- the official `createfile until`
+# reference uses `{name of operating system}` in a block body as its own
+# example -- which is why heredoc payloads escape a literal brace as `{{`. So an
+# unescaped `{...}` in the body is a real substitution site.
+
+
+def test_actionscript_createfile_heredoc_substitutions_are_extracted() -> None:
+    body = "\n".join(
+        [
+            "createfile until END_OF_FILE",
+            "Operating system = {name of operating system}",
+            "Processor count = {number of processors}",
             "END_OF_FILE",
             "appendfile {name of it}",
         ]
     )
     sites = extract_relevance_from_actionscript(body)
-    assert texts(sites) == ["name of it"]
-    assert sites[0].line == 4
+    assert texts(sites) == ["name of operating system", "number of processors", "name of it"]
+    assert [site.line for site in sites] == [2, 3, 5]
+    assert {site.kind for site in sites} == {"actionscript-substitution"}
 
 
-def test_actionscript_appendfile_heredoc_content_is_excluded() -> None:
-    body = "appendfile until _END_\n{nope}\n_END_\nexit {name of it}"
-    assert texts(extract_relevance_from_actionscript(body)) == ["name of it"]
+def test_actionscript_appendfile_heredoc_substitutions_are_extracted() -> None:
+    body = "appendfile until _END_\n{name of client}\n_END_\nexit {name of it}"
+    assert texts(extract_relevance_from_actionscript(body)) == ["name of client", "name of it"]
+
+
+def test_actionscript_escaped_brace_in_a_heredoc_is_literal() -> None:
+    body = "createfile until END\nfunction f() {{ return 1; }}\necho {name of client}\nEND"
+    assert texts(extract_relevance_from_actionscript(body)) == ["name of client"]
+
+
+def test_actionscript_comment_inside_a_heredoc_is_still_content() -> None:
+    """Inside a heredoc `//` is file content, so its substitutions run."""
+    body = "createfile until END\n// {name of client}\nEND\n// appendfile {name of it}"
+    sites = extract_relevance_from_actionscript(body)
+    assert texts(sites) == ["name of client"]
+    assert sites[0].line == 2
+
+
+def test_actionscript_keyword_inside_a_heredoc_is_content_not_a_condition() -> None:
+    """`if {...}` written into a file is text, not an ActionScript `if`."""
+    body = "createfile until END\nif {name of client}\nEND"
+    [site] = extract_relevance_from_actionscript(body)
+    assert site.kind == "actionscript-substitution"
 
 
 def test_actionscript_heredoc_terminator_must_match_exactly() -> None:
-    """A different token does not end the heredoc, so its braces stay excluded."""
-    body = "createfile until END_OF_FILE\n{nope}\nSOMETHING_ELSE\n{still nope}"
+    """A different token does not end the heredoc, so a following `//` line is
+    still content; only the real terminator returns to ActionScript, where it
+    is a comment again."""
+    body = "\n".join(
+        [
+            "createfile until END_OF_FILE",
+            "SOMETHING_ELSE",
+            "// {name of client}",
+            "END_OF_FILE",
+            "// {nope}",
+        ]
+    )
+    assert texts(extract_relevance_from_actionscript(body)) == ["name of client"]
+
+
+def test_actionscript_heredoc_terminator_line_is_not_scanned() -> None:
+    body = "createfile until {nope}\nx\n{nope}"
     assert extract_relevance_from_actionscript(body) == []
 
 
@@ -201,12 +284,6 @@ def test_actionscript_double_slash_mid_line_is_not_a_comment() -> None:
     assert texts(extract_relevance_from_actionscript(body)) == ["name of it"]
 
 
-def test_actionscript_comment_inside_a_heredoc_is_still_content() -> None:
-    """Inside a heredoc `//` is file content; the heredoc still ends on its terminator."""
-    body = "createfile until END\n// {nope}\nEND\nappendfile {name of it}"
-    assert texts(extract_relevance_from_actionscript(body)) == ["name of it"]
-
-
 def test_actionscript_unterminated_substitution_warns_and_yields_nothing(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -214,6 +291,32 @@ def test_actionscript_unterminated_substitution_warns_and_yields_nothing(
         sites = extract_relevance_from_actionscript("exit {number of folders of client")
     assert sites == []
     assert any(record.levelno == logging.WARNING for record in caplog.records)
+
+
+# Actions 39249-39254 (issue 52): an unclosed `{` is written literally only
+# when it is the line's last character -- `try {` and `} catch {` work, while
+# `x {   ` (trailing spaces), `x { name of operating system` and
+# `parameter "p" = "try {"` all fail the action.
+
+
+@pytest.mark.parametrize(
+    "line", ["exit {number of folders of client", "x {   ", 'parameter "p" = "try {"']
+)
+def test_actionscript_unclosed_brace_with_anything_after_it_warns(
+    caplog: pytest.LogCaptureFixture, line: str
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="bigfix_relevance_analyzer"):
+        assert extract_relevance_from_actionscript(line) == []
+    assert any(record.levelno == logging.WARNING for record in caplog.records)
+
+
+@pytest.mark.parametrize("line", ["try {", "} catch {", "{"])
+def test_actionscript_unclosed_brace_at_end_of_line_is_literal_and_quiet(
+    caplog: pytest.LogCaptureFixture, line: str
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="bigfix_relevance_analyzer"):
+        assert extract_relevance_from_actionscript(line) == []
+    assert not any(record.levelno >= logging.WARNING for record in caplog.records)
 
 
 # --------------------------------------------------------------------------
