@@ -390,7 +390,7 @@ def test_the_cli_shows_the_suggested_relevance_and_applied_counts(
 ) -> None:
     from bigfix_relevance_analyzer.__main__ import main
 
-    assert main([*flags, "--dialect", "client", CASCADE]) == 0
+    assert main(["--markdown", *flags, "--dialect", "client", CASCADE]) == 0
     out = capsys.readouterr().out
     assert "## Suggested fix" in out
     assert f"```\n{CASCADE_FIXED}\n```" in out
@@ -402,7 +402,7 @@ def test_the_cli_shows_no_suggested_fix_when_nothing_fixes(
 ) -> None:
     from bigfix_relevance_analyzer.__main__ import main
 
-    assert main(["--dialect", "client", CASCADE_FIXED]) == 0
+    assert main(["--markdown", "--dialect", "client", CASCADE_FIXED]) == 0
     assert "Suggested fix" not in capsys.readouterr().out
 
 

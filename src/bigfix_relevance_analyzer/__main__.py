@@ -5,7 +5,13 @@
     python -m bigfix_relevance_analyzer --verbose 'names of files of folder "/tmp"'
     python -m bigfix_relevance_analyzer MyFixlet.bes
 
-Default output is compact: the statement, a one-screen summary, and -- only
+Default output is plain terminal text from
+:mod:`~bigfix_relevance_analyzer._text`: a verdict, aligned summary rows, any
+issues, and a closing ``No issues found.`` or error/warning tally.
+``--markdown`` renders the same report as Markdown via :func:`render` (below),
+for pasting into an issue or a PR; ``--json`` is for a program.
+
+The Markdown report is compact: the statement, a one-screen summary, and -- only
 when :mod:`~bigfix_relevance_analyzer.lint`'s rules found something worth
 flagging (a parse error, an unbound ``it``, a type error, an unknown
 inspector, or complexity/evaluation cost past its default ceiling) -- an
@@ -53,29 +59,30 @@ from pathlib import Path
 
 from bigfix_relevance_analyzer._cli_common import (
     add_ceiling_args,
+    add_format_args,
     add_scope_args,
     config_from_args,
     dialect_from_args,
     emit_json,
-    emit_rules_json,
-    lint_targets,
+    output_format,
+    print_rules,
 )
 from bigfix_relevance_analyzer._markdown import capped, code_cell, table
 from bigfix_relevance_analyzer._serialize import _path
-from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis, analyze
+from bigfix_relevance_analyzer._text import Style, render_text, verdict_line
+from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.extract import RelevanceSite, extract_relevance_from_file
 from bigfix_relevance_analyzer.lint import (
-    DEFAULT_MAX_DEPTH,
     DEFAULT_MAX_EVALUATION_COST,
     DEFAULT_MAX_SCORE,
     Finding,
     LintConfig,
     _analyze_site,
+    _analyze_text,
     _passed,
     counts,
     lint_analysis,
-    rules,
 )
 from bigfix_relevance_analyzer.typecheck import Plurality, _describe_types
 
@@ -362,6 +369,12 @@ def render(
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _prog() -> str:
+    """The name to report usage under: the console script, or ``python -m``."""
+    name = Path(sys.argv[0]).name
+    return name if name.startswith("bigfix-relevance") else "python -m bigfix_relevance_analyzer"
+
+
 def _site_heading(site: RelevanceSite) -> str:
     return f"{site.context} (line {site.line}, {site.kind})"
 
@@ -370,16 +383,18 @@ def _run_file(
     path: Path,
     config: LintConfig,
     *,
-    as_json: bool,
+    output: str,
     mermaid: bool,
     verbose: bool,
 ) -> int:
     sites = extract_relevance_from_file(path)
     if not sites:
-        if as_json:
+        if output == "json":
             emit_json({"file": _path(path), "sites": []})
-        else:
+        elif output == "markdown":
             print(f"# Relevance Analysis: {path}\n\nNo relevance found.")
+        else:
+            print(f"{path}: no relevance found.")
         return 0
 
     # Each site in its extracted dialect unless --dialect forced one, through
@@ -389,7 +404,7 @@ def _run_file(
         lint_analysis(report, config, path=path, base_line=site.line, site=site)
         for site, report in reports
     ]
-    if as_json:
+    if output == "json":
         emit_json(
             {
                 "file": _path(path),
@@ -406,6 +421,30 @@ def _run_file(
                 ],
             }
         )
+    elif output == "text":
+        style = Style.for_stream(sys.stdout)
+        print(style.bold(f"{path}: {len(sites)} relevance site(s) found."))
+        total = len(sites)
+        paired = enumerate(zip(reports, findings, strict=True), 1)
+        for index, ((site, report), site_findings) in paired:
+            heading = f"Site {index} of {total}: {_site_heading(site)}"
+            print()
+            print(
+                render_text(
+                    report,
+                    site_findings,
+                    config,
+                    style,
+                    heading=heading,
+                    verbose=verbose,
+                    mermaid=mermaid,
+                ),
+                end="",
+            )
+        if total > 1:
+            every = tuple(finding for site_findings in findings for finding in site_findings)
+            print()
+            print(style.bold(f"All {total} sites: ") + verdict_line(every, style))
     else:
         print(f"# Relevance Analysis: {path}\n")
         print(f"{len(sites)} relevance site(s) found.\n")
@@ -422,59 +461,9 @@ def _run_file(
                     verbose=verbose,
                 )
             )
-    return 0 if all(report.parsed for _site, report in reports) else 1
-
-
-def _run_check(paths: list[str], config: LintConfig, *, max_depth: int) -> int:
-    """Lint every path: one grep-able line per finding, for a hook or CI.
-
-    Given no paths at all, walks the current directory (see
-    :func:`~bigfix_relevance_analyzer.lint.lint_directory`) instead of erroring --
-    an *explicit* path, including ``.``, is never expanded this way.
-
-    The full rule set and its severities live in
-    :mod:`~bigfix_relevance_analyzer.lint`; ``bigfix-relevance-lint`` (see
-    :mod:`~bigfix_relevance_analyzer._lint_cli`) offers the rest of that
-    module's knobs (per-code severity overrides, ``--fail-on-warning``,
-    ``--quiet``) for a caller that needs them -- this flag exists so the same
-    judgement is reachable without a second console script installed.
-    """
-    findings = lint_targets(paths, config, max_depth=max_depth)
-    for finding in findings:
-        print(finding)
-    # Same verdict `bigfix-relevance-lint` exits on, from the same tally -- see
-    # :func:`~bigfix_relevance_analyzer.lint.counts`.
-    return 0 if _passed(counts(findings)) else 1
-
-
-def _run_rules(*, as_json: bool) -> int:
-    """Print the lint rule catalog -- see :data:`~bigfix_relevance_analyzer.lint.RULES`.
-
-    Here as well as on ``bigfix-relevance-lint`` because the codes show up in
-    this CLI's ``--check`` output too, and a code should be lookup-able with
-    whichever entry point produced it.
-    """
-    if as_json:
-        return emit_rules_json()
-
-    listed = rules()
-    defaults = LintConfig()
-    print("# Lint rules\n")
-    rows = [
-        (
-            f"`{rule.code}`",
-            rule.default_severity.value,
-            rule.summary,
-            (
-                f"`{rule.threshold}` (default {getattr(defaults, rule.threshold):g})"
-                if rule.threshold
-                else "always on"
-            ),
-        )
-        for rule in listed
-    ]
-    print(table(("Code", "Default", "Fires when", "Ceiling"), rows))
-    return 0
+    return (
+        0 if _passed(counts(tuple(f for site_findings in findings for f in site_findings))) else 1
+    )
 
 
 def _run_reference(slug: str, *, brief: bool, as_json: bool) -> int:
@@ -540,8 +529,17 @@ def _run_search(query: str, dialect: Dialect | None, *, as_json: bool) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments, analyse, print. Returns a process exit status."""
+    arguments = sys.argv[1:] if argv is None else list(argv)
+    if "--check" in arguments:
+        # Linting has one implementation: `bigfix-relevance-lint`'s. Every
+        # other argument is handed to it untouched, so `--check` takes all of
+        # that command's flags and can never drift from it.
+        from bigfix_relevance_analyzer import _lint_cli
+
+        arguments.remove("--check")
+        return _lint_cli.main(arguments, prog=f"{_prog()} --check")
     parser = argparse.ArgumentParser(
-        prog="python -m bigfix_relevance_analyzer",
+        prog=_prog(),
         description=(
             "Analyse one BigFix Relevance statement: dialect, parse, types, "
             "platforms, bindings, breakdown probes, complexity. Prints a "
@@ -555,10 +553,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "relevance",
         nargs="*",
-        help=(
-            "the statement, or a file path; omit to read stdin. "
-            "With --check, one or more files to lint"
-        ),
+        help="the statement, or a file path; omit to read stdin",
     )
     add_scope_args(
         parser,
@@ -583,12 +578,17 @@ def main(argv: list[str] | None = None) -> int:
             "parse tree section to add it to"
         ),
     )
-    parser.add_argument("--json", action="store_true", help="emit the analysis as JSON")
-    parser.add_argument(
-        "--rules",
-        action="store_true",
-        help="print the lint rule catalog and exit, instead of analysing anything",
+    add_format_args(
+        parser, json_help="emit the analysis as JSON, for a program, an MCP server or an AI agent"
     )
+    parser.add_argument(
+        "--list-rules",
+        action="store_true",
+        help="print every lint rule, its default severity and what it means, then exit",
+    )
+    # The pre-1.16 spelling, kept working but unlisted: `--list-rules` is the
+    # name `bigfix-relevance-lint` uses, and both commands now share it.
+    parser.add_argument("--rules", dest="list_rules", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
         "--reference",
         choices=["client", "session", "dialects", "universal"],
@@ -610,12 +610,14 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="with --reference, the authored prose only, without the generated tables",
     )
+    # Never parsed here: `main` hands everything to `bigfix-relevance-lint`
+    # first. Declared only so `--help` lists it.
     parser.add_argument(
         "--check",
         action="store_true",
         help=(
-            "lint the given files instead of analysing a single statement -- "
-            "one grep-able line per finding, for a pre-commit hook or CI"
+            "lint files (or statements) instead -- exactly `bigfix-relevance-lint`, "
+            "with all of its flags; see `--check --help`"
         ),
     )
     add_ceiling_args(
@@ -628,14 +630,14 @@ def main(argv: list[str] | None = None) -> int:
             "raise the evaluation-cost ceiling above its default "
             f"({DEFAULT_MAX_EVALUATION_COST:g}); a cost over it is always reported"
         ),
-        max_depth_help=(
-            "with --check and no paths, how many directory levels to walk "
-            f"(default {DEFAULT_MAX_DEPTH})"
-        ),
+        max_depth_help=None,
     )
     args = parser.parse_args(argv)
     forced = dialect_from_args(args)
-    config = config_from_args(args)
+    # "Did you mean" candidates cost milliseconds per unknown name -- nothing
+    # for the one statement or one file this command analyses.
+    config = dataclasses.replace(config_from_args(args), suggest=True)
+    output = output_format(args)
     # The parse tree section -- where the flowchart lives -- only renders in
     # verbose mode, so --mermaid without --verbose would otherwise do nothing.
     verbose = args.verbose or args.mermaid
@@ -643,8 +645,8 @@ def main(argv: list[str] | None = None) -> int:
     # Both of these are questions about the language or the tool rather than
     # about a statement, so they are answered before anything else looks at the
     # positional arguments -- and they exit 0 even alongside a broken file.
-    if args.rules:
-        return _run_rules(as_json=args.json)
+    if args.list_rules:
+        return print_rules(output)
 
     if args.reference is not None:
         return _run_reference(args.reference, brief=args.brief, as_json=args.json)
@@ -652,11 +654,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.search is not None:
         return _run_search(args.search, forced, as_json=args.json)
 
-    if args.check:
-        return _run_check(args.relevance, config, max_depth=args.max_depth)
-
     if len(args.relevance) > 1:
-        parser.error("only one statement or file is accepted without --check")
+        parser.error("only one statement or file is accepted; use --check to lint several")
 
     if args.relevance:
         candidate = Path(args.relevance[0])
@@ -669,7 +668,7 @@ def main(argv: list[str] | None = None) -> int:
             is_file = False
         if is_file:
             return _run_file(
-                candidate, config, as_json=args.json, mermaid=args.mermaid, verbose=verbose
+                candidate, config, output=output, mermaid=args.mermaid, verbose=verbose
             )
         text = args.relevance[0].strip()
     else:
@@ -678,19 +677,27 @@ def main(argv: list[str] | None = None) -> int:
     if not text:
         parser.error("no relevance statement given")
 
-    report = analyze(text, forced, args.platform)
+    report = _analyze_text(text, config)
     findings = lint_analysis(report, config)
-    if args.json:
+    if output == "json":
         emit_json(
             {
                 **report.to_dict(mermaid=args.mermaid),
                 "findings": [finding.to_dict() for finding in findings],
             }
         )
-    else:
+    elif output == "markdown":
         print(render(report, mermaid=args.mermaid, findings=findings, verbose=verbose), end="")
-    # Unparsable input is a finding, not a crash, but a hook wants to know.
-    return 0 if report.parsed else 1
+    else:
+        style = Style.for_stream(sys.stdout)
+        text_report = render_text(
+            report, findings, config, style, verbose=verbose, mermaid=args.mermaid
+        )
+        print(text_report, end="")
+    # The same gate `--check` and `bigfix-relevance-lint` exit on: anything at
+    # error severity -- a parse failure, but also a type error or an unbound
+    # `it` -- fails, so the exit status agrees with the "N errors." it printed.
+    return 0 if _passed(counts(findings)) else 1
 
 
 if __name__ == "__main__":

@@ -408,3 +408,25 @@ def test_fix_refuses_relevance_text() -> None:
     with pytest.raises(SystemExit) as raised:
         main(["--fix", "name of operating system"])
     assert raised.value.code == 2
+
+
+def test_markdown_lists_findings_under_a_heading_with_the_summary(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["--markdown", "name of oprating system"]) == 0
+    out = capsys.readouterr().out
+
+    assert out.startswith("# Lint results\n")
+    # The finding quotes a name in backticks, so the span needs a wider fence.
+    assert "- `` line 1: warning [unknown-inspector] no dump defines `oprating system` ``" in out
+    assert out.rstrip().endswith("**0 error(s), 1 warning(s) in 1 statement(s)**")
+
+
+def test_markdown_says_so_when_nothing_was_found(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--markdown", "name of operating system"]) == 0
+    assert "No issues found." in capsys.readouterr().out
+
+
+def test_json_and_markdown_are_mutually_exclusive() -> None:
+    with pytest.raises(SystemExit):
+        main(["--json", "--markdown", "name of operating system"])

@@ -260,7 +260,7 @@ def test_cli_reports_the_platform_section_for_session_relevance(
     """The section used to be an apology -- "not an axis" -- because the axis
     was client-only. It now answers for session too, in the Summary row and in
     the section itself."""
-    assert main(["--verbose", SESSION]) == 0
+    assert main(["--markdown", "--verbose", SESSION]) == 0
     out = capsys.readouterr().out
 
     assert "Not an axis" not in out
@@ -271,7 +271,7 @@ def test_cli_reports_the_platform_section_for_session_relevance(
 
 
 def test_cli_prints_markdown_with_every_section(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["--verbose", CLIENT]) == 0
+    assert main(["--markdown", "--verbose", CLIENT]) == 0
     out = capsys.readouterr().out
 
     assert out.startswith("# Relevance Analysis\n")
@@ -290,7 +290,7 @@ def test_cli_prints_markdown_with_every_section(capsys: pytest.CaptureFixture[st
 def test_cli_default_output_is_compact_with_no_issues_when_clean(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert main([CLIENT]) == 0
+    assert main(["--markdown", CLIENT]) == 0
     out = capsys.readouterr().out
 
     assert "## Summary" in out
@@ -302,7 +302,7 @@ def test_cli_default_output_is_compact_with_no_issues_when_clean(
 def test_cli_default_output_shows_issues_when_something_is_wrong(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert main([UNKNOWN_INSPECTOR]) == 0
+    assert main(["--markdown", UNKNOWN_INSPECTOR]) == 0
     out = capsys.readouterr().out
 
     assert "## Issues" in out
@@ -310,14 +310,14 @@ def test_cli_default_output_shows_issues_when_something_is_wrong(
 
 
 def test_cli_adds_the_flowchart_only_when_asked(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["--mermaid", CLIENT]) == 0
+    assert main(["--markdown", "--mermaid", CLIENT]) == 0
     with_flag = capsys.readouterr().out
 
     assert "```mermaid\nflowchart TD\n" in with_flag
 
     # --mermaid implies --verbose: the parse tree section it lives in only
     # renders in verbose mode.
-    assert main(["--verbose", CLIENT]) == 0
+    assert main(["--markdown", "--verbose", CLIENT]) == 0
     without_flag = capsys.readouterr().out
 
     assert "```mermaid" not in without_flag
@@ -329,9 +329,9 @@ def test_cli_adds_the_flowchart_only_when_asked(capsys: pytest.CaptureFixture[st
 def test_cli_mermaid_block_is_deterministic_across_separate_runs(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    main([CLIENT])
+    main(["--markdown", CLIENT])
     first = capsys.readouterr().out
-    main([CLIENT])
+    main(["--markdown", CLIENT])
     second = capsys.readouterr().out
 
     assert first == second
@@ -340,7 +340,7 @@ def test_cli_mermaid_block_is_deterministic_across_separate_runs(
 def test_cli_reports_a_parse_failure_and_exits_nonzero(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert main([BROKEN]) == 1
+    assert main(["--markdown", BROKEN]) == 1
     out = capsys.readouterr().out
 
     # A parse failure is a compact Issues line even without --verbose.
@@ -348,7 +348,7 @@ def test_cli_reports_a_parse_failure_and_exits_nonzero(
     assert "error [parse-error]" in out
     assert "error [error-token]" in out
 
-    assert main(["--verbose", BROKEN]) == 1
+    assert main(["--markdown", "--verbose", BROKEN]) == 1
     verbose_out = capsys.readouterr().out
     assert "## Parse error" in verbose_out
     assert "> Line 1, column 13: unterminated string literal" in verbose_out
@@ -377,19 +377,19 @@ def test_cli_reads_stdin_when_no_argument(
 ) -> None:
     monkeypatch.setattr("sys.stdin", __import__("io").StringIO(f"  {SESSION}\n"))
 
-    assert main([]) == 0
+    assert main(["--markdown"]) == 0
     assert SESSION in capsys.readouterr().out
 
 
 def test_cli_rejects_empty_input() -> None:
     with pytest.raises(SystemExit):
-        main(["   "])
+        main(["--markdown", "   "])
 
 
 def test_cli_treats_a_real_file_path_as_a_file_to_extract(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert main([str(BES_EXAMPLE)]) == 0
+    assert main(["--markdown", str(BES_EXAMPLE)]) == 0
     out = capsys.readouterr().out
 
     assert "2 relevance site(s) found." in out
@@ -421,7 +421,7 @@ def test_cli_reports_a_file_with_no_relevance_sites(
 ) -> None:
     plain = write(tmp_path, "notes.txt", "just some notes, no relevance here\n")
 
-    assert main([str(plain)]) == 0
+    assert main(["--markdown", str(plain)]) == 0
     assert "No relevance found." in capsys.readouterr().out
 
 
@@ -432,7 +432,7 @@ def test_cli_a_nonexistent_path_is_analysed_as_relevance_text(
 
     # It fails to parse as relevance too -- the point is *how* it fails: as a
     # single badly-lexed statement, not as a file-extraction error.
-    assert main(["--verbose", missing]) == 1
+    assert main(["--markdown", "--verbose", missing]) == 1
     out = capsys.readouterr().out
     assert missing in out
     assert "relevance site(s)" not in out
@@ -454,7 +454,9 @@ def test_cell_collapses_whitespace_and_truncates_long_context() -> None:
 def test_cli_renders_a_valid_table_row_when_it_binding_context_has_a_pipe(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert main(["--verbose", "1 of (it | false; it | true) whose (exists it)"]) == 0
+    assert (
+        main(["--markdown", "--verbose", "1 of (it | false; it | true) whose (exists it)"]) == 1
+    )  # unbound `it` is an error
     out = capsys.readouterr().out
 
     bindings_section = out.split("`it` bindings")[1].split("\n## ")[0]
@@ -473,7 +475,7 @@ def test_cli_renders_a_valid_table_row_when_it_binding_context_has_a_pipe(
 def test_cli_forced_dialect_overrides_every_site_in_a_file(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert main(["--dialect", "client", str(BES_EXAMPLE)]) == 0
+    assert main(["--markdown", "--dialect", "client", str(BES_EXAMPLE)]) == 0
     out = capsys.readouterr().out
 
     assert out.count("| Dialect | `client`") == 2
@@ -742,3 +744,93 @@ def test_articles_are_ignored_like_the_engine(text: str) -> None:
     assert result.parsed
     findings = lint_analysis(result, LintConfig())
     assert not findings, [f.to_dict() for f in findings]
+
+
+def test_cli_default_output_is_plain_text_with_a_verdict(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main([CLIENT]) == 0
+    out = capsys.readouterr().out
+
+    assert out.startswith(f"{CLIENT}\n")
+    assert "OK" in out
+    assert "Complexity" in out and "(limit 550)" in out
+    assert out.rstrip().endswith("No issues found.")
+    # Not Markdown, and no colour when stdout is not a terminal.
+    assert "## " not in out and "| |" not in out and ":white_check_mark:" not in out
+    assert "\x1b[" not in out
+
+
+def test_cli_text_points_a_caret_at_a_parse_error(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["names of fooz whose (it > 3"]) == 1
+    lines = capsys.readouterr().out.splitlines()
+
+    assert any("[parse-error]" in line for line in lines)
+    caret = next(i for i, line in enumerate(lines) if line.strip() == "^")
+    # The caret sits one past the last character: the unclosed `(`.
+    assert lines[caret - 1].strip() == "names of fooz whose (it > 3"
+    assert lines[caret].index("^") == len(lines[caret - 1])
+    assert lines[-1] == "1 error."
+
+
+def test_cli_text_suggests_a_near_miss_inspector(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["name of oprating system"]) == 0
+    out = capsys.readouterr().out
+
+    assert "did you mean `operating system`" in out
+    assert out.rstrip().endswith("1 warning.")
+
+
+def test_cli_exit_status_fails_on_any_error_not_only_a_parse_failure(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["version of client as string = 3"]) == 1
+    assert "[type-error]" in capsys.readouterr().out
+
+
+def test_cli_text_reports_every_site_of_a_file(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main([str(BES_EXAMPLE)]) == 0
+    out = capsys.readouterr().out
+
+    assert "2 relevance site(s) found." in out
+    assert "Site 1 of 2:" in out and "Site 2 of 2:" in out
+    assert out.rstrip().endswith("All 2 sites: No issues found.")
+
+
+def test_cli_json_and_markdown_are_mutually_exclusive() -> None:
+    with pytest.raises(SystemExit):
+        main(["--json", "--markdown", CLIENT])
+
+
+def test_cli_check_is_the_lint_command_with_all_of_its_flags(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from bigfix_relevance_analyzer import _lint_cli
+
+    argv = ["--fail-on-warning", "--ignore", "complexity", UNKNOWN_INSPECTOR]
+    assert main(["--check", *argv]) == 1
+    via_check = capsys.readouterr()
+    assert _lint_cli.main(argv) == 1
+    direct = capsys.readouterr()
+
+    assert via_check.out == direct.out
+    assert via_check.err == direct.err
+
+
+@pytest.mark.parametrize("flag", ["--list-rules", "--rules"])
+def test_cli_lists_rules_under_the_lint_commands_flag_and_the_old_one(
+    flag: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from bigfix_relevance_analyzer import _lint_cli
+
+    assert main([flag]) == 0
+    analyzer_out = capsys.readouterr().out
+    assert _lint_cli.main(["--list-rules"]) == 0
+
+    assert analyzer_out == capsys.readouterr().out
+    assert "unknown-inspector" in analyzer_out
+
+
+def test_cli_lists_rules_as_markdown_only_when_asked(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["--list-rules", "--markdown"]) == 0
+    assert capsys.readouterr().out.startswith("# Lint rules\n")

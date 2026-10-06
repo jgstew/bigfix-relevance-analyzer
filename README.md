@@ -170,19 +170,29 @@ package's own name:
 uvx bigfix-relevance-analyzer "(version of client, name of it, version of it) of operating system"
 ```
 
-The default output is Markdown, and compact: the statement, a summary table,
-and - only when `lint.py`'s rules found something worth flagging (a parse
-error, an unbound `it`, a type error, an unknown inspector, or complexity /
-evaluation cost past its default ceiling) - an `Issues` section, one
-grep-able line per finding, the same wording `--check` prints - and, when
-a fix exists, a `Suggested fix` section with the fully fixed statement and how
-many of each fix went into it (see [Auto-fix](#auto-fix)). A clean
-statement's report ends after the summary; there is nothing to say about
-something that isn't wrong. `--verbose` adds one heading per further analysis
+There are three output formats:
+
+- **Plain text** (the default) is for a person at a terminal. It starts with a
+  verdict (`OK`, `Parses, with warnings`, or `Problems found`) and the
+  dialect. Then come aligned rows: the result type, the platforms the
+  statement can evaluate on, and the complexity score against its ceiling. If
+  `lint.py`'s rules found anything (a parse error, an unbound `it`, a type
+  error, an unknown inspector with "did you mean" suggestions, or complexity /
+  evaluation cost past its default ceiling), an `Issues` list follows, with a
+  `^` under the position of a parse error. When a fix exists, a
+  `Suggested fix` comes next (see [Auto-fix](#auto-fix)). It ends with a
+  closing line: `No issues found.` or the error/warning tally. Colour is used
+  only on a terminal, and never when `NO_COLOR` is set.
+- **`--markdown`** is the same report as Markdown, for pasting into an issue
+  or a PR: the statement, a summary table, and the same `Issues` and
+  `Suggested fix` sections.
+- **`--json`** is for a program, an MCP server or an AI agent (see below).
+
+`--verbose` adds one section per further analysis
 (Lexing, Parse tree, Platforms, Inspectors, `it` bindings, Breakdown probes,
-Complexity), with GitHub-flavored tables for the tabular sections and fenced
-code blocks for the statement source, the S-expression, and each breakdown
-probe - paste it straight into an issue or a PR comment. The S-expression is
+Complexity): aligned plain text by default, or with `--markdown`,
+GitHub-flavored tables for the tabular sections and fenced code blocks for the
+statement source, the S-expression, and each breakdown probe. The S-expression is
 always there in verbose mode; the Mermaid flowchart is additionally behind
 `--mermaid` (which implies `--verbose`, since the parse tree is the only
 place it renders) in both output modes - Markdown and `--json`'s `to_dict()`
@@ -191,8 +201,9 @@ a line per box and per edge and on a real statement outweighs the rest of the
 report combined. `--json` always includes everything, verbose or not, plus
 the same findings under `"findings"`. `--dialect client|session` forces the
 dialect and `--platform windows` narrows the lookups; with no argument the
-statement is read from stdin. The exit status is 1 when the statement does
-not parse, so a shell check can use it. This is the only part of the package
+statement is read from stdin. The exit status is 1 when anything at error
+severity was found (a parse failure, a type error, an unbound `it`, ...) and 0
+otherwise, the same gate `--check` uses, so a shell check can rely on it. This is the only part of the package
 that writes to stdout - importing the library still prints nothing.
 
 When the argument is a path to a file that actually exists, it is run through
@@ -428,10 +439,13 @@ There is no CLI spelling to disable `complexity`/`evaluation-cost` entirely -
 only to raise their ceiling. A caller that wants a rule off altogether passes
 `None` for it through the library API: `LintConfig(max_score=None)`.
 
-The same rules are reachable two other ways: `python -m bigfix_relevance_analyzer
---check --max-score=800 file1.bes file2.bes` for a one-off run, or the
+The same rules are reachable from the command line through the
 `bigfix-relevance-lint` console script this package installs, which is what a
-pre-commit hook's `entry:` calls:
+pre-commit hook's `entry:` calls. `bigfix-relevance-analyzer --check` (or
+`python -m bigfix_relevance_analyzer --check`) is the same command: it hands
+every other argument to `bigfix-relevance-lint` unchanged, so it takes all of
+the same flags, e.g. `uvx bigfix-relevance-analyzer --check --max-score=800
+file1.bes file2.bes`.
 
 ```yaml
 - repo: https://github.com/jgstew/pre-commit-bigfix
@@ -565,8 +579,8 @@ threshold. `DEFAULT_SEVERITIES` is derived from it, so the two cannot disagree.
 
 A `Finding` carries only its `code`; serve the catalog once and join on it,
 rather than repeating two sentences of prose on every finding. Both CLIs can
-print it: `python -m bigfix_relevance_analyzer --rules` and
-`bigfix-relevance-lint --list-rules` (add `--json` to either).
+print it with the same flag: `bigfix-relevance-analyzer --list-rules` and
+`bigfix-relevance-lint --list-rules` (add `--json` or `--markdown` to either).
 
 ### Auto-fix
 

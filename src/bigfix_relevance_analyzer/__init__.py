@@ -75,6 +75,7 @@ from bigfix_relevance_analyzer.lint import (
     lint_file,
     lint_paths,
     lint_paths_to_dict,
+    lint_text,
     rules,
 )
 from bigfix_relevance_analyzer.nodes import to_mermaid, to_sexpr
@@ -184,6 +185,7 @@ __all__ = [
     "lint_file",
     "lint_paths",
     "lint_paths_to_dict",
+    "lint_text",
     "looks_like_clientui",
     "lookup",
     "parse_relevance",

@@ -17,6 +17,7 @@ import os
 import sys
 from collections.abc import Sequence
 
+from bigfix_relevance_analyzer._markdown import table
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
@@ -37,13 +38,72 @@ def emit_json(payload: object) -> None:
     print()
 
 
-def emit_rules_json() -> int:
-    """The lint rule catalog as JSON -- the one rules listing both CLIs share.
+def add_format_args(parser: argparse.ArgumentParser, *, json_help: str) -> None:
+    """``--json`` and ``--markdown``: the two opt-in alternatives to plain text.
 
-    Their text forms differ on purpose (an aligned list for a hook's terminal,
-    a Markdown table for a report), so only this one lives here.
+    Mutually exclusive, and the same pair on every CLI here, so a caller learns
+    one spelling: text for a person at a terminal by default, ``--markdown``
+    for pasting into an issue or a PR, ``--json`` for a program.
     """
-    emit_json([rule.to_dict() for rule in rules()])
+    formats = parser.add_mutually_exclusive_group()
+    formats.add_argument("--json", action="store_true", help=json_help)
+    formats.add_argument(
+        "--markdown",
+        action="store_true",
+        help="emit Markdown instead, e.g. to paste into an issue or PR",
+    )
+
+
+def output_format(args: argparse.Namespace) -> str:
+    """``"json"``, ``"markdown"`` or ``"text"``, from :func:`add_format_args`' flags."""
+    if args.json:
+        return "json"
+    return "markdown" if args.markdown else "text"
+
+
+def print_rules(output: str) -> int:
+    """The lint rule catalog -- see :data:`~bigfix_relevance_analyzer.lint.RULES`.
+
+    The one listing both CLIs print, in whichever :func:`output_format` was
+    asked for, so a code in either one's output can be looked up with
+    whichever entry point produced it. The text columns are aligned to the
+    widest code present, so adding a rule does not leave the list crooked.
+    """
+    listed = rules()
+    if output == "json":
+        emit_json([rule.to_dict() for rule in listed])
+        return 0
+
+    defaults = LintConfig()
+
+    def ceiling(threshold: str) -> str:
+        return f"{getattr(defaults, threshold):g}"
+
+    if output == "markdown":
+        rows = [
+            (
+                f"`{rule.code}`",
+                rule.default_severity.value,
+                rule.summary,
+                (
+                    f"`{rule.threshold}` (default {ceiling(rule.threshold)})"
+                    if rule.threshold
+                    else "always on"
+                ),
+            )
+            for rule in listed
+        ]
+        print("# Lint rules\n")
+        print(table(("Code", "Default", "Fires when", "Ceiling"), rows))
+        return 0
+
+    width = max(len(rule.code) for rule in listed)
+    for rule in listed:
+        gate = ""
+        if rule.threshold:
+            flag = f"--{rule.threshold.replace('_', '-')}"
+            gate = f" (default {ceiling(rule.threshold)}, raise with {flag})"
+        print(f"{rule.code:<{width}}  {rule.default_severity.value:<7}  {rule.summary}{gate}")
     return 0
 
 
@@ -64,9 +124,9 @@ def add_ceiling_args(
     *,
     max_score_help: str,
     max_evaluation_cost_help: str,
-    max_depth_help: str,
+    max_depth_help: str | None,
 ) -> None:
-    """``--max-score``, ``--max-evaluation-cost`` and ``--max-depth``.
+    """``--max-score``, ``--max-evaluation-cost`` and, unless its help is ``None``, ``--max-depth``.
 
     The two ceilings default to ``None``, meaning "not given" -- see
     :func:`config_from_args` for why that must not reach
@@ -76,7 +136,8 @@ def add_ceiling_args(
     parser.add_argument(
         "--max-evaluation-cost", type=float, default=None, help=max_evaluation_cost_help
     )
-    parser.add_argument("--max-depth", type=int, default=DEFAULT_MAX_DEPTH, help=max_depth_help)
+    if max_depth_help is not None:
+        parser.add_argument("--max-depth", type=int, default=DEFAULT_MAX_DEPTH, help=max_depth_help)
 
 
 def dialect_from_args(args: argparse.Namespace) -> Dialect | None:

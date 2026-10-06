@@ -531,7 +531,7 @@ def test_asking_for_a_reference_never_analyses_anything(
 ) -> None:
     """A question about the language exits 0 even beside an unparsable statement.
 
-    ``--reference`` and ``--rules`` are answered before the positional argument
+    ``--reference`` and ``--list-rules`` are answered before the positional argument
     is looked at, so a script probing the tool's capabilities cannot be made to
     fail by whatever happened to be on the command line.
     """
@@ -540,7 +540,7 @@ def test_asking_for_a_reference_never_analyses_anything(
     assert main(["--reference", "client", "exists files ("]) == 0
     assert capsys.readouterr().out.startswith("# Client relevance")
 
-    assert main(["--rules", "exists files ("]) == 0
+    assert main(["--list-rules", "exists files ("]) == 0
     assert "unbound-it" in capsys.readouterr().out
 
 

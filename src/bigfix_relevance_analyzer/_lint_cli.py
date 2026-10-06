@@ -56,25 +56,24 @@ from pathlib import Path
 
 from bigfix_relevance_analyzer._cli_common import (
     add_ceiling_args,
+    add_format_args,
     add_scope_args,
     config_from_args,
     emit_json,
-    emit_rules_json,
     lint_targets,
+    output_format,
+    print_rules,
 )
-from bigfix_relevance_analyzer.analyzer import analyze
 from bigfix_relevance_analyzer.fixfile import FileFix, FixResult, fix_directory, fix_paths
 from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
     DEFAULT_MAX_EVALUATION_COST,
     DEFAULT_MAX_SCORE,
     Finding,
-    LintConfig,
     Severity,
     _findings_dict,
     counts,
-    lint_analysis,
-    rules,
+    lint_text,
 )
 
 __all__ = ["main"]
@@ -102,44 +101,15 @@ def _is_relevance_text(arg: str) -> bool:
         return True
 
 
-def _lint_texts(texts: list[str], config: LintConfig) -> tuple[Finding, ...]:
-    findings: list[Finding] = []
-    for text in texts:
-        findings.extend(
-            lint_analysis(analyze(text.strip(), config.dialect, config.platform), config)
-        )
-    return tuple(findings)
+def main(argv: list[str] | None = None, *, prog: str = "bigfix-relevance-lint") -> int:
+    """Parse arguments, lint every path, print findings. Returns a process exit status.
 
-
-def _print_rules(*, as_json: bool) -> int:
-    """List every rule and what it means, from :data:`~bigfix_relevance_analyzer.lint.RULES`.
-
-    Here so that the codes in a hook's output can be looked up with the same
-    tool that produced them, rather than by reading this package's source. The
-    aligned columns are built from the widest code present, so adding a rule
-    does not leave the table crooked.
+    ``prog`` is the name usage and errors are reported under:
+    ``bigfix-relevance-analyzer --check`` hands its arguments here (see
+    ``__main__``) and says so, rather than keeping a second linter of its own.
     """
-    if as_json:
-        return emit_rules_json()
-
-    listed = rules()
-    defaults = LintConfig()
-    width = max(len(rule.code) for rule in listed)
-    for rule in listed:
-        if rule.threshold:
-            ceiling = getattr(defaults, rule.threshold)
-            flag = f"--{rule.threshold.replace('_', '-')}"
-            gate = f" (default {ceiling:g}, raise with {flag})"
-        else:
-            gate = ""
-        print(f"{rule.code:<{width}}  {rule.default_severity.value:<7}  {rule.summary}{gate}")
-    return 0
-
-
-def main(argv: list[str] | None = None) -> int:
-    """Parse arguments, lint every path, print findings. Returns a process exit status."""
     parser = argparse.ArgumentParser(
-        prog="bigfix-relevance-lint",
+        prog=prog,
         description=(
             "Lint every relevance site found in the given files: parse failures, "
             "unbound `it`, and type errors are always errors, unknown inspectors "
@@ -191,11 +161,7 @@ def main(argv: list[str] | None = None) -> int:
         help="exit non-zero if anything, even a warning, was found",
     )
     parser.add_argument("--quiet", action="store_true", help="print nothing; exit code still set")
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="emit findings as one JSON object instead of one line each",
-    )
+    add_format_args(parser, json_help="emit findings as one JSON object instead of one line each")
     add_scope_args(
         parser,
         dialect_help="force the dialect instead of trusting extraction",
@@ -216,8 +182,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    output = output_format(args)
     if args.list_rules:
-        return _print_rules(as_json=args.json)
+        return print_rules(output)
 
     severities: dict[str, Severity] = {}
     severities.update(_severity_map(args.warn, Severity.WARNING))
@@ -241,7 +208,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         findings = fixes.findings
     elif texts:
-        findings = _lint_texts(texts, config)
+        findings = tuple(f for text in texts for f in lint_text(text, config))
         if paths:
             findings += lint_targets(paths, config, max_depth=args.max_depth)
     else:
@@ -255,9 +222,11 @@ def main(argv: list[str] | None = None) -> int:
     warnings = tallies[Severity.WARNING.value]
 
     if not args.quiet:
-        if args.json:
+        if output == "json":
             payload = fixes.to_dict() if fixes is not None else _findings_dict(findings)
             emit_json({**payload, "scope": scope})
+        elif output == "markdown":
+            print(_markdown_report(findings, fixes, _summary(errors, warnings, scope)), end="")
         else:
             if fixes is not None:
                 for fix in fixes.applied:
@@ -278,6 +247,32 @@ def main(argv: list[str] | None = None) -> int:
     if errors or (args.fail_on_warning and warnings) or (fixes is not None and fixes.changed):
         return 1
     return 0
+
+
+def _markdown_report(findings: tuple[Finding, ...], fixes: FixResult | None, summary: str) -> str:
+    """The same lines the text form prints, as a Markdown list under a heading."""
+    lines = ["# Lint results", ""]
+    if fixes is not None:
+        lines.extend(
+            f"- {_code_span(_fix_line(fix))}" for fix in (*fixes.applied, *fixes.unapplied)
+        )
+    lines.extend(f"- {_code_span(str(finding))}" for finding in findings)
+    if len(lines) == 2:
+        lines.append("No issues found.")
+    lines += ["", f"**{summary}**"]
+    return "\n".join(lines) + "\n"
+
+
+def _code_span(text: str) -> str:
+    """``text`` as one inline code span.
+
+    Findings quote names in single backticks (``no dump defines `fooz```), so
+    those need a double-backtick fence, padded with spaces as CommonMark
+    requires when the content itself starts or ends with a backtick.
+    """
+    if "`" in text:
+        return f"`` {text} ``"
+    return f"`{text}`"
 
 
 def _fix_line(fix: FileFix) -> str:

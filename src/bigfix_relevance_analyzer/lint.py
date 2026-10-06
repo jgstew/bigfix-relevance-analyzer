@@ -135,6 +135,7 @@ __all__ = [
     "lint_file",
     "lint_paths",
     "lint_paths_to_dict",
+    "lint_text",
     "rules",
 ]
 
@@ -1218,6 +1219,21 @@ def _lint_sites(
             lint_analysis(report, config, path=file_path, base_line=site.line, site=site)
         )
     return tuple(findings)
+
+
+def lint_text(text: str, config: LintConfig) -> tuple[Finding, ...]:
+    """Judge one bare relevance statement, given as text rather than in a file.
+
+    Analysed in ``config.dialect`` when one is forced (classified otherwise)
+    and ``config.platform``, through the same cache a file's sites use.
+    Findings carry no path; their lines are relative to ``text``.
+    """
+    return lint_analysis(_analyze_text(text, config), config)
+
+
+def _analyze_text(text: str, config: LintConfig) -> RelevanceAnalysis:
+    """The analysis :func:`lint_text` judges, for a caller that renders it too."""
+    return _analyze_cached(text.strip(), config.dialect, config.platform)
 
 
 def _analyze_site(site: RelevanceSite, config: LintConfig) -> RelevanceAnalysis:
