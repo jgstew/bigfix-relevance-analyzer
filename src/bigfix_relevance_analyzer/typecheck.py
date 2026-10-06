@@ -160,12 +160,11 @@ class RelevanceValue:
     elements into :attr:`types` loses that name and the row stops matching,
     which is the whole reason this field exists.
 
-    It is kept beside :attr:`types` rather than replacing it because only the
-    property lookup is known to want the tuple name. The operator tables carry
-    no tuple rows at all, so a value that answered *only* to `( string, string
-    )` would make `("a", "b") = ("a", "b")` a fresh false positive -- trading
-    one for another. Additive, the lookup gains a candidate and nothing loses
-    one. See :func:`_subject`.
+    It is kept beside :attr:`types` rather than replacing it because the two
+    readers differ. The operator tables carry no tuple rows at all, so the
+    operators keep reading the elements -- `("a", "b") = ("a", "b")` is fine.
+    The property lookup reads *only* the tuple name when there is one, as the
+    engine does: `lengths of ("a", 1)` is not defined. See :func:`_subject`.
     """
 
     platforms: frozenset[str] = frozenset()
@@ -487,13 +486,16 @@ def _tuple_spellings(values: Sequence[RelevanceValue]) -> frozenset[str]:
 def _subject(value: RelevanceValue) -> frozenset[str] | None:
     """The candidate direct-object types ``value`` offers a property lookup.
 
-    Both readings of a tuple at once -- see
-    :attr:`RelevanceValue.tuple_types`. ``None`` propagates: an object whose
+    A tuple offers only its tuple spellings -- the engine never resolves a
+    property of a tuple against its elements (`lengths of ("a", 1)` is `The
+    operator "lengths" is not defined.`). Empty :attr:`RelevanceValue.tuple_types`
+    (not a tuple, or too many spellings to enumerate) falls back to
+    :attr:`RelevanceValue.types`. ``None`` propagates: an object whose
     own type is undetermined determines nothing about a property of it.
     """
     if value.types is None:
         return None
-    return value.types | value.tuple_types
+    return value.tuple_types or value.types
 
 
 def _ruled_out(value: RelevanceValue) -> bool:
@@ -944,9 +946,8 @@ def _singular_fix(operand: Node, value: RelevanceValue, source: str | None) -> T
     Parenthesized unless the operand is a name, an `of` chain or already one
     parenthesized group, all of which `unique value of` takes whole. `None`
     for a tuple, which the engine defines no aggregate on at all -- `unique
-    value of ("a", "b")` is `The operator "unique value" is not defined.` --
-    and which the checker would not catch, resolving a property of a tuple
-    against its elements too. `None` too without ``source``: a wrap copies
+    value of ("a", "b")` is `The operator "unique value" is not defined.`, a
+    `property-not-defined` already. `None` too without ``source``: a wrap copies
     the operand as written.
     """
     if isinstance(operand, Of) and not operand.prop_grouped:
@@ -1441,13 +1442,19 @@ class _Checker:
 
         Always singular, however plural the context is: `A of B` evaluates `A`
         once per element of `B`, so `it` is one element and not the collection.
+        Over tuples, one element is one whole tuple: `(length of it) of ("ab",
+        "c")` is `The operator "length" is not defined.`, so `it` keeps the
+        tuple spellings.
         """
         if not self.contexts:
             self.report("used-without-context", span, token="it")
             return self.unknown()
         context = self.contexts[-1]
         return RelevanceValue(
-            types=context.types, plurality=Plurality.SINGULAR, platforms=context.platforms
+            types=context.types,
+            plurality=Plurality.SINGULAR,
+            tuple_types=context.tuple_types,
+            platforms=context.platforms,
         )
 
     def pop(self, count: int) -> list[RelevanceValue]:

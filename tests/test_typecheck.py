@@ -2742,3 +2742,53 @@ def test_the_singular_required_diagnostic_message_is_unchanged(env: TypeEnvironm
     source = 'pathnames of files "x" | "y"'
     (diagnostic,) = check(parse(source), env, source=source).diagnostics
     assert diagnostic.message == "the left operand of '|' must be singular"
+
+
+# ---------------------------------------------------------------------------
+# A property of a tuple (#72)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        pytest.param('lengths of ("a", 1)', id="lengths"),
+        pytest.param('unique value of ("a", "b")', id="unique-value"),
+        pytest.param('unique values of ("a", 1)', id="unique-values"),
+        pytest.param('maximum of ("a", 1)', id="maximum"),
+        pytest.param('concatenation of ("a", "b")', id="concatenation"),
+        pytest.param('lengths of (("a", "b"), "c")', id="nested"),
+        pytest.param('lengths of ("abc", "d") of "x"', id="tuple-of-x"),
+        pytest.param('exists ("ab", "c") whose (length of it = 1)', id="whose-it"),
+        pytest.param('(length of it) of ("ab", "c")', id="paren-it"),
+        pytest.param('lengths of (("a", "b"); ("c", "d"))', id="collection-of-tuples"),
+        pytest.param('lengths of (("a", 1); ("b", 2))', id="collection-of-mixed-tuples"),
+    ],
+)
+def test_a_property_of_a_tuple_is_not_resolved_against_its_elements(
+    source: str, env: TypeEnvironment
+) -> None:
+    """qna + remote clients: `The operator "lengths" is not defined.` -- a
+    tuple offers only its tuple spelling to a property, never its elements'."""
+    assert "property-not-defined" in codes_of(source, env)
+
+
+def test_tuple_string_of_a_tuple_is_not_defined(env: TypeEnvironment) -> None:
+    """qna: `tuple string` is not defined on `( string, integer )`."""
+    assert "property-not-defined" in codes_of('tuple string of ("a", 1)', env)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        pytest.param('substring (1, 1) of "abc"', id="substring"),
+        pytest.param('attr lists of ("a", "b")', id="attr-lists"),
+        pytest.param('("a", 1) = ("a", 1)', id="tuple-equality"),
+        pytest.param('item 0 of ("a", 1)', id="item"),
+        pytest.param('exists ("ab", "c") whose (length of item 0 of it = 2)', id="item-of-it"),
+        pytest.param('(item 1 of it) of ("ab", "c")', id="item-of-it-of"),
+    ],
+)
+def test_a_tuple_keeps_what_its_tuple_spelling_defines(source: str, env: TypeEnvironment) -> None:
+    """qna: each evaluates (or errors only on display)."""
+    assert codes_of(source, env) == []
