@@ -163,6 +163,13 @@ consumers across a wire.
 python -m bigfix_relevance_analyzer 'exists file "C:\foo.txt" whose (size of it > 100)'
 ```
 
+Without installing anything, the same report runs through `uvx` under the
+package's own name:
+
+```bash
+uvx bigfix-relevance-analyzer "(version of client, name of it, version of it) of operating system"
+```
+
 The default output is Markdown, and compact: the statement, a summary table,
 and - only when `lint.py`'s rules found something worth flagging (a parse
 error, an unbound `it`, a type error, an unknown inspector, or complexity /
@@ -444,6 +451,14 @@ uvx --from bigfix-relevance-analyzer bigfix-relevance-lint
 That walks the current directory with the default rules; every flag below works
 the same way after the script name, e.g. `uvx --from bigfix-relevance-analyzer
 bigfix-relevance-lint --max-score=800 path/to/content`.
+
+An argument that contains whitespace and is not an existing path is linted as
+a relevance statement instead of a file, so a single expression can be checked
+directly:
+
+```bash
+uvx --from bigfix-relevance-analyzer bigfix-relevance-lint "(version of client, name of it, version of it) of operating system"
+```
 
 `bigfix-relevance-lint` adds `--error CODE` / `--warn CODE` / `--ignore CODE`
 (each repeatable) to override a rule's default severity per repo, and

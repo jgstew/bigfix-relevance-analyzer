@@ -3,6 +3,7 @@
     bigfix-relevance-lint MyFixlet.bes MyTask.bes
     bigfix-relevance-lint --max-score=800 --max-evaluation-cost=80 *.bes
     bigfix-relevance-lint
+    bigfix-relevance-lint "(version of client, name of it) of operating system"
 
 Shaped for a pre-commit hook, not a human report -- see ``__main__`` for that.
 Findings go to stdout, one per line, in the compact form a hook or CI log can
@@ -29,6 +30,12 @@ the author has not seen yet, and pre-commit's convention is that a hook which
 modifies files fails, so the fix is reviewed and staged rather than committed
 unread.
 
+A positional argument that names nothing on disk *and* contains whitespace is
+linted as relevance text rather than reported as a missing file -- a filename
+rarely has a space in it, and a statement almost always does. Findings for it
+carry no path, only a line relative to the text. ``--fix`` does not apply to
+such text: there is no file to rewrite.
+
 Called with no paths at all, this walks the current directory (see
 :func:`~bigfix_relevance_analyzer.lint.lint_directory`) instead of erroring --
 an *explicit* path, including ``.``, is never expanded this way; it is taken
@@ -45,6 +52,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from bigfix_relevance_analyzer._cli_common import (
     add_ceiling_args,
@@ -54,15 +62,18 @@ from bigfix_relevance_analyzer._cli_common import (
     emit_rules_json,
     lint_targets,
 )
+from bigfix_relevance_analyzer.analyzer import analyze
 from bigfix_relevance_analyzer.fixfile import FileFix, FixResult, fix_directory, fix_paths
 from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
     DEFAULT_MAX_EVALUATION_COST,
     DEFAULT_MAX_SCORE,
+    Finding,
     LintConfig,
     Severity,
     _findings_dict,
     counts,
+    lint_analysis,
     rules,
 )
 
@@ -71,6 +82,33 @@ __all__ = ["main"]
 
 def _severity_map(pairs: list[str] | None, severity: Severity) -> dict[str, Severity]:
     return {code: severity for code in (pairs or [])}
+
+
+def _is_relevance_text(arg: str) -> bool:
+    """Whether a positional argument is a relevance statement rather than a path.
+
+    Only when nothing exists at that path and the argument contains whitespace:
+    a pre-commit hook passes real files, which always exist, so its behaviour
+    is unchanged, and a mistyped filename without a space still surfaces as
+    ``file-error`` rather than as a parse error on nonsense relevance.
+    """
+    if not any(char.isspace() for char in arg):
+        return False
+    try:
+        return not Path(arg).exists()
+    except OSError:
+        # Too long or strange for the filesystem (name too long, embedded
+        # NUL): relevance text, not a path.
+        return True
+
+
+def _lint_texts(texts: list[str], config: LintConfig) -> tuple[Finding, ...]:
+    findings: list[Finding] = []
+    for text in texts:
+        findings.extend(
+            lint_analysis(analyze(text.strip(), config.dialect, config.platform), config)
+        )
+    return tuple(findings)
 
 
 def _print_rules(*, as_json: bool) -> int:
@@ -111,7 +149,12 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
-        "paths", nargs="*", help="files to lint; omit entirely to walk the current directory"
+        "paths",
+        nargs="*",
+        help=(
+            "files to lint, or relevance statements (any argument with whitespace that "
+            "is not an existing path); omit entirely to walk the current directory"
+        ),
     )
     add_ceiling_args(
         parser,
@@ -183,17 +226,26 @@ def main(argv: list[str] | None = None) -> int:
 
     config = config_from_args(args, severities=severities)
 
-    scope = f"{len(args.paths)} file(s)" if args.paths else "the current directory"
+    texts = [arg for arg in args.paths if _is_relevance_text(arg)]
+    paths = [arg for arg in args.paths if arg not in texts]
+    if texts and args.fix:
+        parser.error("--fix rewrites files in place; it cannot fix relevance given as text")
+
+    scope = _scope(paths, texts)
     fixes: FixResult | None = None
     if args.fix:
         fixes = (
-            fix_paths(args.paths, config)
-            if args.paths
+            fix_paths(paths, config)
+            if paths
             else fix_directory(".", config, max_depth=args.max_depth)
         )
         findings = fixes.findings
+    elif texts:
+        findings = _lint_texts(texts, config)
+        if paths:
+            findings += lint_targets(paths, config, max_depth=args.max_depth)
     else:
-        findings = lint_targets(args.paths, config, max_depth=args.max_depth)
+        findings = lint_targets(paths, config, max_depth=args.max_depth)
 
     # One tally, from `lint.counts`, feeding the summary, the exit status and
     # the JSON payload alike -- rather than each recounting the findings and
@@ -239,6 +291,15 @@ def _fix_line(fix: FileFix) -> str:
         f"{original[edit.start : edit.end]} -> {edit.replacement}" for edit in fix.autofix.edits
     )
     return f"{where}: fixed [{rules}] {changes}"
+
+
+def _scope(paths: list[str], texts: list[str]) -> str:
+    parts = []
+    if paths:
+        parts.append(f"{len(paths)} file(s)")
+    if texts:
+        parts.append(f"{len(texts)} statement(s)")
+    return " and ".join(parts) or "the current directory"
 
 
 def _summary(errors: int, warnings: int, scope: str) -> str:

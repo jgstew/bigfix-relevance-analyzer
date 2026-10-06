@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bigfix-relevance-analyzer"
-version = "1.14.2"
+version = "1.15.0"
 description = "A python module for working with BigFix Relevance generically. Extract, Analyze, etc."
 readme = "README.md"
 license = "MIT"
@@ -25,9 +25,12 @@ dependencies = []
 
 [project.scripts]
 # The console script a pre-commit hook's `entry:` calls -- see
-# `src/bigfix_relevance_analyzer/_lint_cli.py`. `python -m bigfix_relevance_analyzer`
-# stays the only other entry point; this is deliberately the sole addition.
+# `src/bigfix_relevance_analyzer/_lint_cli.py`.
 bigfix-relevance-lint = "bigfix_relevance_analyzer._lint_cli:main"
+# The human report `python -m bigfix_relevance_analyzer` prints, under the
+# package's own name so `uvx bigfix-relevance-analyzer "<relevance>"` works
+# without `--from`.
+bigfix-relevance-analyzer = "bigfix_relevance_analyzer.__main__:main"
 
 [project.optional-dependencies]
 # Only for consumers that already parse BES XML with lxml and would rather hand

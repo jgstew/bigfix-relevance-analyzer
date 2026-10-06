@@ -226,3 +226,6 @@ node_modules/
 # build output (multi-MiB HTML files embedding a whole Python runtime), not
 # source.
 /playground/
+
+# macos metadata
+.DS_Store

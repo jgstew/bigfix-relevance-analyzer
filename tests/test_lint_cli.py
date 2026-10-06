@@ -377,3 +377,34 @@ def test_fix_with_no_paths_walks_the_current_directory(
     assert main(["--fix"]) == 1
     assert path.read_text() == SETTING_TASK.replace("setting ", "settings ")
     assert "fixed [plural-preferred]" in capsys.readouterr().out
+
+
+def test_relevance_text_argument_is_linted_directly(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["(version of client, name of it, version of it) of operating system"]) == 0
+    assert "in 1 statement(s)" in capsys.readouterr().err
+
+
+def test_broken_relevance_text_exits_one(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["names of (files"]) == 1
+    assert "[parse-error]" in capsys.readouterr().out
+
+
+def test_missing_path_without_whitespace_is_still_a_file_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main([str(tmp_path / "typo.bes")]) == 1
+    assert "[file-error]" in capsys.readouterr().out
+
+
+def test_existing_path_with_whitespace_is_still_a_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    broken = write(tmp_path, "my broken.rel", BROKEN)
+    assert main([str(broken)]) == 1
+    assert "my broken.rel:" in capsys.readouterr().out
+
+
+def test_fix_refuses_relevance_text() -> None:
+    with pytest.raises(SystemExit) as raised:
+        main(["--fix", "name of operating system"])
+    assert raised.value.code == 2
