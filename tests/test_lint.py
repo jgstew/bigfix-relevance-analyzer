@@ -21,6 +21,7 @@ from _helpers import BES_EXAMPLE, BROKEN, CLIENT, MIXED_DIALECT, UNKNOWN_INSPECT
 
 from bigfix_relevance_analyzer.analyzer import analyze
 from bigfix_relevance_analyzer.dialect import Dialect
+from bigfix_relevance_analyzer.extract import RelevanceSite
 from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
     DEFAULT_MAX_EVALUATION_COST,
@@ -30,6 +31,7 @@ from bigfix_relevance_analyzer.lint import (
     Finding,
     LintConfig,
     Severity,
+    _lint_data,
     lint_analysis,
     lint_directory,
     lint_file,
@@ -1728,3 +1730,35 @@ def test_a_fix_inside_a_wrap_is_not_taken_for_applied() -> None:
     both = autofix(text, Dialect.CLIENT)
     assert _fix_applied(by_code["right-operand-not-singular"], both)
     assert _fix_applied(by_code["singular-spelling-mid-chain"], both)
+
+
+# ---------------------------------------------------------------------------
+# Linting content in memory (an editor buffer)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("path", corpus_files(), ids=lambda path: path.name)
+def test_lint_data_matches_lint_file(path: Path) -> None:
+    config = LintConfig()
+    assert _lint_data(path, path.read_bytes(), config) == lint_file(path, config)
+
+
+def test_lint_data_reports_nothing_for_an_unrecognized_type(tmp_path: Path) -> None:
+    """Unlike :func:`lint_file`, no ``file-error``: the content was handed
+    over, not a path named to be linted."""
+    assert _lint_data(tmp_path / "notes.txt", BROKEN.encode(), LintConfig()) == ()
+
+
+def test_lint_data_runs_every_site_through_the_given_judge(tmp_path: Path) -> None:
+    seen: list[tuple[Path | None, str]] = []
+
+    def judge(
+        file_path: Path | None, site: RelevanceSite, config: LintConfig
+    ) -> tuple[Finding, ...]:
+        seen.append((file_path, site.text))
+        return ()
+
+    path = tmp_path / "doc.md"
+    text = f"```relevance\n{CLIENT}\n```\n\n```relevance\n{BROKEN}\n```\n"
+    assert _lint_data(path, text.encode(), LintConfig(), judge) == ()
+    assert seen == [(path, CLIENT), (path, BROKEN)]

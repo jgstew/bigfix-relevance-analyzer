@@ -561,6 +561,39 @@ Not a rule at any of the three entry points: `RelevanceAnalysis.missing_platform
 stays a fact to read off the analysis directly rather than a finding this
 package asserts an opinion about.
 
+## Language server
+
+`bigfix-relevance-lsp` (or `python -m bigfix_relevance_analyzer.lsp`) is a
+language server over stdio, still with no dependencies. It publishes the
+linter's findings as diagnostics on open, change and save, using the same
+extractors and rules as `bigfix-relevance-lint`, but over the editor's unsaved
+buffer. The file type comes from the document URI's suffix. Diagnostics only,
+for now. Each one spans its whole line: findings carry a line, not a range.
+
+The protocol logic does no I/O, so it can also run without stdio. A host such
+as a WASM runtime inside an editor extension passes each parsed JSON-RPC
+message to `Server.handle()` and sends back whatever list it returns:
+
+```python
+from bigfix_relevance_analyzer.lsp import Server
+
+server = Server()
+for reply in server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}):
+    ...  # hand each reply back to the client
+```
+
+On a keystroke the server re-judges only the sites that changed. Unchanged
+statements keep their cached findings, moved to their current line, so typing
+in a 59-site task costs about 2 ms instead of about 50 ms. "Did you mean" leads
+are on, as recommended for interactive use. A document over 1 MiB (UTF-8) is
+not linted. It gets one informational `document-too-large` diagnostic instead,
+because one real 13 MB generated task takes about 19 s. Change the limit with
+the `maxDocumentBytes` initialization option.
+
+For hover-style questions, `node_at(tree, offset)` returns the innermost node
+under a character offset of the parsed statement. `nodes_at` returns the whole
+chain from the root down.
+
 ## Serving this from an MCP server
 
 This package is meant to be wrapped, and more than one server wraps it. What

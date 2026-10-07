@@ -1398,22 +1398,41 @@ def _extract_file(file_path: Path) -> tuple[list[RelevanceSite], list[_Extractio
     Problems are content this extractor could not read relevance out of: an
     unclosed ActionScript `{`, an unterminated `<?Relevance`, an unclosed
     relevance code fence, or BES XML that does not parse.
+
+    An unrecognized type is never opened -- see :func:`_is_recognized` for why
+    that matters.
+    """
+    if not _is_recognized(file_path):
+        logger.debug("no relevance extractor for %s; skipping it", file_path.name)
+        return [], []
+    return _extract_data(file_path, file_path.read_bytes())
+
+
+def _extract_data(
+    file_path: Path, data: bytes
+) -> tuple[list[RelevanceSite], list[_ExtractionProblem]]:
+    """:func:`_extract_file` over ``data`` rather than whatever is on disk.
+
+    ``file_path`` only chooses the extractor, from its suffixes, and is never
+    opened. This is how an editor buffer gets linted before it is saved.
     """
     if _is_bes_xml(file_path):
-        return _extract_bes_xml(file_path.read_bytes())
+        return _extract_bes_xml(data)
     problems: list[_ExtractionProblem] = []
-    sites = _extract_text_file(file_path, problems)
+    sites = _extract_text(file_path, _decode_text(data), problems)
     return sites, sorted(problems, key=lambda problem: problem.line)
 
 
-def _extract_text_file(file_path: Path, problems: list[_ExtractionProblem]) -> list[RelevanceSite]:
-    """:func:`extract_relevance_from_file` for every type but BES XML."""
+def _extract_text(
+    file_path: Path, text: str, problems: list[_ExtractionProblem]
+) -> list[RelevanceSite]:
+    """:func:`_extract_data` for every type but BES XML."""
     suffixes = _significant_suffixes(file_path)
     last = suffixes[-1] if suffixes else ""
 
     if last in _CONSOLE_HTML_SUFFIXES:
         return _html_sites(
-            _read_text(file_path),
+            text,
             context=HtmlContext.CONSOLE,
             line_offset=0,
             label=None,
@@ -1421,30 +1440,34 @@ def _extract_text_file(file_path: Path, problems: list[_ExtractionProblem]) -> l
         )
 
     if last in _CLIENTUI_HTML_SUFFIXES:
-        html_text = _read_text(file_path)
         # The extension alone does not say who renders this -- unlike `.ojo` or
         # `.besrpt`, a bare `.html` is also how a WebUI fragment, an exported
         # dashboard, or plain documentation would be named. A ClientUI marker
         # in the document is corroborating evidence worth trusting; without
         # one, only the content mechanism (a JS call, or the classifier on
         # what a static substitution says) gets to decide.
-        context = HtmlContext.CLIENTUI if looks_like_clientui(html_text) else HtmlContext.UNKNOWN
-        return _html_sites(html_text, context=context, line_offset=0, label=None, problems=problems)
+        context = HtmlContext.CLIENTUI if looks_like_clientui(text) else HtmlContext.UNKNOWN
+        return _html_sites(text, context=context, line_offset=0, label=None, problems=problems)
 
     if last in _SESSION_TEXT_SUFFIXES:
-        return _extract_plain_text(_read_text(file_path), Dialect.SESSION)
+        return _extract_plain_text(text, Dialect.SESSION)
 
     if last in _UNTYPED_TEXT_SUFFIXES:
-        return _extract_plain_text(_read_text(file_path), Dialect.UNCERTAIN)
+        return _extract_plain_text(text, Dialect.UNCERTAIN)
 
     if last in _MARKDOWN_SUFFIXES:
-        return _markdown_sites(_read_text(file_path), problems)
+        return _markdown_sites(text, problems)
 
     logger.debug("no relevance extractor for %s; skipping it", file_path.name)
     return []
 
 
-def _read_text(path: Path) -> str:
-    # BES content is UTF-8 in practice, but a stray byte in a hand-edited file
-    # should not lose the rest of the relevance in it.
-    return path.read_text(encoding="utf-8", errors="replace")
+def _decode_text(data: bytes) -> str:
+    """``data`` as the text a text-mode read of the same file would give.
+
+    BES content is UTF-8 in practice, but a stray byte in a hand-edited file
+    should not lose the rest of the relevance in it. Line endings are folded
+    exactly as ``Path.read_text`` folds them -- this replaced that call, and
+    the lines every finding reports depend on it.
+    """
+    return data.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")

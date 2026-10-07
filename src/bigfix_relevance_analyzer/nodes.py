@@ -54,6 +54,8 @@ __all__ = [
     "Unary",
     "Whose",
     "children",
+    "node_at",
+    "nodes_at",
     "to_mermaid",
     "to_sexpr",
     "tree_depth",
@@ -461,6 +463,37 @@ def walk(node: Node) -> Iterator[Node]:
         current = stack.pop()
         yield current
         stack.extend(reversed(children(current)))
+
+
+def nodes_at(root: Node, offset: int) -> tuple[Node, ...]:
+    """Every node whose span covers ``offset``, from ``root`` down to the innermost.
+
+    ``offset`` is a 0-based character offset into the text ``root`` was parsed
+    from, and spans are half-open, as :class:`Span` documents: a cursor just
+    past a token is not on it. Empty when ``offset`` is outside ``root``.
+
+    The nodes covering one offset are always nested -- siblings never overlap
+    -- so this is a single descent rather than a search, and iterative for the
+    reason :func:`walk` is. An offset between two children (on the ``of`` of
+    ``a of b``, say) ends the descent at their parent.
+    """
+    if not root.span.start <= offset < root.span.end:
+        return ()
+    chain = [root]
+    while True:
+        inner = next(
+            (child for child in children(chain[-1]) if child.span.start <= offset < child.span.end),
+            None,
+        )
+        if inner is None:
+            return tuple(chain)
+        chain.append(inner)
+
+
+def node_at(root: Node, offset: int) -> Node | None:
+    """The innermost node covering ``offset``, or ``None``. See :func:`nodes_at`."""
+    chain = nodes_at(root, offset)
+    return chain[-1] if chain else None
 
 
 def tree_depth(node: Node) -> int:

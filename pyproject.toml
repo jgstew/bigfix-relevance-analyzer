@@ -31,6 +31,8 @@ bigfix-relevance-lint = "bigfix_relevance_analyzer._lint_cli:main"
 # package's own name so `uvx bigfix-relevance-analyzer "<relevance>"` works
 # without `--from`.
 bigfix-relevance-analyzer = "bigfix_relevance_analyzer.__main__:main"
+# The language server over stdio -- see `src/bigfix_relevance_analyzer/lsp/`.
+bigfix-relevance-lsp = "bigfix_relevance_analyzer.lsp.__main__:main"
 
 [project.optional-dependencies]
 # Only for consumers that already parse BES XML with lxml and would rather hand
