@@ -45,7 +45,13 @@ from typing import TYPE_CHECKING, Any, Final, Literal
 
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis, analyze
 from bigfix_relevance_analyzer.tokenizer import _normalize_phrase
-from bigfix_relevance_analyzer.typecheck import _UNIQUE_VALUE, SINGULAR_REQUIRED
+from bigfix_relevance_analyzer.typecheck import (
+    _UNIQUE_VALUE,
+    PLURALIZABLE,
+    PLURALIZABLE_BELOW,
+    SINGULAR_REQUIRED,
+    Plurality,
+)
 
 if TYPE_CHECKING:
     from bigfix_relevance_analyzer.dialect import Dialect
@@ -435,6 +441,28 @@ class _Guard:
             if diagnostic.fix is not None
         }
         self._required = _singular_required(original)
+        # Whether the original proposes pluralizing the whole statement's
+        # outermost link: a `PLURALIZABLE` finding spanning the entire value.
+        self._root_pluralizable = original.node is not None and any(
+            d.code == PLURALIZABLE
+            and (d.span.start, d.span.end) == (original.node.span.start, original.node.span.end)
+            for d in (original.check.diagnostics if original.check else ())
+        )
+        # Pluralizing under a singular last link leaves that link written
+        # singular over a plural: the same risk the singular links below it
+        # already ran, now named. One `singular-over-plural-object` per
+        # reported link is the most that can arise -- an upper bound, since a
+        # chain has one top for however many links sit below it.
+        self._named_risk = (
+            0
+            if original.check is None
+            else sum(d.code == PLURALIZABLE_BELOW for d in original.check.diagnostics)
+        )
+
+    def _allowed(self, code: str, baseline: Counter[str]) -> int:
+        """How many ``code`` problems a candidate may hold: the baseline's, plus
+        the risk pluralizing under a singular last link names rather than adds."""
+        return baseline[code] + (self._named_risk if code == "singular-over-plural-object" else 0)
 
     def _counts(self, rule: str) -> bool:
         return self._config.severity_for(rule) in self._counted
@@ -474,6 +502,17 @@ class _Guard:
         before, after = original.check.value, report.check.value
         if after.types == before.types and after.plurality is before.plurality:
             return True
+        # The other licensed change: the statement's own value, which nothing
+        # consumes and so nothing requires singular, going plural because the
+        # checker proposed pluralizing its outermost link. Same types, and only
+        # in that direction.
+        if (
+            self._root_pluralizable
+            and after.types == before.types
+            and before.plurality is Plurality.SINGULAR
+            and after.plurality is Plurality.PLURAL
+        ):
+            return True
         # The one licensed change: a plural where the engine requires a
         # singular is being repaired. The original never runs, so its
         # plurality is nothing to keep. Licensed by the count going down, not
@@ -484,14 +523,14 @@ class _Guard:
         """The per-round check: fix-carrying diagnostics are not counted."""
         found = self.problems(report, fixable=False)
         return self._same_meaning(report) and all(
-            count <= self._round_baseline[code] for code, count in found.items()
+            count <= self._allowed(code, self._round_baseline) for code, count in found.items()
         )
 
     def final(self, state: _State) -> bool:
         """The full check: fix-carrying diagnostics counted, none introduced."""
         found = self.problems(state.report, fixable=True)
         if not self._same_meaning(state.report) or any(
-            count > self._full_baseline[code] for code, count in found.items()
+            count > self._allowed(code, self._full_baseline) for code, count in found.items()
         ):
             return False
         for diagnostic in _fixable(state.report, self._codes):

@@ -25,6 +25,7 @@ from bigfix_relevance_analyzer.nodes import If, Node
 from bigfix_relevance_analyzer.parser import parse
 from bigfix_relevance_analyzer.typecheck import (
     PLURALIZABLE,
+    PLURALIZABLE_BELOW,
     CheckResult,
     Plurality,
     TypeEnvironment,
@@ -34,15 +35,19 @@ from bigfix_relevance_analyzer.typecheck import check as _check
 
 
 def check(node: Node, environment: TypeEnvironment, *, source: str | None = None) -> CheckResult:
-    """:func:`~bigfix_relevance_analyzer.typecheck.check`, without `PLURALIZABLE`.
+    """:func:`~bigfix_relevance_analyzer.typecheck.check`, without `PLURALIZABLE` and
+    `PLURALIZABLE_BELOW`.
 
-    That code reports nearly every singular spelling below a plural consumer,
-    so it would ride along on most assertions here, which pin other rules.
+    Those codes report nearly every singular spelling below a consumer, so
+    they would ride along on most assertions here, which pin other rules.
     It has its own module, ``test_plural_everywhere.py``.
     """
     result = _check(node, environment, source=source)
     return dataclasses.replace(
-        result, diagnostics=tuple(d for d in result.diagnostics if d.code != PLURALIZABLE)
+        result,
+        diagnostics=tuple(
+            d for d in result.diagnostics if d.code not in {PLURALIZABLE, PLURALIZABLE_BELOW}
+        ),
     )
 
 

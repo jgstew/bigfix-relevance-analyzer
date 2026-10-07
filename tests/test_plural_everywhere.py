@@ -42,6 +42,7 @@ from bigfix_relevance_analyzer.lint import (
     Severity,
     lint_analysis,
 )
+from bigfix_relevance_analyzer.typecheck import Plurality
 
 CODE = "singular-spelling-pluralizable"
 RULE = "plural-everywhere"
@@ -133,6 +134,147 @@ def test_a_mid_chain_link_is_reported_once_not_twice() -> None:
     """`singular-spelling-mid-chain` already names `file` here; the new code
     adds only the root."""
     assert codes(MIXED).count(CODE) == 1
+
+
+# -- below a singular last link ---------------------------------------------------
+#
+# Engine facts (QnA, client, macOS), the same answer as the singular spelling in
+# every case tried::
+#
+#     Q: file "hosts" of folder "/etc"
+#     A: ...
+#     Q: file "hosts" of folders "/etc"
+#     A: ... (identical)
+#     Q: file "" of folder "" of folder ""
+#     E: Singular expression refers to nonexistent object.
+#     Q: file "" of folders "" of folders ""
+#     E: Singular expression refers to nonexistent object.
+#     Q: files "" of folder "/etc" | files ""
+#     E: A singular expression is required.
+
+BELOW = "singular-spelling-pluralizable-below-singular"
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # A comparison operand, which requires a singular.
+        (
+            'name of file "x" of folder "/etc" = "z"',
+            'name of files "x" of folders "/etc" = "z"',
+        ),
+        # The right of a `|` is a singular position too, but nothing there
+        # depends on the error.
+        (
+            '"y" | name of file "x" of folder "/etc"',
+            '"y" | name of files "x" of folders "/etc"',
+        ),
+        # An `if` condition.
+        (
+            'if (name of file "x" of folder "/etc" = "z") then 1 else 2',
+            'if (name of files "x" of folders "/etc" = "z") then 1 else 2',
+        ),
+    ],
+)
+def test_a_singular_last_link_keeps_its_plurality_and_what_is_below_it_goes_plural(
+    text: str, expected: str
+) -> None:
+    assert BELOW in codes(text)
+    assert fixed(text) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Left of a `|` the error is the fallback's trigger, and a plural below
+        # could answer where the singular erred.
+        '(name of file "x" of folder "/etc") | "y"',
+        '(version of file "x" of folder "/etc" as string) | "y"',
+    ],
+)
+def test_the_left_of_a_pipe_is_never_pluralized(text: str) -> None:
+    assert BELOW not in codes(text)
+    assert CODE not in codes(text)
+    assert fixed(text) == text
+
+
+def test_the_result_stays_singular() -> None:
+    text = 'name of file "x" of folder "/etc" = "z"'
+    before = analyze(text, Dialect.CLIENT)
+    after = analyze(fixed(text), Dialect.CLIENT)
+    assert before.check is not None and after.check is not None
+    assert after.check.value.plurality is before.check.value.plurality
+    assert after.check.value.types == before.check.value.types
+
+
+def test_a_bare_singular_with_nothing_below_it_is_left_alone() -> None:
+    assert BELOW not in codes("name of operating system")
+    assert fixed("name of operating system") == "name of operating system"
+
+
+# The statement's own value has no consumer, so nothing requires it singular --
+# but only a chain that takes a parameter has anything to pluralize. Engine,
+# client::
+#
+#     Q: files "" of folders "" of folders ""
+#     A: (empty, no error)
+#     Q: wmis "root/cimv2" ...   (plural spelling of the same root)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ('file "" of folder "" of folder ""', 'files "" of folders "" of folders ""'),
+        ('wmi "root/cimv2"', 'wmis "root/cimv2"'),
+        ('name of folder "/etc"', 'names of folders "/etc"'),
+        ('selects "x" of wmi "root/cimv2"', 'selects "x" of wmis "root/cimv2"'),
+        # The bare `wmi` stays; the links above it take a parameter or sit on
+        # one, and go plural.
+        ('string value of select "" of wmi', 'string values of selects "" of wmi'),
+    ],
+)
+def test_the_statements_own_chain_goes_plural_all_the_way_up_when_it_takes_a_parameter(
+    text: str, expected: str
+) -> None:
+    assert CODE in codes(text)
+    assert fixed(text) == expected
+
+
+@pytest.mark.parametrize("text", ["wmi", "name of operating system", "operating system"])
+def test_a_statements_own_chain_that_takes_no_parameter_stays_singular(text: str) -> None:
+    assert CODE not in codes(text)
+    assert fixed(text) == text
+
+
+def test_pluralizing_the_statements_own_chain_changes_only_its_plurality() -> None:
+    text = 'file "" of folder "" of folder ""'
+    before = analyze(text, Dialect.CLIENT)
+    after = analyze(fixed(text), Dialect.CLIENT)
+    assert before.check is not None and after.check is not None
+    assert before.check.value.plurality is Plurality.SINGULAR
+    assert after.check.value.plurality is Plurality.PLURAL
+    assert after.check.value.types == before.check.value.types
+
+
+def test_it_is_a_second_pass_fixed_point() -> None:
+    once = fixed('file "" of folder "" of folder ""')
+    assert fixed(once) == once
+
+
+def test_default_lint_stays_quiet_for_it() -> None:
+    findings = lint_analysis(
+        analyze('file "" of folder "" of folder ""', Dialect.CLIENT), LintConfig()
+    )
+    assert not findings
+
+
+def test_enabled_lint_reports_and_fixes_it() -> None:
+    findings = lint_analysis(analyze('file "" of folder "" of folder ""', Dialect.CLIENT), ENABLED)
+    # One finding per link, each carrying the whole statement's fix.
+    assert [f.code for f in findings] == [RULE] * 3
+    assert {f.autofix.fixed for f in findings if f.autofix} == {
+        'files "" of folders "" of folders ""'
+    }
 
 
 # -- analysis: on by default ------------------------------------------------------

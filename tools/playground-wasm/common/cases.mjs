@@ -56,4 +56,11 @@ export const CASES = [
     text: 'exists values of setting "_BESClient_Resource_SleepIdle" of client',
     expectBadges: "dialect: client parse: ok types: ok fix: available",
   },
+  {
+    // The statement's own chain takes a parameter and nothing requires it
+    // singular, so it goes plural all the way up: `files "" of folders ""
+    // of folders ""`.
+    text: 'file "" of folder "" of folder ""',
+    expectBadges: "dialect: client parse: ok types: ok fix: available",
+  },
 ];

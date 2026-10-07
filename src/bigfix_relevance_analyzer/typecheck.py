@@ -108,11 +108,13 @@ from bigfix_relevance_analyzer.nodes import (
     TupleExpr,
     Unary,
     Whose,
+    walk,
 )
 from bigfix_relevance_analyzer.tokenizer import code_tokens
 
 __all__ = [
     "PLURALIZABLE",
+    "PLURALIZABLE_BELOW",
     "SINGULAR_REQUIRED",
     "CheckResult",
     "Plurality",
@@ -765,6 +767,18 @@ it reports under its own lint rule, off by default; see
 :mod:`~bigfix_relevance_analyzer.lint` for how its fix rides along there.
 """
 
+PLURALIZABLE_BELOW: Final = "singular-spelling-pluralizable-below-singular"
+""":data:`PLURALIZABLE`, for a chain whose last link stays singular.
+
+Every `of` chain not already consumed by something that takes a plural has a
+last link -- the outermost, evaluated last, written first -- that must stay
+singular for the consumer (a comparison operand, an `if` condition, the
+statement's own value). Everything below it can still be plural: the engine
+errors on the result no more often than it did, and the result's plurality is
+unchanged. Never left of a `|`, where a plural below could answer in a case the
+singular erred in, and the error is what the fallback is there to catch.
+"""
+
 _Link = tuple[str, str, "TypeFix"] | str
 """How one link of an `of` chain takes being pluralized from below.
 
@@ -777,7 +791,7 @@ the walk: a singular with no plural spelling would turn a plural below it into
 """
 
 _FILTERED_SPELLING: Final = frozenset(
-    {"filtered-singular-spelling", "singular-spelling-mid-chain", PLURALIZABLE}
+    {"filtered-singular-spelling", "singular-spelling-mid-chain", PLURALIZABLE, PLURALIZABLE_BELOW}
 )
 """The shape rules, retracted left of a `|` -- and only there.
 
@@ -1192,7 +1206,9 @@ def check(node: Node, environment: TypeEnvironment, *, source: str | None = None
     return CheckResult(
         value=value,
         diagnostics=tuple(
-            d for d in checker.diagnostics if not (d.code == PLURALIZABLE and d.span in mid_chain)
+            d
+            for d in checker.diagnostics
+            if not (d.code in {PLURALIZABLE, PLURALIZABLE_BELOW} and d.span in mid_chain)
         ),
         # A read-only view, not the checker's own dict. The annotation already
         # says `Mapping`; this makes that true at runtime, which matters
@@ -1293,6 +1309,9 @@ class _Checker:
         # Nodes already reported as `PLURALIZABLE`, so two consumers over the
         # same chain report each link once.
         self.pluralized: set[int] = set()
+        # The left operand of every `|`, whose chains are never pluralized: see
+        # `PLURALIZABLE_BELOW`.
+        self.bar_lefts: list[Span] = []
 
     def run(self, root: Node) -> RelevanceValue:
         work: list[_Work] = [_Descend(root)]
@@ -1317,6 +1336,7 @@ class _Checker:
                     self.contexts.pop()
                 case _:  # pragma: no cover - exhaustiveness over _Work
                     assert_never(item)
+        self.pluralize_chain_tops(root)
         return self.values.pop()
 
     # -- helpers ------------------------------------------------------------
@@ -1340,7 +1360,62 @@ class _Checker:
             )
             self.diagnostics.append(replace(diagnostic, fix=fix))
 
-    def pluralize_below(self, node: Node) -> None:
+    def pluralize_chain_tops(self, root: Node) -> None:
+        """Pluralize below the last link of every chain nothing else pluralized.
+
+        A chain whose consumer takes a plural has been walked already, top
+        link included (:meth:`pluralize_below`); this reaches the rest, with
+        the top link kept singular, and the consumer none the wiser. The
+        exception is the statement's own chain, which nothing consumes and so
+        nothing requires singular: it is pluralized all the way up. The
+        links already reported are skipped, so running over every chain is
+        safe. Left of a `|` is skipped, see :data:`PLURALIZABLE_BELOW`.
+        """
+        nodes = list(walk(root))
+        # What is part of a chain rather than the top of one: an object, a
+        # collection, or a property -- a property's own chain is typed inside
+        # the object's, and is reported, if at all, by the `of` it belongs to.
+        inner: set[int] = set()
+        for node in nodes:
+            match node:
+                case Of(prop=prop, obj=obj):
+                    inner.update((id(prop), id(obj)))
+                case Whose(collection=collection):
+                    inner.add(id(collection))
+        for node in nodes:
+            if node is root:
+                self.pluralize_root(node)
+                continue
+            if not isinstance(node, Of | Whose) or id(node) in inner:
+                continue
+            if any(
+                left.start <= node.span.start and node.span.end <= left.end
+                for left in self.bar_lefts
+            ):
+                continue
+            self.pluralize_below(node, keep_top=True)
+
+    def pluralize_root(self, root: Node) -> None:
+        """Pluralize the statement's own chain, top link included.
+
+        Nothing consumes the statement's value, so nothing requires it
+        singular. But only a chain that takes a parameter of some kind has
+        anything to pluralize: `wmi "root\\cimv2"` becomes `wmis "root\\cimv2"`
+        and `file "" of folder "" of folder ""` goes plural all the way up,
+        while `wmi` and `name of operating system` are singletons and stay as
+        written. So a property chain is pluralized only when a link below its
+        top was, too.
+        """
+        before = len(self.diagnostics)
+        self.pluralize_below(root)
+        reported = self.diagnostics[before:]
+        if isinstance(root, Reference) or len(reported) != 1:
+            return
+        # Only the top link would change, over nothing that can be plural.
+        self.pluralized.discard(id(root))
+        del self.diagnostics[before:]
+
+    def pluralize_below(self, node: Node, *, keep_top: bool = False) -> None:
         """Report every link of the chain at ``node`` the plural is valid for.
 
         Called where the consumer of ``node`` accepts a plural, so pluralizing
@@ -1360,38 +1435,49 @@ class _Checker:
         """
         filtered = False
         below_property = False
+        # With ``keep_top`` the first link is left as written -- the consumer
+        # needs it singular -- and the walk reports from the one below it,
+        # under `PLURALIZABLE_BELOW`. The top link need not be pluralizable
+        # for that: it is not being changed.
+        top = keep_top
+        code = PLURALIZABLE_BELOW if keep_top else PLURALIZABLE
         while True:
             match node:
                 case Whose(collection=collection):
                     node = collection
                     filtered = True
                 case Of(obj=obj):
-                    link = self.links.get(id(node))
-                    if link is None:
-                        return
-                    if isinstance(link, tuple):
-                        self.report_pluralizable(node, link)
+                    if top:
+                        top = False
+                    else:
+                        link = self.links.get(id(node))
+                        if link is None:
+                            return
+                        if isinstance(link, tuple):
+                            self.report_pluralizable(node, link, code)
                     node = obj
                     filtered = False
                     below_property = True
                 case Reference(index=index):
                     link = self.links.get(id(node))
-                    if isinstance(link, tuple) and (
-                        index is not None or (filtered and below_property)
+                    if (
+                        not top
+                        and isinstance(link, tuple)
+                        and (index is not None or (filtered and below_property))
                     ):
-                        self.report_pluralizable(node, link)
+                        self.report_pluralizable(node, link, code)
                     return
                 case _:
                     return
 
-    def report_pluralizable(self, node: Node, link: tuple[str, str, TypeFix]) -> None:
+    def report_pluralizable(
+        self, node: Node, link: tuple[str, str, TypeFix], code: str = PLURALIZABLE
+    ) -> None:
         if id(node) in self.pluralized:
             return
         self.pluralized.add(id(node))
         phrase, plural_phrase, fix = link
-        diagnostic = _diagnostic(
-            PLURALIZABLE, node.span, phrase=phrase, plural_phrase=plural_phrase
-        )
+        diagnostic = _diagnostic(code, node.span, phrase=phrase, plural_phrase=plural_phrase)
         self.diagnostics.append(replace(diagnostic, fix=fix))
 
     def register_root(self, node: Reference, value: RelevanceValue) -> None:
@@ -2497,6 +2583,7 @@ class _Checker:
         # folders | 0`. The right operand earns it for the plainer reason
         # every `require_singular` site does: a position that demands a
         # singular cannot also advise writing the plural.
+        self.bar_lefts.append(node.left.span)
         self.require_singular(left, node.left, "left-operand-not-singular", token="|")
         self.require_singular(right, node.right, "right-operand-not-singular", token="|")
         # The shape rule too, and only on the left: there the empty case

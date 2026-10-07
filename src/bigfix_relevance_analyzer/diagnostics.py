@@ -331,6 +331,22 @@ _TYPE_CHECK: Final = [
         "'{plural_phrase}' answers the same values and does not error when "
         "nothing, or more than one, matches",
     ),
+    _entry(
+        "singular-spelling-pluralizable-below-singular",
+        # The same links `singular-spelling-pluralizable` reports, under a
+        # chain whose last link has to stay singular: a comparison operand, an
+        # `if` condition, the statement's own value. The plural below it
+        # errors no more often than the singular did -- engine-confirmed on
+        # `file "hosts" of folders "/etc"`, `file "" of folders ""` and
+        # `file "" of folder "" of folders ""`, all answering as their singular
+        # spellings do -- and the result stays singular, so the consumer's
+        # requirement is untouched. Never left of a `|`, where the error is
+        # the fallback's trigger.
+        Origin.RUNTIME,
+        "'{phrase}' is a singular spelling where the plural is valid; "
+        "'{plural_phrase}' errors no more often, and the chain's last link "
+        "stays singular, so the result is unchanged",
+    ),
     # Operators and casts.
     _entry(
         "operand-types-incompatible",

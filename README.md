@@ -641,10 +641,22 @@ is what the checker read, case-insensitively and whitespace-normalized.
   | `number of names of files of folders "/etc"` | the count |
   | `names of operating systems = "x"` | `E: A singular expression is required.` |
 
-  It never fires where a singular is required (a comparison operand, an `if`
-  condition, the statement's own value) or left of an `|`, where the
-  singular's error is what trips the fallback. Analysis reports and suggests
-  it by default. Its lint rule is off by default, because it would touch a
+  The statement's own chain has no consumer, so nothing requires it singular
+  and it goes plural all the way up - but only when something in it takes a
+  parameter: `file "" of folder "" of folder ""` becomes
+  `files "" of folders "" of folders ""`, `wmi "root\\cimv2"` becomes
+  `wmis "root\\cimv2"` and `string value of select "" of wmi` becomes
+  `string values of selects "" of wmi` (the bare `wmi` stays), while `wmi` and
+  `name of operating system` are left as written. Where a singular is
+  required (a comparison operand, an `if` condition, the right of a `|`), the
+  chain's last link stays singular, so the result keeps its plurality, and
+  everything below it is pluralized, reported as
+  `singular-spelling-pluralizable-below-singular`: `name of file "x" of folder
+  "/etc" = "z"` becomes `name of files "x" of folders "/etc" = "z"`. The engine
+  answers each pair identically. It never fires left of an `|`, where the
+  singular's error is what trips the fallback (a plural there is refused
+  outright: `E: A singular expression is required.`). Analysis reports and
+  suggests it by default. Its lint rule is off by default, because it would touch a
   large share of an existing repo; while off, its fix still **rides along**
   with any other fix of the same statement (`LintRule.rides_along`), since that
   statement is being rewritten anyway, and never costs that fix: a combined

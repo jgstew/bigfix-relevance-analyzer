@@ -124,6 +124,7 @@ from bigfix_relevance_analyzer.nodes import Node, Of, Reference
 from bigfix_relevance_analyzer.typecheck import (
     _UNIQUE_VALUE,
     PLURALIZABLE,
+    PLURALIZABLE_BELOW,
     SINGULAR_REQUIRED,
     Plurality,
     TypeDiagnostic,
@@ -536,8 +537,14 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 'folder "/etc"` raises the non-unique error where `number of names of '
                 'files of folders "/etc"` counts -- confirmed on 20 client targets and in '
                 "session. The plural never answers differently where the singular "
-                "answers. Never fires where a singular is required (a comparison operand, "
-                "an `if` condition, the statement's own value) or left of an `|`. Off by "
+                "answers. The statement's own chain, which nothing requires singular, "
+                "goes plural all the way up when anything in it takes a parameter "
+                '(`string value of select "" of wmi` becomes `string values of selects '
+                '"" of wmi`; a bare `wmi` or `name of operating system` stays). Where a '
+                "singular is required (a comparison operand, an `if` condition, the right "
+                "of an `|`) the chain's last link stays singular and everything below it "
+                "is pluralized. Never fires left of an `|`, where the error is the "
+                "fallback's trigger. Off by "
                 "default because it would touch a large share of an existing repo; while "
                 "off, its fix still rides along with any other fix of the same statement, "
                 "since that statement is being rewritten anyway. Enable it to report and "
@@ -872,6 +879,7 @@ _CHECK_RULES: Final = {
     # The rest of the chain, off by default; its fix rides along. See
     # `_site_fix`.
     PLURALIZABLE: "plural-everywhere",
+    PLURALIZABLE_BELOW: "plural-everywhere",
     # The engine's up-front `A singular expression is required.`. An error like
     # `type-error`, but its own rule because it carries a fix a repo may want
     # off by name.
