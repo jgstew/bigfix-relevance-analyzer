@@ -108,13 +108,10 @@ from bigfix_relevance_analyzer.nodes import (
     TupleExpr,
     Unary,
     Whose,
-    walk,
 )
 from bigfix_relevance_analyzer.tokenizer import code_tokens
 
 __all__ = [
-    "PLURALIZABLE",
-    "PLURALIZABLE_BELOW",
     "SINGULAR_REQUIRED",
     "CheckResult",
     "Plurality",
@@ -756,43 +753,7 @@ containing it. `|` does not rescue it either -- `((line whose (it contains
 the error, not the fallback.
 """
 
-PLURALIZABLE: Final = "singular-spelling-pluralizable"
-"""A singular spelling with a plural one, where the plural is valid (#67).
-
-The rest of the chain `singular-spelling-mid-chain` stops short of: the chain
-root when it takes an argument or a filter, and every link below a consumer
-that accepts a plural -- `exists`,
-`number of`, an aggregate, or a plural property. It carries a respelling, and
-it reports under its own lint rule, off by default; see
-:mod:`~bigfix_relevance_analyzer.lint` for how its fix rides along there.
-"""
-
-PLURALIZABLE_BELOW: Final = "singular-spelling-pluralizable-below-singular"
-""":data:`PLURALIZABLE`, for a chain whose last link stays singular.
-
-Every `of` chain not already consumed by something that takes a plural has a
-last link -- the outermost, evaluated last, written first -- that must stay
-singular for the consumer (a comparison operand, an `if` condition, the
-statement's own value). Everything below it can still be plural: the engine
-errors on the result no more often than it did, and the result's plurality is
-unchanged. Never left of a `|`, where a plural below could answer in a case the
-singular erred in, and the error is what the fallback is there to catch.
-"""
-
-_Link = tuple[str, str, "TypeFix"] | str
-"""How one link of an `of` chain takes being pluralized from below.
-
-``"plural"`` -- written plural, so a plural below it changes nothing above;
-``"pass"`` -- no written form (a cast, a nested `of`, a parenthesized
-property), so the object settles plurality; or the singular spelling's
-(phrase, plural phrase, fix), a candidate itself. Anything unregistered stops
-the walk: a singular with no plural spelling would turn a plural below it into
-`singular-over-plural-object`.
-"""
-
-_FILTERED_SPELLING: Final = frozenset(
-    {"filtered-singular-spelling", "singular-spelling-mid-chain", PLURALIZABLE, PLURALIZABLE_BELOW}
-)
+_FILTERED_SPELLING: Final = frozenset({"filtered-singular-spelling", "singular-spelling-mid-chain"})
 """The shape rules, retracted left of a `|` -- and only there.
 
 `filtered-singular-spelling` names two things against an indexed filtered
@@ -1200,16 +1161,9 @@ def check(node: Node, environment: TypeEnvironment, *, source: str | None = None
     """
     checker = _Checker(environment, source)
     value = checker.run(node)
-    # `singular-spelling-mid-chain` already names the link next to the
-    # consumer, with the same fix; report it once, under the default rule.
-    mid_chain = {d.span for d in checker.diagnostics if d.code == "singular-spelling-mid-chain"}
     return CheckResult(
         value=value,
-        diagnostics=tuple(
-            d
-            for d in checker.diagnostics
-            if not (d.code in {PLURALIZABLE, PLURALIZABLE_BELOW} and d.span in mid_chain)
-        ),
+        diagnostics=tuple(checker.diagnostics),
         # A read-only view, not the checker's own dict. The annotation already
         # says `Mapping`; this makes that true at runtime, which matters
         # because a `CheckResult` is shared -- `lint` caches one analysis per
@@ -1303,15 +1257,6 @@ class _Checker:
         # The fix rides along because only `combine_of` still has the
         # reference whose written name it replaces.
         self.mid_chain: dict[int, tuple[str, str, TypeFix]] = {}
-        # Every `of` chain link and chain root, by how it takes a plural from
-        # below; see `_Link` and `pluralize_below`.
-        self.links: dict[int, _Link] = {}
-        # Nodes already reported as `PLURALIZABLE`, so two consumers over the
-        # same chain report each link once.
-        self.pluralized: set[int] = set()
-        # The left operand of every `|`, whose chains are never pluralized: see
-        # `PLURALIZABLE_BELOW`.
-        self.bar_lefts: list[Span] = []
 
     def run(self, root: Node) -> RelevanceValue:
         work: list[_Work] = [_Descend(root)]
@@ -1336,7 +1281,6 @@ class _Checker:
                     self.contexts.pop()
                 case _:  # pragma: no cover - exhaustiveness over _Work
                     assert_never(item)
-        self.pluralize_chain_tops(root)
         return self.values.pop()
 
     # -- helpers ------------------------------------------------------------
@@ -1359,138 +1303,6 @@ class _Checker:
                 plural_phrase=plural_phrase,
             )
             self.diagnostics.append(replace(diagnostic, fix=fix))
-
-    def pluralize_chain_tops(self, root: Node) -> None:
-        """Pluralize below the last link of every chain nothing else pluralized.
-
-        A chain whose consumer takes a plural has been walked already, top
-        link included (:meth:`pluralize_below`); this reaches the rest, with
-        the top link kept singular, and the consumer none the wiser. The
-        exception is the statement's own chain, which nothing consumes and so
-        nothing requires singular: it is pluralized all the way up. The
-        links already reported are skipped, so running over every chain is
-        safe. Left of a `|` is skipped, see :data:`PLURALIZABLE_BELOW`.
-        """
-        nodes = list(walk(root))
-        # What is part of a chain rather than the top of one: an object, a
-        # collection, or a property -- a property's own chain is typed inside
-        # the object's, and is reported, if at all, by the `of` it belongs to.
-        inner: set[int] = set()
-        for node in nodes:
-            match node:
-                case Of(prop=prop, obj=obj):
-                    inner.update((id(prop), id(obj)))
-                case Whose(collection=collection):
-                    inner.add(id(collection))
-        for node in nodes:
-            if node is root:
-                self.pluralize_root(node)
-                continue
-            if not isinstance(node, Of | Whose) or id(node) in inner:
-                continue
-            if any(
-                left.start <= node.span.start and node.span.end <= left.end
-                for left in self.bar_lefts
-            ):
-                continue
-            self.pluralize_below(node, keep_top=True)
-
-    def pluralize_root(self, root: Node) -> None:
-        """Pluralize the statement's own chain, top link included.
-
-        Nothing consumes the statement's value, so nothing requires it
-        singular. But only a chain that takes a parameter of some kind has
-        anything to pluralize: `wmi "root\\cimv2"` becomes `wmis "root\\cimv2"`
-        and `file "" of folder "" of folder ""` goes plural all the way up,
-        while `wmi` and `name of operating system` are singletons and stay as
-        written. So a property chain is pluralized only when a link below its
-        top was, too.
-        """
-        before = len(self.diagnostics)
-        self.pluralize_below(root)
-        reported = self.diagnostics[before:]
-        if isinstance(root, Reference) or len(reported) != 1:
-            return
-        # Only the top link would change, over nothing that can be plural.
-        self.pluralized.discard(id(root))
-        del self.diagnostics[before:]
-
-    def pluralize_below(self, node: Node, *, keep_top: bool = False) -> None:
-        """Report every link of the chain at ``node`` the plural is valid for.
-
-        Called where the consumer of ``node`` accepts a plural, so pluralizing
-        the top link is safe, and each link below it is safe while every link
-        above it is or can be plural. Walks down through `of` objects and a
-        `whose`'s collection, and stops at the first link that cannot take a
-        plural, or at anything that is not a chain.
-
-        A chain root is pluralized only when it names something: an argument
-        (`folder "/etc"`, `wmi "root\\cimv2"`) or a `whose` filter, either of
-        which can match nothing, or more than one. A bare root (`client`,
-        `windows folder`, `wmi`) is a singleton the plural adds nothing to.
-        A filtered root without an argument also needs a property taken of it:
-        directly under `exists` or `number of` the filtered singular already
-        answers rather than erroring (`exists bes computer whose (false)` is
-        `False`), so `exists true whose (...)`, a common idiom, stays as written.
-        """
-        filtered = False
-        below_property = False
-        # With ``keep_top`` the first link is left as written -- the consumer
-        # needs it singular -- and the walk reports from the one below it,
-        # under `PLURALIZABLE_BELOW`. The top link need not be pluralizable
-        # for that: it is not being changed.
-        top = keep_top
-        code = PLURALIZABLE_BELOW if keep_top else PLURALIZABLE
-        while True:
-            match node:
-                case Whose(collection=collection):
-                    node = collection
-                    filtered = True
-                case Of(obj=obj):
-                    if top:
-                        top = False
-                    else:
-                        link = self.links.get(id(node))
-                        if link is None:
-                            return
-                        if isinstance(link, tuple):
-                            self.report_pluralizable(node, link, code)
-                    node = obj
-                    filtered = False
-                    below_property = True
-                case Reference(index=index):
-                    link = self.links.get(id(node))
-                    if (
-                        not top
-                        and isinstance(link, tuple)
-                        and (index is not None or (filtered and below_property))
-                    ):
-                        self.report_pluralizable(node, link, code)
-                    return
-                case _:
-                    return
-
-    def report_pluralizable(
-        self, node: Node, link: tuple[str, str, TypeFix], code: str = PLURALIZABLE
-    ) -> None:
-        if id(node) in self.pluralized:
-            return
-        self.pluralized.add(id(node))
-        phrase, plural_phrase, fix = link
-        diagnostic = _diagnostic(code, node.span, phrase=phrase, plural_phrase=plural_phrase)
-        self.diagnostics.append(replace(diagnostic, fix=fix))
-
-    def register_root(self, node: Reference, value: RelevanceValue) -> None:
-        """Record a reference that is not an `of`'s property as a chain root."""
-        if (
-            id(node) in self.explicit_objects
-            or value.plurality is not Plurality.SINGULAR
-            or _is_aggregate(node.phrase)
-        ):
-            return
-        spelling = _sole_plural(list(self.resolutions.get(id(node), ())), node.phrase)
-        if spelling is not None:
-            self.links[id(node)] = (node.phrase, spelling, _respelling(node, spelling))
 
     def unknown(self) -> RelevanceValue:
         return RelevanceValue(types=None, platforms=self.env.universe)
@@ -1791,7 +1603,6 @@ class _Checker:
                 # is dropped (see `_FILTERED_SPELLING`). For the same reason
                 # a bare singular spelling mid-chain is reported here too.
                 self.report_mid_chain(node.operand)
-                self.pluralize_below(node.operand)
                 # Boolean everywhere it can be asked, and it can only be asked
                 # where the operand resolves: `exists` swallows a *runtime*
                 # nonexistent object, not a missing inspector. Confirmed live
@@ -1801,7 +1612,6 @@ class _Checker:
                 self.values.append(self.literal("boolean", operand.platforms))
             case NumberOf():
                 (operand,) = self.pop(1)
-                self.pluralize_below(node.operand)
                 # The same, for the same reason: `number of applications of
                 # registry` on macOS is `E: The operator "applications" is not
                 # defined.`, not a count of zero.
@@ -1825,9 +1635,7 @@ class _Checker:
                 self.values.append(self.combine_whose(node, collection, predicate))
             case Reference(index=index):
                 taken = self.pop(0 if index is None else 1)
-                value = self.combine_reference(node, taken[0] if taken else None)
-                self.register_root(node, value)
-                self.values.append(value)
+                self.values.append(self.combine_reference(node, taken[0] if taken else None))
             case NumberLiteral() | StringLiteral() | It():  # pragma: no cover - never queued
                 pass
             case _:  # pragma: no cover - exhaustiveness over the Node union
@@ -2205,23 +2013,8 @@ class _Checker:
                 # error rather than hiding it, so even `exists values of
                 # setting "x" of client` raises when the setting is absent.
                 self.report_mid_chain(node.obj)
-            if plurality is Plurality.PLURAL:
-                self.links[id(node)] = "plural"
-            elif (
-                plurality is Plurality.SINGULAR
-                and not aggregate
-                and (
-                    spelling := _plural_spelling(written.phrase, subject, self.env, indexed=indexed)
-                )
-            ):
-                self.links[id(node)] = (written.phrase, spelling, _respelling(written, spelling))
-            if plurality is Plurality.PLURAL or aggregate:
-                # A plural property, or an aggregate, takes its object plural.
-                self.pluralize_below(node.obj)
         else:
             plurality = _widen(prop.plurality, obj.plurality)
-            if written is None:
-                self.links[id(node)] = "pass"
         return RelevanceValue(
             types=prop.types,
             plurality=plurality,
@@ -2583,7 +2376,6 @@ class _Checker:
         # folders | 0`. The right operand earns it for the plainer reason
         # every `require_singular` site does: a position that demands a
         # singular cannot also advise writing the plural.
-        self.bar_lefts.append(node.left.span)
         self.require_singular(left, node.left, "left-operand-not-singular", token="|")
         self.require_singular(right, node.right, "right-operand-not-singular", token="|")
         # The shape rule too, and only on the left: there the empty case

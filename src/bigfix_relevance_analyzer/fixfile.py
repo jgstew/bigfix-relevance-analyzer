@@ -61,16 +61,13 @@ from bigfix_relevance_analyzer.extract import (
 )
 from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
-    RULES,
     Finding,
     LintConfig,
     Severity,
-    _analyze_site,
     _depth_findings,
     _file_error,
     _findings_dict,
     _lint_sites,
-    _site_fix,
     _unlintable,
     _walk_files,
     lint_file,
@@ -242,21 +239,9 @@ def _ignored_rules(autofix: AutofixResult, config: LintConfig) -> tuple[str, ...
     A disabled rule produces no finding, so a fix reaching here under one is
     a fix whose site *also* had an enabled one. The fix is a single result over
     every edit, so it cannot be applied in part: it is not applied at all.
-    A rule that rides along (:attr:`~bigfix_relevance_analyzer.lint.LintRule.rides_along`)
-    is exempt: joining another rule's fix while off is what it is for.
     """
     return tuple(
-        rule
-        for rule in autofix.applied_rules
-        if config.severity_for(rule) is Severity.IGNORE and not RULES[rule].rides_along
-    )
-
-
-def _rides_along(autofix: AutofixResult, config: LintConfig) -> bool:
-    """Whether ``autofix`` applies a rule that is off and only rode along."""
-    return any(
-        RULES[rule].rides_along and config.severity_for(rule) is Severity.IGNORE
-        for rule in autofix.applied_rules
+        rule for rule in autofix.applied_rules if config.severity_for(rule) is Severity.IGNORE
     )
 
 
@@ -333,12 +318,6 @@ def _fix_file(file_path: Path, config: LintConfig, *, explicit: bool) -> FileFix
             unapplied.append(fix_record(fix, f"rule {', '.join(ignored)} is ignored"))
             continue
         edits = source_edits(fix.site, fix.autofix)
-        if isinstance(edits, Unmapped) and _rides_along(fix.autofix, config):
-            # A riding edit must never cost the fix it joined: retry without it.
-            base = _site_fix(_analyze_site(fix.site, config), config, ride_along=False)
-            if base is not None:
-                fix = SiteFix(fix.site, base)
-                edits = source_edits(fix.site, fix.autofix)
         if isinstance(edits, Unmapped):
             unapplied.append(fix_record(fix, edits.reason))
         elif edits:

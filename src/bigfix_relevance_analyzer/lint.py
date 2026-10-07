@@ -123,8 +123,6 @@ from bigfix_relevance_analyzer.extract import (
 from bigfix_relevance_analyzer.nodes import Node, Of, Reference
 from bigfix_relevance_analyzer.typecheck import (
     _UNIQUE_VALUE,
-    PLURALIZABLE,
-    PLURALIZABLE_BELOW,
     SINGULAR_REQUIRED,
     Plurality,
     TypeDiagnostic,
@@ -243,15 +241,6 @@ class LintRule:
     severity -- they still report by default, just only past that ceiling.
     """
 
-    rides_along: bool = False
-    """Whether the rule's fix is applied, while the rule is off, to a statement
-    another enabled fix is already rewriting.
-
-    For a fix that is safe everywhere but too widespread to apply to a whole
-    repo by default: off, it changes no statement that would not have changed
-    anyway; on, it is reported and fixed like any other rule.
-    """
-
     threshold: str | None = None
     """The :class:`LintConfig` field that carries a :attr:`gated` rule's ceiling.
 
@@ -269,7 +258,6 @@ class LintRule:
             "rationale": self.rationale,
             "gated": self.gated,
             "threshold": self.threshold,
-            "rides_along": self.rides_along,
         }
 
 
@@ -286,7 +274,6 @@ def _rule(
     rationale: str,
     *,
     threshold: str | None = None,
-    rides_along: bool = False,
 ) -> tuple[str, LintRule]:
     return code, LintRule(
         code=code,
@@ -295,7 +282,6 @@ def _rule(
         rationale=rationale,
         gated=threshold is not None,
         threshold=threshold,
-        rides_along=rides_along,
     )
 
 
@@ -522,34 +508,6 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 '(...) of folders "c:\\\\"`. A warning, and a separate rule from '
                 "`non-unique-risk` so that silencing this shape does not also silence "
                 "the collapses that error on several rather than on none.",
-            ),
-            _rule(
-                "plural-everywhere",
-                Severity.IGNORE,
-                "a singular spelling where the plural is valid, chain roots included",
-                "The rest of the chain `plural-preferred` stops short of: the chain root "
-                'when it takes an argument or a filter (`folder "/etc"`, not a bare '
-                "`client` or `windows folder`), and every link below `exists`, "
-                "`number of`, an aggregate or a plural "
-                'property. `exists files "x" of folder "zz_none"` still raises '
-                "`Singular expression refers to nonexistent object.` where `exists files "
-                '"x" of folders "zz_none"` answers False, and `number of name of file of '
-                'folder "/etc"` raises the non-unique error where `number of names of '
-                'files of folders "/etc"` counts -- confirmed on 20 client targets and in '
-                "session. The plural never answers differently where the singular "
-                "answers. The statement's own chain, which nothing requires singular, "
-                "goes plural all the way up when anything in it takes a parameter "
-                '(`string value of select "" of wmi` becomes `string values of selects '
-                '"" of wmi`; a bare `wmi` or `name of operating system` stays). Where a '
-                "singular is required (a comparison operand, an `if` condition, the right "
-                "of an `|`) the chain's last link stays singular and everything below it "
-                "is pluralized. Never fires left of an `|`, where the error is the "
-                "fallback's trigger. Off by "
-                "default because it would touch a large share of an existing repo; while "
-                "off, its fix still rides along with any other fix of the same statement, "
-                "since that statement is being rewritten anyway. Enable it to report and "
-                "fix it everywhere.",
-                rides_along=True,
             ),
             _rule(
                 "version-truncating-compare",
@@ -876,10 +834,6 @@ _CHECK_RULES: Final = {
     # The same habit without a filter: a singular spelling mid-chain where a
     # plural is being built. Same rule, same rationale.
     "singular-spelling-mid-chain": "plural-preferred",
-    # The rest of the chain, off by default; its fix rides along. See
-    # `_site_fix`.
-    PLURALIZABLE: "plural-everywhere",
-    PLURALIZABLE_BELOW: "plural-everywhere",
     # The engine's up-front `A singular expression is required.`. An error like
     # `type-error`, but its own rule because it carries a fix a repo may want
     # off by name.
@@ -941,46 +895,6 @@ def _with_fix(diagnostic: TypeDiagnostic, applied: bool) -> str:
     else:
         done = f"respelled `{fix.expected}` as `{fix.replacement}`"
     return f"{diagnostic.message}; {done}: this position requires a single value"
-
-
-def _site_fix(
-    report: RelevanceAnalysis, config: LintConfig, *, ride_along: bool = True
-) -> AutofixResult | None:
-    """The site's fixed statement under ``config``, or ``None`` when unchanged.
-
-    A rule that rides along (:attr:`LintRule.rides_along`) and is switched off
-    only joins a fix that is happening anyway: the fix is first worked out
-    without it, and only if that changes the statement is it worked out again
-    with it. The second result is kept only if it still applies everything the
-    first did -- judged by what is left unfixed rather than by which code fixed
-    what, since a riding code may fix a link another code would have reached a
-    round later -- so riding along never costs the fix that triggered it. Every
-    other code is in both passes exactly as before, a disabled one included --
-    :func:`~bigfix_relevance_analyzer.fixfile.fix_file` refuses those.
-
-    ``ride_along=False`` returns the first result alone: what
-    :func:`~bigfix_relevance_analyzer.fixfile.fix_file` falls back to when a
-    riding edit cannot be written back into the file.
-    """
-    assert report.check is not None
-    fixable = {d.code for d in report.check.diagnostics if d.fix is not None}
-    if not fixable:
-        return None
-    riding = {
-        code
-        for code in fixable
-        if RULES[_rule_for(code)].rides_along
-        and config.severity_for(_rule_for(code)) is Severity.IGNORE
-    }
-    base = report.autofix(codes=fixable - riding)
-    if not base.changed:
-        return None
-    if not riding or not ride_along:
-        return base
-    full = report.autofix()
-    if all(full.unapplied.get(code, 0) <= base.unapplied.get(code, 0) for code in fixable - riding):
-        return full
-    return base
 
 
 def _rule_for(check_code: str) -> str:
@@ -1252,7 +1166,12 @@ def lint_analysis(
 
     if report.check is not None:
         # Worked out once for the site, and only when something could use it.
-        site_fix = _site_fix(report, config)
+        fixed = (
+            report.autofix()
+            if any(diagnostic.fix is not None for diagnostic in report.check.diagnostics)
+            else None
+        )
+        site_fix = fixed if fixed is not None and fixed.changed else None
         for diagnostic in report.check.diagnostics:
             # `used-without-context` is the checker's own independent detection
             # of the same unbound `it` the loop above already reports -- see
