@@ -154,3 +154,16 @@ def test_error_fallback_passes_its_context_through_to_both_sides() -> None:
         ("it", "files", Binder.WHOSE),
     ]
     assert bindings_as_text("size of it | 42") == [("it", None, None)]
+
+
+def test_it_in_a_parenthesized_index_binds_to_the_properties_own_object() -> None:
+    """Inside `substrings separated by (it) of "a,b"`, `it` is `"a,b"`.
+
+    The index belongs to the property, so it sees that property's direct object,
+    not the outer `of`'s. All 20 engine targets answer two empty strings for this
+    expression, which only `"a,b"` as the separator produces (issue #75).
+    """
+    # The index's `It` span covers its parentheses, hence "(it)".
+    assert bindings_as_text('(substrings separated by (it) of "a,b") of ","') == [
+        ("(it)", '"a,b"', Binder.OF)
+    ]
