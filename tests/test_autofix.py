@@ -25,15 +25,35 @@ from __future__ import annotations
 
 import itertools
 import json
+from typing import Any
 
 import pytest
 from _helpers import MID_CHAIN, SETTING
 
 from bigfix_relevance_analyzer import autofix as autofix_module
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis, analyze
-from bigfix_relevance_analyzer.autofix import AutofixResult, TextEdit, autofix
+from bigfix_relevance_analyzer.autofix import AutofixResult, TextEdit
+from bigfix_relevance_analyzer.autofix import autofix as _autofix
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.lint import LintConfig, lint_analysis
+from bigfix_relevance_analyzer.typecheck import PLURALIZABLE, SINGULAR_REQUIRED
+
+# The fixes these tests pin the machinery with: everything but #67's
+# `singular-spelling-pluralizable`, which finishes the cascade below in one
+# round and pluralizes its root too. Its own tests are in
+# `test_plural_everywhere.py`.
+PRE_67 = frozenset({MID_CHAIN, *SINGULAR_REQUIRED})
+
+
+def autofix(text: str, *args: Any, **kwargs: Any) -> AutofixResult:
+    kwargs.setdefault("codes", PRE_67)
+    return _autofix(text, *args, **kwargs)
+
+
+def others(report: Any) -> tuple[Any, ...]:
+    """A check's diagnostics, without `PLURALIZABLE` (see :data:`PRE_67`)."""
+    return tuple(d for d in report.diagnostics if d.code != PLURALIZABLE)
+
 
 CASCADE = 'number of names of files of folder "etc" of folder "private" of folder "/"'
 CASCADE_FIXED = 'number of names of files of folders "etc" of folders "private" of folder "/"'
@@ -47,7 +67,7 @@ def test_the_mid_chain_diagnostic_carries_a_fix_on_the_written_name() -> None:
     replacement is the plural spelling."""
     report = analyze(SETTING, Dialect.CLIENT)
     assert report.check is not None
-    (diagnostic,) = report.check.diagnostics
+    (diagnostic,) = others(report.check)
     assert diagnostic.code == MID_CHAIN
     fix = diagnostic.fix
     assert fix is not None
@@ -60,7 +80,7 @@ def test_filtered_singular_spelling_carries_no_fix() -> None:
     """It fires in singular contexts, where pluralizing would add a W601."""
     report = analyze('exists values of setting "x" whose (true) of client', Dialect.CLIENT)
     assert report.check is not None
-    (diagnostic,) = report.check.diagnostics
+    (diagnostic,) = others(report.check)
     assert diagnostic.code == "filtered-singular-spelling"
     assert diagnostic.fix is None
 
@@ -83,7 +103,7 @@ def test_spacing_and_case_around_the_name_are_kept() -> None:
     plural spelling, lower-cased like every table phrase."""
     text = 'exists values of  Setting  "x" of client'
     result = autofix(text, Dialect.CLIENT)
-    assert result.fixed == 'exists values of  settings  "x" of client'
+    assert result.fixed == 'exists values of  Settings  "x" of client'
     assert result.applied == {MID_CHAIN: 1}
 
 
@@ -128,14 +148,14 @@ def test_an_unfixable_error_carries_through() -> None:
     text = SETTING + " and 1"
     report = analyze(text, Dialect.CLIENT)
     assert report.check is not None
-    assert [d.code for d in report.check.diagnostics] == [MID_CHAIN, "right-operand-not-boolean"]
+    assert [d.code for d in others(report.check)] == [MID_CHAIN, "right-operand-not-boolean"]
 
     result = autofix(text, Dialect.CLIENT)
     assert result.fixed == 'exists values of settings "x" of client and 1'
     assert result.applied == {MID_CHAIN: 1}
     fixed = analyze(result.fixed, Dialect.CLIENT)
     assert fixed.check is not None
-    assert [d.code for d in fixed.check.diagnostics] == ["right-operand-not-boolean"]
+    assert [d.code for d in others(fixed.check)] == ["right-operand-not-boolean"]
 
 
 def test_max_rounds_one_on_the_cascade_falls_back_to_the_original() -> None:
@@ -156,7 +176,7 @@ def _force(monkeypatch: pytest.MonkeyPatch, old: str, new: str, *, only_if: str)
     """Make `_edits` propose replacing the first ``old`` with ``new``, whenever
     the text still contains ``only_if``."""
 
-    def forced(report: RelevanceAnalysis) -> tuple[TextEdit, ...]:
+    def forced(report: RelevanceAnalysis, codes: object = None) -> tuple[TextEdit, ...]:
         if only_if not in report.text:
             return ()
         start = report.text.index(old)
@@ -170,7 +190,7 @@ def test_the_guard_rejects_an_edit_that_adds_an_error(monkeypatch: pytest.Monkey
     _force(monkeypatch, "client", "client + 1", only_if="exists client")
     worse = analyze("exists client + 1", Dialect.CLIENT).check
     assert worse is not None
-    assert [d.code for d in worse.diagnostics] == ["binary-operator-not-defined"]
+    assert [d.code for d in others(worse)] == ["binary-operator-not-defined"]
     result = autofix(text, Dialect.CLIENT)
     assert result.fixed == text
     assert result.applied == {}
@@ -210,10 +230,10 @@ def test_a_failing_round_keeps_the_edits_that_pass_on_their_own(
     """One bad edit in a batch does not sink the good ones beside it."""
     real_edits = autofix_module._edits
 
-    def with_a_bad_one(report: RelevanceAnalysis) -> tuple[TextEdit, ...]:
+    def with_a_bad_one(report: RelevanceAnalysis, codes: Any = None) -> tuple[TextEdit, ...]:
         start = report.text.index("client")
         bad = TextEdit(start, start + len("client"), "clientzz", "forced")
-        return (*real_edits(report), bad)
+        return (*real_edits(report, codes), bad)
 
     monkeypatch.setattr(autofix_module, "_edits", with_a_bad_one)
     result = autofix(SETTING, Dialect.CLIENT)
@@ -224,7 +244,7 @@ def test_a_failing_round_keeps_the_edits_that_pass_on_their_own(
 
 def test_an_unknown_guard_is_refused() -> None:
     with pytest.raises(ValueError, match="guard"):
-        autofix(SETTING, Dialect.CLIENT, guard="everything")  # type: ignore[arg-type]
+        _autofix(SETTING, Dialect.CLIENT, guard="everything")  # type: ignore[arg-type]
 
 
 # -- edits against the original --------------------------------------------------
@@ -350,9 +370,10 @@ def test_to_dict_shape() -> None:
 def test_the_analysis_payload_carries_the_autofix() -> None:
     fixable = analyze(SETTING, Dialect.CLIENT)
     assert isinstance(fixable.autofix(), AutofixResult)
-    assert fixable.to_dict()["autofix"] == autofix(SETTING, Dialect.CLIENT).to_dict()
+    # Every fix, #67's included: analysis suggests it by default.
+    assert fixable.to_dict()["autofix"] == _autofix(SETTING, Dialect.CLIENT).to_dict()
 
-    clean = analyze('exists values of settings "x" of client', Dialect.CLIENT)
+    clean = analyze('exists values of settings "x" of clients', Dialect.CLIENT)
     assert clean.to_dict()["autofix"] is None
 
 
@@ -575,7 +596,7 @@ def test_a_plurality_change_elsewhere_is_still_rejected(monkeypatch: pytest.Monk
     _force(monkeypatch, "name of file", "names of file", only_if="name of file")
     report = analyze(text.replace("name of file", "names of file"), Dialect.CLIENT)
     assert report.check is not None
-    assert [d.code for d in report.check.diagnostics] == [LEFT]
+    assert [d.code for d in others(report.check)] == [LEFT]
     original = analyze(text, Dialect.CLIENT).check
     assert original is not None
     assert report.check.value.plurality is not original.value.plurality
@@ -609,7 +630,7 @@ def test_no_back_and_forth_with_the_mid_chain_plural_fix() -> None:
     text = '"x" & values of setting "y" of client'
     report = analyze(text, Dialect.CLIENT)
     assert report.check is not None
-    assert sorted(d.code for d in report.check.diagnostics) == [RIGHT, MID_CHAIN]
+    assert sorted(d.code for d in others(report.check)) == [RIGHT, MID_CHAIN]
 
     result = autofix(text, Dialect.CLIENT, max_rounds=8)
     assert result.fixed == '"x" & unique value of values of settings "y" of client'
@@ -648,8 +669,12 @@ def test_the_cli_shows_the_suggested_relevance_and_applied_counts(
     assert main(["--markdown", *flags, "--dialect", "client", CASCADE]) == 0
     out = capsys.readouterr().out
     assert "## Suggested fix" in out
-    assert f"```\n{CASCADE_FIXED}\n```" in out
-    assert f"- applied 2 `{MID_CHAIN}` (`plural-preferred`) over 2 rounds" in out
+    # Analysis suggests every fix, #67's included, which also pluralizes the
+    # root and finishes the cascade in one round.
+    full = CASCADE_FIXED.replace('folder "/"', 'folders "/"')
+    assert f"```\n{full}\n```" in out
+    assert f"- applied 1 `{MID_CHAIN}` (`plural-preferred`) over 1 round" in out
+    assert f"- applied 2 `{PLURALIZABLE}` (`plural-everywhere`) over 1 round" in out
 
 
 def test_the_cli_shows_no_suggested_fix_when_nothing_fixes(
@@ -657,12 +682,88 @@ def test_the_cli_shows_no_suggested_fix_when_nothing_fixes(
 ) -> None:
     from bigfix_relevance_analyzer.__main__ import main
 
-    assert main(["--markdown", "--dialect", "client", CASCADE_FIXED]) == 0
+    assert (
+        main(
+            [
+                "--markdown",
+                "--dialect",
+                "client",
+                CASCADE_FIXED.replace('folder "/"', 'folders "/"'),
+            ]
+        )
+        == 0
+    )
     assert "Suggested fix" not in capsys.readouterr().out
 
 
 def test_autofix_is_exported_from_the_package() -> None:
     import bigfix_relevance_analyzer as package
 
-    assert package.autofix_relevance is autofix
+    assert package.autofix_relevance is _autofix
     assert package.AutofixResult is AutofixResult
+
+
+# -- the author's capitalization ---------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # Lowercase, the common spelling, stays lowercase.
+        ('exists values of setting "x" of client', 'exists values of settings "x" of client'),
+        # Capitalized words stay capitalized.
+        ('exists values of Setting "x" of client', 'exists values of Settings "x" of client'),
+        # A short all-caps word reads as an acronym and takes a lowercase `s`.
+        (
+            'exists selects "x" of WMI "root\\cimv2"',
+            'exists selects "x" of WMIs "root\\cimv2"',
+        ),
+        # Any other all-caps word stays all caps.
+        ('exists values of SETTING "x" of client', 'exists values of SETTINGS "x" of client'),
+        # Word by word, for a multi-word name.
+        (
+            'exists files of Parent Folder of folder "/etc"',
+            'exists files of Parent Folders of folders "/etc"',
+        ),
+    ],
+)
+def test_a_respelling_keeps_the_authors_capitalization(text: str, expected: str) -> None:
+    """Only some names in a statement are rewritten, so a lowercase plural in
+    a capitalized statement would look inconsistent unless the author wrote it
+    that way."""
+    assert _autofix(text, Dialect.CLIENT).fixed == expected
+
+
+@pytest.mark.parametrize(
+    ("written", "spelling", "expected"),
+    [
+        # An ordinary short word in caps is not an acronym.
+        ("KEY", "keys", "KEYS"),
+        ("DAY", "days", "DAYS"),
+        # An acronym, short or long, takes a lowercase suffix.
+        ("WMI", "wmis", "WMIs"),
+        ("SID", "sids", "SIDs"),
+        ("BIOS", "bioses", "BIOSes"),
+        ("SMBIOS", "smbioses", "SMBIOSes"),
+        ("GUID", "guids", "GUIDs"),
+        # Plural to singular keeps the shared letters as written.
+        ("SIDs", "sid", "SID"),
+        ("WMIs", "wmi", "WMI"),
+        ("Concatenations", "concatenation", "Concatenation"),
+        # Mixed case and irregular plurals.
+        ("WiFi", "wifis", "WiFis"),
+        ("Child", "children", "Children"),
+        ("Nil", "nothings", "Nothings"),
+        # Lowercase is untouched.
+        ("key", "keys", "keys"),
+    ],
+)
+def test_match_case(written: str, spelling: str, expected: str) -> None:
+    assert autofix_module._match_case(written, spelling) == expected
+
+
+def test_an_all_caps_statement_stays_all_caps() -> None:
+    text = 'EXISTS VALUES OF KEY "x" OF KEY "y" OF REGISTRY'
+    assert (
+        _autofix(text, Dialect.CLIENT).fixed == 'EXISTS VALUES OF KEYS "x" OF KEYS "y" OF REGISTRY'
+    )

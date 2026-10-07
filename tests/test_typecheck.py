@@ -9,6 +9,7 @@ tagged where they have not been confirmed against a real evaluator.
 
 from __future__ import annotations
 
+import dataclasses
 import pathlib
 import re
 
@@ -23,11 +24,27 @@ from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 from bigfix_relevance_analyzer.nodes import If, Node
 from bigfix_relevance_analyzer.parser import parse
 from bigfix_relevance_analyzer.typecheck import (
+    PLURALIZABLE,
+    CheckResult,
     Plurality,
     TypeEnvironment,
-    check,
     resolve_property,
 )
+from bigfix_relevance_analyzer.typecheck import check as _check
+
+
+def check(node: Node, environment: TypeEnvironment, *, source: str | None = None) -> CheckResult:
+    """:func:`~bigfix_relevance_analyzer.typecheck.check`, without `PLURALIZABLE`.
+
+    That code reports nearly every singular spelling below a plural consumer,
+    so it would ride along on most assertions here, which pin other rules.
+    It has its own module, ``test_plural_everywhere.py``.
+    """
+    result = _check(node, environment, source=source)
+    return dataclasses.replace(
+        result, diagnostics=tuple(d for d in result.diagnostics if d.code != PLURALIZABLE)
+    )
+
 
 ALL_PLATFORMS = {
     context
