@@ -959,6 +959,9 @@ def test_the_catalog_and_the_default_severities_cannot_disagree() -> None:
         assert DEFAULT_SEVERITIES[code] is rule.default_severity
 
 
+PLURAL_EVERYWHERE_ON = LintConfig(severities={"plural-everywhere": Severity.WARNING})
+
+
 def _every_emitted_code() -> set[str]:
     """Drive every rule and collect the codes that actually come out.
 
@@ -983,7 +986,8 @@ def _every_emitted_code() -> set[str]:
         MIXED_DIALECT,
         ACTIONSCRIPT_KEYWORD,
     ):
-        for config in (LintConfig(), thresholds):
+        # `plural-everywhere` is off by default (#67), so it needs turning on.
+        for config in (LintConfig(), thresholds, PLURAL_EVERYWHERE_ON):
             emitted.update(finding.code for finding in lint_analysis(analyze(text), config))
     return emitted
 
@@ -1117,9 +1121,11 @@ def test_the_catalog_is_ordered_errors_first() -> None:
     assert len(listed) == len(RULES)
     errors = [rule.code for rule in listed if rule.default_severity is Severity.ERROR]
     warnings = [rule.code for rule in listed if rule.default_severity is Severity.WARNING]
-    assert [rule.code for rule in listed] == errors + warnings
+    ignored = [rule.code for rule in listed if rule.default_severity is Severity.IGNORE]
+    assert [rule.code for rule in listed] == errors + warnings + ignored
     assert errors == sorted(errors)
     assert warnings == sorted(warnings)
+    assert ignored == sorted(ignored)
 
 
 def test_a_finding_does_not_repeat_the_catalog() -> None:
@@ -1139,7 +1145,7 @@ def test_a_finding_does_not_repeat_the_catalog() -> None:
 README = Path(__file__).parent.parent / "README.md"
 #: The README's generated rule table: `| \`code\` | severity | ... |` rows only,
 #: so prose and fenced example output cannot be mistaken for entries.
-_README_RULE_ROW = re.compile(r"^\|\s*`([a-z-]+)`\s*\|\s*(error|warning)\s*\|", re.MULTILINE)
+_README_RULE_ROW = re.compile(r"^\|\s*`([a-z-]+)`\s*\|\s*(error|warning|ignore)\s*\|", re.MULTILINE)
 
 
 def test_the_readme_rule_table_matches_the_catalog() -> None:
@@ -1187,6 +1193,8 @@ def test_the_readme_rule_table_says_which_rules_are_gated() -> None:
                 int(default) if isinstance(default, float) and default.is_integer() else default
             )
             assert f"default {rendered}" in row, rule.code
+        elif rule.default_severity is Severity.IGNORE:
+            assert "off by default" in row, rule.code
         else:
             assert "always on" in row, rule.code
 

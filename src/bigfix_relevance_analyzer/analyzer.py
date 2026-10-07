@@ -58,6 +58,8 @@ from bigfix_relevance_analyzer.tokenizer import Token, TokenKind, _lex
 from bigfix_relevance_analyzer.typecheck import CheckResult, TypeEnvironment, check
 
 if TYPE_CHECKING:
+    from collections.abc import Collection
+
     from bigfix_relevance_analyzer.autofix import AutofixResult, Guard
 
 __all__ = [
@@ -410,12 +412,18 @@ class RelevanceAnalysis:
         """Occurrences of ``it`` with no context to bind to."""
         return tuple(entry for entry in self.it_bindings if entry.context is None)
 
-    def autofix(self, *, guard: Guard = "warnings", max_rounds: int | None = None) -> AutofixResult:
+    def autofix(
+        self,
+        *,
+        guard: Guard = "warnings",
+        max_rounds: int | None = None,
+        codes: Collection[str] | None = None,
+    ) -> AutofixResult:
         """This statement with every safe fix applied, as one final result.
 
         Re-analyses under the same requested dialect and platform this
         analysis ran with. See :func:`~bigfix_relevance_analyzer.autofix.autofix`
-        for what "safe" means, and for ``guard`` and ``max_rounds``. Not
+        for what "safe" means, and for ``guard``, ``max_rounds`` and ``codes``. Not
         memoized: this object is frozen, and a statement with nothing to fix
         -- the common case -- costs one pass over its diagnostics.
         """
@@ -428,6 +436,7 @@ class RelevanceAnalysis:
             self.environment.platform,
             guard,
             DEFAULT_MAX_ROUNDS if max_rounds is None else max_rounds,
+            codes,
         )
 
     def to_dict(self, *, mermaid: bool = False) -> dict[str, Any]:

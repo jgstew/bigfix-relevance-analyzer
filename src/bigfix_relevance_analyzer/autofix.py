@@ -39,7 +39,7 @@ Print-free and never raises on bad relevance, like the rest of the package.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Final, Literal
 
@@ -185,19 +185,62 @@ def _anchored(text: str, fix: TypeFix, code: str) -> TextEdit | None:
     if not name or _normalize_phrase(name, fold=True) != _normalize_phrase(fix.expected, fold=True):
         return None
     start = fix.start + len(written) - len(written.lstrip())
-    return TextEdit(start, start + len(name), fix.replacement, code)
+    replacement = fix.replacement
+    if not replacement.startswith(_UNIQUE_VALUE):
+        # A respelling, not a wrap: write it the way the author wrote the name.
+        replacement = _match_case(name, replacement)
+    return TextEdit(start, start + len(name), replacement, code)
 
 
-def _fixable(report: RelevanceAnalysis) -> tuple[TypeDiagnostic, ...]:
+_ACRONYM: Final = 3
+"""The longest all-caps word :func:`_match_case` reads as an acronym."""
+
+
+def _match_case(written: str, spelling: str) -> str:
+    """``spelling`` (as the inspector tables write it) in ``written``'s capitalization.
+
+    Only some names in a statement are rewritten, so a lowercase plural in a
+    capitalized statement looks inconsistent unless the author wrote it so.
+    Word by word: a capitalized word stays capitalized, and an all-caps word
+    stays all caps (`SETTING` -> `SETTINGS`) -- except a short one, read as an
+    acronym, that only gains a suffix: that suffix stays lowercase (`WMI` ->
+    `WMIs`, `SID` -> `SIDs`), the usual way to pluralize an acronym.
+    Lowercase, by far the common spelling, is left alone, and so is a name
+    whose words do not line up one to one with the spelling's.
+    """
+    words, targets = written.split(), spelling.split()
+    if len(words) != len(targets):
+        return spelling
+    matched = []
+    for word, target in zip(words, targets, strict=True):
+        if word.isupper() and len(word) > 1:
+            if len(word) <= _ACRONYM and target.lower().startswith(word.lower()):
+                target = word + target[len(word) :]
+            else:
+                target = target.upper()
+        elif word[:1].isupper():
+            target = target[:1].upper() + target[1:]
+        matched.append(target)
+    return " ".join(matched)
+
+
+def _fixable(
+    report: RelevanceAnalysis, codes: Collection[str] | None = None
+) -> tuple[TypeDiagnostic, ...]:
+    """``report``'s fix-carrying diagnostics, limited to ``codes`` when given."""
     if report.check is None:
         return ()
-    return tuple(diagnostic for diagnostic in report.check.diagnostics if diagnostic.fix)
+    return tuple(
+        diagnostic
+        for diagnostic in report.check.diagnostics
+        if diagnostic.fix and (codes is None or diagnostic.code in codes)
+    )
 
 
-def _edits(report: RelevanceAnalysis) -> tuple[TextEdit, ...]:
+def _edits(report: RelevanceAnalysis, codes: Collection[str] | None = None) -> tuple[TextEdit, ...]:
     """Every fix ``report``'s diagnostics carry, anchored to its text, in order."""
     found: set[TextEdit] = set()
-    for diagnostic in _fixable(report):
+    for diagnostic in _fixable(report, codes):
         assert diagnostic.fix is not None
         edit = _anchored(report.text, diagnostic.fix, diagnostic.code)
         if edit is not None:
@@ -352,7 +395,9 @@ class _State:
 class _Guard:
     """Whether a candidate is no worse than the original."""
 
-    def __init__(self, original: RelevanceAnalysis, guard: Guard) -> None:
+    def __init__(
+        self, original: RelevanceAnalysis, guard: Guard, codes: Collection[str] | None = None
+    ) -> None:
         from bigfix_relevance_analyzer.lint import LintConfig, Severity
 
         # The default configuration's severities: the guard judges by what a
@@ -362,11 +407,12 @@ class _Guard:
             {Severity.ERROR} if guard == "errors" else {Severity.ERROR, Severity.WARNING}
         )
         self.original = original
+        self._codes = codes
         self._round_baseline = self.problems(original, fixable=False)
         self._full_baseline = self.problems(original, fixable=True)
         self._original_fixes = {
             (diagnostic.fix.start, diagnostic.fix.end)
-            for diagnostic in _fixable(original)
+            for diagnostic in _fixable(original, codes)
             if diagnostic.fix is not None
         }
         self._required = _singular_required(original)
@@ -429,7 +475,7 @@ class _Guard:
             count > self._full_baseline[code] for code, count in found.items()
         ):
             return False
-        for diagnostic in _fixable(state.report):
+        for diagnostic in _fixable(state.report, self._codes):
             assert diagnostic.fix is not None
             span: tuple[int, int] | None = (diagnostic.fix.start, diagnostic.fix.end)
             for edits, before in zip(
@@ -472,6 +518,7 @@ def _autofix(
     platform: str | None,
     guard: Guard,
     max_rounds: int,
+    codes: Collection[str] | None = None,
 ) -> AutofixResult:
     if guard not in _GUARDS:
         raise ValueError(f"guard must be one of {sorted(_GUARDS)}, not {guard!r}")
@@ -482,15 +529,15 @@ def _autofix(
         return analyze(text, dialect, platform)
 
     # Cheap exit for the overwhelmingly common case: nothing proposes a fix.
-    if not _edits(original):
+    if not _edits(original, codes):
         return AutofixResult(original=original.text, fixed=original.text)
 
-    judge = _Guard(original, guard)
+    judge = _Guard(original, guard, codes)
     states = [_State(original.text, original, Counter())]
     seen = {original.text}
     for _ in range(max_rounds):
         current = states[-1]
-        edits = _disjoint(_edits(current.report))
+        edits = _disjoint(_edits(current.report, codes))
         if not edits:
             break
         text = _apply(current.text, edits)
@@ -529,7 +576,7 @@ def _autofix(
         original=original.text,
         fixed=final.text,
         applied=dict(sorted(final.applied.items())),
-        unapplied=dict(sorted(Counter(d.code for d in _fixable(final.report)).items())),
+        unapplied=dict(sorted(Counter(d.code for d in _fixable(final.report, codes)).items())),
         rounds=len(final.rounds),
         edits=final.edits,
     )
@@ -542,6 +589,7 @@ def autofix(
     *,
     guard: Guard = "warnings",
     max_rounds: int = DEFAULT_MAX_ROUNDS,
+    codes: Collection[str] | None = None,
 ) -> AutofixResult:
     """Apply every safe fix to ``text``, cascades included, and report the result.
 
@@ -550,9 +598,10 @@ def autofix(
     analysed with the same pair. ``guard`` is what a fix may not add more of;
     see :data:`Guard`. ``max_rounds`` bounds the cascade; one reached
     mid-cascade falls back to the last state that passes the full check,
-    which may be the original.
+    which may be the original. ``codes`` limits the fixes applied to those
+    checker codes; ``None``, the default, applies every fix.
 
     Raises :class:`ValueError` only for a bad ``guard`` or ``max_rounds`` --
     never for bad relevance, which simply has nothing to fix.
     """
-    return _autofix(analyze(text, dialect, platform), dialect, platform, guard, max_rounds)
+    return _autofix(analyze(text, dialect, platform), dialect, platform, guard, max_rounds, codes)
