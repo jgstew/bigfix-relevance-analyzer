@@ -192,8 +192,21 @@ def _anchored(text: str, fix: TypeFix, code: str) -> TextEdit | None:
     return TextEdit(start, start + len(name), replacement, code)
 
 
-_ACRONYM: Final = 3
-"""The longest all-caps word :func:`_match_case` reads as an acronym."""
+_ACRONYMS: Final = frozenset(
+    {
+        # Drawn from the words the inspector tables pluralize, where an all-caps
+        # spelling reads as an acronym. A short all-caps word that is not one
+        # -- `KEY`, `DAY`, `LOG`, `SET` -- is why this is a list, not a length.
+        *("acl", "ace", "bcc", "bios", "bssid", "cpu", "dacl", "dmi", "fpu"),
+        *("ghz", "gid", "guid", "html", "ia64", "id", "ip", "ipv4", "ipv6"),
+        *("irtt", "json", "khz", "lan", "ldap", "mac", "md5", "mhz", "mtu"),
+        *("pid", "ppid", "ram", "rpm", "rssi", "rtt", "sacl", "scsi", "sha1"),
+        *("sha224", "sha256", "sha384", "sha512", "sid", "smbios", "ssid"),
+        *("ssl", "tcb", "tcp", "tty", "udp", "uid", "uri", "url", "usb"),
+        *("uuid", "wmi", "wow64", "x32", "x64", "xml", "yaml"),
+    }
+)
+"""All-caps words :func:`_match_case` pluralizes with a lowercase suffix."""
 
 
 def _match_case(written: str, spelling: str) -> str:
@@ -201,26 +214,32 @@ def _match_case(written: str, spelling: str) -> str:
 
     Only some names in a statement are rewritten, so a lowercase plural in a
     capitalized statement looks inconsistent unless the author wrote it so.
-    Word by word: a capitalized word stays capitalized, and an all-caps word
-    stays all caps (`SETTING` -> `SETTINGS`) -- except a short one, read as an
-    acronym, that only gains a suffix: that suffix stays lowercase (`WMI` ->
-    `WMIs`, `SID` -> `SIDs`), the usual way to pluralize an acronym.
-    Lowercase, by far the common spelling, is left alone, and so is a name
-    whose words do not line up one to one with the spelling's.
+    Word by word, the letters the two words share keep the author's case
+    (`Setting` -> `Settings`, `SIDs` -> `SID`, `WiFi` -> `WiFis`), and only
+    the letters the respelling adds need one: uppercase after an all-caps word
+    (`KEY` -> `KEYS`) unless it is one of :data:`_ACRONYMS`, the usual way to
+    pluralize an acronym (`WMI` -> `WMIs`, `BIOS` -> `BIOSes`), and lowercase
+    otherwise. A word sharing nothing keeps at least a leading capital
+    (`Nil` -> `Nothings`). Lowercase, by far the common spelling, is left
+    alone, and so is a name whose words do not line up one to one with the
+    spelling's.
     """
     words, targets = written.split(), spelling.split()
     if len(words) != len(targets):
         return spelling
     matched = []
     for word, target in zip(words, targets, strict=True):
-        if word.isupper() and len(word) > 1:
-            if len(word) <= _ACRONYM and target.lower().startswith(word.lower()):
-                target = word + target[len(word) :]
-            else:
-                target = target.upper()
-        elif word[:1].isupper():
-            target = target[:1].upper() + target[1:]
-        matched.append(target)
+        shared = 0
+        while (
+            shared < min(len(word), len(target)) and word[shared].lower() == target[shared].lower()
+        ):
+            shared += 1
+        shouted = word.isupper() and word.lower() not in _ACRONYMS
+        added = target[shared:].upper() if shouted else target[shared:].lower()
+        result = word[:shared] + added
+        if shared == 0 and word[:1].isupper():
+            result = result[:1].upper() + result[1:]
+        matched.append(result)
     return " ".join(matched)
 
 

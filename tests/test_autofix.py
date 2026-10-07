@@ -732,3 +732,38 @@ def test_a_respelling_keeps_the_authors_capitalization(text: str, expected: str)
     a capitalized statement would look inconsistent unless the author wrote it
     that way."""
     assert _autofix(text, Dialect.CLIENT).fixed == expected
+
+
+@pytest.mark.parametrize(
+    ("written", "spelling", "expected"),
+    [
+        # An ordinary short word in caps is not an acronym.
+        ("KEY", "keys", "KEYS"),
+        ("DAY", "days", "DAYS"),
+        # An acronym, short or long, takes a lowercase suffix.
+        ("WMI", "wmis", "WMIs"),
+        ("SID", "sids", "SIDs"),
+        ("BIOS", "bioses", "BIOSes"),
+        ("SMBIOS", "smbioses", "SMBIOSes"),
+        ("GUID", "guids", "GUIDs"),
+        # Plural to singular keeps the shared letters as written.
+        ("SIDs", "sid", "SID"),
+        ("WMIs", "wmi", "WMI"),
+        ("Concatenations", "concatenation", "Concatenation"),
+        # Mixed case and irregular plurals.
+        ("WiFi", "wifis", "WiFis"),
+        ("Child", "children", "Children"),
+        ("Nil", "nothings", "Nothings"),
+        # Lowercase is untouched.
+        ("key", "keys", "keys"),
+    ],
+)
+def test_match_case(written: str, spelling: str, expected: str) -> None:
+    assert autofix_module._match_case(written, spelling) == expected
+
+
+def test_an_all_caps_statement_stays_all_caps() -> None:
+    text = 'EXISTS VALUES OF KEY "x" OF KEY "y" OF REGISTRY'
+    assert (
+        _autofix(text, Dialect.CLIENT).fixed == 'EXISTS VALUES OF KEYS "x" OF KEYS "y" OF REGISTRY'
+    )

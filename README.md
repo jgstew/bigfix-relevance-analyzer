@@ -617,9 +617,11 @@ is what the checker read, case-insensitively and whitespace-normalized.
   name becomes its plural spelling (`of  Setting  "x"` becomes
   `of  Settings  "x"`). Every respelling keeps the author's capitalization,
   word by word, so a partly rewritten statement stays consistent: lowercase
-  stays lowercase, `Setting` becomes `Settings`, a longer all-caps word stays
-  all caps (`SETTINGS`), and an all-caps acronym of up to three letters takes
-  a lowercase suffix (`WMI "root\\cimv2"` becomes `WMIs "root\\cimv2"`). `filtered-singular-spelling` stays unfixable: it fires
+  stays lowercase, the letters a respelling shares with the name keep the
+  author's case (`Setting` becomes `Settings`, `SIDs` becomes `SID`), and the
+  letters it adds follow an all-caps word (`KEY` becomes `KEYS`) unless that
+  word is a known acronym, which takes a lowercase suffix (`WMI "root\\cimv2"`
+  becomes `WMIs "root\\cimv2"`, `BIOS` becomes `BIOSes`). `filtered-singular-spelling` stays unfixable: it fires
   in singular contexts, where the plural would only trade it for a
   `non-unique-risk`.
 - `singular-spelling-pluralizable` (`plural-everywhere`): the rest of the
