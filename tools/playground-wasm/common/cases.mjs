@@ -14,7 +14,7 @@
 // Each case is a relevance string plus the badge text run() should produce.
 // Chosen to cover every failure mode a real bug has actually hit in this
 // page: the happy path, an unresolved identifier, a parse error, an
-// it-binding, and statements autofix rewrites (see template.html's
+// it-binding, and a statement autofix rewrites (see template.html's
 // renderPayload for what these read).
 //
 // The dialect badge reads `dialect.resolved` -- the inspector tables' own
@@ -26,10 +26,8 @@
 // opinion about is still valid as neither dialect when the names contradict.
 export const CASES = [
   {
-    // A root that takes an argument, under `exists`: autofix offers
-    // `running applications "winlogon.exe"` (#67).
     text: 'exists running application "winlogon.exe" AND version of operating system >= "10.0"',
-    expectBadges: "dialect: client parse: ok types: ok fix: available",
+    expectBadges: "dialect: client parse: ok types: ok fix: none",
   },
   { text: "asdfdffds", expectBadges: "dialect: undetermined parse: ok types: ok fix: none" },
   {
@@ -37,11 +35,8 @@ export const CASES = [
     expectBadges: "dialect: undetermined parse: error types: n/a fix: n/a",
   },
   {
-    // `size` is not defined for a folder, so the type error stands. Under
-    // `exists`, `file "x.txt"` of the plural `folders` is pluralizable (#67),
-    // which also clears its `singular-over-plural-object` collapse.
     text: 'exists file "x.txt" of folders "/" whose (size of it > 100)',
-    expectBadges: "dialect: client parse: ok types: error fix: available",
+    expectBadges: "dialect: client parse: ok types: error fix: none",
   },
   {
     // `files`/`folders` are client-only, `bes computers` is session-only, so
@@ -52,7 +47,7 @@ export const CASES = [
   },
   {
     // `setting` is a singular spelling mid-chain, which autofix rewrites to
-    // `settings`; the bare root `client` stays singular (#67).
+    // `settings`; the only case here with a fix to offer.
     text: 'exists values of setting "_BESClient_Resource_SleepIdle" of client',
     expectBadges: "dialect: client parse: ok types: ok fix: available",
   },

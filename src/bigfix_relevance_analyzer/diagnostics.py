@@ -309,28 +309,6 @@ _TYPE_CHECK: Final = [
         "matches; prefer '{plural_phrase}' and, where a singular is required, "
         "'unique value of' at the end of the chain",
     ),
-    _entry(
-        "singular-spelling-pluralizable",
-        # The rest of the chain `singular-spelling-mid-chain` stops short of:
-        # the chain root, and every link under a consumer that accepts a plural
-        # (`exists`, `number of`, an aggregate, a plural property). The plural
-        # spelling never answers differently where the singular answers, and
-        # answers where it errors. Confirmed on 20 client targets and in
-        # session (#67)::
-        #
-        #     Q: exists files "x" of folder "zz_none"
-        #     E: Singular expression refers to nonexistent object.
-        #     Q: exists files "x" of folders "zz_none"
-        #     A: False
-        #     Q: number of name of file of folder "/etc"
-        #     E: Singular expression refers to non-unique object.
-        #     Q: number of names of files of folders "/etc"
-        #     A: 58
-        Origin.RUNTIME,
-        "'{phrase}' is a singular spelling where the plural is valid; "
-        "'{plural_phrase}' answers the same values and does not error when "
-        "nothing, or more than one, matches",
-    ),
     # Operators and casts.
     _entry(
         "operand-types-incompatible",

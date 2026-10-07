@@ -434,7 +434,6 @@ same way instead of each inventing a description:
 | `mixed-dialect` | error | inspectors exclusive to client relevance and to session relevance in one statement | always on |
 | `non-unique-risk` | warning | a property written singular where more than one value may come back | always on |
 | `plural-preferred` | warning | a singular spelling mid-chain, where the plural reads safer | always on |
-| `plural-everywhere` | ignore | a singular spelling where the plural is valid, chain roots included | off by default; its fix rides along with any other fix of the same statement |
 | `version-truncating-compare` | warning | a version comparison that truncates to the shorter operand's components | always on |
 | `version-like-string-compare` | warning | two version-looking strings compared as strings, not as versions | always on |
 | `actionscript-keyword` | error | an ActionScript command word used as a relevance name | always on |
@@ -600,58 +599,21 @@ from bigfix_relevance_analyzer import autofix_relevance
 result = autofix_relevance(
     'number of names of files of folder "etc" of folder "private" of folder "/"'
 )
-result.fixed  # 'number of names of files of folders "etc" of folders "private" of folders "/"'
-result.applied  # {'singular-spelling-mid-chain': 1, 'singular-spelling-pluralizable': 2}
-result.rounds  # 1
+result.fixed  # 'number of names of files of folders "etc" of folders "private" of folder "/"'
+result.applied  # {'singular-spelling-mid-chain': 2}
+result.rounds  # 2
 result.unapplied  # {} - fixable diagnostics still standing in `fixed`
 ```
 
-`codes=` limits the fixes to some checker codes (`autofix_relevance(text,
-codes={"singular-spelling-mid-chain"})`); the default applies every fix.
-
-Three kinds of diagnostic carry a fix today. The checker attaches a `TypeFix`
+Two kinds of diagnostic carry a fix today. The checker attaches a `TypeFix`
 to each, and the fix layer applies it only when the text in its range really
 is what the checker read, case-insensitively and whitespace-normalized.
 
 - `singular-spelling-mid-chain` (`plural-preferred`): the written property
   name becomes its plural spelling (`of  Setting  "x"` becomes
-  `of  Settings  "x"`). Every respelling keeps the author's capitalization,
-  word by word, so a partly rewritten statement stays consistent: lowercase
-  stays lowercase, the letters a respelling shares with the name keep the
-  author's case (`Setting` becomes `Settings`, `SIDs` becomes `SID`), and the
-  letters it adds follow an all-caps word (`KEY` becomes `KEYS`) unless that
-  word is a known acronym, which takes a lowercase suffix (`WMI "root\\cimv2"`
-  becomes `WMIs "root\\cimv2"`, `BIOS` becomes `BIOSes`). `filtered-singular-spelling` stays unfixable: it fires
+  `of  settings  "x"`). `filtered-singular-spelling` stays unfixable: it fires
   in singular contexts, where the plural would only trade it for a
   `non-unique-risk`.
-- `singular-spelling-pluralizable` (`plural-everywhere`): the rest of the
-  chain `singular-spelling-mid-chain` stops short of - the chain root when it
-  takes an argument or a filter (`folder "/etc"` becomes `folders "/etc"`,
-  `wmi "root\\cimv2"` becomes `wmis "root\\cimv2"`; a bare `client`,
-  `windows folder` or `wmi` is a singleton and stays), and every link below `exists`, `number of`, an aggregate or a plural property -
-  becomes its plural spelling. The plural never answers differently where the
-  singular answers, and answers where the singular errors (confirmed on 20
-  client targets and in session):
-
-  | Expression | Engine |
-  |---|---|
-  | `exists files "x" of folder "zz_none"` | `E: Singular expression refers to nonexistent object.` |
-  | `exists files "x" of folders "zz_none"` | `False` |
-  | `number of name of file of folder "/etc"` | `E: Singular expression refers to non-unique object.` |
-  | `number of names of files of folders "/etc"` | the count |
-  | `names of operating systems = "x"` | `E: A singular expression is required.` |
-
-  It never fires where a singular is required (a comparison operand, an `if`
-  condition, the statement's own value) or left of an `|`, where the
-  singular's error is what trips the fallback. Analysis reports and suggests
-  it by default. Its lint rule is off by default, because it would touch a
-  large share of an existing repo; while off, its fix still **rides along**
-  with any other fix of the same statement (`LintRule.rides_along`), since that
-  statement is being rewritten anyway, and never costs that fix: a combined
-  result that fixes less, or a riding edit that cannot be written back into
-  the file, falls back to the fix without it. So a default `--fix` changes
-  exactly the statements it would have changed without this rule. `--warn
-  plural-everywhere` reports and fixes it everywhere.
 - `left-operand-not-singular`, `right-operand-not-singular` and
   `argument-not-singular` (`singular-required`): a plural operand where the
   engine requires a singular, which it refuses before evaluating anything. A
@@ -663,8 +625,8 @@ is what the checker read, case-insensitively and whitespace-normalized.
   since the engine defines `unique value of` on none. ActionScript `{...}`
   substitutions are never touched: they join a plural rather than refusing it.
 
-Fixes cascade - with `codes={"singular-spelling-mid-chain"}`, pluralizing
-`folder "etc"` above makes `folder "private"` fire next - so they are applied in rounds, until nothing more is accepted, the
+Fixes cascade - pluralizing `folder "etc"` above makes `folder "private"`
+fire next - so they are applied in rounds, until nothing more is accepted, the
 text stops changing or repeats, or `max_rounds` (16) is reached. Every
 candidate is held against the *original* statement: no parse or lex error,
 unknown name or checker diagnostic may become more common (with
@@ -686,13 +648,11 @@ because only a rewrite worked out over every fix at once is safe to swap in.
 `AutofixResult.to_dict()` names each code's lint rule:
 
 ```json
-{"original": "...", "fixed": "...", "changed": true, "rounds": 1,
- "applied": [{"code": "singular-spelling-mid-chain", "rule": "plural-preferred", "count": 1},
-             {"code": "singular-spelling-pluralizable", "rule": "plural-everywhere", "count": 2}],
+{"original": "...", "fixed": "...", "changed": true, "rounds": 2,
+ "applied": [{"code": "singular-spelling-mid-chain", "rule": "plural-preferred", "count": 2}],
  "unapplied": [],
  "edits": [{"start": 28, "end": 34, "replacement": "folders", "code": "singular-spelling-mid-chain"},
-           {"start": 44, "end": 50, "replacement": "folders", "code": "singular-spelling-pluralizable"},
-           {"start": 64, "end": 70, "replacement": "folders", "code": "singular-spelling-pluralizable"}]}
+           {"start": 44, "end": 50, "replacement": "folders", "code": "singular-spelling-mid-chain"}]}
 ```
 
 ### Writing fixes back into files
