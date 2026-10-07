@@ -6,6 +6,7 @@ content corpus under `tests/examples/`.
 
 import logging
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -13,6 +14,10 @@ from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.extract import (
     HtmlContext,
     RelevanceSite,
+    _actionscript_sites,
+    _extract_bes_xml,
+    _extract_file,
+    _ExtractionProblem,
     extract_relevance_from_actionscript,
     extract_relevance_from_bes_xml,
     extract_relevance_from_file,
@@ -319,6 +324,199 @@ def test_actionscript_unclosed_brace_at_end_of_line_is_literal_and_quiet(
     assert not any(record.levelno >= logging.WARNING for record in caplog.records)
 
 
+# Issue 70: the failing rows above are runtime failures, so each one is also a
+# problem record, which `lint` turns into an `unterminated-substitution`
+# finding. The literal rows are not. Every row behaved the same inside a
+# `createfile until` body and outside one (issue 52), so each runs both ways.
+
+_FAILING_ROWS = [
+    "x { name of operating system",
+    "x {   ",
+    'x {"a" &',
+    'parameter "probe" = "try {"',
+    'parameter "probe" = "{"a" &\n"b"}"',
+]
+_LITERAL_ROWS = ["try {", "} catch {", "{"]
+
+
+def _problems(body: str, line_offset: int = 0) -> list[_ExtractionProblem]:
+    problems: list[_ExtractionProblem] = []
+    _actionscript_sites(
+        body,
+        context="ActionScript",
+        dialect=Dialect.CLIENT,
+        line_offset=line_offset,
+        problems=problems,
+    )
+    return problems
+
+
+def _in_heredoc(body: str) -> str:
+    return f"createfile until __END\n{body}\n__END"
+
+
+@pytest.mark.parametrize("wrap", [False, True], ids=["plain", "heredoc"])
+@pytest.mark.parametrize("body", _FAILING_ROWS)
+def test_an_unclosed_brace_with_anything_after_it_is_a_problem(body: str, wrap: bool) -> None:
+    problems = _problems(_in_heredoc(body) if wrap else body)
+    assert [problem.line for problem in problems] == [2 if wrap else 1]
+    (problem,) = problems
+    assert problem.code == "unterminated-substitution"
+    assert "not closed on this line" in problem.message
+    assert "`{{`" in problem.message
+    assert problem.context == "ActionScript"
+
+
+@pytest.mark.parametrize("wrap", [False, True], ids=["plain", "heredoc"])
+@pytest.mark.parametrize("body", _LITERAL_ROWS)
+def test_an_unclosed_brace_at_end_of_line_is_no_problem(body: str, wrap: bool) -> None:
+    assert _problems(_in_heredoc(body) if wrap else body) == []
+
+
+def test_an_unclosed_brace_in_a_comment_is_no_problem() -> None:
+    assert _problems("// x { name") == []
+
+
+def test_an_unclosed_brace_after_slashes_in_a_heredoc_is_a_problem() -> None:
+    """`//` is file content inside a heredoc, and the engine still substitutes it."""
+    assert [problem.line for problem in _problems(_in_heredoc("// x { name"))] == [2]
+
+
+def test_a_problem_line_is_offset_like_a_site_line() -> None:
+    body = "// one\nexit {name of it}\nx { name of operating system"
+    assert [problem.line for problem in _problems(body)] == [3]
+    assert [problem.line for problem in _problems(body, line_offset=10)] == [13]
+
+
+def test_a_site_before_an_unclosed_brace_on_one_line_is_still_a_site() -> None:
+    problems: list[_ExtractionProblem] = []
+    sites = _actionscript_sites(
+        "x {name of it} y {b",
+        context="ActionScript",
+        dialect=Dialect.CLIENT,
+        line_offset=0,
+        problems=problems,
+    )
+    assert texts(sites) == ["name of it"]
+    assert [problem.line for problem in problems] == [1]
+
+
+def test_a_problem_in_a_bes_action_reports_its_absolute_line() -> None:
+    document = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        "<BES><Fixlet>\n"
+        "<Relevance>true</Relevance>\n"
+        "<DefaultAction><ActionScript>// one\n"
+        "exit {name of it}\n"
+        "x { name of operating system</ActionScript></DefaultAction>\n"
+        "</Fixlet></BES>\n"
+    )
+    sites, problems = _extract_bes_xml(document.encode("utf-8"))
+    assert texts(sites) == ["true", "name of it"]
+    assert [(problem.line, problem.context) for problem in problems] == [
+        (6, "BES/Fixlet/DefaultAction/ActionScript")
+    ]
+    # The public API is unchanged: still a plain list of sites.
+    assert extract_relevance_from_bes_xml(document) == sites
+
+
+def test_a_problem_reaches_the_file_level_extractor(tmp_path: Path) -> None:
+    path = tmp_path / "t.bes"
+    path.write_text(
+        "<BES><Fixlet><DefaultAction><ActionScript>x {   </ActionScript>"
+        "</DefaultAction></Fixlet></BES>"
+    )
+    sites, problems = _extract_file(path)
+    assert sites == extract_relevance_from_file(path) == []
+    assert [problem.line for problem in problems] == [1]
+
+
+# The other problems that used to be logged only. Each one meant relevance that
+# was never linted while the file looked clean.
+
+
+def _file_problems(tmp_path: Path, name: str, text: str) -> list[tuple[str, int]]:
+    path = tmp_path / name
+    path.write_text(text)
+    sites, problems = _extract_file(path)
+    assert sites == extract_relevance_from_file(path)
+    return [(problem.code, problem.line) for problem in problems]
+
+
+@pytest.mark.parametrize("suffix", [".ojo", ".besrpt", ".html"])
+def test_an_unterminated_processing_instruction_is_a_problem(tmp_path: Path, suffix: str) -> None:
+    text = "<p>one</p>\n<?Relevance now ?>\n<p><?Relevance number of bes computers</p>\n"
+    assert _file_problems(tmp_path, f"t{suffix}", text) == [
+        ("unterminated-processing-instruction", 3)
+    ]
+    _, (problem,) = _extract_file(tmp_path / f"t{suffix}")
+    assert "Description" not in problem.message
+
+
+def test_a_multiline_processing_instruction_is_no_problem(tmp_path: Path) -> None:
+    """`<?Relevance ... ?>` may span lines; only a missing `?>` is a problem."""
+    text = "<?Relevance number of\n  bes computers\n?>\n"
+    assert _file_problems(tmp_path, "t.ojo", text) == []
+
+
+def test_an_unterminated_processing_instruction_in_a_description_has_its_file_line() -> None:
+    document = (
+        "<BES><Fixlet>\n"
+        "<Description><![CDATA[<p>one</p>\n"
+        "<?Relevance number of bes computers]]></Description>\n"
+        "</Fixlet></BES>\n"
+    )
+    sites, problems = _extract_bes_xml(document)
+    assert sites == []
+    assert [(problem.code, problem.line) for problem in problems] == [
+        ("unterminated-processing-instruction", 3)
+    ]
+    assert problems[0].message.endswith("before `</Description>`")
+
+
+def test_a_processing_instruction_must_close_inside_its_own_description() -> None:
+    """The `?>` must come before `</Description>`: one in a later element does
+    not close a processing instruction left open in the Description."""
+    document = (
+        "<BES><Fixlet>\n"
+        "<Description><![CDATA[<?Relevance number of bes computers]]></Description>\n"
+        '<Relevance>"?&gt;" = "x"</Relevance>\n'
+        "</Fixlet></BES>\n"
+    )
+    sites, problems = _extract_bes_xml(document)
+    assert texts(sites) == ['"?>" = "x"']
+    assert [(problem.code, problem.line) for problem in problems] == [
+        ("unterminated-processing-instruction", 2)
+    ]
+
+
+@pytest.mark.parametrize("tag", ["relevance", "client_relevance", "Session_Relevance"])
+def test_an_unclosed_relevance_fence_is_a_problem(tmp_path: Path, tag: str) -> None:
+    text = f"# t\n\n```{tag}\nnow\n"
+    assert _file_problems(tmp_path, "t.md", text) == [("unterminated-code-fence", 3)]
+
+
+@pytest.mark.parametrize("tag", ["", "python"])
+def test_an_unclosed_fence_of_another_language_is_no_problem(tmp_path: Path, tag: str) -> None:
+    """CommonMark runs an unclosed fence to the end of the document, so it is
+    valid markdown; only a relevance fence loses relevance by it."""
+    assert _file_problems(tmp_path, "t.md", f"# t\n\n```{tag}\nnow\n") == []
+
+
+def test_a_closed_relevance_fence_is_no_problem(tmp_path: Path) -> None:
+    assert _file_problems(tmp_path, "t.md", "```relevance\nnow\n```\n") == []
+
+
+def test_unparsable_bes_xml_is_a_problem_at_the_parser_line(tmp_path: Path) -> None:
+    text = "<BES><Fixlet>\n<Relevance>true</Relevance>\n<Relevance>oops</BES>\n"
+    problems = _file_problems(tmp_path, "t.bes", text)
+    assert problems == [("xml-parse-error", 3)]
+    _, (problem,) = _extract_bes_xml(text)
+    assert "mismatched tag" in problem.message
+    # The public API is unchanged: still nothing, and still a warning.
+    assert extract_relevance_from_bes_xml(text) == []
+
+
 # --------------------------------------------------------------------------
 # HTML / text scanner: <?Relevance ?> processing instructions
 # --------------------------------------------------------------------------
@@ -413,6 +611,40 @@ def test_js_call_non_literal_argument_is_skipped(snippet: str) -> None:
 def test_js_call_name_must_not_be_part_of_a_longer_identifier() -> None:
     text = "bigfix.relevance.errorWrapper('nope'); myRelevance('nope');"
     assert extract_relevance_from_html_text(text, context=HtmlContext.CONSOLE) == []
+
+
+@pytest.mark.parametrize(
+    "text", ['<?Relevance ("abc") ?>', '<?Relevance("abc")?>', "<?Relevance ('abc', \"d\") ?>"]
+)
+def test_a_processing_instruction_opening_with_a_paren_is_not_a_js_call(text: str) -> None:
+    """`<?Relevance (` is the opener of a processing instruction, not a call:
+    reading it as one too gave a second, bogus site for the same text."""
+    sites = extract_relevance_from_html_text(text, context=HtmlContext.CONSOLE)
+    assert [site.kind for site in sites] == ["relevance-pi"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '<script>var a = c ?Relevance("now") : 1;</script>',
+        '<script>a?Relevance("now"):b</script>',
+        '<script>a?EvaluateRelevance("now"):b</script>',
+    ],
+)
+def test_a_js_call_after_a_ternary_question_mark_is_a_js_call(text: str) -> None:
+    """Only `<?` opens a processing instruction: minified JavaScript calls
+    `Relevance(` straight after a ternary's `?`, and that is still a call."""
+    sites = extract_relevance_from_html_text(text, context=HtmlContext.CONSOLE)
+    assert [(site.kind, site.text) for site in sites] == [("javascript-call", "now")]
+
+
+def test_a_js_call_next_to_a_processing_instruction_is_still_a_js_call() -> None:
+    text = "<?Relevance (\"abc\") ?><script>x = Relevance('number of bes computers');</script>"
+    sites = extract_relevance_from_html_text(text, context=HtmlContext.CONSOLE)
+    assert [(site.kind, site.text) for site in sites] == [
+        ("relevance-pi", '("abc")'),
+        ("javascript-call", "number of bes computers"),
+    ]
 
 
 # --------------------------------------------------------------------------

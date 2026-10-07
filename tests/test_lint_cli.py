@@ -221,6 +221,30 @@ def test_json_emits_one_object_with_findings_counts_and_verdict(
     assert payload["findings"][0]["site"]["kind"] == "plain-text"
 
 
+UNCLOSED_BES = (
+    "<BES><Fixlet><Relevance>true</Relevance>\n"
+    "<DefaultAction><ActionScript>// one\n"
+    "x { name of operating system</ActionScript></DefaultAction>\n"
+    "</Fixlet></BES>\n"
+)
+"""An action line whose `{` never closes, on line 3: a runtime failure (#70)."""
+
+
+def test_an_unclosed_action_brace_fails_the_run(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    unclosed = write(tmp_path, "unclosed.bes", UNCLOSED_BES)
+
+    assert main([str(unclosed)]) == 1
+    assert f"{unclosed}:3: error [unterminated-substitution]" in capsys.readouterr().out
+
+    assert main(["--json", str(unclosed)]) == 1
+    (finding,) = json.loads(capsys.readouterr().out)["findings"]
+    assert finding["code"] == "unterminated-substitution"
+    assert finding["line"] == 3
+    assert finding["site"] is None
+
+
 def test_json_and_the_line_output_report_the_same_findings(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

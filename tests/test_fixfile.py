@@ -15,7 +15,11 @@ from _helpers import SETTING
 
 from bigfix_relevance_analyzer import fixfile
 from bigfix_relevance_analyzer.autofix import AutofixResult, TextEdit
-from bigfix_relevance_analyzer.extract import RelevanceSite, extract_relevance_from_bes_xml
+from bigfix_relevance_analyzer.extract import (
+    RelevanceSite,
+    _ExtractionProblem,
+    extract_relevance_from_bes_xml,
+)
 from bigfix_relevance_analyzer.fixfile import (
     ByteEdit,
     Unmapped,
@@ -83,6 +87,36 @@ def test_the_singular_spelling_is_rewritten_and_nothing_else(tmp_path: Path) -> 
 
     again = fix_file(path, LintConfig())
     assert not again.changed and again.applied == ()
+
+
+def test_an_unclosed_action_brace_is_still_reported_after_a_fix(tmp_path: Path) -> None:
+    """A problem from extraction is not a site, so it neither blocks the fix nor
+    gets lost in the re-lint: `--fix` must not print a cleaner result than lint."""
+    data = task(
+        f"<Relevance>{SETTING}</Relevance>",
+        '<DefaultAction ID="Action1">',
+        "<ActionScript>x { name of operating system</ActionScript>",
+        "</DefaultAction>",
+    )
+    path = write(tmp_path, data)
+    result = fix_file(path, LintConfig())
+    assert result.changed
+    assert path.read_bytes() == data.replace(b"setting ", b"settings ")
+    unclosed = [f for f in result.findings if f.code == "unterminated-substitution"]
+    assert [(f.line, f.severity) for f in unclosed] == [(7, Severity.ERROR)]
+
+
+def test_an_unclosed_action_brace_is_reported_when_there_is_nothing_to_fix(
+    tmp_path: Path,
+) -> None:
+    data = task(
+        '<DefaultAction ID="Action1">',
+        "<ActionScript>x {   </ActionScript>",
+        "</DefaultAction>",
+    )
+    result = fix_file(write(tmp_path, data), LintConfig())
+    assert not result.changed
+    assert [f.line for f in result.findings if f.code == "unterminated-substitution"] == [6]
 
 
 def test_an_escaped_lt_stays_escaped(tmp_path: Path) -> None:
@@ -179,14 +213,16 @@ def test_a_re_extract_mismatch_restores_the_original_bytes(
     path = write(tmp_path, data)
     real = fixfile._extract
 
-    def tampered(file_path: Path, contents: bytes) -> list[RelevanceSite]:
-        sites = real(file_path, contents)
+    def tampered(
+        file_path: Path, contents: bytes
+    ) -> tuple[list[RelevanceSite], list[_ExtractionProblem]]:
+        sites, problems = real(file_path, contents)
         if contents == data:
-            return sites
+            return sites, problems
         return [
             RelevanceSite(**{**{f: getattr(s, f) for f in s.__dataclass_fields__}, "text": "x"})
             for s in sites
-        ]
+        ], problems
 
     monkeypatch.setattr(fixfile, "_extract", tampered)
     result = fix_file(path, LintConfig())

@@ -12,6 +12,7 @@ import dataclasses
 import json
 import os
 import re
+from collections.abc import Iterable
 from pathlib import Path
 
 import pytest
@@ -33,6 +34,7 @@ from bigfix_relevance_analyzer.lint import (
     lint_directory,
     lint_file,
     lint_paths,
+    lint_text,
     rules,
 )
 
@@ -378,6 +380,83 @@ def test_a_relevance_element_that_is_not_a_boolean_is_a_finding(tmp_path: Path) 
 def test_a_boolean_relevance_element_is_silent(tmp_path: Path) -> None:
     """The negative that sizes the rule: 50,901 shipped clauses are this shape."""
     assert "site-type-mismatch" not in codes(_lint_fixlet(tmp_path, 'exists file "/etc/hosts"'))
+
+
+def _unterminated(findings: Iterable[Finding]) -> list[Finding]:
+    return [finding for finding in findings if finding.code == "unterminated-substitution"]
+
+
+def test_an_unclosed_action_brace_with_text_after_it_is_an_error(tmp_path: Path) -> None:
+    """Issue 70: the action fails on this line (real actions, issue 52), so the
+    file must not lint clean. No site is extracted for it, so the finding has none."""
+    path = tmp_path / "t.bes"
+    path.write_text(_fixlet("true", action="// one\nx { name of operating system"))
+    (finding,) = _unterminated(lint_file(path, LintConfig()))
+    assert finding.severity is Severity.ERROR
+    assert finding.path == path
+    assert finding.line == 6
+    assert finding.site is None
+    assert "not closed on this line" in finding.message
+    assert "`{{`" in finding.message
+
+
+def test_an_unclosed_action_brace_ending_its_line_is_not_reported(tmp_path: Path) -> None:
+    """`try {` is written literally: the regression guard for the rule's edge."""
+    assert _unterminated(_lint_fixlet(tmp_path, "true", action="try {")) == []
+
+
+def test_the_unterminated_substitution_rule_honours_its_severity(tmp_path: Path) -> None:
+    path = tmp_path / "t.bes"
+    path.write_text(_fixlet("true", action="x {   "))
+    ignored = LintConfig(severities={"unterminated-substitution": Severity.IGNORE})
+    assert _unterminated(lint_file(path, ignored)) == []
+    warned = LintConfig(severities={"unterminated-substitution": Severity.WARNING})
+    (finding,) = _unterminated(lint_file(path, warned))
+    assert finding.severity is Severity.WARNING
+
+
+def test_bare_text_with_an_unclosed_brace_is_not_an_action_problem() -> None:
+    """Bare text is a relevance statement, not ActionScript: nothing is extracted."""
+    assert _unterminated(lint_text("x { name of operating system", LintConfig())) == []
+
+
+@pytest.mark.parametrize(
+    ("name", "text", "code", "severity", "line"),
+    [
+        (
+            "t.ojo",
+            "<p>x</p>\n<?Relevance number of bes computers",
+            "unterminated-processing-instruction",
+            Severity.ERROR,
+            2,
+        ),
+        ("t.md", "# t\n```relevance\nnow\n", "unterminated-code-fence", Severity.WARNING, 2),
+        ("t.bes", "<BES>\n<Relevance>oops</BES>", "xml-parse-error", Severity.ERROR, 2),
+    ],
+)
+def test_extraction_problems_are_findings(
+    tmp_path: Path, name: str, text: str, code: str, severity: Severity, line: int
+) -> None:
+    """Each of these was a log line only, so the file linted clean while
+    relevance in it went unlinted."""
+    path = tmp_path / name
+    path.write_text(text)
+    (finding,) = lint_file(path, LintConfig())
+    assert (finding.code, finding.severity, finding.line, finding.site) == (
+        code,
+        severity,
+        line,
+        None,
+    )
+    assert lint_file(path, LintConfig(severities={code: Severity.IGNORE})) == ()
+
+
+def test_file_findings_come_out_in_line_order(tmp_path: Path) -> None:
+    path = tmp_path / "t.bes"
+    path.write_text(_fixlet("true", action="x {   \nexit {totally bogus made up inspector}"))
+    findings = lint_file(path, LintConfig())
+    assert [finding.line for finding in findings] == sorted(finding.line for finding in findings)
+    assert {"unterminated-substitution", "unknown-inspector"} <= codes(findings)
 
 
 def _plural_substitution_findings(tmp_path: Path, relevance: str) -> list[Finding]:
@@ -1031,6 +1110,22 @@ def test_every_rule_in_the_catalog_is_a_rule_that_fires(tmp_path: Path) -> None:
     joined = tmp_path / "joined.bes"
     joined.write_text(_fixlet("true", action='run echo {names of files of folder "/tmp"}'))
     emitted.update(finding.code for finding in lint_file(joined, LintConfig()))
+
+    # `unterminated-substitution` comes from extraction, not from a statement:
+    # an action line whose `{` never closes.
+    unclosed = tmp_path / "unclosed.bes"
+    unclosed.write_text(_fixlet("true", action="x { name of operating system"))
+    emitted.update(finding.code for finding in lint_file(unclosed, LintConfig()))
+
+    # The other extraction problems, one file each.
+    for name, text in (
+        ("unclosed.ojo", "<?Relevance number of bes computers"),
+        ("unclosed.md", "```relevance\nnow\n"),
+        ("broken.bes", "<BES><Fixlet><Relevance>oops</BES>"),
+    ):
+        problem = tmp_path / name
+        problem.write_text(text)
+        emitted.update(finding.code for finding in lint_file(problem, LintConfig()))
 
     assert emitted == set(RULES)
 

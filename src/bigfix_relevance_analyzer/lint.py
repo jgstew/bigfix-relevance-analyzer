@@ -19,7 +19,7 @@ itself something to report, not something to crash over.
     if any(f.severity is Severity.ERROR for f in findings):
         raise SystemExit(1)
 
-Eleven rules, nine of them always on and two tunable:
+Every rule is listed in :data:`RULES`; all but two are always on. The main ones:
 
 - ``parse-error`` / ``error-token`` -- the statement is broken. Always an
   error; nothing to configure.
@@ -75,6 +75,17 @@ Eleven rules, nine of them always on and two tunable:
   indistinguishable from a clean file, and a typo'd path in a hook would pass
   CI having linted nothing. An existing directory is
   exempt -- a path is taken literally and only :func:`lint_directory` recurses.
+- ``unterminated-substitution`` -- an ActionScript `{` with anything after it
+  on its line and no `}` to close it there, which fails the action (issue 52).
+  Always an error. Unlike every rule above, it is about the ActionScript
+  around the relevance, found while extracting it, so its finding has no
+  site.
+- ``unterminated-processing-instruction`` / ``unterminated-code-fence`` /
+  ``xml-parse-error`` -- the other problems met while extracting: a
+  `<?Relevance` with no `?>` (error), a relevance-tagged markdown fence never
+  closed (warning: the markdown is valid, but its relevance went unread), and a
+  BES file that is not well-formed XML (error). Like the rule above, each
+  means relevance that was never linted, so each finding has no site.
 - ``max-depth-exceeded`` -- only from :func:`lint_directory`: a directory tree
   deeper than its ``max_depth`` was not fully walked. Always an error, because
   a limit this generous (6 levels, by default) being hit at all is itself
@@ -103,6 +114,7 @@ from __future__ import annotations
 
 import enum
 import functools
+import heapq
 import os
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
@@ -117,8 +129,9 @@ from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 from bigfix_relevance_analyzer.extract import (
     _RECOGNIZED_SUFFIXES,
     RelevanceSite,
+    _extract_file,
+    _ExtractionProblem,
     _is_recognized,
-    extract_relevance_from_file,
 )
 from bigfix_relevance_analyzer.nodes import Node, Of, Reference
 from bigfix_relevance_analyzer.typecheck import (
@@ -575,6 +588,49 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "about content. An existing *directory* is not a file error; it is skipped, "
                 "because a path here is taken literally and only :func:`lint_directory` "
                 "recurses.",
+            ),
+            _rule(
+                "unterminated-substitution",
+                Severity.ERROR,
+                "an ActionScript `{` is not closed on its line, so the action fails there",
+                "The action engine substitutes relevance line by line, so a `}` on a later "
+                "line never closes a `{`. A `{` that is its line's last character is written "
+                "literally (`try {`); one with anything after it, even trailing whitespace, "
+                "fails the action -- confirmed with real actions, inside `createfile until` "
+                "bodies and outside them (issue 52). Always an error: no statement is "
+                "extracted from the line, so it would otherwise lint clean. There is no "
+                "autofix, because closing it with `}` and escaping it as `{{` mean different "
+                "things and only the author knows which was meant.",
+            ),
+            _rule(
+                "unterminated-processing-instruction",
+                Severity.ERROR,
+                "a `<?Relevance` has no closing `?>`, so its relevance was not linted",
+                "A processing instruction may span lines, but it has to close: with no `?>` "
+                "after it in the document -- or, in a BES `<Description>`, before "
+                "`</Description>` -- there is no statement to extract, and the file would "
+                "otherwise lint clean with relevance in it that nobody checked. An error for "
+                "the same reason as `file-error`: a silent pass over content that was never "
+                "read.",
+            ),
+            _rule(
+                "unterminated-code-fence",
+                Severity.WARNING,
+                "a relevance code fence in markdown is never closed, so its relevance was "
+                "not linted",
+                "Only fences tagged `relevance`, `client_relevance` or `session_relevance`. "
+                "CommonMark runs an unclosed fence to the end of the document, so the markdown "
+                "itself is valid and renders, which is why this is a warning rather than an "
+                "error -- but the relevance in it is never extracted, so it is never checked.",
+            ),
+            _rule(
+                "xml-parse-error",
+                Severity.ERROR,
+                "a BES XML file does not parse, so nothing in it was linted",
+                "Reported at the line the XML parser stopped on. Checking documents against "
+                "the BES schema is not this package's job, but a file that is not well-formed "
+                "XML yields no sites at all, which would otherwise read exactly like a clean "
+                "file.",
             ),
             _rule(
                 "max-depth-exceeded",
@@ -1344,10 +1400,10 @@ def _lint_file(file_path: Path, config: LintConfig, *, explicit: bool) -> tuple[
     if blocked is not None:
         return blocked
     try:
-        sites = extract_relevance_from_file(file_path)
+        sites, problems = _extract_file(file_path)
     except OSError as error:
         return _file_error(file_path, error.strerror or str(error), config)
-    return _lint_sites(file_path, sites, config)
+    return _lint_extracted(file_path, sites, problems, config)
 
 
 def _unlintable(
@@ -1392,6 +1448,39 @@ def _lint_sites(
             lint_analysis(report, config, path=file_path, base_line=site.line, site=site)
         )
     return tuple(findings)
+
+
+def _problem_findings(
+    file_path: Path, problems: Iterable[_ExtractionProblem], config: LintConfig
+) -> tuple[Finding, ...]:
+    """One finding per problem the extractor met in ``file_path``. None has a
+    site: the problem is that no statement could be extracted there."""
+    findings = (
+        _finding(config, problem.code, problem.message, path=file_path, line=problem.line)
+        for problem in problems
+    )
+    return tuple(finding for finding in findings if finding is not None)
+
+
+def _lint_extracted(
+    file_path: Path,
+    sites: Iterable[RelevanceSite],
+    problems: Iterable[_ExtractionProblem],
+    config: LintConfig,
+) -> tuple[Finding, ...]:
+    """Every finding for one extracted file, sites and problems together.
+
+    Problem findings are merged in by line rather than the whole list sorted:
+    a site's findings keep the order they always had, even where a multi-line
+    statement reports a line past the next site's.
+    """
+    return tuple(
+        heapq.merge(
+            _problem_findings(file_path, problems, config),
+            _lint_sites(file_path, sites, config),
+            key=lambda finding: finding.line,
+        )
+    )
 
 
 def lint_text(text: str, config: LintConfig) -> tuple[Finding, ...]:

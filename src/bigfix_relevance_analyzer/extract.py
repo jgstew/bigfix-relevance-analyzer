@@ -404,9 +404,15 @@ _CONDITION_KEYWORD_RE = re.compile(
 )
 
 
-def _iter_substitution_spans(body: str) -> Iterator[tuple[int, int, str, bool]]:
+def _iter_substitution_spans(
+    body: str, unterminated: list[int] | None = None
+) -> Iterator[tuple[int, int, str, bool]]:
     """Yield ``(line, offset, relevance_text, is_condition)`` for each `{...}`
     substitution in ``body``, ``offset`` being where the text starts in it.
+
+    The line of each `{` that is never closed and is not the line's last
+    character -- a runtime failure, see below -- is appended to
+    ``unterminated`` when one is given.
 
     Handles `{{`/`}}` literal-brace escapes, ignores `}` inside a relevance
     string literal, and skips `//` comment lines entirely -- except inside
@@ -460,6 +466,8 @@ def _iter_substitution_spans(body: str) -> Iterator[tuple[int, int, str, bool]]:
                 if brace == len(line) - 1:
                     logger.debug("literal `{` at the end of line %d", line_number)
                 else:
+                    if unterminated is not None:
+                        unterminated.append(line_number)
                     logger.warning(
                         "unterminated relevance substitution opened at line %d; skipping it",
                         line_number,
@@ -519,6 +527,53 @@ def extract_relevance_from_actionscript(
     return _actionscript_sites(body, context=context, dialect=dialect, line_offset=line_offset)
 
 
+@dataclass(frozen=True, slots=True)
+class _ExtractionProblem:
+    """Something wrong with the content around the relevance, found while
+    extracting it, that ``lint`` reports as a finding of its own.
+
+    Private on purpose: the public extractors return only sites, and only
+    ``lint`` and ``fixfile`` ask for these, through the private ``_extract_*``
+    entry points.
+    """
+
+    code: str
+    """The lint rule this is reported under, e.g. ``unterminated-substitution``."""
+
+    line: int
+    """1-based line, absolute in the file -- the convention of :attr:`RelevanceSite.line`."""
+
+    message: str
+    context: str
+
+
+_UNTERMINATED_MESSAGE: Final = (
+    "`{` opens a relevance substitution that is not closed on this line; the action "
+    "fails here. Close it with `}` on the same line, or write `{{` for a literal brace"
+)
+
+
+_UNTERMINATED_PI_MESSAGE: Final = (
+    "`<?Relevance` has no closing `?>` after it, so the relevance in it was not linted. "
+    "Close it with `?>`"
+)
+
+
+def _unterminated_pi_message(problem_context: str) -> str:
+    """:data:`_UNTERMINATED_PI_MESSAGE`, worded for where the processing
+    instruction sits: in a BES `<Description>` (``problem_context`` is then
+    the element's path) the `?>` must come before `</Description>`."""
+    if problem_context.rsplit("/", 1)[-1] == "Description":
+        return f"{_UNTERMINATED_PI_MESSAGE} before `</Description>`"
+    return _UNTERMINATED_PI_MESSAGE
+
+
+_UNTERMINATED_FENCE_MESSAGE: Final = (
+    "this relevance code fence is never closed, so the relevance in it was not linted. "
+    "Close it with a matching fence line"
+)
+
+
 def _actionscript_sites(
     body: str,
     *,
@@ -526,8 +581,10 @@ def _actionscript_sites(
     dialect: Dialect,
     line_offset: int,
     source: _TextSource | None = None,
+    problems: list[_ExtractionProblem] | None = None,
 ) -> list[RelevanceSite]:
-    return [
+    unterminated: list[int] = []
+    sites = [
         _make_site(
             kind="actionscript-condition" if is_condition else "actionscript-substitution",
             text=text,
@@ -536,8 +593,19 @@ def _actionscript_sites(
             context_dialect=dialect,
             source_map=_site_map(source, offset, text),
         )
-        for line, offset, text, is_condition in _iter_substitution_spans(body)
+        for line, offset, text, is_condition in _iter_substitution_spans(body, unterminated)
     ]
+    if problems is not None:
+        problems.extend(
+            _ExtractionProblem(
+                code="unterminated-substitution",
+                line=line + line_offset,
+                message=_UNTERMINATED_MESSAGE,
+                context=context,
+            )
+            for line in unterminated
+        )
+    return sites
 
 
 # ---------------------------------------------------------------------------
@@ -547,8 +615,12 @@ def _actionscript_sites(
 _PI_OPEN_RE = re.compile(r"<\?relevance\b", re.IGNORECASE)
 
 # `Relevance(` or `EvaluateRelevance(`, but not when it is the tail of a longer
-# identifier or a property access (`bigfix.relevance.errorWrapper`).
-_JS_CALL_RE = re.compile(r"(?<![\w.$])(?:Evaluate)?Relevance\s*\(")
+# identifier or a property access (`bigfix.relevance.errorWrapper`), nor the
+# opener of a processing instruction whose body starts with a parenthesis
+# (`<?Relevance ("x") ?>`), which would otherwise be a second, bogus site. Only
+# `<?` is excluded, not a bare `?`: minified JavaScript calls it straight after
+# a ternary's `?` (`a?Relevance("x"):b`).
+_JS_CALL_RE = re.compile(r"(?<![\w.$])(?<!<\?)(?:Evaluate)?Relevance\s*\(")
 
 _CLIENTUI_MARKER_RE = re.compile(
     r"""product\s*=\s*["']CustomDashboardClientUI["']|cid:load\?page=|takeoffer:""",
@@ -570,11 +642,21 @@ def _line_of(text: str, index: int) -> int:
     return text.count("\n", 0, index) + 1
 
 
-def _iter_pi_spans(text: str) -> Iterator[tuple[int, int, str]]:
-    """Yield ``(line, offset, relevance_text)`` for each `<?Relevance ?>` in ``text``."""
+def _iter_pi_spans(
+    text: str, unterminated: list[int] | None = None
+) -> Iterator[tuple[int, int, str]]:
+    """Yield ``(line, offset, relevance_text)`` for each `<?Relevance ?>` in ``text``.
+
+    A body may span lines. The line of each `<?Relevance` with no `?>` anywhere
+    after it in ``text`` is appended to ``unterminated`` when one is given.
+    ``text`` is one element's body when it comes from a BES `<Description>`, so
+    the `?>` has to close before that element does.
+    """
     for match in _PI_OPEN_RE.finditer(text):
         end = text.find("?>", match.end())
         if end == -1:
+            if unterminated is not None:
+                unterminated.append(_line_of(text, match.start()))
             logger.warning(
                 "unterminated <?Relevance ?> processing instruction at line %d; skipping it",
                 _line_of(text, match.start()),
@@ -678,8 +760,21 @@ def _html_sites(
     line_offset: int,
     label: str | None,
     source: _TextSource | None = None,
+    problems: list[_ExtractionProblem] | None = None,
+    problem_context: str = "HTML",
 ) -> list[RelevanceSite]:
-    pi_spans = list(_iter_pi_spans(text))
+    unterminated: list[int] = []
+    pi_spans = list(_iter_pi_spans(text, unterminated))
+    if problems is not None:
+        problems.extend(
+            _ExtractionProblem(
+                code="unterminated-processing-instruction",
+                line=line + line_offset,
+                message=_unterminated_pi_message(problem_context),
+                context=problem_context,
+            )
+            for line in unterminated
+        )
     js_spans = list(_iter_js_call_spans(text))
 
     if context is HtmlContext.CLIENTUI and js_spans:
@@ -762,6 +857,19 @@ def extract_relevance_from_markdown(text: str) -> list[RelevanceSite]:
     one actually is relevance" rather than this module guessing from content
     alone and finding whatever else happens to parse.
     """
+    return _markdown_sites(text)
+
+
+def _markdown_sites(
+    text: str, problems: list[_ExtractionProblem] | None = None
+) -> list[RelevanceSite]:
+    """:func:`extract_relevance_from_markdown`, adding an unclosed relevance
+    fence to ``problems``.
+
+    Only a relevance fence is a problem: CommonMark runs any unclosed fence to
+    the end of the document, so the markdown is valid, but this extractor never
+    reads a relevance fence it did not see closed.
+    """
     sites: list[RelevanceSite] = []
     lines = text.split("\n")
     fence: str | None = None
@@ -803,6 +911,15 @@ def extract_relevance_from_markdown(text: str) -> list[RelevanceSite]:
 
     if fence is not None:
         logger.warning("unterminated markdown code fence opened at line %d", block_start - 1)
+        if extracting and problems is not None:
+            problems.append(
+                _ExtractionProblem(
+                    code="unterminated-code-fence",
+                    line=block_start - 1,
+                    message=_UNTERMINATED_FENCE_MESSAGE,
+                    context="markdown code block",
+                )
+            )
 
     return sites
 
@@ -878,8 +995,11 @@ def _body_site(element: _Element, *, kind: SiteKind, context: str) -> list[Relev
     ]
 
 
-def _sites_for_element(element: _Element) -> list[RelevanceSite]:
-    """The relevance sites, if any, that one XML element contributes."""
+def _sites_for_element(
+    element: _Element, problems: list[_ExtractionProblem] | None = None
+) -> list[RelevanceSite]:
+    """The relevance sites, if any, that one XML element contributes, adding
+    any problem found on the way to ``problems``."""
     tag = element.tag
     text = element.text
     context = "/".join(element.path)
@@ -919,6 +1039,7 @@ def _sites_for_element(element: _Element) -> list[RelevanceSite]:
             dialect=Dialect.CLIENT,
             line_offset=element.line - 1,
             source=element.source,
+            problems=problems,
         )
 
     if tag == "Description":
@@ -933,6 +1054,8 @@ def _sites_for_element(element: _Element) -> list[RelevanceSite]:
                 line_offset=element.line - 1,
                 label=None,
                 source=element.source,
+                problems=problems,
+                problem_context=context,
             )
         ]
 
@@ -944,10 +1067,12 @@ _RELEVANT_TAGS = frozenset(
 )
 
 
-def _sites_from_elements(elements: Iterable[_Element]) -> list[RelevanceSite]:
+def _sites_from_elements(
+    elements: Iterable[_Element], problems: list[_ExtractionProblem] | None = None
+) -> list[RelevanceSite]:
     sites: list[RelevanceSite] = []
     for element in elements:
-        sites.extend(_sites_for_element(element))
+        sites.extend(_sites_for_element(element, problems))
     return sites
 
 
@@ -1006,7 +1131,9 @@ def _text_spans(data: bytes, pieces: Sequence[tuple[int, str]]) -> tuple[SourceS
     return tuple(spans)
 
 
-def _iter_elements_expat(data: bytes, *, mapped: bool = True) -> Iterator[_Element]:
+def _iter_elements_expat(
+    data: bytes, *, mapped: bool = True, problems: list[_ExtractionProblem] | None = None
+) -> Iterator[_Element]:
     """Walk ``data`` with stdlib expat, yielding the elements worth looking at.
 
     Character data arrives already decoded and with CDATA merged in, so a
@@ -1077,6 +1204,18 @@ def _iter_elements_expat(data: bytes, *, mapped: bool = True) -> Iterator[_Eleme
         # Document validity is not this package's job; a consumer that cares
         # runs a schema check. Report nothing rather than half a file.
         logger.warning("could not parse BES XML: %s", error)
+        if problems is not None:
+            problems.append(
+                _ExtractionProblem(
+                    code="xml-parse-error",
+                    line=error.lineno,
+                    message=(
+                        f"the BES XML does not parse ({xml.parsers.expat.ErrorString(error.code)}"
+                        f" at column {error.offset + 1}), so nothing in this file was linted"
+                    ),
+                    context="BES XML",
+                )
+            )
         return
 
     yield from collected
@@ -1095,12 +1234,24 @@ def extract_relevance_from_bes_xml(data: str | bytes) -> list[RelevanceSite]:
     HTML. Returns an empty list, having logged a warning, if the document
     cannot be parsed.
     """
+    return _extract_bes_xml(data)[0]
+
+
+def _extract_bes_xml(
+    data: str | bytes,
+) -> tuple[list[RelevanceSite], list[_ExtractionProblem]]:
+    """:func:`extract_relevance_from_bes_xml`, plus the problems found on the way."""
+    problems: list[_ExtractionProblem] = []
     # A `str` is encoded before parsing, so offsets into it would describe
     # bytes the caller never had: only bytes get a map.
     sites = _sites_from_elements(
-        _iter_elements_expat(_as_bytes(data), mapped=isinstance(data, bytes))
+        _iter_elements_expat(_as_bytes(data), mapped=isinstance(data, bytes), problems=problems),
+        problems,
     )
-    return sorted(sites, key=lambda site: site.line)
+    return (
+        sorted(sites, key=lambda site: site.line),
+        sorted(problems, key=lambda problem: problem.line),
+    )
 
 
 def _lxml_record(element: etree._Element, path: tuple[str, ...]) -> _Element:
@@ -1238,15 +1389,36 @@ def extract_relevance_from_file(path: str | bytes | os.PathLike[str]) -> list[Re
     the ClientUI treatment, and otherwise the document's own mechanism (a
     JavaScript relevance call, if any) or the content classifier decides.
     """
-    file_path = _as_path(path)
+    return _extract_file(_as_path(path))[0]
+
+
+def _extract_file(file_path: Path) -> tuple[list[RelevanceSite], list[_ExtractionProblem]]:
+    """:func:`extract_relevance_from_file`, plus the problems found on the way.
+
+    Problems are content this extractor could not read relevance out of: an
+    unclosed ActionScript `{`, an unterminated `<?Relevance`, an unclosed
+    relevance code fence, or BES XML that does not parse.
+    """
+    if _is_bes_xml(file_path):
+        return _extract_bes_xml(file_path.read_bytes())
+    problems: list[_ExtractionProblem] = []
+    sites = _extract_text_file(file_path, problems)
+    return sites, sorted(problems, key=lambda problem: problem.line)
+
+
+def _extract_text_file(file_path: Path, problems: list[_ExtractionProblem]) -> list[RelevanceSite]:
+    """:func:`extract_relevance_from_file` for every type but BES XML."""
     suffixes = _significant_suffixes(file_path)
     last = suffixes[-1] if suffixes else ""
 
-    if _is_bes_xml(file_path):
-        return extract_relevance_from_bes_xml(file_path.read_bytes())
-
     if last in _CONSOLE_HTML_SUFFIXES:
-        return extract_relevance_from_html_text(_read_text(file_path), context=HtmlContext.CONSOLE)
+        return _html_sites(
+            _read_text(file_path),
+            context=HtmlContext.CONSOLE,
+            line_offset=0,
+            label=None,
+            problems=problems,
+        )
 
     if last in _CLIENTUI_HTML_SUFFIXES:
         html_text = _read_text(file_path)
@@ -1257,7 +1429,7 @@ def extract_relevance_from_file(path: str | bytes | os.PathLike[str]) -> list[Re
         # one, only the content mechanism (a JS call, or the classifier on
         # what a static substitution says) gets to decide.
         context = HtmlContext.CLIENTUI if looks_like_clientui(html_text) else HtmlContext.UNKNOWN
-        return extract_relevance_from_html_text(html_text, context=context)
+        return _html_sites(html_text, context=context, line_offset=0, label=None, problems=problems)
 
     if last in _SESSION_TEXT_SUFFIXES:
         return _extract_plain_text(_read_text(file_path), Dialect.SESSION)
@@ -1266,7 +1438,7 @@ def extract_relevance_from_file(path: str | bytes | os.PathLike[str]) -> list[Re
         return _extract_plain_text(_read_text(file_path), Dialect.UNCERTAIN)
 
     if last in _MARKDOWN_SUFFIXES:
-        return extract_relevance_from_markdown(_read_text(file_path))
+        return _markdown_sites(_read_text(file_path), problems)
 
     logger.debug("no relevance extractor for %s; skipping it", file_path.name)
     return []

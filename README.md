@@ -388,10 +388,11 @@ same input always lexes the same way, regardless of which dumps happen to exist.
 ## Linting content
 
 `bigfix_relevance_analyzer.lint` turns the analyses above into pre-commit-shaped
-verdicts. Eight of the ten rules are always on: parse failures, an `it` with
-nothing to bind to, any other type-check diagnostic, and a path that could not
-be read at all are always errors; an inspector no dump defines is always a
-warning. The other two - complexity
+verdicts. Every rule but two is always on (the table below lists them all):
+parse failures, an `it` with nothing to bind to, any other type-check
+diagnostic, an ActionScript `{` that never closes, and a path that could not
+be read at all are errors; an inspector no dump defines is a warning. The
+other two - complexity
 score and evaluation cost - are *also* on by default, at a generous built-in
 ceiling (`DEFAULT_MAX_SCORE = 550`, `DEFAULT_MAX_EVALUATION_COST = 50`) chosen
 to sit well above ordinary content and catch only the genuinely extreme;
@@ -431,6 +432,9 @@ same way instead of each inventing a description:
 | `singular-required` | error | a plural where the engine requires a single value | always on |
 | `site-type-mismatch` | error | the value does not fit the kind of site it was extracted from | always on |
 | `unbound-it` | error | `it` is used where there is no context to bind it to | always on |
+| `unterminated-substitution` | error | an ActionScript `{` is not closed on its line, so the action fails there | always on |
+| `unterminated-processing-instruction` | error | a `<?Relevance` has no closing `?>`, so its relevance was not linted | always on |
+| `xml-parse-error` | error | a BES XML file does not parse, so nothing in it was linted | always on |
 | `mixed-dialect` | error | inspectors exclusive to client relevance and to session relevance in one statement | always on |
 | `non-unique-risk` | warning | a property written singular where more than one value may come back | always on |
 | `plural-preferred` | warning | a singular spelling mid-chain, where the plural reads safer | always on |
@@ -438,8 +442,37 @@ same way instead of each inventing a description:
 | `version-like-string-compare` | warning | two version-looking strings compared as strings, not as versions | always on |
 | `actionscript-keyword` | error | an ActionScript command word used as a relevance name | always on |
 | `unknown-inspector` | warning | a name no inspector dump defines | always on |
+| `unterminated-code-fence` | warning | a relevance code fence in markdown is never closed, so its relevance was not linted | always on |
 | `plural-substitution` | warning | an ordinary ActionScript substitution's value may be more than one value | always on |
 | `non-renderable-substitution` | warning | an ordinary ActionScript substitution's value is an opaque object with no text form | always on |
+
+`unterminated-substitution` is the one rule about the ActionScript around the
+relevance rather than the relevance itself. The action engine substitutes line
+by line, so a `}` on a later line never closes a `{`. Real actions (issue 52,
+BES 11.0.6.137) behaved the same inside `createfile until` bodies and outside
+them:
+
+| Line | Result | Reported |
+| --- | --- | --- |
+| `x { name of operating system` | action fails | yes |
+| `x {   ` (trailing spaces) | action fails | yes |
+| `parameter "p" = "try {"` (the `"` follows the `{`) | action fails | yes |
+| `try {`, `} catch {`, `{` alone | written literally | no |
+
+A `//` comment line is not reported, since it never runs, except inside a
+heredoc body, where `//` is content. There is no autofix: `}` and `{{` mean
+different things, and only the author knows which was meant.
+
+Three more rules come from the same place, extraction, and exist for the same
+reason: each is content the extractor could not read relevance out of, which
+would otherwise lint clean. `unterminated-processing-instruction` is a
+`<?Relevance` with no `?>` after it. A body may span lines, but in a BES
+`<Description>` it must close before `</Description>`. `unterminated-code-fence`
+is a fence tagged `relevance`, `client_relevance` or `session_relevance` that is
+never closed; it's a warning, because CommonMark makes that valid markdown. An
+unclosed fence of any other language is not reported. `xml-parse-error` is a
+`.bes` file that is not well-formed XML, reported at the line the parser
+stopped on.
 
 There is no CLI spelling to disable `complexity`/`evaluation-cost` entirely -
 only to raise their ceiling. A caller that wants a rule off altogether passes

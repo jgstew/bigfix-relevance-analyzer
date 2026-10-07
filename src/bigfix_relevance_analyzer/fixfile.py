@@ -55,9 +55,10 @@ from bigfix_relevance_analyzer._serialize import _as_path, _path
 from bigfix_relevance_analyzer.autofix import AutofixResult
 from bigfix_relevance_analyzer.extract import (
     RelevanceSite,
+    _extract_bes_xml,
+    _extract_file,
+    _ExtractionProblem,
     _is_bes_xml,
-    extract_relevance_from_bes_xml,
-    extract_relevance_from_file,
 )
 from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
@@ -67,7 +68,7 @@ from bigfix_relevance_analyzer.lint import (
     _depth_findings,
     _file_error,
     _findings_dict,
-    _lint_sites,
+    _lint_extracted,
     _unlintable,
     _walk_files,
     lint_file,
@@ -245,11 +246,12 @@ def _ignored_rules(autofix: AutofixResult, config: LintConfig) -> tuple[str, ...
     )
 
 
-def _extract(file_path: Path, data: bytes) -> list[RelevanceSite]:
-    """``file_path``'s sites, from ``data`` itself when it is BES XML."""
+def _extract(file_path: Path, data: bytes) -> tuple[list[RelevanceSite], list[_ExtractionProblem]]:
+    """``file_path``'s sites and extraction problems, from ``data`` itself when
+    it is BES XML."""
     if _is_bes_xml(file_path):
-        return extract_relevance_from_bes_xml(data)
-    return extract_relevance_from_file(file_path)
+        return _extract_bes_xml(data)
+    return _extract_file(file_path)
 
 
 def _write(file_path: Path, data: bytes) -> None:
@@ -302,10 +304,12 @@ def _fix_file(file_path: Path, config: LintConfig, *, explicit: bool) -> FileFix
         return result(lint_file(file_path, config))
     try:
         data = file_path.read_bytes()
-        sites = _extract(file_path, data)
+        sites, problems = _extract(file_path, data)
     except OSError as error:
         return result(_file_error(file_path, error.strerror or str(error), config))
-    findings = _lint_sites(file_path, sites, config)
+    # A problem is not a site, so it never blocks a fix; it is reported
+    # before and after one alike, or `--fix` would look cleaner than lint.
+    findings = _lint_extracted(file_path, sites, problems, config)
 
     def fix_record(fix: SiteFix, reason: str | None = None) -> FileFix:
         return FileFix(file_path, fix.site.line, fix.site, fix.autofix, reason)
@@ -341,7 +345,7 @@ def _fix_file(file_path: Path, config: LintConfig, *, explicit: bool) -> FileFix
     fixed_text = {id(fix.site): fix.autofix.fixed for fix, _ in planned}
     expected = Counter(_site_key(site, fixed_text.get(id(site))) for site in sites)
     try:
-        new_sites = _extract(file_path, fixed)
+        new_sites, new_problems = _extract(file_path, fixed)
     except OSError as error:
         return refuse(f"could not re-read: {error.strerror or error}")
     if Counter(_site_key(site) for site in new_sites) != expected:
@@ -362,7 +366,12 @@ def _fix_file(file_path: Path, config: LintConfig, *, explicit: bool) -> FileFix
         return refuse(f"could not write: {detail}", _file_error(file_path, detail, config))
 
     applied = [fix_record(fix) for fix, _ in planned]
-    return result(_lint_sites(file_path, new_sites, config), applied, unapplied, changed=True)
+    return result(
+        _lint_extracted(file_path, new_sites, new_problems, config),
+        applied,
+        unapplied,
+        changed=True,
+    )
 
 
 def fix_paths(paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfig) -> FixResult:
