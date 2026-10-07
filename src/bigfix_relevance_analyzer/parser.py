@@ -346,6 +346,24 @@ class _Parser:
             words.append(self.advance())
         return words
 
+    def read_cast_target(self) -> list[Token]:
+        """Like :meth:`read_phrase`, but stop at any operator's first word.
+
+        A name phrase absorbs a word that starts an operator without completing
+        one (see :meth:`phrase_ends_here`); a cast target does not. Every engine
+        target refuses `5 as starts`, `5 as ends`, `5 as does` and `5 as
+        contains` as unparsable, while `5 as start` parses and fails only at
+        `The operator "start" is not defined.`
+        """
+        words: list[Token] = []
+        while not self.phrase_ends_here():
+            token = self.peek()
+            assert token is not None
+            if token.normalized in grammar.OPERATOR_FIRST_WORDS:
+                break
+            words.append(self.advance())
+        return words
+
     def mark_grouped(self, grouped: Node) -> Node:
         """Remember ``grouped`` came out of its own parentheses (see :func:`_of`)."""
         self.grouped[id(grouped)] = grouped
@@ -409,6 +427,7 @@ class _Parser:
 
         if token.kind is TokenKind.WORD:
             if token.normalized == "of" and min_bp < grammar.BP_OF:
+                self.reject_bad_tuple_index(left)
                 self.advance()
                 obj = self.parse_expression(grammar.BP_OF - 1)  # right-associative
                 return _of(left, obj, grouped=id(left) in self.grouped)
@@ -423,7 +442,7 @@ class _Parser:
 
             if token.normalized == "as" and min_bp < grammar.BP_CAST:
                 self.advance()
-                target_words = self.read_phrase()
+                target_words = self.read_cast_target()
                 if not target_words:
                     raise self.error_at(self.peek(), "expected a type name after 'as'")
                 span = _join_spans(left.span, _token_span(target_words[-1]))
@@ -441,6 +460,38 @@ class _Parser:
                     return _binary(op.canonical, left, right)
 
         return None
+
+    def reject_bad_tuple_index(self, prop: Node) -> None:
+        """Refuse `item <index> of` / `items <index> of` with any index but an
+        integer literal, parenthesized or not.
+
+        The engine reads that shape as tuple-index syntax whatever the object
+        is -- every client target, Windows included, answers `item "foo" of
+        folder "/etc"` and `item (0+1) of (1,2)` with the sentence below -- so
+        the inspector table's `item <string> of <folder>` is unreachable.
+        `item (1) of (1,2)` answers `2`. A grouped `(item "a") of x` is not this
+        shape: parentheses end the bare phrase (see :func:`_of`).
+        """
+        if (
+            not isinstance(prop, Reference)
+            or id(prop) in self.grouped
+            or prop.phrase not in grammar.TUPLE_INDEX_WORDS
+            or prop.index is None
+        ):
+            return
+        index = prop.index
+        if isinstance(index, NumberLiteral) and index.is_integer_literal:
+            return
+        raise ParseError(
+            "This expression contained a tuple index which was not an integer literal",
+            *self.position_of(index.span.start),
+        )
+
+    def position_of(self, offset: int) -> tuple[int, int, int]:
+        """``(offset, line, column)`` for a 0-based source offset."""
+        line = self.text.count("\n", 0, offset) + 1
+        column = offset - (self.text.rfind("\n", 0, offset) + 1) + 1
+        return offset, line, column
 
     def right_bp(self, op: grammar.InfixOp) -> int:
         """The minimum binding power for ``op``'s right operand."""
@@ -615,9 +666,10 @@ def _of(prop: Node, obj: Node, *, grouped: bool = False) -> Node:
             return NumberOf(span=span, operand=obj)
         if (
             # Either written form subscripts a tuple: `items 1 of (a, b)` is
-            # the same indexing said plurally, and resolving it as the
-            # `item <string> of <folder>` property's plural spelling types it
-            # as a filesystem object, which it is not.
+            # the same indexing said plurally. Any other index never gets here
+            # (`reject_bad_tuple_index`): the engine reads `item <x> of` as
+            # tuple syntax whatever the object, so the table's `item <string>
+            # of <folder>` is unreachable.
             prop.phrase in grammar.TUPLE_INDEX_WORDS
             and isinstance(prop.index, NumberLiteral)
             and prop.index.is_integer_literal

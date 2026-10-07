@@ -1516,12 +1516,21 @@ def test_a_plural_operand_inside_a_filter_fails_on_the_operator(env: TypeEnviron
     assert [d.code for d in result.diagnostics] == ["left-operand-not-singular"]
 
 
-def test_a_tuple_index_must_be_an_integer_literal(env: TypeEnvironment) -> None:
-    """A string index parses as `item <string> of ...`, a real property. It is
-    a finding only because no row defines that property on a tuple."""
-    result = check(parse('item "a" of (1, 2, 3)'), env)
-    assert [d.code for d in result.diagnostics] == ["tuple-index-not-literal"]
-    assert result.diagnostics[0].message == "the tuple index '\"a\"' is not an integer literal"
+@pytest.mark.parametrize(
+    ("index", "code"),
+    [
+        ("9223372036854775807", "tuple-index-out-of-range"),
+        ("9223372036854775808", "tuple-index-unreasonable"),
+    ],
+)
+def test_the_tuple_index_diagnostics_split_at_the_engines_integer_limit(
+    env: TypeEnvironment, index: str, code: str
+) -> None:
+    """qna 11.0.7: `item 9223372036854775807 of (1,2)` (2^63-1) is `The tuple
+    index ... is out of range.`; one more is `This expression contained a
+    tuple index which was not an integer literal.`"""
+    result = check(parse(f"item {index} of (1, 2)"), env)
+    assert [d.code for d in result.diagnostics] == [code]
 
 
 # ---------------------------------------------------------------------------
@@ -1839,7 +1848,9 @@ def test_every_type_check_diagnostic_is_reachable() -> None:
     # `item 0 of <not a tuple>`: the engine settles this by evaluating, and the
     # parser only builds an `ItemOf` for a literal tuple in the first place, so
     # the checker never has a case to report. Kept in the catalog as vocabulary.
-    assert catalog - emitted == {"argument-not-a-tuple"}
+    # `item "a" of x`: any index but an integer literal is a parse error now
+    # (issue #73), so the checker never sees one. Kept as vocabulary too.
+    assert catalog - emitted == {"argument-not-a-tuple", "tuple-index-not-literal"}
 
 
 def test_a_wide_expression_does_not_exhaust_the_python_stack(env: TypeEnvironment) -> None:

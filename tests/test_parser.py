@@ -19,6 +19,7 @@ from bigfix_relevance_analyzer.nodes import (
     MAX_LARGE_INTEGER,
     Bar,
     Binary,
+    Cast,
     It,
     ItemOf,
     NumberKind,
@@ -626,12 +627,49 @@ def test_prop_grouped_records_the_parentheses() -> None:
     assert bare.prop_grouped is False
 
 
-def test_a_string_index_stays_a_property_because_item_really_is_one() -> None:
-    """`item <string> of <folder>` is a real inspector, so a string index
-    cannot be read as a tuple subscript without knowing the object's type --
-    which this parser does not consult. Positive evidence only."""
-    assert [entry.signature for entry in inspectors.lookup("item")] != []
-    assert isinstance(parse('item "foo" of folder "c"'), Of)
+@pytest.mark.parametrize(
+    ("text", "column"),
+    [
+        ('item "foo" of folder "c"', 6),
+        ('items "foo" of folder "c"', 7),
+        ('item "a" of (1, 2, 3)', 6),
+        ("item (0+1) of (1, 2)", 6),
+    ],
+)
+def test_an_item_index_that_is_not_an_integer_literal_is_a_parse_error(
+    text: str, column: int
+) -> None:
+    """The engine reads `item <anything> of` as tuple-index syntax whatever the
+    object is, so the inspector table's `item <string> of <folder>` is not
+    reachable. Every client target, Windows included, refuses
+    `item "foo" of folder "/etc"` and `item (0+1) of (1,2)` with `This
+    expression contained a tuple index which was not an integer literal.`"""
+    with pytest.raises(ParseError, match="not an integer literal") as info:
+        parse(text)
+    assert (info.value.line, info.value.column) == (1, column)
+
+
+def test_a_parenthesized_integer_literal_is_still_a_tuple_index() -> None:
+    """qna: `item (1) of (1,2)` and `items (1) of (1,2)` both answer `2`."""
+    assert isinstance(parse("item (1) of (1, 2)"), ItemOf)
+    assert isinstance(parse("items (1) of (1, 2)"), ItemOf)
+
+
+def test_an_item_without_of_is_left_to_name_resolution() -> None:
+    """Only `item <index> of` is tuple syntax: qna answers a bare `item "x"`
+    with `The operator "item" is not defined.`, a name error."""
+    assert isinstance(parse('item "x"'), Reference)
+
+
+def test_a_cast_target_stops_at_an_operator_first_word() -> None:
+    """qna, every target: `5 as starts`, `5 as ends`, `5 as does` and
+    `5 as contains` are parse errors, while `5 as start` and `5 as foo` parse
+    and fail later with `The operator ... is not defined.`"""
+    for word in ("starts", "ends", "does", "contains"):
+        with pytest.raises(ParseError) as info:
+            parse(f"5 as {word}")
+        assert info.value.column == 6
+    assert isinstance(parse("5 as start"), Cast)
 
 
 def test_an_indexed_number_is_not_aggregation() -> None:

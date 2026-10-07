@@ -65,15 +65,25 @@ items 0 of (1, 2, 3)
 ----
 (items-of (num "0") (tuple (num "1") (num "2") (num "3")))
 
-==== [unverified] a tuple index too big for an integer is still a tuple index
+==== a tuple index too big for an integer is still a tuple index; the checker refuses it (qna: "integer constant was too large" / "not an integer literal", all targets)
 item 99999999999999999999 of (1, 2)
 ----
 (item-of (num "99999999999999999999") (tuple (num "1") (num "2")))
 
-==== a string index stays a property: `item <string> of <folder>` is a real one
+==== a string tuple index is an error, not a property (qna: item "foo" of folder is "tuple index which was not an integer literal", all targets)
 item "foo" of folder "c:\temp"
 ----
-(of (ref "item" (str "foo")) (ref "folder" (str "c:\\temp")))
+ERROR line 1 column 6
+
+==== a computed tuple index is an error too (qna: item (0+1) of (1,2) is "not an integer literal")
+item (0+1) of (1, 2)
+----
+ERROR line 1 column 6
+
+==== a parenthesized integer literal is still a tuple index (qna: item (1) of (1,2) is 2)
+item (1) of (1, 2)
+----
+(item-of (num "1") (tuple (num "1") (num "2")))
 
 ==== the plural `items` is a property too, not aggregation
 items of folder "c:\temp"

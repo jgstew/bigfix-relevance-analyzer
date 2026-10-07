@@ -1539,11 +1539,6 @@ class _Checker:
                         self.world_only.add(id(node.prop))
                     else:
                         self.explicit_objects.add(id(node.prop))
-                if isinstance(node, Of) and self.bad_tuple_index(node) is not None:
-                    # `item "a" of (1,2,3)` is one mistake, not two: the tuple
-                    # rule is the finding, so the name is not also resolved as
-                    # the `item <string> of <folder>` property it is not.
-                    self.suppressed.add(id(node.prop))
                 work.append(_Combine(node))
                 work.append(_PopContext())
                 work.append(_Descend(first))
@@ -1894,11 +1889,6 @@ class _Checker:
         which is why `(it as string) of files of folder "c:\\"` is plural off a
         singular `it`.
         """
-        index = self.bad_tuple_index(node)
-        if index is not None:
-            self.report("tuple-index-not-literal", node.span, token=index.text)
-            return _RULED_OUT
-
         # `resolve_property` already read the written form; it leaves plurality
         # `UNKNOWN` for a name it could not match, or one whose matched rows
         # disagree, and there the object is still the best evidence there is.
@@ -2038,27 +2028,6 @@ class _Checker:
             # A chain intersects: every step has to hold at once.
             platforms=prop.platforms & obj.platforms,
         )
-
-    def bad_tuple_index(self, node: Of) -> NumberLiteral | StringLiteral | None:
-        """The offending index of an `item <not an integer literal> of <tuple>`.
-
-        The parser builds :class:`~...nodes.ItemOf` only for an integer-literal
-        index, because telling a tuple subscript from the real `item <string> of
-        <folder>` property needs the object's type -- which the checker has and
-        the parser deliberately does not. So the rule lands here.
-
-        Only a literal index is recognised, since the message names the
-        offending token and the checker is not given the source text to quote a
-        computed one from.
-        """
-        if not isinstance(node.obj, TupleExpr) or not isinstance(node.prop, Reference):
-            return None
-        index = node.prop.index
-        if node.prop.phrase not in grammar.TUPLE_INDEX_WORDS or not isinstance(
-            index, NumberLiteral | StringLiteral
-        ):
-            return None
-        return index
 
     def branches_coexist(self, then_value: RelevanceValue, else_value: RelevanceValue) -> bool:
         """Whether any one platform sees both branches of an `if` at once.
