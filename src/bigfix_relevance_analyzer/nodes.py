@@ -184,10 +184,10 @@ class NumberLiteral:
     def is_integer_literal(self) -> bool:
         """Whether this is written as a whole number, of any magnitude.
 
-        The distinction a tuple index turns on: the parser needs to tell a
-        tuple subscript from the real `item <string> of <folder>` property by
-        the index's written form alone (see :func:`parser._of`), before any
-        magnitude check runs. A numeral too large even to parse is still
+        The distinction a tuple index turns on: the engine accepts only an
+        integer literal there, judged by its written form alone, and the parser
+        refuses anything else (see :meth:`parser._Parser.reject_bad_tuple_index`)
+        before any magnitude check runs. A numeral too large even to parse is still
         written as a whole number, so it counts here too -- the checker is
         what tells :attr:`~NumberKind.LARGE_INTEGER` and
         :attr:`~NumberKind.CONSTANT_TOO_LARGE` apart from there, since each has
@@ -266,12 +266,10 @@ class ItemOf:
     None of those rules have anywhere to attach on a generic
     :class:`Reference` plus :class:`Of`, which is why this is its own node.
 
-    Only an integer-literal index produces this node. ``item`` is also a real
-    property -- ``item <string> of <folder>`` yields a filesystem object -- and
-    telling that apart from a tuple index needs the direct object's type, which
-    this parser deliberately does not consult. So a string index stays a
-    :class:`Reference`, on the package's usual rule of drawing only positive
-    conclusions.
+    Only an integer-literal index produces this node; any other index before
+    ``of`` is a parse error. The engine reads ``item <index> of`` as tuple
+    syntax whatever the object is, so the inspector table's ``item <string> of
+    <folder>`` is unreachable (see :meth:`parser._Parser.reject_bad_tuple_index`).
     """
 
     span: Span

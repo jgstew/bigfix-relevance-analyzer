@@ -13,7 +13,7 @@ if 1 then 2 + 3 else 4
 ----
 (if (num "1") (bin "+" (num "2") (num "3")) (num "4"))
 
-==== [unverified] the else branch is greedy to the right
+==== the else branch is greedy to the right
 if 1 then 2 else 3 + 4
 ----
 (if (num "1") (num "2") (bin "+" (num "3") (num "4")))

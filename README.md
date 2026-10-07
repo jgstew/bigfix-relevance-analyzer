@@ -60,11 +60,12 @@ be an integer literal; and `number of x` is `NumberOf`, the sibling of the
 classification (`NumberKind`) as a derived property rather than as three
 separate node classes, which keeps the literal verbatim and the corpus stable.
 
-Recognising `item 0 of (...)` without also swallowing `item "foo" of folder "c"`
-is the one place this needs care: `item <string> of <folder>` is a real
-inspector, and telling the two apart in general needs the object's type. Only an
-integer-literal index is specialised, on the same positive-evidence-only rule
-the rest of the package follows.
+The engine reads `item <index> of` and `items <index> of` as tuple-index syntax
+whatever the object is. So the inspector table's `item <string> of <folder>` is
+unreachable: every client target refuses `item "foo" of folder "/etc"` with
+`This expression contained a tuple index which was not an integer literal.`
+The parser follows suit and raises that error for any index that isn't an
+integer literal, parenthesized or not (`item (1) of (1, 2)` is still `2`).
 
 The long-term goal may be to **translate the core to Rust**, exposed as PyO3
 wheels for Python consumers and as WebAssembly for a VS Code extension. That is

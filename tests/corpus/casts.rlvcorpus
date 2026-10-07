@@ -38,7 +38,12 @@ it as 5
 ----
 ERROR line 1 column 7
 
-==== a cast target may be a word that starts an operator
+==== a cast target cannot be an operator's first word (qna: 5 as starts / ends / does is a parse error, all targets)
 x as starts
 ----
-(cast (ref "x") "starts")
+ERROR line 1 column 6
+
+==== a cast target may be the singular of a colliding name (qna: 5 as start says operator start is not defined)
+x as start
+----
+(cast (ref "x") "start")

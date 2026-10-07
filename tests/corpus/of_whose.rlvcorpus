@@ -33,7 +33,7 @@ item 0 of it
 ----
 (item-of (num "0") it)
 
-==== [unverified] a parenthesized index binds the same way
+==== a parenthesized index binds the same way
 key (name of it) of registry
 ----
 (of (ref "key" (of (ref "name") it)) (ref "registry"))
@@ -105,7 +105,7 @@ exists w and exists b
 ----
 (bin "and" (exists (ref "w")) (exists (ref "b")))
 
-==== [unverified] exists does not swallow a comparison
+==== exists does not swallow a comparison
 exists w = 2
 ----
 (bin "=" (exists (ref "w")) (num "2"))

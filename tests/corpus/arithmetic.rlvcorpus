@@ -18,7 +18,7 @@
 ----
 (bin "mod" (bin "/" (num "4") (num "2")) (num "3"))
 
-==== [unverified] concatenation sits with multiplication, tighter than addition
+==== concatenation sits with multiplication, tighter than addition
 1 & 2 + 3
 ----
 (bin "+" (bin "&" (num "1") (num "2")) (num "3"))
