@@ -90,10 +90,10 @@ x as string starts with "a"
 ----
 (bin "starts with" (cast (ref "x") "string") (str "a"))
 
-==== a partial `does not ...` is still an error, at the structural word
+==== a partial `does not ...` is an error at does, which cannot end a name before not
 x does not start of it
 ----
-ERROR line 1 column 8
+ERROR line 1 column 3
 
 ==== a dangling operator word after a non-reference operand is still an error
 it ends "a"
@@ -104,3 +104,33 @@ ERROR line 1 column 4
 (x) ends "a"
 ----
 ERROR line 1 column 5
+
+==== a dangling does not is an error at does (qna: "a" does not is a -- the engine skips it, refused as unclear)
+"a" does not
+----
+ERROR line 1 column 5
+
+==== a dangling bare does is an error too (qna: "a" does is a)
+"a" does
+----
+ERROR line 1 column 5
+
+==== a dangling does not before a comparison is an error (qna: "a" does not = "a" is True, the negation silently lost)
+"a" does not = "a"
+----
+ERROR line 1 column 5
+
+==== a dangling does not before a closing paren is an error at does (qna: (1 does not) = 1 is True)
+(1 does not) = 1
+----
+ERROR line 1 column 4
+
+==== a dangling does not after a name stops the name at does (qna: name of operating system does not is the name)
+name of operating system does not
+----
+ERROR line 1 column 26
+
+==== a near-miss verb after does not is an error at does (qna: "ab" does not contains "b" -- operator "does" is not defined)
+"ab" does not contains "b"
+----
+ERROR line 1 column 6

@@ -823,3 +823,45 @@ def test_only_parentheses_nest_a_tuple(source: str, expected: str) -> None:
 def test_a_collection_still_flattens() -> None:
     """Pooling is flat: `((1; 2); 3)` is the same three values as `(1; 2; 3)`."""
     assert to_sexpr(parse("((1; 2); 3)")) == '(coll (num "1") (num "2") (num "3"))'
+
+
+def test_a_dangling_does_not_says_the_engine_drops_it() -> None:
+    """The engine skips a `does` / `does not` that nothing completes before the
+    end, `)` or a punctuation operator -- `"a" does not = "a"` is True live,
+    the negation silently lost (issue 74). We refuse it and say so."""
+    for source, column in (
+        ('"a" does not', 5),
+        ('"a" does', 5),
+        ('"a" does not = "a"', 5),
+        ("(1 does not) = 1", 4),
+        ("name of operating system does not", 26),
+        ("1 does not, 2", 3),
+    ):
+        with pytest.raises(ParseError) as info:
+            parse(source)
+        assert info.value.column == column, source
+        assert "missing its verb" in info.value.message, source
+        assert "ignores" in info.value.message, source
+
+
+def test_a_near_miss_verb_after_does_suggests_the_operator() -> None:
+    """`does not contains` is "The operator "does" is not defined" live."""
+    for source, suggestion in (
+        ('"ab" does not contains "b"', "does not contain"),
+        ('"ab" does not starts with "a"', "does not start with"),
+        ('"ab" does not equals "a"', "does not equal"),
+        ('"ab" does not ends with "a"', "does not end with"),
+        ("x does not start of it", "does not start with"),
+        ('"ab" does contain "a"', "contains' or 'does not contain"),
+    ):
+        with pytest.raises(ParseError) as info:
+            parse(source)
+        assert f"did you mean '{suggestion}'" in info.value.message, source
+
+
+def test_does_not_before_any_other_word_names_the_verbs() -> None:
+    """The engine rejects these too (`does not as string`, `does not and`)."""
+    for source in ('"a" does not as string', "true does not and false", '"a" does not of "b"'):
+        with pytest.raises(ParseError) as info:
+            parse(source)
+        assert "must be followed by" in info.value.message, source

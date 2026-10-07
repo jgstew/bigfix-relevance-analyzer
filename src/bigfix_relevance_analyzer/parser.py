@@ -449,6 +449,8 @@ class _Parser:
                 return Cast(span=span, operand=left, target=_phrase(target_words))
 
             matched = self.match_word_infix()
+            if matched is None and token.normalized == "does":
+                raise self.incomplete_does(token)
             if matched is not None:
                 op, consumed = matched
                 if op.lbp > min_bp:
@@ -550,7 +552,51 @@ class _Parser:
             return True
         if token.normalized not in grammar.OPERATOR_FIRST_WORDS:
             return False
+        if token.normalized == "does" and self.word_ahead(1) == "not":
+            # `not` is structural, so no name runs through `does not`: stop
+            # here and let parse_infix explain the incomplete operator.
+            return True
         return self.match_word_infix() is not None
+
+    def word_ahead(self, ahead: int) -> str | None:
+        """The normalized word ``ahead`` tokens on, or None if it is not a word."""
+        at = self.at + ahead
+        if at >= len(self.tokens) or self.tokens[at].kind is not TokenKind.WORD:
+            return None
+        return self.tokens[at].normalized
+
+    def incomplete_does(self, does: Token) -> ParseError:
+        """Refuse a `does` / `does not` that no operator completes.
+
+        Before the end, `)` or a punctuation operator the engine skips the
+        words -- `"a" does not = "a"` is True live, the negation silently
+        lost (issue 74) -- so the message says so rather than just "unexpected".
+        Before any other word the engine refuses it too ("The operator "does"
+        is not defined"), and a near-miss verb gets the spelling it wanted.
+        """
+        words = 2 if self.word_ahead(1) == "not" else 1
+        spelled = "does not" if words == 2 else "does"
+        following = self.tokens[self.at + words] if self.at + words < len(self.tokens) else None
+        if following is None or (following.kind is TokenKind.PUNCT and following.text != "("):
+            return self.error_at(
+                does,
+                f"'{spelled}' is missing its verb (contain, equal, start with, end with); "
+                f"the engine silently ignores a dangling '{spelled}', so this evaluates "
+                f"as if it were absent and any negation is lost",
+            )
+        suggestion = _DOES_NEAR_MISSES.get(self.word_ahead(words) or "")
+        if suggestion is not None:
+            # A bare `does contain` may have wanted either polarity.
+            positive = "" if words == 2 else f"{_DOES_POSITIVE[suggestion]}' or '"
+            return self.error_at(
+                does,
+                f"'{spelled} {following.text}' is not an operator; "
+                f"did you mean '{positive}does not {suggestion}'?",
+            )
+        return self.error_at(
+            does,
+            f"'{spelled}' must be followed by contain, equal, start with, or end with",
+        )
 
     def match_word_infix(self) -> tuple[grammar.InfixOp, int] | None:
         """Max-munch the word-operator trie at the current position.
@@ -578,6 +624,25 @@ class _Parser:
 # ---------------------------------------------------------------------------
 # Node construction helpers
 # ---------------------------------------------------------------------------
+
+
+# The verb a `does` / `does not` was probably reaching for, by the word written.
+_DOES_NEAR_MISSES = {
+    "contain": "contain",
+    "contains": "contain",
+    "equal": "equal",
+    "equals": "equal",
+    "start": "start with",
+    "starts": "start with",
+    "end": "end with",
+    "ends": "end with",
+}
+_DOES_POSITIVE = {
+    "contain": "contains",
+    "equal": "equals",
+    "start with": "starts with",
+    "end with": "ends with",
+}
 
 
 def _token_span(token: Token) -> Span:
