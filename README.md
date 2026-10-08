@@ -238,7 +238,9 @@ for site in extract_relevance_from_file("MyFixlet.bes"):
 ```
 
 Each result is a frozen `RelevanceSite` with `kind`, `text`, `line` (1-based,
-in the file), `context` (a short label for messages), and the dialect fields
+in the file, where the statement itself starts - below its tag, fence or
+`<?Relevance` when a line break comes first), `context` (a short label for
+messages), and the dialect fields
 described under [Which dialect a statement is in](#which-dialect-a-statement-is-in).
 
 | File type | What is extracted |
