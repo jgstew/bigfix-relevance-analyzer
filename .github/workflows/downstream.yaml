@@ -1,0 +1,157 @@
+---
+name: downstream
+
+# Runs pre-commit-bigfix's own test suite against this commit's analyzer.
+#
+# pre-commit-bigfix's bes-relevance-lint hook depends on this package with no
+# upper bound, so every release reaches its users at once. The aim is to know
+# when a change here breaks it, not to forbid that: this job shows red, and the
+# change is then avoided or made deliberately, with the hook following. That is
+# also why it is advisory. It is not a required check, and tag_and_release.yaml
+# does not wait for it: a deliberate break has to land here before the hook can
+# be changed to match, so a required check would block exactly that case.
+#
+# Tested: the latest pre-commit-bigfix *release*, which is what its users run,
+# unless a manual run names another ref (a branch carrying a fix, say).
+#
+# Two test runs, in one environment holding that release and this checkout's
+# analyzer:
+#   1. pre-commit-bigfix's own pytest suite, in its checkout;
+#   2. this repo's tests/test_downstream_pre_commit_bigfix.py with
+#      PRE_COMMIT_BIGFIX_SRC set, so its real-hook golden check, which skips
+#      in test.yaml, runs here.
+# tests/test_downstream_pre_commit_bigfix.py holds this file's shape.
+
+on:
+  pull_request:
+    paths: &inputs
+      - "src/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "tests/test_downstream_pre_commit_bigfix.py"
+      - "tests/golden/**"
+      - ".github/workflows/downstream.yaml"
+  push:
+    branches:
+      - main
+    paths: *inputs
+  # Weekly, for the other direction: a new pre-commit-bigfix release against
+  # this repository's main.
+  schedule:
+    - cron: "23 7 * * 1"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "pre-commit-bigfix ref to test (branch, tag or SHA); empty means its latest release"
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: downstream-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pre-commit-bigfix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The newest CPython this package is tested on (as in test.yaml); the
+      # hook's analyzer dependency needs 3.11+.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      # Same single source of truth for the uv version as test.yaml.
+      - name: read uv version from .pre-commit-config.yaml
+        run: |
+          UV_VERSION="$(awk '
+            /^[[:space:]]*-[[:space:]]*repo:.*astral-sh\/uv-pre-commit[[:space:]]*$/ { found = 1; next }
+            found && $1 == "rev:" {
+              if (match($0, /#[ \t]*(frozen:[ \t]*)?[vV]?[0-9]+(\.[0-9]+)*/)) {
+                ver = substr($0, RSTART, RLENGTH)
+                sub(/^#[ \t]*(frozen:[ \t]*)?[vV]?/, "", ver)
+              } else {
+                ver = $2
+                gsub(/["'\'']/, "", ver)
+                sub(/^[vV]/, "", ver)
+              }
+              print ver
+              exit
+            }
+          ' .pre-commit-config.yaml)"
+          if [ -z "$UV_VERSION" ]; then
+            echo "::error::could not read the astral-sh/uv-pre-commit version from .pre-commit-config.yaml"
+            exit 1
+          fi
+          echo "UV_VERSION=$UV_VERSION" >> "$GITHUB_ENV"
+          echo "uv version: $UV_VERSION"
+
+      - name: install uv
+        run: python -m pip install "uv==${UV_VERSION}"
+
+      # The ref a manual run names, else the latest release's tag. `gh` reads
+      # the public release with this run's read-only token.
+      - name: pick the pre-commit-bigfix ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ inputs.ref }}
+        run: |
+          if [ -z "$REF" ]; then
+            REF="$(gh release view --repo jgstew/pre-commit-bigfix --json tagName --jq .tagName)"
+          fi
+          if [ -z "$REF" ]; then
+            echo "::error::could not determine the latest pre-commit-bigfix release"
+            exit 1
+          fi
+          echo "PRE_COMMIT_BIGFIX_REF=$REF" >> "$GITHUB_ENV"
+          echo "testing pre-commit-bigfix at $REF" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: jgstew/pre-commit-bigfix
+          ref: ${{ env.PRE_COMMIT_BIGFIX_REF }}
+          path: downstream/pre-commit-bigfix
+          persist-credentials: false
+
+      # One resolve, with this checkout (`.`) as a requirement, so the hook's
+      # `bigfix-relevance-analyzer >= ...` is met by this commit, never by
+      # PyPI. pyyaml is for its hook-declaration test, which skips without it.
+      # The 7-day release-age cooldown holds for third-party packages, as in
+      # pyproject.toml; jgstew's own packages are exempt.
+      - name: install pre-commit-bigfix with this analyzer
+        run: |
+          uv venv -p 3.13 downstream/.venv
+          uv pip install -p downstream/.venv/bin/python \
+            --exclude-newer "7 days" \
+            --exclude-newer-package "bigfix-prefetch=0 days" \
+            --exclude-newer-package "validate-bes-xml=0 days" \
+            "downstream/pre-commit-bigfix[test]" pyyaml .
+
+      # A version number cannot tell this checkout from the PyPI release of the
+      # same version; the installer's record of where it came from can.
+      - name: check the analyzer is this checkout's
+        run: |
+          downstream/.venv/bin/python - <<'EOF'
+          import importlib.metadata as m, json, pathlib, sys
+          dist = m.distribution("bigfix-relevance-analyzer")
+          url = json.loads(dist.read_text("direct_url.json") or "{}").get("url", "")
+          expected = pathlib.Path.cwd().as_uri()
+          print(f"bigfix-relevance-analyzer {dist.version} from {url}")
+          sys.exit(0 if url == expected else f"expected the analyzer from {expected}, got {url or 'PyPI'}")
+          EOF
+
+      - name: pre-commit-bigfix's tests
+        working-directory: downstream/pre-commit-bigfix
+        run: ../.venv/bin/python -m pytest -q
+
+      - name: this repo's contract tests, with the real hook
+        env:
+          PRE_COMMIT_BIGFIX_SRC: downstream/pre-commit-bigfix
+        run: downstream/.venv/bin/python -m pytest -q -p no:cacheprovider tests/test_downstream_pre_commit_bigfix.py

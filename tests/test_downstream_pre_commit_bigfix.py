@@ -53,6 +53,7 @@ import importlib
 import inspect
 import io
 import os
+import re
 import sys
 from collections.abc import Iterable, Iterator
 from pathlib import Path
@@ -352,3 +353,90 @@ def test_the_real_hook_prints_the_golden_report() -> None:
             line = line.replace(f": [{code}] ", f": [{rule}] ", 1)
         lines.append(line)
     assert "".join(f"{line}\n" for line in lines) == GOLDEN.read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# The CI job that runs pre-commit-bigfix's own tests against this analyzer
+# ---------------------------------------------------------------------------
+
+DOWNSTREAM_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "downstream.yaml"
+
+
+def _workflow() -> str:
+    assert DOWNSTREAM_WORKFLOW.is_file(), DOWNSTREAM_WORKFLOW
+    return DOWNSTREAM_WORKFLOW.read_text("utf-8")
+
+
+def test_a_workflow_runs_pre_commit_bigfixs_tests_against_this_analyzer() -> None:
+    text = _workflow()
+    assert "repository: jgstew/pre-commit-bigfix" in text
+    # Its own suite, then this module with the real hook importable, so the
+    # golden-report check that skips in `test` runs here.
+    assert "python -m pytest" in text
+    assert "PRE_COMMIT_BIGFIX_SRC:" in text
+    assert "tests/test_downstream_pre_commit_bigfix.py" in text
+
+
+def test_it_tests_the_latest_release_unless_given_a_ref() -> None:
+    """What users run by default; a branch can be tried by hand."""
+    text = _workflow()
+    assert "gh release view --repo jgstew/pre-commit-bigfix" in text
+    assert "workflow_dispatch:" in text
+    assert "ref:" in text.split("workflow_dispatch:", 1)[1].split("jobs:", 1)[0]
+
+
+def test_it_installs_this_commits_analyzer_not_pypis() -> None:
+    """One resolve with the checkout as a requirement, then proof of where the
+    installed analyzer came from: a version number alone cannot tell a
+    checkout from the PyPI release of the same version."""
+    commands = re.sub(r"\\\n\s*", "", _workflow())  # join `\` continuation lines
+    assert re.search(
+        r'uv pip install .*"downstream/pre-commit-bigfix\[test\]".* \.\s*$', commands, re.M
+    )
+    text = _workflow()
+    assert "direct_url.json" in text
+
+
+def test_it_keeps_the_release_age_cooldown_for_third_party_packages() -> None:
+    """Seven days for PyPI packages, as everywhere in this repository; jgstew's
+    own packages are exempt, as bigfix-remote-client-relevance is in
+    pyproject.toml."""
+    text = _workflow()
+    assert '--exclude-newer "7 days"' in text
+    exempt = set(re.findall(r'--exclude-newer-package "([\w-]+)=0 days"', text))
+    assert exempt == {"bigfix-prefetch", "validate-bes-xml"}
+
+
+def test_it_is_advisory_and_never_gates_a_release() -> None:
+    """A deliberate break has to land here before the hook can follow, so a
+    required check would block exactly that. It runs and shows red; it is not
+    called by the release workflow."""
+    release = (REPO_ROOT / ".github" / "workflows" / "tag_and_release.yaml").read_text("utf-8")
+    assert "downstream" not in release
+    assert "continue-on-error" not in _workflow(), "red must stay visible"
+
+
+def test_it_runs_when_the_analyzer_changes_and_weekly() -> None:
+    text = _workflow()
+    for path in (
+        '"src/**"',
+        '"pyproject.toml"',
+        '"uv.lock"',
+        '"tests/test_downstream_pre_commit_bigfix.py"',
+        '"tests/golden/**"',
+        '".github/workflows/downstream.yaml"',
+    ):
+        assert path in text, path
+    assert "paths: *inputs" in text
+    # Weekly, for changes on the hook's side against this repository's main.
+    assert re.search(r"schedule:\s*\n\s*- cron:", text)
+
+
+def test_its_actions_are_pinned_and_its_token_read_only() -> None:
+    text = _workflow()
+    uses = re.findall(r"uses:\s*(\S+)", text)
+    assert uses
+    for action in uses:
+        assert re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", action), action
+    assert "permissions:\n  contents: read" in text
+    assert text.count("persist-credentials: false") == text.count("actions/checkout@")
