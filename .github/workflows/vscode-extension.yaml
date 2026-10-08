@@ -42,6 +42,8 @@ on:
       - "uv.lock"
       - "tools/vscode-extension/**"
       - "tools/playground-wasm/componentize-py/build-playground/**"
+      # The uv version the package job installs is read from it.
+      - ".pre-commit-config.yaml"
       - ".github/workflows/vscode-extension.yaml"
   push:
     branches:
