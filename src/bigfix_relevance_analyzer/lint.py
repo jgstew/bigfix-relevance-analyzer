@@ -135,6 +135,7 @@ from bigfix_relevance_analyzer.extract import (
     _is_recognized,
 )
 from bigfix_relevance_analyzer.nodes import Node, Of, Reference
+from bigfix_relevance_analyzer.tokenizer import TokenKind
 from bigfix_relevance_analyzer.typecheck import (
     _UNIQUE_VALUE,
     SINGULAR_REQUIRED,
@@ -668,6 +669,33 @@ DEFAULT_SEVERITIES: Mapping[str, Severity] = MappingProxyType(
 
 
 @dataclass(frozen=True, slots=True)
+class TextSpan:
+    """Which characters of the analysed statement a :class:`Finding` is about.
+
+    0-based offsets, end exclusive, into the text that was analysed: a site's
+    :attr:`~bigfix_relevance_analyzer.extract.RelevanceSite.text` when the
+    finding came from extraction, else the bare statement (stripped, as
+    :func:`lint_text` analyses it). Relative to the statement, never to a file,
+    so a span stays right when the statement moves and is independent of how
+    the file was decoded. Turning one into a file position is the consumer's
+    job; :mod:`bigfix_relevance_analyzer.lsp.positions` does it for an editor.
+
+    ``start == end`` is a point between characters: a parse error at the end
+    of the statement, where there is no character to cover.
+
+    Deliberately not :class:`~bigfix_relevance_analyzer.nodes.Span`, whose line
+    and column are relative to the statement too and would read as a file
+    position on a finding that carries a file path.
+    """
+
+    start: int
+    end: int
+
+    def to_dict(self) -> dict[str, int]:
+        return {"start": self.start, "end": self.end}
+
+
+@dataclass(frozen=True, slots=True)
 class Finding:
     """One thing worth a commit's attention, already worded to stand alone."""
 
@@ -717,6 +745,21 @@ class Finding:
     version to offer.
     """
 
+    spans: tuple[TextSpan, ...] = ()
+    """The characters of the statement this finding is about, when it knows.
+
+    See :class:`TextSpan` for what the offsets are into. Empty means the
+    finding is about the statement as a whole -- ``complexity``,
+    ``mixed-dialect``, a substitution's slot -- or about the file around it
+    (an unterminated fence, say), and a consumer should fall back to
+    :attr:`line`. One span for most rules: the token, ``it``, or expression
+    the rule is about. ``unknown-inspector`` stays one finding per statement
+    but has a span for every use of every name it reports, in source order.
+
+    Where there is a span, :attr:`line` is the line it starts on, except for
+    ``unknown-inspector``, which reports the statement's first line.
+    """
+
     def __str__(self) -> str:
         where = f"{self.path}:{self.line}" if self.path is not None else f"line {self.line}"
         return f"{where}: {self.severity.value} [{self.code}] {self.message}"
@@ -744,6 +787,7 @@ class Finding:
             "suggestions": list(self.suggestions),
             "autofix": None if self.autofix is None else self.autofix.to_dict(),
             "text": str(self),
+            "spans": [span.to_dict() for span in self.spans],
         }
 
 
@@ -839,6 +883,7 @@ def _finding(
     site: RelevanceSite | None = None,
     suggestions: tuple[str, ...] = (),
     autofix: AutofixResult | None = None,
+    spans: tuple[TextSpan, ...] = (),
 ) -> Finding | None:
     """A :class:`Finding` at ``code``'s configured severity, or ``None`` when
     that severity is :attr:`Severity.IGNORE` -- an ignored finding is never
@@ -855,6 +900,7 @@ def _finding(
         site=site,
         suggestions=suggestions,
         autofix=autofix,
+        spans=spans,
     )
 
 
@@ -1173,6 +1219,38 @@ def _non_renderable_substitution(
     return f"{site.context} substitutes {rendered}, which has no string representation to embed"
 
 
+def _parse_error_span(report: RelevanceAnalysis, offset: int) -> TextSpan:
+    """The token a parse error points at, or the empty span at ``offset``
+    when none starts there -- the end of the statement, typically."""
+    for token in report.tokens:
+        if token.offset == offset and not token.is_trivia():
+            return TextSpan(offset, offset + len(token.text))
+    return TextSpan(offset, offset)
+
+
+def _name_span(report: RelevanceAnalysis, reference: Reference) -> TextSpan:
+    """Where ``reference``'s name is written, without its index argument.
+
+    A reference's own span takes in the argument -- ``bogus "x"`` -- but the
+    name is what a name rule is about. The name ends with its last word
+    before the argument, which tokens say exactly, wherever comments or
+    parentheses sit.
+    """
+    span = reference.span
+    if reference.index is None:
+        return TextSpan(span.start, span.end)
+    stop = reference.index.span.start
+    end = max(
+        (
+            token.offset + len(token.text)
+            for token in report.tokens
+            if token.kind is TokenKind.WORD and span.start <= token.offset < stop
+        ),
+        default=span.end,
+    )
+    return TextSpan(span.start, end)
+
+
 def lint_analysis(
     report: RelevanceAnalysis,
     config: LintConfig,
@@ -1197,6 +1275,7 @@ def lint_analysis(
         line: int,
         suggestions: tuple[str, ...] = (),
         autofix: AutofixResult | None = None,
+        spans: tuple[TextSpan, ...] = (),
     ) -> None:
         finding = _finding(
             config,
@@ -1207,19 +1286,36 @@ def lint_analysis(
             site=site,
             suggestions=suggestions,
             autofix=autofix,
+            spans=spans,
         )
         if finding is not None:
             findings.append(finding)
 
     if report.parse_error is not None:
         error = report.parse_error
-        emit("parse-error", f"col {error.column}: {error.message}", error.line)
+        emit(
+            "parse-error",
+            f"col {error.column}: {error.message}",
+            error.line,
+            spans=(_parse_error_span(report, error.offset),),
+        )
 
     for token in report.error_tokens:
-        emit("error-token", f"unlexable text {token.text!r}", token.line)
+        emit(
+            "error-token",
+            f"unlexable text {token.text!r}",
+            token.line,
+            spans=(TextSpan(token.offset, token.offset + len(token.text)),),
+        )
 
     for binding in report.unbound_its:
-        emit("unbound-it", "`it` used with no context to bind to", binding.it.span.line)
+        span = binding.it.span
+        emit(
+            "unbound-it",
+            "`it` used with no context to bind to",
+            span.line,
+            spans=(TextSpan(span.start, span.end),),
+        )
 
     if report.check is not None:
         # Worked out once for the site, and only when something could use it.
@@ -1242,6 +1338,7 @@ def lint_analysis(
                 _with_fix(diagnostic, applied),
                 diagnostic.span.line,
                 autofix=site_fix if applied else None,
+                spans=(TextSpan(diagnostic.span.start, diagnostic.span.end),),
             )
 
     # Statement-level, like `unknown-inspector` below: the mismatch is between
@@ -1275,19 +1372,20 @@ def lint_analysis(
     # keyword, the `run` in a longer inspector phrase is not.
     # One finding per word, on the line of its first use. The parser has
     # already lowercased the phrase, so `ElseIf` matches too.
-    keyword_lines: dict[str, int] = {}
+    keyword_uses: dict[str, Reference] = {}
     for entry in report.references:
         word = entry.reference.phrase
         if word in ACTIONSCRIPT_KEYWORDS:
-            keyword_lines.setdefault(word, entry.reference.span.line)
-    for word, line in keyword_lines.items():
+            keyword_uses.setdefault(word, entry.reference)
+    for word, reference in keyword_uses.items():
         emit(
             "actionscript-keyword",
             f"ActionScript keyword `{word}` inside a relevance expression",
-            line,
+            reference.span.line,
+            spans=(_name_span(report, reference),),
         )
 
-    unknown = tuple(name for name in report.unknown_references if name not in keyword_lines)
+    unknown = tuple(name for name in report.unknown_references if name not in keyword_uses)
     if unknown:
         names = ", ".join(f"`{name}`" for name in unknown)
         message = f"no dump defines {names}"
@@ -1314,7 +1412,15 @@ def lint_analysis(
         # statement's first line -- relative line 1, which `emit` offsets by
         # `base_line`. Passing `base_line` itself here double-counted the
         # offset for extracted sites (line 15 of an 11-line file).
-        emit("unknown-inspector", message, 1, leads)
+        # Every use of every name, in source order: one finding still (the
+        # hook counts findings), but an editor underlines each use.
+        unknown_set = set(unknown)
+        uses = tuple(
+            _name_span(report, entry.reference)
+            for entry in report.references
+            if entry.reference.phrase in unknown_set
+        )
+        emit("unknown-inspector", message, 1, leads, spans=uses)
 
     if config.max_score is not None and report.complexity.score > config.max_score:
         detail = _complexity_detail(report)
