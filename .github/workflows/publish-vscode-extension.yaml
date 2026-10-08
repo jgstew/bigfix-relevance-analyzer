@@ -1,0 +1,139 @@
+---
+name: Publish VS Code Extension
+
+# Publishes "BigFix Relevance Developer" to the Visual Studio Marketplace.
+#
+# Publishes the .vsix attached to a PUBLISHED GitHub release, checked against
+# that release's SHA256SUMS.txt, rather than packaging a new one: the
+# Marketplace gets the same bytes as the release, and nothing is built in the
+# job that holds the publishing credential.
+#
+# Authentication is Microsoft Entra ID through GitHub OIDC (azure/login, then
+# vsce --azure-credential): no long-lived PAT is stored anywhere. The Azure
+# app registration's federated credential trusts this repository's
+# `vscode-ext-publisher` environment, and AZURE_CLIENT_ID / AZURE_TENANT_ID
+# are variables of that environment. resolve-marketplace-identity.yaml prints
+# the identity ID that has to be added as a member of the Marketplace
+# publisher.
+#
+# Callers:
+#   * tag_and_release.yaml, after `finalize` publishes the release
+#   * workflow_dispatch, to (re)publish an existing release by hand -- for
+#     example if the release's own run failed here. --skip-duplicate makes
+#     publishing a version the Marketplace already has a no-op.
+#
+# Every step runs on every call except the last: the actual `vsce publish` is
+# inert until the repository variable VSCE_PUBLISH is set to `true`. Until
+# then a run is a dry run that still proves the release download, the Entra ID
+# login, and the publisher membership (`vsce verify-pat`).
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Release version to publish, without the leading v"
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to publish, without the leading v (e.g. 1.2.3)"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to the Marketplace
+    runs-on: ubuntu-latest
+    # Holds AZURE_CLIENT_ID / AZURE_TENANT_ID, and is the subject the Azure
+    # federated credential trusts. Any protection rules on it (required
+    # reviewer, branch restriction) gate this job.
+    environment: vscode-ext-publisher
+    permissions:
+      # contents: read - download the release's assets
+      # id-token: write - the OIDC token azure/login exchanges for Entra ID
+      contents: read
+      id-token: write
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - name: Check the version input
+        run: |
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-]?[0-9A-Za-z.]+)?$'; then
+            echo "::error::unexpected version: '$VERSION' (expected e.g. 1.2.3, no leading v)"
+            exit 1
+          fi
+
+      # The tag, not the triggering ref: vsce comes from the lockfile the
+      # release was built from, whichever ref a manual run starts on.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/v${{ inputs.version }}
+          persist-credentials: false
+
+      # Node 22: @vscode/vsce 4 requires it. No `cache:` on purpose -- a
+      # publishing job should not restore anything another run could have
+      # written.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+
+      # Installs the vsce pinned in package-lock.json, instead of `npx` pulling
+      # whatever @vscode/vsce is newest at publish time.
+      - name: npm ci
+        working-directory: tools/vscode-extension/componentize-py
+        run: npm ci
+
+      # A draft release has no tag and is not downloadable, so this also
+      # confirms the release really was published.
+      - name: Download the release's .vsix and checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/release"
+          gh release download "v${VERSION}" --repo "$GITHUB_REPOSITORY" \
+            --dir "${RUNNER_TEMP}/release" \
+            --pattern bigfix-relevance-developer.vsix \
+            --pattern SHA256SUMS.txt
+          cd "${RUNNER_TEMP}/release"
+          sha256sum -c --ignore-missing --strict SHA256SUMS.txt
+          echo "VSIX=${RUNNER_TEMP}/release/bigfix-relevance-developer.vsix" >> "$GITHUB_ENV"
+
+      # The manifest inside the .vsix is what the Marketplace reads, so take
+      # the publisher from there and make sure its version is the release's.
+      - name: Read the .vsix manifest
+        run: |
+          unzip -p "$VSIX" extension/package.json > "${RUNNER_TEMP}/manifest.json"
+          vsix_version="$(jq -er .version "${RUNNER_TEMP}/manifest.json")"
+          publisher="$(jq -er .publisher "${RUNNER_TEMP}/manifest.json")"
+          if [ "$vsix_version" != "$VERSION" ]; then
+            echo "::error::the .vsix is version $vsix_version, the release is $VERSION"
+            exit 1
+          fi
+          echo "PUBLISHER=$publisher" >> "$GITHUB_ENV"
+          echo "publisher: $publisher, version: $vsix_version"
+
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      # Fails fast, with a clearer message than a rejected upload, when the
+      # identity is not (or no longer) a member of the publisher.
+      - name: Verify publish rights
+        working-directory: tools/vscode-extension/componentize-py
+        run: npx --no-install vsce verify-pat --azure-credential "$PUBLISHER"
+
+      - name: Publish
+        if: vars.VSCE_PUBLISH == 'true'
+        working-directory: tools/vscode-extension/componentize-py
+        run: npx --no-install vsce publish --azure-credential --skip-duplicate --packagePath "$VSIX"
+
+      - name: Note the skipped publish
+        if: vars.VSCE_PUBLISH != 'true'
+        run: |
+          echo "::notice::VSCE_PUBLISH is not 'true': verified $PUBLISHER can publish v$VERSION, but did not publish it"

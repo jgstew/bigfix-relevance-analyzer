@@ -2,7 +2,8 @@
 # Tags and releases on a version bump. Nothing here bumps the version: the flow
 # is to change `[project] version` in pyproject.toml in a PR, merge it to main,
 # and this workflow does the rest (tag, build, checksums, GitHub Release, and -
-# once deliberately enabled, see the publish step - PyPI).
+# once deliberately enabled - PyPI, see the publish step, and the VS Code
+# Marketplace, see the `marketplace` job).
 name: Tag and Release
 
 on:
@@ -17,6 +18,7 @@ on:
       - ".github/workflows/test.yaml"
       - ".github/workflows/wasm-html.yaml"
       - ".github/workflows/vscode-extension.yaml"
+      - ".github/workflows/publish-vscode-extension.yaml"
   # a re-run path for when a release run failed after the version was already
   # merged; the tag check below still makes it a no-op if the tag exists
   workflow_dispatch:
@@ -362,3 +364,28 @@ jobs:
           gh release edit "v${VERSION}" --repo "$GITHUB_REPOSITORY" \
             --notes-file "${NOTES_FILE}" \
             --draft=false
+
+  # Publishes the released .vsix to the VS Code Marketplace. After `finalize`
+  # on purpose, unlike PyPI: the Marketplace never accepts a version twice, so
+  # it gets the extension only once the release it came from is public, and
+  # publish-vscode-extension.yaml takes the .vsix from that published release
+  # (verified against its SHA256SUMS.txt).
+  #
+  # Runs on every release, but only its final `vsce publish` step is gated, on
+  # the repository variable VSCE_PUBLISH being `true`. Until then each release
+  # still exercises everything up to that step (the release download and
+  # checksum, Entra ID login, and `vsce verify-pat`), so the setup is proven
+  # before anything goes to the Marketplace. If this job fails, the release is
+  # already published; re-run it with "Re-run failed jobs", or run
+  # publish-vscode-extension.yaml by hand with the version.
+  marketplace:
+    name: Publish VS Code extension
+    needs: [version, finalize]
+    permissions:
+      # a called workflow gets at most what its caller job grants; id-token is
+      # for the Entra ID (azure/login) OIDC exchange
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/publish-vscode-extension.yaml # zizmor: ignore[self-repository]
+    with:
+      version: ${{ needs.version.outputs.version }}
