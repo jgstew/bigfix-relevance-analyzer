@@ -9,10 +9,15 @@ things.
 from __future__ import annotations
 
 import importlib.util
+import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
+from typing import Any
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -44,6 +49,62 @@ def write(directory: Path, name: str, text: str) -> Path:
     path = directory / name
     path.write_text(text)
     return path
+
+
+def golden_text(path: Path, actual: str) -> str:
+    """The pinned contents of the golden file ``path``, to compare ``actual`` with.
+
+    With ``UPDATE_GOLDEN`` set in the environment, ``actual`` is written to
+    ``path`` instead and the test fails, so a regeneration is never mistaken
+    for a pass: review the diff, then rerun without it. Every golden in the
+    suite goes through here, so regenerating one works like regenerating any.
+    """
+    if os.environ.get("UPDATE_GOLDEN"):
+        path.write_text(actual, encoding="utf-8")
+        pytest.fail(f"{path.name} rewritten -- review the diff, then rerun without UPDATE_GOLDEN")
+    assert path.is_file(), f"missing {path}; regenerate with UPDATE_GOLDEN=1"
+    return path.read_text(encoding="utf-8")
+
+
+Position = tuple[int, int]
+"""An LSP position, ``(line, character)``: 0-based, the character in UTF-16 units."""
+
+
+def lsp_lines(buffer: str) -> tuple[list[str], list[str]]:
+    """``buffer``'s lines and the breaks after them, split only where LSP splits:
+    ``\r\n``, ``\r`` and ``\n``, unlike :meth:`str.splitlines`."""
+    pieces = re.split(r"(\r\n|\r|\n)", buffer)
+    return pieces[0::2], pieces[1::2]
+
+
+def _code_point_index(line: str, character: int) -> int:
+    """Where UTF-16 offset ``character`` falls in ``line``, in code points."""
+    units = 0
+    for index, char in enumerate(line):
+        if units == character:
+            return index
+        assert units < character, f"character {character} is inside a surrogate pair"
+        units += 2 if ord(char) > 0xFFFF else 1
+    assert units == character, f"character {character} is past the end of {line!r}"
+    return len(line)
+
+
+def lsp_text(buffer: str, start: Position, end: Position) -> str:
+    """What ``buffer`` holds between two LSP positions, line breaks as written."""
+    lines, breaks = lsp_lines(buffer)
+    (start_line, start_char), (end_line, end_char) = start, end
+    first = _code_point_index(lines[start_line], start_char)
+    last = _code_point_index(lines[end_line], end_char)
+    if start_line == end_line:
+        return lines[start_line][first:last]
+    middle = "".join(lines[i] + breaks[i] for i in range(start_line + 1, end_line))
+    return lines[start_line][first:] + breaks[start_line] + middle + lines[end_line][:last]
+
+
+def diagnostic_text(buffer: str, diagnostic: dict[str, Any]) -> str:
+    """What ``buffer`` holds over an LSP diagnostic's range."""
+    start, end = diagnostic["range"]["start"], diagnostic["range"]["end"]
+    return lsp_text(buffer, (start["line"], start["character"]), (end["line"], end["character"]))
 
 
 def load_tool(path: Path, name: str) -> ModuleType:

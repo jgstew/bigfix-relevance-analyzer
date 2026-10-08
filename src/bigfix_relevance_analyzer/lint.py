@@ -691,8 +691,15 @@ class TextSpan:
     start: int
     end: int
 
-    def to_dict(self) -> dict[str, int]:
-        return {"start": self.start, "end": self.end}
+    message: str | None = None
+    """What to say about this span alone, when the finding's own message covers
+    several. Only ``unknown-inspector`` sets it: one span per use of each
+    unknown name, each saying which name and offering that name's leads, where
+    the finding's message lists every name and all their leads together.
+    ``None`` means the finding's message is the one to show."""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"start": self.start, "end": self.end, "message": self.message}
 
 
 @dataclass(frozen=True, slots=True)
@@ -1219,6 +1226,18 @@ def _non_renderable_substitution(
     return f"{site.context} substitutes {rendered}, which has no string representation to embed"
 
 
+def _unknown_message(names: tuple[str, ...], leads: tuple[str, ...]) -> str:
+    """``unknown-inspector``'s wording, for a statement's names or for one of them."""
+    message = "no dump defines " + ", ".join(f"`{name}`" for name in names)
+    if not leads:
+        return message
+    quoted = [f"`{lead}`" for lead in leads]
+    # "a, b or c" rather than "a or b or c" -- three `or`s in one clause reads
+    # as a parser bug rather than a list.
+    offered = quoted[0] if len(quoted) == 1 else f"{', '.join(quoted[:-1])} or {quoted[-1]}"
+    return f"{message} -- did you mean {offered}?"
+
+
 def _parse_error_span(report: RelevanceAnalysis, offset: int) -> TextSpan:
     """The token a parse error points at, or the empty span at ``offset``
     when none starts there -- the end of the statement, typically."""
@@ -1387,40 +1406,32 @@ def lint_analysis(
 
     unknown = tuple(name for name in report.unknown_references if name not in keyword_uses)
     if unknown:
-        names = ", ".join(f"`{name}`" for name in unknown)
-        message = f"no dump defines {names}"
         # Imported here rather than at module scope: `inspectors` is only needed
         # on this one opt-in branch, and `lint` is otherwise reachable without
         # paying for the search index at all.
-        leads: tuple[str, ...] = ()
+        name_leads: dict[str, tuple[str, ...]] = dict.fromkeys(unknown, ())
         if config.suggest:
             from bigfix_relevance_analyzer.inspectors import suggest as _suggest
 
             dialect = config.dialect or (report.dialect if not report.dialect_assumed else None)
-            leads = tuple(
-                dict.fromkeys(lead for name in unknown for lead in _suggest(name, dialect=dialect))
-            )
-            if leads:
-                quoted = [f"`{lead}`" for lead in leads]
-                # "a, b or c" rather than "a or b or c" -- three `or`s in one
-                # clause reads as a parser bug rather than a list.
-                offered = (
-                    quoted[0] if len(quoted) == 1 else f"{', '.join(quoted[:-1])} or {quoted[-1]}"
-                )
-                message = f"{message} -- did you mean {offered}?"
-        # Statement-level findings carry no span, so they land on the
-        # statement's first line -- relative line 1, which `emit` offsets by
-        # `base_line`. Passing `base_line` itself here double-counted the
-        # offset for extracted sites (line 15 of an 11-line file).
+            name_leads = {name: _suggest(name, dialect=dialect) for name in unknown}
+        leads = tuple(dict.fromkeys(lead for name in unknown for lead in name_leads[name]))
         # Every use of every name, in source order: one finding still (the
-        # hook counts findings), but an editor underlines each use.
-        unknown_set = set(unknown)
-        uses = tuple(
-            _name_span(report, entry.reference)
-            for entry in report.references
-            if entry.reference.phrase in unknown_set
-        )
-        emit("unknown-inspector", message, 1, leads, spans=uses)
+        # hook counts findings), but an editor underlines each use, and each
+        # span carries the message for its own name and its own leads, so a
+        # consumer never has to take the finding's message apart.
+        uses: list[TextSpan] = []
+        for entry in report.references:
+            phrase = entry.reference.phrase
+            if phrase in name_leads:
+                written = _name_span(report, entry.reference)
+                message = _unknown_message((phrase,), name_leads[phrase])
+                uses.append(TextSpan(written.start, written.end, message))
+        # The finding itself is statement-level for its line: relative line 1,
+        # which `emit` offsets by `base_line`. Passing `base_line` itself here
+        # double-counted the offset for extracted sites (line 15 of an 11-line
+        # file).
+        emit("unknown-inspector", _unknown_message(unknown, leads), 1, leads, spans=tuple(uses))
 
     if config.max_score is not None and report.complexity.score > config.max_score:
         detail = _complexity_detail(report)
@@ -1625,7 +1636,10 @@ def lint_text(text: str, config: LintConfig) -> tuple[Finding, ...]:
 
     Analysed in ``config.dialect`` when one is forced (classified otherwise)
     and ``config.platform``, through the same cache a file's sites use.
-    Findings carry no path; their lines are relative to ``text``.
+    Findings carry no path. What is analysed is ``text.strip()``, and both
+    positions are relative to that: lines count from its first line, and
+    :attr:`Finding.spans` are offsets into it -- so for an indented or
+    blank-led ``text``, index ``text.strip()``, not ``text``.
     """
     return lint_analysis(_analyze_text(text, config), config)
 

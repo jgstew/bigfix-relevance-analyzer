@@ -57,7 +57,8 @@ def line_of(text: str, offset: int) -> int:
 def test_a_text_span_is_a_frozen_start_and_end() -> None:
     span = TextSpan(3, 7)
     assert (span.start, span.end) == (3, 7)
-    assert [field.name for field in dataclasses.fields(TextSpan)] == ["start", "end"]
+    assert [field.name for field in dataclasses.fields(TextSpan)] == ["start", "end", "message"]
+    assert span.message is None
     with pytest.raises(dataclasses.FrozenInstanceError):
         span.start = 1  # type: ignore[misc]
 
@@ -189,9 +190,43 @@ def test_unknown_inspector_stays_one_finding_with_a_span_per_use() -> None:
     assert [span.start for span in finding.spans] == sorted(span.start for span in finding.spans)
 
 
+def test_each_unknown_use_carries_a_message_for_its_own_name() -> None:
+    """Worded in lint, not re-derived by a consumer from the finding's message."""
+    text = "exists bogus one whose (exists bogus two) and exists bogus one"
+    finding = only(lint_text(text, LintConfig()), "unknown-inspector")
+    assert [span.message for span in finding.spans] == [
+        "no dump defines `bogus one`",
+        "no dump defines `bogus two`",
+        "no dump defines `bogus one`",
+    ]
+
+
+def test_each_unknown_use_offers_only_its_own_leads() -> None:
+    text = "exists oprating system and exists bogus two"
+    finding = only(lint_text(text, LintConfig(suggest=True)), "unknown-inspector")
+    typo, bogus = (span.message for span in finding.spans)
+    assert typo is not None and bogus is not None
+    assert typo.startswith("no dump defines `oprating system` -- did you mean `operating system`")
+    assert bogus == "no dump defines `bogus two`"
+
+
+def test_one_unknown_name_has_the_findings_own_message() -> None:
+    for config in (LintConfig(), LintConfig(suggest=True)):
+        finding = only(lint_text("exists oprating system", config), "unknown-inspector")
+        assert [span.message for span in finding.spans] == [finding.message]
+
+
+def test_spans_of_other_rules_have_no_message_of_their_own() -> None:
+    for finding in lint_text(
+        'exists file "x" whose (size of it = "big") or ' + BROKEN, LintConfig()
+    ):
+        assert finding.spans
+        assert all(span.message is None for span in finding.spans), finding.code
+
+
 def test_unknown_inspector_with_one_name() -> None:
     finding = only(lint_text(f"exists {UNKNOWN_INSPECTOR}", LintConfig()), "unknown-inspector")
-    assert finding.spans == (TextSpan(7, 7 + len(UNKNOWN_INSPECTOR)),)
+    assert [(span.start, span.end) for span in finding.spans] == [(7, 7 + len(UNKNOWN_INSPECTOR))]
 
 
 @pytest.mark.parametrize(
@@ -284,7 +319,7 @@ def test_to_dict_adds_spans_and_keeps_every_other_key() -> None:
         "text",
         "spans",
     ]
-    assert payload["spans"] == [{"start": 12, "end": 25}]
+    assert payload["spans"] == [{"start": 12, "end": 25, "message": None}]
     assert payload["text"] == str(finding)
 
 

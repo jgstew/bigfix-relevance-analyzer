@@ -17,7 +17,16 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from _helpers import BES_EXAMPLE, BROKEN, CLIENT, UNKNOWN_INSPECTOR, run_fresh_python, write
+from _helpers import (
+    BES_EXAMPLE,
+    BROKEN,
+    CLIENT,
+    UNKNOWN_INSPECTOR,
+    diagnostic_text,
+    lsp_lines,
+    run_fresh_python,
+    write,
+)
 
 from bigfix_relevance_analyzer.lint import LintConfig, Severity, lint_file, lint_text
 from bigfix_relevance_analyzer.lsp.linter import (
@@ -39,15 +48,7 @@ def span_range(line: int, start: int, end_line: int, end: int) -> dict[str, Any]
 
 
 def whole_line(text: str, line: int) -> dict[str, Any]:
-    return span_range(line, 0, line, len(text.splitlines()[line]))
-
-
-def underlined(text: str, diagnostic: dict[str, Any]) -> str:
-    """The text a single-line diagnostic covers (no astral characters in these)."""
-    start: dict[str, int] = diagnostic["range"]["start"]
-    end: dict[str, int] = diagnostic["range"]["end"]
-    assert start["line"] == end["line"]
-    return text.splitlines()[start["line"]][start["character"] : end["character"]]
+    return span_range(line, 0, line, len(lsp_lines(text)[0][line]))
 
 
 def as_lint(found: list[dict[str, Any]]) -> list[tuple[str, str, int]]:
@@ -284,7 +285,7 @@ BES_TYPE_ERROR = (
 def test_a_bes_type_error_covers_the_comparison_only() -> None:
     (diagnostic,) = DocumentLinter().diagnostics("file:///w/a.bes", BES_TYPE_ERROR)
     assert diagnostic["code"] == "type-error"
-    assert underlined(BES_TYPE_ERROR, diagnostic) == 'size of it = "big"'
+    assert diagnostic_text(BES_TYPE_ERROR, diagnostic) == 'size of it = "big"'
     assert diagnostic["range"]["start"]["line"] == 3
 
 
@@ -300,7 +301,7 @@ def test_unknown_inspector_gets_one_diagnostic_per_name() -> None:
     config = LintConfig(suggest=False)
     found = DocumentLinter(config=config).diagnostics("file:///w/a.rel", text)
     assert [d["code"] for d in found] == ["unknown-inspector", "unknown-inspector"]
-    assert [underlined(text, d) for d in found] == ["bogus one", "bogus two"]
+    assert [diagnostic_text(text, d) for d in found] == ["bogus one", "bogus two"]
     # Each one names its own name: with no "did you mean" to attribute, the
     # message is tailored to it.
     assert [d["message"] for d in found] == [
@@ -315,20 +316,19 @@ def test_unknown_inspector_gets_one_diagnostic_per_name() -> None:
 def test_every_use_of_an_unknown_name_is_underlined() -> None:
     text = "exists bogus one and exists bogus one"
     found = DocumentLinter(config=LintConfig()).diagnostics("file:///w/a.rel", text)
-    assert [underlined(text, d) for d in found] == ["bogus one", "bogus one"]
+    assert [diagnostic_text(text, d) for d in found] == ["bogus one", "bogus one"]
     assert found[0]["range"] != found[1]["range"]
 
 
-def test_an_unknown_name_with_suggestions_keeps_the_findings_message() -> None:
-    """The "did you mean" leads are the finding's, for all its names together;
-    tailoring the message to one name would misattribute them, so it is kept."""
+def test_each_unknown_name_gets_only_its_own_leads() -> None:
+    """Leads are worked out per name, so each diagnostic offers its own."""
     text = "exists oprating system and exists bogus two"
     linter = DocumentLinter()
     found = linter.diagnostics("file:///w/a.rel", text)
-    (finding,) = lint_text(text, linter.config)
-    assert finding.suggestions, "no lead for the typo; pick another"
-    assert [underlined(text, d) for d in found] == ["oprating system", "bogus two"]
-    assert {d["message"] for d in found} == {finding.message}
+    assert [diagnostic_text(text, d) for d in found] == ["oprating system", "bogus two"]
+    assert "did you mean `operating system`" in found[0]["message"]
+    assert "`bogus two`" not in found[0]["message"]
+    assert found[1]["message"] == "no dump defines `bogus two`"
 
 
 def test_one_unknown_name_with_suggestions_keeps_the_findings_message() -> None:
@@ -338,7 +338,7 @@ def test_one_unknown_name_with_suggestions_keeps_the_findings_message() -> None:
     (finding,) = lint_text(text, linter.config)
     assert "did you mean" in diagnostic["message"]
     assert diagnostic["message"] == finding.message
-    assert underlined(text, diagnostic) == "oprating system"
+    assert diagnostic_text(text, diagnostic) == "oprating system"
 
 
 def test_a_statement_level_finding_still_covers_its_line() -> None:
@@ -382,7 +382,7 @@ def test_a_cached_site_that_moved_sideways_keeps_its_range_right() -> None:
     text = "<div><p>moved <?Relevance exists bogus thing ?></p></div>"
     (diagnostic,) = linter.diagnostics("file:///w/a.ojo", text)
     assert linter.cache_stats().hits == 1
-    assert underlined(text, diagnostic) == "bogus thing"
+    assert diagnostic_text(text, diagnostic) == "bogus thing"
 
 
 def test_diagnostics_stay_in_finding_order_then_span_order() -> None:
