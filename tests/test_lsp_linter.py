@@ -203,3 +203,38 @@ def test_an_oversized_document_is_never_split_into_lines(monkeypatch: pytest.Mon
     (diagnostic,) = DocumentLinter(max_document_bytes=10).diagnostics("file:///w/a.rel", BROKEN)
     assert diagnostic["code"] == DOCUMENT_TOO_LARGE
     assert DocumentLinter().diagnostics("file:///w/a.rel", CLIENT) == []
+
+
+# ---------------------------------------------------------------------------
+# Buffers identified by language rather than by file name
+# ---------------------------------------------------------------------------
+
+
+def test_an_untitled_relevance_buffer_is_linted_as_whole_file_relevance() -> None:
+    from bigfix_relevance_analyzer.lsp.linter import LANGUAGE_ID
+
+    found = DocumentLinter().diagnostics("untitled:Untitled-1", BROKEN, language_id=LANGUAGE_ID)
+    assert "error-token" in {d["code"] for d in found}
+
+
+def test_an_untitled_buffer_of_another_language_is_not_linted() -> None:
+    assert (
+        DocumentLinter().diagnostics("untitled:Untitled-1", BROKEN, language_id="plaintext") == []
+    )
+    assert DocumentLinter().diagnostics("untitled:Untitled-1", BROKEN) == []
+
+
+def test_a_file_switched_to_the_relevance_language_is_linted(tmp_path: Path) -> None:
+    from bigfix_relevance_analyzer.lsp.linter import LANGUAGE_ID
+
+    found = DocumentLinter().diagnostics("file:///w/notes.txt", BROKEN, language_id=LANGUAGE_ID)
+    assert found
+    assert as_lint(found) == lint_expected(write(tmp_path, "notes.rel", BROKEN))
+
+
+def test_a_recognized_suffix_wins_over_the_language() -> None:
+    """A .md stays markdown: only its relevance fences are linted, not the prose."""
+    from bigfix_relevance_analyzer.lsp.linter import LANGUAGE_ID
+
+    prose = "# Notes\n\nnot relevance at all\n"
+    assert DocumentLinter().diagnostics("file:///w/doc.md", prose, language_id=LANGUAGE_ID) == []

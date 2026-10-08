@@ -82,7 +82,12 @@ try {
       vscodeExecutablePath: code,
       extensionDevelopmentPath: EXTENSION,
       extensionTestsPath: join(HERE, "suite.js"),
-      extensionTestsEnv: { SMOKE_RESULT: result },
+      // An extension that contributes the relevance language also gets an
+      // untitled buffer in it, which needs that language to reach the server.
+      extensionTestsEnv: {
+        SMOKE_RESULT: result,
+        SMOKE_UNTITLED_LANGUAGE: manifest.contributes.languages?.[0]?.id ?? "",
+      },
       // A throwaway profile per run, rather than test-electron's default of
       // one shared under the cache directory.
       launchArgs: [

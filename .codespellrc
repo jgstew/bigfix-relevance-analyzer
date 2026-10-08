@@ -15,7 +15,11 @@
 # returns nothing for an unknown name rather than "correcting" it. codespell's
 # dictionary maps oprating->operating unambiguously, so it needs an explicit
 # override; _typos.toml carries the matching entry for "wnidows".
-ignore-words-list = thead,theads,oprating,wnidows,wit
+#
+# "notIn" is a key of VS Code's language-configuration.json schema
+# (autoClosingPairs[].notIn: where a pair should not auto-close), used in
+# tools/vscode-extension/componentize-py/language-configuration.json.
+ignore-words-list = thead,theads,oprating,wnidows,wit,notin
 
 # tests/examples/ holds real-world BigFix content copied verbatim from
 # https://github.com/jgstew/bigfix-content for fidelity (see its README), plus

@@ -616,3 +616,18 @@ def test_run_answers_absurdly_nested_json_with_a_parse_error_and_carries_on() ->
     assert initialized["id"] == 1
     assert refused["error"]["code"] == -32700
     assert shut_down == {"jsonrpc": "2.0", "id": 2, "result": None}
+
+
+def test_an_untitled_relevance_buffer_gets_diagnostics() -> None:
+    """The client says what the buffer is in `languageId`; with no file name
+    to go on, that is what the server uses."""
+    server = started()
+    document = {
+        "uri": "untitled:Untitled-1",
+        "languageId": "bigfix-relevance",
+        "version": 1,
+        "text": BROKEN,
+    }
+    (published,) = server.handle(notification("textDocument/didOpen", {"textDocument": document}))
+    assert published["params"]["uri"] == "untitled:Untitled-1"
+    assert published["params"]["diagnostics"]

@@ -25,6 +25,10 @@ const manifest = require("./package.json");
 const documentPatterns = require("./document-patterns.json");
 
 const PREFIX = manifest.settingsPrefix;
+// The language this extension contributes for whole-file relevance (.rel, .bsr).
+// The server lints a buffer in it even with no file name: see LANGUAGE_ID in
+// src/bigfix_relevance_analyzer/lsp/linter.py.
+const LANGUAGE_ID = manifest.contributes.languages[0].id;
 const NAME = manifest.displayName;
 const SERVER = path.join(__dirname, "server.js");
 const COMPONENT = path.join(__dirname, "dist", "component", "lsp.js");
@@ -37,9 +41,13 @@ function createClient() {
   const server = { module: SERVER, transport: TransportKind.ipc };
   const serverOptions = { run: server, debug: server };
   const clientOptions = {
-    // `file` only: the server picks the file type from the URI's suffix, so an
-    // unsaved `untitled:` buffer has nothing for it to go on yet.
-    documentSelector: documentPatterns.map((pattern) => ({ scheme: "file", pattern })),
+    // Files by suffix, plus any buffer in the relevance language whatever its
+    // scheme: that is what brings an unsaved `untitled:` buffer to the server,
+    // which then lints it by its languageId.
+    documentSelector: [
+      ...documentPatterns.map((pattern) => ({ scheme: "file", pattern })),
+      { language: LANGUAGE_ID },
+    ],
     initializationOptions: { maxDocumentBytes: config.get("maxDocumentBytes") },
   };
   return new LanguageClient(PREFIX, NAME, serverOptions, clientOptions);
