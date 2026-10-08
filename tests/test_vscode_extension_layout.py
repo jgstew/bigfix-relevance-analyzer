@@ -19,6 +19,7 @@ Pure and cheap, like ``test_playground_layout.py``: paths and text, never a buil
 
 from __future__ import annotations
 
+import inspect
 import json
 import re
 import shutil
@@ -347,3 +348,57 @@ def test_the_workflow_runs_only_when_an_input_of_the_extension_changes() -> None
         assert path in text, path
     assert "paths: *inputs" in text
     assert "workflow_dispatch:" in text
+
+
+# ---------------------------------------------------------------------------
+# Releases: tag_and_release.yaml attaches the .vsix, built from the release's wheel
+# ---------------------------------------------------------------------------
+
+RELEASE = REPO_ROOT / ".github" / "workflows" / "tag_and_release.yaml"
+
+
+def test_the_build_can_take_a_given_wheel(tmp_path: Path) -> None:
+    """A release builds from the wheel it publishes, not from a rebuild of the tree."""
+    build = load_tool(PRIMARY / "build-component" / "build_component.py", "_build_component")
+    assert inspect.signature(build.build).parameters["wheel"].default is None
+    with pytest.raises(SystemExit, match=r"missing\.whl"):
+        build.main(["--wheel", str(tmp_path / "missing.whl")])
+
+
+def test_the_build_checks_the_component_against_the_wheels_version() -> None:
+    build = load_tool(PRIMARY / "build-component" / "build_component.py", "_build_component")
+    wheel = Path("dist/bigfix_relevance_analyzer-1.19.0-py3-none-any.whl")
+    assert build.wheel_version(wheel) == "1.19.0"
+
+
+def test_the_workflow_is_callable_for_a_release() -> None:
+    """Same shape as wasm-html.yaml: the release hands over its dist/ as an artifact."""
+    text = WORKFLOW.read_text("utf-8")
+    assert "workflow_call:" in text
+    assert "release_artifact:" in text
+    assert "sha256sum -c SHA256SUMS.txt" in text
+    assert "--wheel" in text
+    # Under workflow_call, github.workflow is the caller's name, so a release run
+    # and this workflow's own push-to-main run cannot cancel each other.
+    assert "group: vscode-extension-${{ github.workflow }}-${{ github.ref }}" in text
+
+
+def test_a_release_runs_only_the_quick_unit_tests() -> None:
+    """The headless VS Code job would hold up a release; the node tests do not."""
+    text = WORKFLOW.read_text("utf-8")
+    e2e = text[text.index("  e2e:") :]
+    assert "if: inputs.release_artifact == ''" in e2e.split("steps:")[0]
+    package = text[text.index("  package:") : text.index("  e2e:")]
+    assert "if:" not in package.split("steps:")[0], "the package job must run for a release"
+    assert "node --test" in package
+
+
+def test_the_release_attaches_the_vsix() -> None:
+    text = RELEASE.read_text("utf-8")
+    assert "uses: ./.github/workflows/vscode-extension.yaml" in text
+    job = text[text.index("  vscode-extension:") :]
+    assert "release_artifact: release-dist" in job.split("\n\n")[0]
+    finalize = text[text.index("  finalize:") :]
+    assert "vscode-extension" in finalize.split("steps:")[0]
+    assert "name: bigfix-relevance-developer-vsix" in finalize
+    assert "bigfix-relevance-developer.vsix assets/" in finalize
