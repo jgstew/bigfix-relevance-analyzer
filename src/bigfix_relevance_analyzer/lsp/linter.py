@@ -23,9 +23,10 @@ Over the text a finding is about, wherever it has
 maps into the buffer (:mod:`~bigfix_relevance_analyzer.lsp.positions`): one
 diagnostic per span, in finding order, then span order. That is one for most
 findings, and one per use of each unknown name for ``unknown-inspector``,
-which lint reports as a single finding per statement. Each of those names its
-own name in its message, unless the finding offered "did you mean" leads, which
-belong to all its names together and so stay in the finding's message whole.
+which lint reports as a single finding per statement. A span with a message of
+its own (:attr:`~bigfix_relevance_analyzer.lint.TextSpan.message`) shows that
+instead of the finding's: each unknown name's diagnostic names just that name
+and offers just its leads.
 
 Otherwise -- a statement-level rule, an extraction problem, or a span that
 cannot be placed for certain -- the diagnostic covers the finding's whole line,
@@ -85,7 +86,6 @@ from bigfix_relevance_analyzer.lint import (
     Finding,
     LintConfig,
     Severity,
-    TextSpan,
     _judge_site,
     _lint_data,
 )
@@ -277,31 +277,15 @@ def _diagnostics(index: DocumentIndex, finding: Finding) -> list[Diagnostic]:
     site = finding.site
     if site is not None and finding.spans:
         ranges = [index.site_range(site, span) for span in finding.spans]
-        if all(found is not None for found in ranges):
+        mapped = [found for found in ranges if found is not None]
+        if len(mapped) == len(ranges):
             return [
-                _diagnostic(found, severity, finding.code, _message(finding, site.text, span))
-                for found, span in zip(ranges, finding.spans, strict=True)
-                if found is not None
+                _diagnostic(found, severity, finding.code, span.message or finding.message)
+                for found, span in zip(mapped, finding.spans, strict=True)
             ]
     line = max(finding.line - 1, 0)
     whole = ((line, 0), (line, index.line_length(line)))
     return [_diagnostic(whole, severity, finding.code, finding.message)]
-
-
-def _message(finding: Finding, text: str, span: TextSpan) -> str:
-    """The message for ``span`` of ``finding``: its own, except an
-    ``unknown-inspector`` use, which names just its name when it can.
-
-    Not when the finding has leads -- they are for all its names together --
-    nor when the name as written does not read back as one the message names
-    (a comment inside it, say): the finding's own message is never wrong.
-    """
-    if finding.code != "unknown-inspector" or finding.suggestions:
-        return finding.message
-    name = " ".join(text[span.start : span.end].split()).lower()
-    if f"`{name}`" not in finding.message:
-        return finding.message
-    return f"no dump defines `{name}`"
 
 
 def _diagnostic(found: Range, severity: _DiagnosticSeverity, code: str, message: str) -> Diagnostic:
