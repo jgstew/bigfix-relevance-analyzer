@@ -25,6 +25,7 @@ import re
 import shutil
 import subprocess
 import tomllib
+import zipfile
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
@@ -257,6 +258,45 @@ def test_the_package_leaves_out_build_inputs_but_keeps_the_component() -> None:
             assert pattern.endswith(".d.ts"), f"{pattern} would drop part of the component"
 
 
+def test_the_package_leaves_out_the_native_filesystem_helper() -> None:
+    """One .vsix for every platform: no per-platform native builds inside it.
+
+    npm installs only the build of ``@bytecodealliance/jco-node-fs`` for the
+    machine it runs on, so a .vsix packaged on Linux would carry a Linux binary
+    to Windows and macOS. The shim loads that helper only for a WASI ``advise``
+    call, which the server never makes (issue #96, item 8).
+    """
+    ignored = (PRIMARY / ".vscodeignore").read_text("utf-8").splitlines()
+    assert "node_modules/@bytecodealliance/jco-node-fs-*/**" in ignored
+
+
+def _vsix(path: Path, names: list[str]) -> Path:
+    with zipfile.ZipFile(path, "w") as archive:
+        for name in names:
+            archive.writestr(name, "")
+    return path
+
+
+def test_a_package_holding_a_native_build_is_refused(tmp_path: Path) -> None:
+    build = load_tool(PRIMARY / "build-component" / "build_component.py", "_build_component")
+    native = (
+        "extension/node_modules/@bytecodealliance/"
+        "jco-node-fs-linux-x64-gnu/jco-node-fs.linux-x64-gnu.node"
+    )
+    vsix = _vsix(tmp_path / "native.vsix", ["extension/server.js", native])
+    with pytest.raises(SystemExit, match=re.escape(native)):
+        build.check_portable(vsix)
+
+
+def test_a_package_without_native_builds_passes(tmp_path: Path) -> None:
+    build = load_tool(PRIMARY / "build-component" / "build_component.py", "_build_component")
+    vsix = _vsix(
+        tmp_path / "portable.vsix",
+        ["extension/server.js", "extension/dist/component/lsp.core.wasm"],
+    )
+    build.check_portable(vsix)
+
+
 def test_the_build_copies_the_project_license_into_the_extension(tmp_path: Path) -> None:
     """vsce packages the LICENSE beside package.json. It is copied there at build
     time rather than committed, so there is one license file in the repository."""
@@ -393,6 +433,37 @@ def test_a_release_runs_only_the_quick_unit_tests() -> None:
     assert "node --test" in package
 
 
+def _e2e_job() -> str:
+    text = WORKFLOW.read_text("utf-8")
+    return text[text.index("  e2e:") :]
+
+
+def test_the_e2e_test_runs_on_linux_and_windows() -> None:
+    """The one .vsix is meant for every platform, so it is tested on more than one.
+
+    ``fail-fast: false`` so a failure on one platform still reports the other.
+    """
+    e2e = _e2e_job()
+    assert "runs-on: ${{ matrix.os }}" in e2e
+    assert re.search(r"os: \[ubuntu-latest, windows-latest\]", e2e)
+    assert "fail-fast: false" in e2e
+
+
+def test_the_e2e_test_needs_a_virtual_display_only_on_linux() -> None:
+    """xvfb-run exists only on Linux; Windows runners have a desktop already."""
+    e2e = _e2e_job()
+    assert "xvfb-run" in e2e
+    assert "RUNNER_OS" in e2e
+    assert "shell: bash" in e2e
+
+
+def test_the_e2e_test_unzips_the_vsix_without_unzip() -> None:
+    """``unzip`` is not on every runner; Python's zipfile is."""
+    e2e = _e2e_job()
+    assert "python -m zipfile -e" in e2e
+    assert "unzip -q" not in e2e
+
+
 def test_the_release_attaches_the_vsix() -> None:
     text = RELEASE.read_text("utf-8")
     assert "uses: ./.github/workflows/vscode-extension.yaml" in text
@@ -416,6 +487,8 @@ def test_the_extension_takes_the_version_of_the_wheel_it_was_built_from(
     monkeypatch.setattr(build, "build", lambda wheel=None: (glue, "9.8.7"))
     monkeypatch.setattr(build, "smoke", lambda glue, version: checked.append(version))
     monkeypatch.setattr(build, "_run", lambda argv, label, cwd=None: commands.append(argv))
+    portable: list[Path] = []
+    monkeypatch.setattr(build, "check_portable", portable.append)
     out = tmp_path / "out" / "bigfix-relevance-developer.vsix"
 
     assert build.main(["--package", str(out)]) == 0
@@ -427,6 +500,7 @@ def test_the_extension_takes_the_version_of_the_wheel_it_was_built_from(
         assert flag in vsce
     assert vsce[vsce.index("--out") + 1] == str(out)
     assert out.parent.is_dir(), "vsce does not create the --out directory itself"
+    assert portable == [out], "every packaged .vsix is checked for native builds"
 
 
 def test_the_workflow_packages_through_the_build_script() -> None:

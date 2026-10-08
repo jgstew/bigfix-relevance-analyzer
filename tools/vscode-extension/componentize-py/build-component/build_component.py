@@ -24,7 +24,8 @@ repository's LICENSE beside package.json for vsce to package (gitignored too):
 With ``--package``, it then packages the extension with vsce, versioned as the
 analyzer it contains: the wheel's version is the extension's version, so a
 .vsix always says which analyzer build is inside. The committed package.json
-keeps a placeholder version and is never rewritten.
+keeps a placeholder version and is never rewritten. A .vsix holding a native
+Node addon is refused: it is one package for every platform.
 
 ``uv run --group wasm`` is what puts ``componentize-py`` (pinned in
 pyproject.toml's ``wasm`` group) on ``PATH`` for step 2.
@@ -38,6 +39,7 @@ import json
 import shutil
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -159,6 +161,23 @@ def package(version: str, out: Path) -> None:
         f"vsce package {version}",
         cwd=EXTENSION,
     )
+    check_portable(out)
+
+
+def check_portable(vsix: Path) -> None:
+    """Exit if ``vsix`` holds a native Node addon (``*.node``).
+
+    The extension ships as one .vsix for every platform, and npm installs only
+    the packaging machine's native builds, so any addon inside would work on
+    that platform alone. .vscodeignore leaves out the one native dependency.
+    """
+    with zipfile.ZipFile(vsix) as archive:
+        native = sorted(name for name in archive.namelist() if name.endswith(".node"))
+    if native:
+        raise SystemExit(
+            f"{vsix} holds native builds, so it would not work on every platform; "
+            f"leave them out in .vscodeignore: {', '.join(native)}"
+        )
 
 
 def resolve_wheel(pattern: str) -> Path:

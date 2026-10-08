@@ -13,6 +13,16 @@ dist/wheel/**
 # TypeScript declarations jco emits beside the glue; nothing reads them at runtime.
 dist/component/**/*.d.ts
 
+# The native builds of @bytecodealliance/jco-node-fs, which preview2-shim
+# requires lazily, only to serve a WASI `advise` (fadvise) call. npm installs
+# just the build for the packaging machine, so keeping them would make the one
+# .vsix carry a Linux binary to every platform. The server never makes that
+# call: the unit and VS Code smoke tests pass with the helper replaced by one
+# that fails on load (issue #96, item 8). If it ever did, the call would fail
+# with "cannot find native binding" on every platform alike.
+# build_component.py refuses a .vsix that still holds any .node binary.
+node_modules/@bytecodealliance/jco-node-fs-*/**
+
 # Development only.
 test/**
 .vscode/**
