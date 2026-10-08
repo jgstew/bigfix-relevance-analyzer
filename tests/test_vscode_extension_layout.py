@@ -645,3 +645,45 @@ def test_the_extension_sends_relevance_buffers_whatever_their_scheme() -> None:
     VS Code send an unsaved `untitled:` buffer to the server."""
     text = (PRIMARY / "extension.js").read_text("utf-8")
     assert "{ language: LANGUAGE_ID }" in text
+
+
+# ---------------------------------------------------------------------------
+# What VS Code shows for the extension: README and manifest text
+# ---------------------------------------------------------------------------
+
+# Words that describe how the extension is built, not what it does for a user.
+IMPLEMENTATION_WORDS = ("python", "webassembly", "wasm", "componentize", "proof of concept")
+
+
+def test_the_primary_extension_has_a_readme_that_ships() -> None:
+    """vsce packages the README beside package.json; VS Code shows it as Details."""
+    readme = PRIMARY / "README.md"
+    assert readme.is_file()
+    ignored = (PRIMARY / ".vscodeignore").read_text("utf-8")
+    assert "README" not in ignored
+
+
+def test_the_readme_covers_every_file_type_setting_and_command() -> None:
+    text = (PRIMARY / "README.md").read_text("utf-8")
+    patterns: list[str] = json.loads((PRIMARY / "document-patterns.json").read_text("utf-8"))
+    for pattern in patterns:
+        suffix = pattern.removeprefix("**/*")
+        assert f"`{suffix}`" in text, suffix
+    for setting in _settings(PRIMARY):
+        assert f"`{setting}`" in text, setting
+    for command in _manifest(PRIMARY)["contributes"]["commands"]:
+        assert command["title"] in text, command["title"]
+
+
+def test_the_user_facing_text_leaves_out_how_the_extension_is_built() -> None:
+    manifest = _manifest(PRIMARY)
+    for text in (manifest["description"], (PRIMARY / "README.md").read_text("utf-8")):
+        lowered = text.lower()
+        for word in IMPLEMENTATION_WORDS:
+            assert word not in lowered, word
+
+
+def test_the_manifest_files_the_extension_where_people_look() -> None:
+    manifest = _manifest(PRIMARY)
+    assert {"Linters", "Programming Languages"} <= set(manifest["categories"])
+    assert "bigfix" in manifest["keywords"]
