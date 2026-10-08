@@ -1,0 +1,132 @@
+{
+  "default": {
+    "tests/examples/README.md": [],
+    "tests/examples/client_relevance/analyses/analysis_relevance_complex_property.bes": [],
+    "tests/examples/client_relevance/analyses/analysis_relevance_simple_property.bes": [],
+    "tests/examples/client_relevance/baselines/baseline_relevance_with_components.bes": [],
+    "tests/examples/client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html": [],
+    "tests/examples/client_relevance/clientui/clientui_dashboard_no_product_meta.html": [],
+    "tests/examples/client_relevance/computer_groups/computer_group_automatic_relevance.bes": [],
+    "tests/examples/client_relevance/computer_groups/computer_group_manual_relevance.bes": [],
+    "tests/examples/client_relevance/fixlets/fixlet_multi_clause_relevance.bes": [],
+    "tests/examples/client_relevance/fixlets/fixlet_registry_and_active_directory_relevance.bes": [],
+    "tests/examples/client_relevance/markdown_codeblocks/client_relevance_markdown_codeblock.md": [],
+    "tests/examples/client_relevance/plain_text/client_relevance_plain_text.rel": [],
+    "tests/examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes": [
+      ["plural-preferred", 12, 12],
+      ["plural-preferred", 12, 12]
+    ],
+    "tests/examples/client_relevance/tasks/task_time_based_relevance.bes": [
+      ["non-unique-risk", 28, 28],
+      ["plural-substitution", 28, 28]
+    ],
+    "tests/examples/mixed_context/task_with_client_and_session_relevance.bes": [],
+    "tests/examples/relevance_inspectors/README.md": [],
+    "tests/examples/session_relevance/dashboards/dashboard_session_relevance_chart.ojo": [],
+    "tests/examples/session_relevance/dashboards/dashboard_session_relevance_html_table.ojo": [],
+    "tests/examples/session_relevance/dynamic_javascript/dashboard_relevance_via_javascript_interactive.ojo": [],
+    "tests/examples/session_relevance/dynamic_javascript/dashboard_relevance_via_javascript_static_and_dynamic.ojo": [],
+    "tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes": [
+      ["plural-preferred", 15, 15],
+      ["plural-preferred", 15, 15],
+      ["plural-preferred", 33, 33],
+      ["plural-substitution", 105, 105],
+      ["complexity", 105, 105],
+      ["plural-preferred", 112, 112],
+      ["plural-preferred", 114, 114],
+      ["plural-preferred", 119, 119]
+    ],
+    "tests/examples/session_relevance/dynamic_javascript/webreport_relevance_via_javascript.besrpt": [],
+    "tests/examples/session_relevance/markdown_codeblocks/session_relevance_markdown_codeblock.md": [],
+    "tests/examples/session_relevance/plain_text/session_relevance_plain_text.bsr": [],
+    "tests/examples/session_relevance/webreports/webreport_session_relevance_basic.besrpt": [],
+    "tests/examples/session_relevance/webreports/webreport_session_relevance_chart.besrpt": [],
+    "tests/golden/pre_commit_bigfix/notes.md": [
+      ["unknown-inspector", 6, 6],
+      ["parse-error", 11, 10],
+      ["unterminated-code-fence", 14, null]
+    ],
+    "tests/golden/pre_commit_bigfix/page.html": [
+      ["type-error", 4, 4],
+      ["unterminated-processing-instruction", 6, null]
+    ],
+    "tests/golden/pre_commit_bigfix/task_errors.bes": [
+      ["type-error", 8, 7],
+      ["unknown-inspector", 9, 9],
+      ["unbound-it", 11, 11],
+      ["parse-error", 14, 13],
+      ["parse-error", 15, 15],
+      ["error-token", 15, 15],
+      ["unterminated-substitution", 34, null],
+      ["plural-substitution", 35, 35]
+    ],
+    "tests/golden/pre_commit_bigfix/whole_file.rel": [
+      ["parse-error", 2, 1]
+    ]
+  },
+  "suggest": {
+    "tests/examples/README.md": [],
+    "tests/examples/client_relevance/analyses/analysis_relevance_complex_property.bes": [],
+    "tests/examples/client_relevance/analyses/analysis_relevance_simple_property.bes": [],
+    "tests/examples/client_relevance/baselines/baseline_relevance_with_components.bes": [],
+    "tests/examples/client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html": [],
+    "tests/examples/client_relevance/clientui/clientui_dashboard_no_product_meta.html": [],
+    "tests/examples/client_relevance/computer_groups/computer_group_automatic_relevance.bes": [],
+    "tests/examples/client_relevance/computer_groups/computer_group_manual_relevance.bes": [],
+    "tests/examples/client_relevance/fixlets/fixlet_multi_clause_relevance.bes": [],
+    "tests/examples/client_relevance/fixlets/fixlet_registry_and_active_directory_relevance.bes": [],
+    "tests/examples/client_relevance/markdown_codeblocks/client_relevance_markdown_codeblock.md": [],
+    "tests/examples/client_relevance/plain_text/client_relevance_plain_text.rel": [],
+    "tests/examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes": [
+      ["plural-preferred", 12, 12],
+      ["plural-preferred", 12, 12]
+    ],
+    "tests/examples/client_relevance/tasks/task_time_based_relevance.bes": [
+      ["non-unique-risk", 28, 28],
+      ["plural-substitution", 28, 28]
+    ],
+    "tests/examples/mixed_context/task_with_client_and_session_relevance.bes": [],
+    "tests/examples/relevance_inspectors/README.md": [],
+    "tests/examples/session_relevance/dashboards/dashboard_session_relevance_chart.ojo": [],
+    "tests/examples/session_relevance/dashboards/dashboard_session_relevance_html_table.ojo": [],
+    "tests/examples/session_relevance/dynamic_javascript/dashboard_relevance_via_javascript_interactive.ojo": [],
+    "tests/examples/session_relevance/dynamic_javascript/dashboard_relevance_via_javascript_static_and_dynamic.ojo": [],
+    "tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes": [
+      ["plural-preferred", 15, 15],
+      ["plural-preferred", 15, 15],
+      ["plural-preferred", 33, 33],
+      ["plural-substitution", 105, 105],
+      ["complexity", 105, 105],
+      ["plural-preferred", 112, 112],
+      ["plural-preferred", 114, 114],
+      ["plural-preferred", 119, 119]
+    ],
+    "tests/examples/session_relevance/dynamic_javascript/webreport_relevance_via_javascript.besrpt": [],
+    "tests/examples/session_relevance/markdown_codeblocks/session_relevance_markdown_codeblock.md": [],
+    "tests/examples/session_relevance/plain_text/session_relevance_plain_text.bsr": [],
+    "tests/examples/session_relevance/webreports/webreport_session_relevance_basic.besrpt": [],
+    "tests/examples/session_relevance/webreports/webreport_session_relevance_chart.besrpt": [],
+    "tests/golden/pre_commit_bigfix/notes.md": [
+      ["unknown-inspector", 6, 6],
+      ["parse-error", 11, 10],
+      ["unterminated-code-fence", 14, null]
+    ],
+    "tests/golden/pre_commit_bigfix/page.html": [
+      ["type-error", 4, 4],
+      ["unterminated-processing-instruction", 6, null]
+    ],
+    "tests/golden/pre_commit_bigfix/task_errors.bes": [
+      ["type-error", 8, 7],
+      ["unknown-inspector", 9, 9],
+      ["unbound-it", 11, 11],
+      ["parse-error", 14, 13],
+      ["parse-error", 15, 15],
+      ["error-token", 15, 15],
+      ["unterminated-substitution", 34, null],
+      ["plural-substitution", 35, 35]
+    ],
+    "tests/golden/pre_commit_bigfix/whole_file.rel": [
+      ["parse-error", 2, 1]
+    ]
+  }
+}
