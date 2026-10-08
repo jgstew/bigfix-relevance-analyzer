@@ -60,6 +60,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from _helpers import golden_text
 
 from bigfix_relevance_analyzer import LintConfig, Severity, lint_directory, lint_paths
 from bigfix_relevance_analyzer.dialect import Dialect
@@ -278,11 +279,7 @@ def test_the_hooks_report_over_the_examples_is_unchanged() -> None:
     they do not move lines.
     """
     report = _golden_report()
-    if os.environ.get("UPDATE_GOLDEN"):
-        GOLDEN.write_text(report, encoding="utf-8")
-        pytest.fail("golden rewritten -- review the diff, then rerun without UPDATE_GOLDEN")
-    assert GOLDEN.is_file(), f"missing {GOLDEN}; regenerate with UPDATE_GOLDEN=1"
-    expected = GOLDEN.read_text(encoding="utf-8")
+    expected = golden_text(GOLDEN, report)
     # Compare per file, so a failure names the file that moved.
     by_file = _split_by_file
     assert by_file(report) == by_file(expected)

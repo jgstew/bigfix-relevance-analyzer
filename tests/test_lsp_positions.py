@@ -10,10 +10,10 @@ whenever the buffer cannot be shown to hold it.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
+from _helpers import lsp_text
 
 from bigfix_relevance_analyzer.extract import (
     RelevanceSite,
@@ -37,36 +37,12 @@ def span_of(site: RelevanceSite, needle: str, occurrence: int = 0) -> TextSpan:
     return TextSpan(start, start + len(needle))
 
 
-def utf16_to_index(line: str, character: int) -> int:
-    """The code point index of UTF-16 offset ``character`` in ``line``."""
-    units = 0
-    for index, char in enumerate(line):
-        if units >= character:
-            return index
-        units += 2 if ord(char) > 0xFFFF else 1
-    assert units == character, "a range ended inside a surrogate pair or past the line"
-    return len(line)
-
-
-def read(text: str, found: Range) -> str:
-    """What the buffer holds over ``found``, with LSP's own line breaks."""
-    pieces = re.split(r"(\r\n|\r|\n)", text)
-    lines, breaks = pieces[0::2], pieces[1::2]
-    (start_line, start_char), (end_line, end_char) = found
-    start = utf16_to_index(lines[start_line], start_char)
-    end = utf16_to_index(lines[end_line], end_char)
-    if start_line == end_line:
-        return lines[start_line][start:end]
-    middle = "".join(lines[i] + breaks[i] for i in range(start_line + 1, end_line))
-    return lines[start_line][start:] + breaks[start_line] + middle + lines[end_line][:end]
-
-
 def mapped(name: str, text: str, needle: str, site_index: int = 0) -> tuple[Range, str]:
     sites, index = sites_of(name, text)
     site = sites[site_index]
     found = index.site_range(site, span_of(site, needle))
     assert found is not None, f"{needle!r} in {name} did not map"
-    return found, read(text, found)
+    return found, lsp_text(text, *found)
 
 
 # ---------------------------------------------------------------------------
