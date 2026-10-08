@@ -65,6 +65,17 @@ updates:
       bytecodealliance:
         patterns:
           - "@bytecodealliance/*"
+    # The group still moves each package to its own latest, and the latest
+    # jco can target an older shim minor than the latest shim (#92 and #93 did
+    # exactly that). So the shim gets patch updates only: a new minor lands
+    # when a jco that targets it does, bumped by hand in that jco PR, where
+    # tests/test_vscode_extension_layout.py fails until both agree. Major is
+    # ignored too, since a 0.x minor is already a breaking change.
+    ignore:
+      - dependency-name: "@bytecodealliance/preview2-shim"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
     labels:
       - "dependencies"
 
@@ -133,6 +144,17 @@ updates:
       bytecodealliance:
         patterns:
           - "@bytecodealliance/*"
+    # The group still moves each package to its own latest, and the latest
+    # jco can target an older shim minor than the latest shim (#92 and #93 did
+    # exactly that). So the shim gets patch updates only: a new minor lands
+    # when a jco that targets it does, bumped by hand in that jco PR, where
+    # tests/test_vscode_extension_layout.py fails until both agree. Major is
+    # ignored too, since a 0.x minor is already a breaking change.
+    ignore:
+      - dependency-name: "@bytecodealliance/preview2-shim"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
     labels:
       - "dependencies"
 

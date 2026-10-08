@@ -509,3 +509,19 @@ def test_the_workflow_passes_the_wheel_pattern_quoted() -> None:
     """The script resolves it, so zero or two wheels fail with a clear message
     rather than as argparse errors about stray arguments."""
     assert "--wheel 'dist/*.whl'" in WORKFLOW.read_text("utf-8")
+
+
+@pytest.mark.parametrize("package", SHIM_PACKAGES, ids=lambda path: path.parent.name)
+def test_dependabot_never_moves_the_shim_past_jco_on_its_own(package: Path) -> None:
+    """The group moves both to their latest, and the latest jco can still target
+    an older shim minor (#92, #93). Only patch updates of the shim are proposed;
+    a jco that targets a new minor fails the test above until the shim is
+    bumped with it, by hand."""
+    text = DEPENDABOT.read_text("utf-8")
+    entry = text[text.index(f'directory: "/{package.relative_to(REPO_ROOT)}"') :]
+    entry = entry.split("- package-ecosystem:")[0]
+    ignored = entry[entry.index("ignore:") :]
+    assert 'dependency-name: "@bytecodealliance/preview2-shim"' in ignored
+    for update_type in ("version-update:semver-major", "version-update:semver-minor"):
+        assert update_type in ignored
+    assert "version-update:semver-patch" not in ignored
