@@ -60,6 +60,22 @@ extension loaded. Open any `.bes`, `.rel` or relevance-fenced `.md` file there.
 - `build-component/`: the WIT world (`handle`, `exit-code`, `version`),
   the `app.py` that componentize-py compiles, and the build script.
 
+- `test/server.test.mjs`: unit tests for the server process in plain Node,
+  with no VS Code (`node --test test/`, about a second). Set `EXTENSION_DIR`
+  to test another copy, such as an unzipped `.vsix`.
+
+### In CI
+
+`.github/workflows/vscode-extension.yaml` builds the component, packages
+`bigfix-relevance-developer.vsix` with `vsce`, runs the unit tests on the
+unzipped package, and uploads it as the `bigfix-relevance-developer-vsix`
+artifact. A second job runs the shared smoke test against that package in a
+headless VS Code (`xvfb-run`). VS Code is downloaded at a pinned version and
+checked against a pinned SHA-256.
+
+To install a build: download the artifact, unzip it, and in VS Code run
+**Extensions: Install from VSIX...** on the `.vsix`.
+
 ## PoC 1 (`python-stdio/`)
 
 ```bash

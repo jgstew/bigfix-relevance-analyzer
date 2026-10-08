@@ -62,6 +62,7 @@ try {
   writeFileSync(join(workspace, ".vscode", "settings.json"), JSON.stringify(settings));
   const result = join(scratch, "result.json");
 
+  const started = Date.now();
   const run = spawnSync(
     code,
     [
@@ -71,9 +72,13 @@ try {
       `--user-data-dir=${join(scratch, "user-data")}`,
       `--extensions-dir=${join(scratch, "extensions")}`,
       "--disable-workspace-trust",
+      "--disable-updates",
       "--skip-welcome",
       "--skip-release-notes",
       "--new-window",
+      // A CI runner has no user namespaces for Chromium's sandbox, and no GPU.
+      // The same flags @vscode/test-electron passes on Linux.
+      ...(process.platform === "linux" ? ["--no-sandbox", "--disable-gpu-sandbox"] : []),
     ],
     {
       stdio: ["ignore", "inherit", "inherit"],
@@ -91,7 +96,7 @@ try {
     console.error(`smoke test failed: VS Code exited ${run.status}`);
     process.exit(1);
   }
-  console.log(`smoke test passed: ${manifest.displayName}`);
+  console.log(`smoke test passed: ${manifest.displayName} (${((Date.now() - started) / 1000).toFixed(1)} s)`);
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }

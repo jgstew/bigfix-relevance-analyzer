@@ -1,0 +1,179 @@
+---
+name: vscode-extension
+
+# Builds "BigFix Relevance Developer" (tools/vscode-extension/componentize-py/)
+# into an installable .vsix, uploads it as this run's artifact, and tests the
+# packaged extension twice. Issue #10 has the background.
+#
+#   package  builds the language-server component from this checkout's wheel,
+#            packages the .vsix with vsce, unit-tests the *unzipped* .vsix in
+#            plain Node (seconds), then uploads it.
+#   e2e      downloads that artifact and runs the shared smoke test in a real,
+#            headless VS Code: the extension activates, starts its server, and
+#            the diagnostics for two files reach the editor.
+#
+# Both test what ships, not the source tree: the component lives under dist/,
+# which is gitignored, and is in the .vsix only because .vscodeignore lets it
+# through.
+#
+# To install the artifact: unzip the download, then in VS Code run
+# "Extensions: Install from VSIX..." and pick the .vsix inside.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vscode-extension-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      # Same awk-from-.pre-commit-config.yaml trick as wasm-html.yaml, so this
+      # workflow doesn't carry a second, driftable uv version pin.
+      - name: read uv version from .pre-commit-config.yaml
+        run: |
+          UV_VERSION="$(awk '
+            /^[[:space:]]*-[[:space:]]*repo:.*astral-sh\/uv-pre-commit[[:space:]]*$/ { found = 1; next }
+            found && $1 == "rev:" {
+              if (match($0, /#[ \t]*(frozen:[ \t]*)?[vV]?[0-9]+(\.[0-9]+)*/)) {
+                ver = substr($0, RSTART, RLENGTH)
+                sub(/^#[ \t]*(frozen:[ \t]*)?[vV]?/, "", ver)
+              } else {
+                ver = $2
+                gsub(/["'"'"']/, "", ver)
+                sub(/^[vV]/, "", ver)
+              }
+              print ver
+              exit
+            }
+          ' .pre-commit-config.yaml)"
+          if [ -z "$UV_VERSION" ]; then
+            echo "::error::could not read the astral-sh/uv-pre-commit version from .pre-commit-config.yaml"
+            exit 1
+          fi
+          echo "UV_VERSION=$UV_VERSION" >> "$GITHUB_ENV"
+          echo "uv version: $UV_VERSION"
+
+      - name: install uv
+        run: python -m pip install "uv==${UV_VERSION}"
+
+      # Node 22: @vscode/vsce 4 requires it. The npm it ships predates
+      # `min-release-age`, which is fine for `npm ci` -- it installs the pinned
+      # lockfile and has nothing to hold back (see the package's .npmrc).
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tools/vscode-extension/componentize-py/package-lock.json
+
+      - name: npm ci
+        working-directory: tools/vscode-extension/componentize-py
+        run: npm ci
+
+      # Wheel -> componentize-py (the playground's two-pass build) -> jco for
+      # Node -> a smoke check that the component boots and answers
+      # `initialize`. `--group wasm` is what puts the pinned componentize-py
+      # on PATH.
+      - name: build the language-server component
+        run: |
+          uv run --group wasm python \
+            tools/vscode-extension/componentize-py/build-component/build_component.py
+
+      # vsce does not create the --out directory itself.
+      - name: package the .vsix
+        working-directory: tools/vscode-extension/componentize-py
+        run: |
+          mkdir -p ../../../dist/vsix
+          npx vsce package --out ../../../dist/vsix/bigfix-relevance-developer.vsix
+
+      # Unzipped the way VS Code installs it: the extension is under extension/.
+      - name: unzip the .vsix
+        run: unzip -q dist/vsix/bigfix-relevance-developer.vsix -d dist/vsix-unpacked
+
+      # The packaged files are all there, and the packaged server.js, with the
+      # packaged component, answers LSP over Node IPC exactly as it will for
+      # vscode-languageclient. No VS Code needed; a couple of seconds.
+      - name: unit-test the packaged extension
+        env:
+          EXTENSION_DIR: ${{ github.workspace }}/dist/vsix-unpacked/extension
+        run: node --test tools/vscode-extension/componentize-py/test/
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bigfix-relevance-developer-vsix
+          path: dist/vsix/bigfix-relevance-developer.vsix
+          if-no-files-found: error
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: package
+    env:
+      # Bump both together. The hash is the "sha256hash" field of
+      # https://update.code.visualstudio.com/api/versions/<version>/linux-x64/stable,
+      # and it was checked against a real download of this version. Pinned
+      # rather than "stable", so a VS Code release cannot change this job's
+      # result, and the download is verified before anything runs it.
+      VSCODE_VERSION: "1.140.0"
+      VSCODE_SHA256: "d32031e9e213d59532af3cf32fcb8b357a1cdd10417967b4f5b5ba30436dc0dc"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: bigfix-relevance-developer-vsix
+          path: dist/vsix
+
+      - name: unzip the .vsix
+        run: unzip -q dist/vsix/bigfix-relevance-developer.vsix -d dist/vsix-unpacked
+
+      # ~350 MB, so cached. The tarball is what is cached, not the unpacked
+      # tree, so the hash check below runs on every run, cache hit or not.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .vscode-download
+          key: vscode-${{ env.VSCODE_VERSION }}-linux-x64-${{ env.VSCODE_SHA256 }}
+
+      - name: download and verify VS Code
+        run: |
+          mkdir -p .vscode-download
+          if [ ! -f .vscode-download/vscode.tar.gz ]; then
+            curl -fsSL --retry 3 -o .vscode-download/vscode.tar.gz \
+              "https://update.code.visualstudio.com/${VSCODE_VERSION}/linux-x64/stable"
+          fi
+          echo "${VSCODE_SHA256}  .vscode-download/vscode.tar.gz" | sha256sum --check
+          mkdir -p .vscode-test
+          tar -xzf .vscode-download/vscode.tar.gz -C .vscode-test
+
+      # xvfb-run gives VS Code a display; the smoke test needs no other setup.
+      # Its report goes to the step summary too, including how long the run
+      # took. `tee` keeps a failing exit code because GitHub runs `run:` with
+      # `bash -eo pipefail`.
+      - name: smoke-test the packaged extension in headless VS Code
+        run: |
+          xvfb-run -a node tools/vscode-extension/common/smoke/run.mjs \
+            dist/vsix-unpacked/extension \
+            --code .vscode-test/VSCode-linux-x64/code \
+            | tee -a "$GITHUB_STEP_SUMMARY"

@@ -20,6 +20,7 @@ Pure and cheap, like ``test_playground_layout.py``: paths and text, never a buil
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import tomllib
@@ -28,6 +29,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from _helpers import load_tool
 
 from bigfix_relevance_analyzer.extract import _RECOGNIZED_SUFFIXES, _is_recognized
 
@@ -216,3 +218,89 @@ def test_poc_1_launches_the_console_script_by_default() -> None:
     scripts = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text("utf-8"))["project"]["scripts"]
     assert default in scripts
     assert scripts[default] == "bigfix_relevance_analyzer.lsp.__main__:main"
+
+
+# ---------------------------------------------------------------------------
+# Packaging and CI: .github/workflows/vscode-extension.yaml
+# ---------------------------------------------------------------------------
+
+WORKFLOW = REPO_ROOT / ".github" / "workflows" / "vscode-extension.yaml"
+SERVER_TEST = PRIMARY / "test" / "server.test.mjs"
+
+
+def test_the_primary_extension_packages_with_a_pinned_vsce() -> None:
+    assert _manifest(PRIMARY)["devDependencies"]["@vscode/vsce"][0].isdigit()
+
+
+def test_the_package_leaves_out_build_inputs_but_keeps_the_component() -> None:
+    """``dist/`` is gitignored, and the built component in it must still ship.
+
+    vsce reads ``.vscodeignore``, not ``.gitignore``, so the component is
+    packaged unless excluded here; everything else under ``dist/`` is a build
+    input that only bloats the package.
+    """
+    ignored = {
+        line.strip()
+        for line in (PRIMARY / ".vscodeignore").read_text("utf-8").splitlines()
+        if line.strip() and not line.startswith("#")
+    }
+    for build_only in ("build-component/**", "dist/work/**", "dist/wheel/**", "test/**"):
+        assert build_only in ignored, build_only
+    for pattern in ignored:
+        assert not pattern.startswith("dist/**"), pattern
+        if pattern.startswith("dist/component"):
+            assert pattern.endswith(".d.ts"), f"{pattern} would drop part of the component"
+
+
+def test_the_build_copies_the_project_license_into_the_extension(tmp_path: Path) -> None:
+    """vsce packages the LICENSE beside package.json. It is copied there at build
+    time rather than committed, so there is one license file in the repository."""
+    build = load_tool(PRIMARY / "build-component" / "build_component.py", "_build_component")
+    copied = build.copy_license(tmp_path)
+    assert copied == tmp_path / "LICENSE"
+    assert copied.read_bytes() == (REPO_ROOT / "LICENSE").read_bytes()
+
+
+def test_the_copied_license_is_never_committed() -> None:
+    git = shutil.which("git")
+    if git is None or not (REPO_ROOT / ".git").exists():
+        pytest.skip("not a git checkout")
+    result = subprocess.run(
+        [git, "check-ignore", "-q", str(PRIMARY / "LICENSE")], cwd=REPO_ROOT, capture_output=True
+    )
+    assert result.returncode == 0, "the build's copy of LICENSE is not gitignored"
+
+
+def test_the_server_has_a_node_test_of_its_own() -> None:
+    assert SERVER_TEST.is_file()
+
+
+def test_the_workflow_builds_packages_uploads_and_tests_the_vsix() -> None:
+    text = WORKFLOW.read_text("utf-8")
+    for step in (
+        "build-component/build_component.py",
+        "vsce package",
+        "actions/upload-artifact@",
+        ".vsix",
+        "node --test",
+    ):
+        assert step in text, step
+
+
+def test_the_workflow_runs_the_shared_smoke_test_on_the_packaged_extension() -> None:
+    """A real, headless VS Code, against the unzipped ``.vsix`` -- what ships."""
+    text = WORKFLOW.read_text("utf-8")
+    assert "xvfb-run" in text
+    assert "tools/vscode-extension/common/smoke/run.mjs" in text
+    # VS Code is downloaded at a pinned version and checked against a pinned hash.
+    assert re.search(r"VSCODE_VERSION: \"\d+\.\d+\.\d+\"", text)
+    assert re.search(r"VSCODE_SHA256: \"[0-9a-f]{64}\"", text)
+    assert "sha256sum --check" in text
+    assert "permissions:\n  contents: read" in text
+
+
+def test_the_workflow_pins_every_action_to_a_commit() -> None:
+    uses = re.findall(r"uses:\s*(\S+)", WORKFLOW.read_text("utf-8"))
+    assert uses
+    for action in uses:
+        assert re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", action), action

@@ -1,0 +1,19 @@
+# What `vsce package` leaves out of the .vsix. vsce reads this file, not
+# .gitignore, which is how the built component under dist/component/ ships even
+# though dist/ is gitignored. tests/test_vscode_extension_layout.py holds both
+# halves: the build inputs below stay out, and dist/component/ is never listed.
+# devDependencies (jco, vsce) are left out by vsce itself.
+
+# Build inputs: the WIT world, app.py and build script, and the intermediate
+# wheel and un-transpiled component.
+build-component/**
+dist/work/**
+dist/wheel/**
+
+# TypeScript declarations jco emits beside the glue; nothing reads them at runtime.
+dist/component/**/*.d.ts
+
+# Development only.
+test/**
+.vscode/**
+.npmrc

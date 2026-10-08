@@ -227,5 +227,10 @@ node_modules/
 # source.
 /playground/
 
+# Copied from the repository root by
+# tools/vscode-extension/componentize-py/build-component/build_component.py, so
+# vsce can package it. A build output: the root LICENSE is the only copy.
+/tools/vscode-extension/componentize-py/LICENSE
+
 # macos metadata
 .DS_Store

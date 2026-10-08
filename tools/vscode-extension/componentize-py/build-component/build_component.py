@@ -5,7 +5,8 @@
     uv run --group wasm python \
         tools/vscode-extension/componentize-py/build-component/build_component.py
 
-Four steps, everything under ``../dist/`` (gitignored):
+Four steps, everything under ``../dist/`` (gitignored), after copying the
+repository's LICENSE beside package.json for vsce to package (gitignored too):
 
 1. ``uv build --wheel`` of this checkout -> ``dist/wheel/``
 2. componentize-py, through the playground's ``componentize.py`` so both share
@@ -51,8 +52,19 @@ def _componentize_module():  # type: ignore[no-untyped-def]
     return module
 
 
+def copy_license(target_dir: Path = EXTENSION) -> Path:
+    """Copy the repository's LICENSE into ``target_dir``; return the copy.
+
+    vsce packages the LICENSE that sits beside package.json and warns without
+    one. Copying it at build time, gitignored, keeps the root LICENSE the
+    only copy in the repository.
+    """
+    return Path(shutil.copyfile(REPO / "LICENSE", target_dir / "LICENSE"))
+
+
 def build() -> Path:
     """Build the component and the Node glue under ``dist/``; return the glue's path."""
+    copy_license()
     shutil.rmtree(DIST, ignore_errors=True)
     wheel_dir = DIST / "wheel"
     _run(["uv", "build", "--wheel", "--quiet", "-o", str(wheel_dir)], "build the wheel", cwd=REPO)
