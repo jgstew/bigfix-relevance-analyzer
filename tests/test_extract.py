@@ -4,6 +4,7 @@ Fixtures here are inline and minimal; `test_examples.py` covers the real
 content corpus under `tests/examples/`.
 """
 
+import dataclasses
 import logging
 import sys
 from pathlib import Path
@@ -1331,3 +1332,90 @@ def test_extract_data_folds_line_endings_like_a_text_read(tmp_path: Path, ending
 
 def test_extract_file_skips_an_unrecognized_type_without_opening_it(tmp_path: Path) -> None:
     assert _extract_file(tmp_path / "missing.txt") == ([], [])
+
+
+# ---------------------------------------------------------------------------
+# RelevanceSite.column: where a text extractor's site starts on its line
+# ---------------------------------------------------------------------------
+
+
+def _text_sites(name: str, text: str) -> list[RelevanceSite]:
+    return _extract_data(Path(name), text.encode("utf-8"))[0]
+
+
+def _starts_at(text: str, site: RelevanceSite) -> str:
+    """The document text from ``site.line`` and ``site.column`` on."""
+    assert site.column is not None
+    line = text.split("\n")[site.line - 1]
+    return line[site.column - 1 :]
+
+
+@pytest.mark.parametrize(
+    ("name", "text", "column"),
+    [
+        ("a.rel", "exists file", 1),
+        ("a.rel", "\n\n   exists file\n", 4),
+        ("a.bsr", "\t names of bes computers", 3),
+        ("a.md", "# T\n\n```relevance\nexists file\n```\n", 1),
+        ("a.md", "- item\n\n    ```relevance\n    exists file\n    ```\n", 5),
+        ("a.ojo", "<p>x <?Relevance  names of bes computers ?></p>", 19),
+        ("a.html", "<p><?Relevance exists file ?></p>", 16),
+        ("a.ojo", '<script>\n  var x = Relevance("names of bes computers");\n</script>', 22),
+        ("a.ojo", "<script>\n  EvaluateRelevance( ' names of bes computers');\n</script>", 24),
+    ],
+)
+def test_a_text_extractor_records_where_its_site_starts(name: str, text: str, column: int) -> None:
+    (site,) = _text_sites(name, text)
+    assert site.column == column
+    assert _starts_at(text, site).startswith(site.text)
+
+
+def test_a_js_call_with_an_escaped_quote_starts_at_the_literal() -> None:
+    text = 'go(Relevance("exists file \\"a\\""));'
+    (site,) = _text_sites("a.ojo", text)
+    assert site.text == 'exists file \\"a\\"'
+    assert site.column == 15
+    assert _starts_at(text, site).startswith(site.text)
+
+
+def test_a_site_whose_text_starts_below_its_line_has_no_column() -> None:
+    """``site.line`` is where the fence or processing instruction body starts;
+    when the statement itself starts lower, no column on that line is right."""
+    for name, text in (
+        ("a.md", "```relevance\n\n  exists file\n```\n"),
+        ("a.ojo", "<p><?Relevance\n  names of bes computers ?></p>"),
+    ):
+        (site,) = _text_sites(name, text)
+        assert site.column is None, name
+
+
+def test_actionscript_substitutions_record_their_column() -> None:
+    body = 'wait cmd\nparameter "x" = "{ name of operating system }"'
+    (site,) = extract_relevance_from_actionscript(body)
+    assert site.column == 20
+    assert body.split("\n")[site.line - 1][site.column - 1 :].startswith(site.text)
+
+
+def test_bes_sites_have_no_column() -> None:
+    """A BES element's text does not start at a line's start, and the source
+    map already says where every character is: a column would only mislead."""
+    sites = extract_relevance_from_bes_xml(
+        b"<BES><Task><Relevance>exists file</Relevance>"
+        b"<Description>&lt;?Relevance names of bes computers ?&gt;</Description>"
+        b"<DefaultAction><ActionScript>wait {name of operating system}</ActionScript>"
+        b"</DefaultAction></Task></BES>"
+    )
+    assert len(sites) == 3
+    assert all(site.column is None for site in sites)
+
+
+def test_column_is_left_out_of_equality_hashing_and_to_dict() -> None:
+    """The editor's cache keys on a site; a column in the key would miss for
+    a statement that only moved sideways."""
+    (site,) = _text_sites("a.rel", "   exists file")
+    other = dataclasses.replace(site, column=1)
+    assert site.column != other.column
+    assert site == other
+    assert hash(site) == hash(other)
+    assert "column" not in site.to_dict()
+    assert "column" not in repr(site)
