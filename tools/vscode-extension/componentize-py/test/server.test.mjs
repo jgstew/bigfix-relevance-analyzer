@@ -82,6 +82,8 @@ async function initialized(server) {
 test("the packaged extension holds the server, the component and its runtime", () => {
   for (const path of [
     "extension.js",
+    "gate.js",
+    "server-gate.json",
     "server.js",
     "document-patterns.json",
     "dist/component/lsp.js",

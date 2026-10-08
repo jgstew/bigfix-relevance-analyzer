@@ -647,6 +647,96 @@ def test_the_primary_extension_contributes_the_relevance_language() -> None:
     assert f"onLanguage:{LANGUAGE_ID}" not in _manifest(PRIMARY)["activationEvents"]
 
 
+GATE = PRIMARY / "server-gate.json"
+
+
+def test_the_primary_extension_activates_cheaply_and_starts_its_server_lazily() -> None:
+    """Activation loads no language client and no WebAssembly: gate.js decides,
+    per open document, whether to start the server (issue #96, item 9).
+
+    So it can activate at startup everywhere, which also covers a single file
+    opened outside any folder, and the ~170 MiB server process exists only in
+    windows with something to lint.
+    """
+    assert _manifest(PRIMARY)["activationEvents"] == ["onStartupFinished"]
+    extension = (PRIMARY / "extension.js").read_text("utf-8")
+    assert 'require("./gate")' in extension
+    for line in extension.splitlines():
+        if "vscode-languageclient" in line and "require(" in line:
+            assert line.startswith(" "), f"loaded at activation: {line.strip()}"
+
+
+def test_the_gate_reads_the_extractors_own_tables() -> None:
+    from bigfix_relevance_analyzer.extract import (
+        _CLIENTUI_HTML_SUFFIXES,
+        _MARKDOWN_RELEVANCE_TAGS,
+        _MARKDOWN_SUFFIXES,
+    )
+
+    gate = json.loads(GATE.read_text("utf-8"))
+    assert gate["markdownFenceTags"] == sorted(_MARKDOWN_RELEVANCE_TAGS)
+    assert gate["markdownSuffixes"] == sorted(_MARKDOWN_SUFFIXES)
+    assert gate["htmlSuffixes"] == sorted(_CLIENTUI_HTML_SUFFIXES)
+
+
+GATE_CHECK = """
+const { needsServer } = require(process.argv[1]);
+const fs = require("node:fs");
+const paths = JSON.parse(fs.readFileSync(0, "utf8"));
+const text = (fileName) => fs.readFileSync(fileName, "utf8");
+const docs = paths.map((fileName) => ({ fileName, getText: () => text(fileName) }));
+console.log(JSON.stringify(docs.map(needsServer)));
+"""
+
+
+def test_the_gate_never_holds_back_a_file_the_extractor_reads() -> None:
+    """Every tracked Markdown and HTML file in this repository with relevance in
+    it, by the extractor's own reading, passes the gate: a miss would leave the
+    file unlinted until something else started the server."""
+    from bigfix_relevance_analyzer.extract import extract_relevance_from_file
+
+    node, git = shutil.which("node"), shutil.which("git")
+    if node is None or git is None or not (REPO_ROOT / ".git").exists():
+        pytest.skip("needs node and a git checkout")
+    listed = subprocess.run(
+        [git, "ls-files", "*.md", "*.markdown", "*.html", "*.htm"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+    paths = [str(REPO_ROOT / name) for name in listed]
+    with_sites = {path for path in paths if extract_relevance_from_file(path)}
+    assert with_sites, "no tracked Markdown or HTML file has relevance to check against"
+    result = subprocess.run(
+        [node, "-e", GATE_CHECK, str(PRIMARY / "gate.js")],
+        input=json.dumps(paths),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    passed = dict(zip(paths, json.loads(result.stdout), strict=True))
+    assert sorted(path for path in with_sites if not passed[path]) == []
+
+
+def test_the_gate_ships_and_is_tested_in_ci() -> None:
+    assert (PRIMARY / "gate.js").is_file()
+    assert "test/gate.test.mjs" in WORKFLOW.read_text("utf-8")
+    assert '"gate.js"' in SERVER_TEST.read_text("utf-8")
+    assert '"server-gate.json"' in SERVER_TEST.read_text("utf-8")
+
+
+def test_the_smoke_test_checks_the_server_waits_for_relevance() -> None:
+    """A second VS Code run: Markdown and HTML without relevance leave the
+    server unstarted; opening a relevance-fenced Markdown file starts it."""
+    run = (COMMON_SMOKE / "run.mjs").read_text("utf-8")
+    suite = (COMMON_SMOKE / "suite.js").read_text("utf-8")
+    assert "SMOKE_SCENARIO" in run
+    for scenario in ("lint", "idle"):
+        assert f'scenario === "{scenario}"' in suite, scenario
+    assert "serverRunning" in suite
+
+
 def test_only_one_extension_defines_the_language() -> None:
     """Two installed extensions defining the same language would conflict."""
     for extension in EXTENSIONS:

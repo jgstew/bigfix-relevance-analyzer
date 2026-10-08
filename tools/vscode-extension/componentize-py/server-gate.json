@@ -1,0 +1,5 @@
+{
+  "markdownSuffixes": [".markdown", ".md"],
+  "markdownFenceTags": ["client_relevance", "relevance", "session_relevance"],
+  "htmlSuffixes": [".htm", ".html"]
+}

@@ -11,7 +11,8 @@ name: vscode-extension
 #   e2e      downloads that artifact and runs the shared smoke test in a real
 #            VS Code (fetched by @vscode/test-electron), on Linux (headless,
 #            under xvfb-run) and on Windows: the extension activates, starts its
-#            server, and the diagnostics for its test files reach the editor.
+#            server, and the diagnostics for its test files reach the editor;
+#            and Markdown and HTML without relevance do not start the server.
 #            The one .vsix is meant for every platform, and was packaged on
 #            Linux, so Windows is where a platform-specific file would show.
 #
@@ -162,13 +163,17 @@ jobs:
 
       # The packaged files are all there, and the packaged server.js, with the
       # packaged component, answers LSP over Node IPC exactly as it will for
-      # vscode-languageclient. No VS Code needed; a couple of seconds.
+      # vscode-languageclient; and gate.js, which decides when to start it,
+      # passes its own tests. No VS Code needed; a couple of seconds.
       - name: unit-test the packaged extension
         env:
           EXTENSION_DIR: ${{ github.workspace }}/dist/vsix-unpacked/extension
-        # The file, not the directory: Node 22 runs a directory argument as a
+        # Files, not the directory: Node 22 runs a directory argument as a
         # module and fails with MODULE_NOT_FOUND (later Node versions expand it).
-        run: node --test tools/vscode-extension/componentize-py/test/server.test.mjs
+        run: |
+          node --test \
+            tools/vscode-extension/componentize-py/test/server.test.mjs \
+            tools/vscode-extension/componentize-py/test/gate.test.mjs
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
