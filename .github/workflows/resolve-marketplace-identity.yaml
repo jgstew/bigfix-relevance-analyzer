@@ -18,12 +18,23 @@ jobs:
           allow-no-subscriptions: true
 
       - name: Get Azure DevOps identity ID
+        # explicit shell adds pipefail; the default `bash -e` let a failed
+        # request write an empty ID to the summary and still pass
+        shell: bash
         run: |
+          set -euo pipefail
           TOKEN=$(az account get-access-token \
             --resource 499b84ac-1321-427f-aa17-267ca6975798 \
             --query accessToken -o tsv)
           echo "::add-mask::$TOKEN"
-          ID=$(curl -sf -H "Authorization: Bearer $TOKEN" \
-            "https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=6.0" \
-            | jq -r .id)
+          STATUS=$(curl -s -o profile.json -w '%{http_code}' \
+            -H "Authorization: Bearer $TOKEN" \
+            "https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=6.0")
+          echo "profiles/me HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::profiles/me returned HTTP $STATUS"
+            head -c 1000 profile.json
+            exit 1
+          fi
+          ID=$(jq -er .id profile.json)
           echo "Marketplace identity ID: $ID" >> "$GITHUB_STEP_SUMMARY"
