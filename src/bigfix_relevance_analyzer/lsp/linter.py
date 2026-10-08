@@ -64,7 +64,7 @@ from typing import Any, Final, NamedTuple
 from urllib.parse import unquote, urlparse
 from urllib.request import url2pathname
 
-from bigfix_relevance_analyzer.extract import RelevanceSite
+from bigfix_relevance_analyzer.extract import RelevanceSite, _is_recognized
 from bigfix_relevance_analyzer.lint import (
     Finding,
     LintConfig,
@@ -86,6 +86,14 @@ DEFAULT_MAX_DOCUMENT_BYTES: Final = 1024 * 1024
 
 DOCUMENT_TOO_LARGE: Final = "document-too-large"
 """The code of the one diagnostic an oversized document gets."""
+
+LANGUAGE_ID: Final = "bigfix-relevance"
+"""The VS Code language id for whole-file relevance (``.rel``, ``.bsr``).
+
+A buffer whose URI names no recognized file type is still linted, as a single
+relevance statement, when the client says it is this language: an unsaved
+``untitled:`` buffer, or a file switched to it by hand. The extension
+contributes the language under this id; a test keeps the two equal."""
 
 DEFAULT_CACHE_SIZE: Final = 2048
 """Sites whose findings the linter keeps -- as many as lint keeps analyses."""
@@ -166,8 +174,14 @@ class DocumentLinter:
     def cache_stats(self) -> CacheStats:
         return CacheStats(self._hits, self._misses, len(self._cache))
 
-    def diagnostics(self, uri: str, text: str) -> list[Diagnostic]:
-        """The diagnostics to publish for the document at ``uri`` holding ``text``."""
+    def diagnostics(self, uri: str, text: str, language_id: str | None = None) -> list[Diagnostic]:
+        """The diagnostics to publish for the document at ``uri`` holding ``text``.
+
+        The file type comes from the URI's suffix. Only when that names nothing
+        the extractor reads does ``language_id`` (the client's ``languageId``)
+        decide: :data:`LANGUAGE_ID` means whole-file relevance. A ``.md`` stays
+        markdown whatever the client calls it.
+        """
         data = text.encode("utf-8", errors="surrogatepass")
         if len(data) > self.max_document_bytes:
             message = (
@@ -182,7 +196,7 @@ class DocumentLinter:
                     [first], 0, _DiagnosticSeverity.INFORMATION, DOCUMENT_TOO_LARGE, message
                 )
             ]
-        findings = _lint_data(_path_of(uri), data, self.config, self._judge)
+        findings = _lint_data(_document_path(uri, language_id), data, self.config, self._judge)
         if not findings:
             return []
         lines = _LINE_BREAK.split(text)
@@ -234,6 +248,15 @@ def _path_of(uri: str) -> Path:
         return Path(url2pathname(parsed.path))
     # `untitled:Untitled-1` and the like: whatever name there is, for its suffix.
     return Path(PurePosixPath(unquote(parsed.path)).name or "untitled")
+
+
+def _document_path(uri: str, language_id: str | None) -> Path:
+    """The path whose suffix picks the extractor for this document."""
+    path = _path_of(uri)
+    if language_id == LANGUAGE_ID and not _is_recognized(path):
+        # Plain relevance, the same as a `.rel` file (dialect from the content).
+        return path.with_name(f"{path.name}.rel")
+    return path
 
 
 def _utf16_length(line: str) -> int:

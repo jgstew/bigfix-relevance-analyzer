@@ -525,3 +525,123 @@ def test_dependabot_never_moves_the_shim_past_jco_on_its_own(package: Path) -> N
     for update_type in ("version-update:semver-major", "version-update:semver-minor"):
         assert update_type in ignored
     assert "version-update:semver-patch" not in ignored
+
+
+# ---------------------------------------------------------------------------
+# The BigFix Relevance language: contribution, configuration and grammars
+# ---------------------------------------------------------------------------
+
+GENERATOR = REPO_ROOT / "tools" / "generate_tmlanguage.py"
+
+
+def _language(extension: Path) -> dict[str, Any]:
+    (language,) = _manifest(extension)["contributes"]["languages"]
+    found: dict[str, Any] = language
+    return found
+
+
+def test_the_primary_extension_contributes_the_relevance_language() -> None:
+    """Whole-file relevance, in the id the server falls back on for untitled buffers."""
+    from bigfix_relevance_analyzer.extract import _SESSION_TEXT_SUFFIXES, _UNTYPED_TEXT_SUFFIXES
+    from bigfix_relevance_analyzer.lsp.linter import LANGUAGE_ID
+
+    language = _language(PRIMARY)
+    assert language["id"] == LANGUAGE_ID
+    assert sorted(language["extensions"]) == sorted(_SESSION_TEXT_SUFFIXES | _UNTYPED_TEXT_SUFFIXES)
+    assert (PRIMARY / language["configuration"]).is_file()
+    assert f"onLanguage:{LANGUAGE_ID}" in _manifest(PRIMARY)["activationEvents"]
+
+
+def test_only_one_extension_defines_the_language() -> None:
+    """Two installed extensions defining the same language would conflict."""
+    for extension in EXTENSIONS:
+        contributes = _manifest(extension)["contributes"]
+        if extension != PRIMARY:
+            assert "languages" not in contributes
+            assert "grammars" not in contributes
+
+
+def test_the_language_configuration_matches_relevance_syntax() -> None:
+    """Block comments only (the tokenizer knows no line comment); parentheses; quotes."""
+    config = json.loads((PRIMARY / _language(PRIMARY)["configuration"]).read_text("utf-8"))
+    assert config["comments"] == {"blockComment": ["/*", "*/"]}
+    assert config["brackets"] == [["(", ")"]]
+    pairs = {(pair["open"], pair["close"]) for pair in config["autoClosingPairs"]}
+    assert pairs == {("(", ")"), ('"', '"')}
+
+
+def test_every_contributed_grammar_exists_and_is_registered_correctly() -> None:
+    from bigfix_relevance_analyzer.lsp.linter import LANGUAGE_ID
+
+    grammars = _manifest(PRIMARY)["contributes"]["grammars"]
+    by_scope = {grammar["scopeName"]: grammar for grammar in grammars}
+    assert by_scope["source.bigfix-relevance"]["language"] == LANGUAGE_ID
+    injection = by_scope["markdown.bigfix-relevance.codeblock"]
+    assert injection["injectTo"] == ["text.html.markdown"]
+    assert injection["embeddedLanguages"] == {"meta.embedded.block.bigfix-relevance": LANGUAGE_ID}
+    for grammar in grammars:
+        on_disk = json.loads((PRIMARY / grammar["path"]).read_text("utf-8"))
+        assert on_disk["scopeName"] == grammar["scopeName"]
+
+
+def test_the_committed_grammars_are_what_the_generator_produces() -> None:
+    """The grammars are generated from grammar.py and extract.py, never hand-edited:
+    run `uv run python tools/generate_tmlanguage.py` after changing either."""
+    generator = load_tool(GENERATOR, "_generate_tmlanguage")
+    for path, grammar in generator.render().items():
+        committed = json.loads((REPO_ROOT / path).read_text("utf-8"))
+        assert committed == grammar, f"{path} is stale; rerun {GENERATOR.name}"
+
+
+def _grammar_regexes(*names: str) -> list[re.Pattern[str]]:
+    generator = load_tool(GENERATOR, "_generate_tmlanguage")
+    repository = generator.relevance_grammar()["repository"]
+    patterns: list[re.Pattern[str]] = []
+    for name in names:
+        rule = repository[name]
+        for entry in rule.get("patterns", [rule]):
+            patterns.append(re.compile(entry["match"]))
+    return patterns
+
+
+def test_the_grammar_colors_every_operator_and_structural_word_the_parser_knows() -> None:
+    """Checked against the grammar's own regexes (Python's `re` reads these
+    patterns the same way), in any case and with articles between the words."""
+    from bigfix_relevance_analyzer.grammar import PUNCT_INFIX, STRUCTURAL_WORDS, WORD_INFIX
+
+    words = _grammar_regexes("word-operator", "structural")
+    phrases = [" ".join(spelling) for spelling in WORD_INFIX] + sorted(STRUCTURAL_WORDS)
+    for phrase in phrases:
+        for written in (phrase, phrase.upper(), phrase.replace(" ", " the ", 1)):
+            assert any(p.fullmatch(written) for p in words), written
+    (punctuation,) = _grammar_regexes("punctuation-operator")
+    for op in PUNCT_INFIX:
+        assert punctuation.fullmatch(op), op
+
+
+def test_a_multi_word_operator_wins_over_its_first_word() -> None:
+    """`is not equal to` is one comparison, not `is` then a logical `not`."""
+    (comparison,) = (p for p in _grammar_regexes("word-operator") if "contained" in p.pattern)
+    match = comparison.search("x is not equal to y")
+    assert match is not None and match.group() == "is not equal to"
+
+
+def test_the_grammar_does_not_color_inside_a_longer_word() -> None:
+    """Word boundaries: `ofs`, `island`, `orange` are not `of`, `is`, `or`."""
+    words = _grammar_regexes("word-operator", "structural")
+    for text in ("ofs", "island", "orange", "itself", "android"):
+        assert not any(p.search(text) for p in words), text
+
+
+def test_the_markdown_injection_colors_exactly_the_fences_the_extractor_reads() -> None:
+    from bigfix_relevance_analyzer.extract import _MARKDOWN_RELEVANCE_TAGS
+
+    generator = load_tool(GENERATOR, "_generate_tmlanguage")
+    assert generator.fence_tags() == sorted(_MARKDOWN_RELEVANCE_TAGS)
+
+
+def test_the_extension_sends_relevance_buffers_whatever_their_scheme() -> None:
+    """A document selector by language, not only by file pattern, is what makes
+    VS Code send an unsaved `untitled:` buffer to the server."""
+    text = (PRIMARY / "extension.js").read_text("utf-8")
+    assert "{ language: LANGUAGE_ID }" in text

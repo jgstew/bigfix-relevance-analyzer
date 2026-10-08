@@ -17,13 +17,45 @@
   "main": "./extension.js",
   "settingsPrefix": "bigfixRelevance",
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onLanguage:bigfix-relevance"
   ],
   "contributes": {
     "commands": [
       {
         "command": "bigfixRelevance.restartServer",
         "title": "BigFix Relevance: Restart Language Server"
+      }
+    ],
+    "languages": [
+      {
+        "id": "bigfix-relevance",
+        "aliases": [
+          "BigFix Relevance",
+          "bigfix-relevance"
+        ],
+        "extensions": [
+          ".rel",
+          ".bsr"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "bigfix-relevance",
+        "scopeName": "source.bigfix-relevance",
+        "path": "./syntaxes/bigfix-relevance.tmLanguage.json"
+      },
+      {
+        "scopeName": "markdown.bigfix-relevance.codeblock",
+        "path": "./syntaxes/markdown-relevance.injection.json",
+        "injectTo": [
+          "text.html.markdown"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.bigfix-relevance": "bigfix-relevance"
+        }
       }
     ],
     "configuration": {

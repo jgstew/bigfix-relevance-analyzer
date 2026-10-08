@@ -60,11 +60,25 @@ async function run() {
       line: d.range.start.line + 1,
       message: d.message,
     }));
+  // An unsaved buffer has no file name, so only its language says it is
+  // relevance (see LANGUAGE_ID in src/bigfix_relevance_analyzer/lsp/linter.py).
+  let untitledFound;
+  const language = process.env.SMOKE_UNTITLED_LANGUAGE;
+  if (language) {
+    const untitled = await vscode.workspace.openTextDocument({
+      language,
+      content: 'exists file "unterminated',
+    });
+    await vscode.window.showTextDocument(untitled);
+    untitledFound = await waitFor(untitled.uri, (found) => found.length > 0);
+  }
+
   const result = {
     vscode: vscode.version,
     firstDiagnosticsMs: firstMs,
     "broken.rel": summary(brokenFound),
     "fenced.md": summary(fencedFound),
+    ...(untitledFound ? { [`untitled (${language})`]: summary(untitledFound) } : {}),
   };
   fs.writeFileSync(process.env.SMOKE_RESULT, JSON.stringify(result, null, 2));
 

@@ -63,6 +63,7 @@ class _SyncKind(enum.IntEnum):
 class _Document:
     text: str
     version: int | None
+    language_id: str | None = None
 
 
 class Server:
@@ -164,7 +165,9 @@ class Server:
         if method == "textDocument/didOpen":
             document = params["textDocument"]
             uri = document["uri"]
-            self._documents[uri] = _Document(document["text"], document.get("version"))
+            self._documents[uri] = _Document(
+                document["text"], document.get("version"), document.get("languageId")
+            )
             return [self._publish(uri)]
         if method == "textDocument/didChange":
             return self._did_change(params)
@@ -206,7 +209,7 @@ class Server:
         params: Message = {
             "uri": uri,
             "version": document.version,
-            "diagnostics": self.linter.diagnostics(uri, document.text),
+            "diagnostics": self.linter.diagnostics(uri, document.text, document.language_id),
         }
         return _notify("textDocument/publishDiagnostics", params)
 
