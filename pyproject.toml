@@ -76,13 +76,12 @@ packages = ["src/bigfix_relevance_analyzer"]
 # Delay dependency resolution by 7 days so newly-published (possibly broken
 # or compromised) releases aren't picked up immediately.
 exclude-newer = "7 days"
-# One deliberate exception, narrowed to a single name so the policy above still
-# covers everything else. `bigfix-remote-client-relevance` is this project's own
-# multi-client qna oracle (see `docs/qna.md`); every release of it so far is
-# newer than the cutoff, so the rule would exclude the package entirely rather
-# than merely hold it back. Remove this entry once its releases age past the
-# window on their own.
-exclude-newer-package = { bigfix-remote-client-relevance = "2026-09-01T00:00:00Z" }
+# One deliberate, permanent exception, narrowed to a single name so the policy
+# above still covers everything else: `bigfix-remote-client-relevance` is this
+# project's own multi-client qna oracle (see `docs/qna.md`), so it is exempt
+# from the cooldown. "0 days" means no delay; unlike a fixed date it never
+# goes stale and hides newer releases.
+exclude-newer-package = { bigfix-remote-client-relevance = "0 days" }
 required-version = ">=0.12"
 
 [tool.ruff]
