@@ -331,3 +331,19 @@ def test_the_workflow_pins_every_action_to_a_commit() -> None:
     assert uses
     for action in uses:
         assert re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", action), action
+
+
+def test_the_workflow_runs_only_when_an_input_of_the_extension_changes() -> None:
+    """Every input the build reads, on both triggers; manual runs stay possible."""
+    text = WORKFLOW.read_text("utf-8")
+    for path in (
+        '"src/**"',
+        '"pyproject.toml"',
+        '"uv.lock"',
+        '"tools/vscode-extension/**"',
+        '"tools/playground-wasm/componentize-py/build-playground/**"',
+        '".github/workflows/vscode-extension.yaml"',
+    ):
+        assert path in text, path
+    assert "paths: *inputs" in text
+    assert "workflow_dispatch:" in text

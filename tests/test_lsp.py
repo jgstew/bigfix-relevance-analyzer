@@ -531,3 +531,38 @@ def test_params_that_are_not_an_object_are_invalid(params: object) -> None:
     assert response["id"] == 5
     assert response["error"]["code"] == -32602
     assert server.handle(notification("textDocument/didOpen", params)) == []
+
+
+def test_a_second_initialize_is_refused() -> None:
+    """The spec: initialize is sent once; a repeat is an InvalidRequest."""
+    server = started(maxDocumentBytes=5)
+    (response,) = server.handle(
+        request("initialize", {"initializationOptions": {"maxDocumentBytes": 9}}, id_=2)
+    )
+    assert response["error"]["code"] == -32600
+    assert server.linter.max_document_bytes == 5
+
+
+def test_a_ranged_change_forgets_the_document_so_saves_publish_nothing_stale() -> None:
+    server = started()
+    did_open(server, "a.rel", BROKEN)
+    change = {
+        "range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+        "text": "x",
+    }
+    server.handle(
+        notification(
+            "textDocument/didChange",
+            {"textDocument": {"uri": uri("a.rel"), "version": 2}, "contentChanges": [change]},
+        )
+    )
+    saved = server.handle(
+        notification("textDocument/didSave", {"textDocument": {"uri": uri("a.rel")}})
+    )
+    assert saved == []
+
+
+def test_read_message_refuses_an_implausible_content_length() -> None:
+    """A bogus huge length would block on stdin until EOF with no explanation."""
+    with pytest.raises(ValueError, match="Content-Length"):
+        stdio.read_message(io.BytesIO(b"Content-Length: 9999999999\r\n\r\n{}"))

@@ -169,16 +169,23 @@ class DocumentLinter:
     def diagnostics(self, uri: str, text: str) -> list[Diagnostic]:
         """The diagnostics to publish for the document at ``uri`` holding ``text``."""
         data = text.encode("utf-8", errors="surrogatepass")
-        lines = _LINE_BREAK.split(text)
         if len(data) > self.max_document_bytes:
             message = (
                 f"not linted: {len(data)} bytes is over the {self.max_document_bytes}-byte "
                 "limit (maxDocumentBytes)"
             )
+            # Only line 0 is needed, and the guard is there so that a document
+            # this size is never processed whole, so no full split.
+            first = text[: next((i for i, c in enumerate(text) if c in "\r\n"), len(text))]
             return [
-                _diagnostic(lines, 0, _DiagnosticSeverity.INFORMATION, DOCUMENT_TOO_LARGE, message)
+                _diagnostic(
+                    [first], 0, _DiagnosticSeverity.INFORMATION, DOCUMENT_TOO_LARGE, message
+                )
             ]
         findings = _lint_data(_path_of(uri), data, self.config, self._judge)
+        if not findings:
+            return []
+        lines = _LINE_BREAK.split(text)
         return [
             _diagnostic(
                 lines,

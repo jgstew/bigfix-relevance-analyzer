@@ -123,6 +123,8 @@ class Server:
 
     def _request(self, id_: Any, method: str, params: Mapping[str, Any]) -> list[Message]:
         if method == "initialize":
+            if self._initialized:
+                return [error_response(id_, ErrorCode.INVALID_REQUEST, "already initialized")]
             return [_result(id_, self._initialize(params))]
         if not self._initialized:
             return [error_response(id_, ErrorCode.SERVER_NOT_INITIALIZED, "not initialized")]
@@ -183,7 +185,10 @@ class Server:
         changes = params.get("contentChanges") or []
         if any("range" in change for change in changes):
             # Only full sync is advertised, so this is a client that ignored it.
+            # The stored text no longer matches the buffer, so forget it rather
+            # than publish stale findings on the next save.
             logger.warning("ignoring a ranged change to %s: only full sync is supported", uri)
+            del self._documents[uri]
             return []
         if not changes:
             return []

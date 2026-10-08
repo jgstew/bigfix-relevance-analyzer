@@ -44,7 +44,12 @@ const PREFIX = manifest.settingsPrefix;
 const SETTINGS = manifest.contributes.configuration.properties;
 
 let code;
-let server = [join(REPO, ".venv", "bin", "bigfix-relevance-lsp")];
+// uv puts a venv's scripts in Scripts\ with an .exe suffix on Windows.
+let server = [
+  process.platform === "win32"
+    ? join(REPO, ".venv", "Scripts", "bigfix-relevance-lsp.exe")
+    : join(REPO, ".venv", "bin", "bigfix-relevance-lsp"),
+];
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] === "--code") code = argv[++i];
   else if (argv[i] === "--server") (server = argv.slice(i + 1)), (i = argv.length);

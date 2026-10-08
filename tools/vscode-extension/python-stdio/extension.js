@@ -63,12 +63,20 @@ async function start() {
   }
 }
 
-async function restart() {
-  if (client) {
-    await client.stop().catch(() => undefined);
-    client = undefined;
-  }
-  await start();
+/** @type {Promise<void>} */
+let restarting = Promise.resolve();
+
+// Serialized: two overlapping restarts (the command and a settings change, say)
+// would otherwise both create a client, and the first would never be stopped.
+function restart() {
+  restarting = restarting.then(async () => {
+    if (client) {
+      await client.stop().catch(() => undefined);
+      client = undefined;
+    }
+    await start();
+  });
+  return restarting;
 }
 
 async function activate(context) {

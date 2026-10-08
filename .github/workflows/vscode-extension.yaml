@@ -20,11 +20,23 @@ name: vscode-extension
 # To install the artifact: unzip the download, then in VS Code run
 # "Extensions: Install from VSIX..." and pick the .vsix inside.
 
+# Runs only when something the extension is built from changes, so a docs-only
+# PR skips the ~350 MB VS Code download. Keep this list complete: a missing input
+# means its changes go untested here. If these checks are ever made required in
+# branch protection, revisit this: a filtered-out workflow never reports.
 on:
   pull_request:
+    paths: &inputs
+      - "src/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "tools/vscode-extension/**"
+      - "tools/playground-wasm/componentize-py/build-playground/**"
+      - ".github/workflows/vscode-extension.yaml"
   push:
     branches:
       - main
+    paths: *inputs
   workflow_dispatch:
 
 permissions:

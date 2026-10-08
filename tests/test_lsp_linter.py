@@ -189,3 +189,17 @@ def test_apply_options_ignores_options_that_are_not_an_object(
         linter.apply_options(["maxDocumentBytes", 5])
     assert linter.max_document_bytes == DEFAULT_MAX_DOCUMENT_BYTES
     assert "initialization options" in caplog.text
+
+
+def test_an_oversized_document_is_never_split_into_lines(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The guard exists for documents too big to process; splitting one is processing it."""
+    import bigfix_relevance_analyzer.lsp.linter as linter_module
+
+    class Refuse:
+        def split(self, text: str) -> list[str]:
+            raise AssertionError("split an oversized document")
+
+    monkeypatch.setattr(linter_module, "_LINE_BREAK", Refuse())
+    (diagnostic,) = DocumentLinter(max_document_bytes=10).diagnostics("file:///w/a.rel", BROKEN)
+    assert diagnostic["code"] == DOCUMENT_TOO_LARGE
+    assert DocumentLinter().diagnostics("file:///w/a.rel", CLIENT) == []

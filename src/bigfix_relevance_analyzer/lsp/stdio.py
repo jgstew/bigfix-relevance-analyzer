@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 
 _CONTENT_LENGTH = b"content-length"
 
+_MAX_CONTENT_LENGTH = 256 * 1024 * 1024
+"""A sanity cap, far above any real message: a bogus length would otherwise
+block on stdin until end of input, with nothing to say why."""
+
 
 class _UnparsableError(Exception):
     """A frame arrived whole, but its body is not a JSON-RPC message."""
@@ -50,6 +54,8 @@ def read_message(stream: IO[bytes]) -> Any:
             # `read(-1)` reads to end of input, swallowing every later message.
             if length < 0:
                 raise ValueError(f"a negative Content-Length: {length}")
+            if length > _MAX_CONTENT_LENGTH:
+                raise ValueError(f"an implausible Content-Length: {length}")
     if length is None:
         raise ValueError("a message header with no Content-Length")
     body = stream.read(length)

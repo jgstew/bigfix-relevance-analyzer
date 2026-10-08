@@ -33,10 +33,12 @@ async function main() {
       // The component traps rather than raises on a fault, and a trapped
       // instance cannot be trusted afterwards; let the client restart us.
       console.error(error);
-      if (message.id !== undefined) {
-        writer.write({ jsonrpc: "2.0", id: message.id, error: { code: INTERNAL_ERROR, message: String(error) } });
-      }
-      process.exit(1);
+      if (message.id === undefined) process.exit(1);
+      // IPC writes are asynchronous: exit once the reply is sent, or it is lost.
+      writer
+        .write({ jsonrpc: "2.0", id: message.id, error: { code: INTERNAL_ERROR, message: String(error) } })
+        .finally(() => process.exit(1));
+      return;
     }
     for (const reply of replies) writer.write(reply);
     const code = component.exitCode();
