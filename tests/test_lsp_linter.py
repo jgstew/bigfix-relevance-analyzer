@@ -238,3 +238,16 @@ def test_a_recognized_suffix_wins_over_the_language() -> None:
 
     prose = "# Notes\n\nnot relevance at all\n"
     assert DocumentLinter().diagnostics("file:///w/doc.md", prose, language_id=LANGUAGE_ID) == []
+
+
+def test_untitled_linting_survives_a_second_untyped_suffix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The fallback borrows an untyped suffix only to pick the extractor, and
+    every untyped suffix picks the same one; a second must not break it."""
+    import bigfix_relevance_analyzer.lsp.linter as linter_module
+    from bigfix_relevance_analyzer.lsp.linter import LANGUAGE_ID
+
+    monkeypatch.setattr(linter_module, "_UNTYPED_TEXT_SUFFIXES", frozenset({".rel", ".relevance"}))
+    found = DocumentLinter().diagnostics("untitled:Untitled-1", BROKEN, language_id=LANGUAGE_ID)
+    assert "error-token" in {d["code"] for d in found}

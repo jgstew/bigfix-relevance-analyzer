@@ -653,25 +653,13 @@ MARKDOWN_SAMPLES = {
 
 def _anchored(pattern: str) -> re.Pattern[str]:
     """A TextMate pattern for Python's `re`: `\\G` (continue where the last
-    match ended) only ever appears as `(^|\\G)` at line start here. Kept a
-    group, so backreference numbers stay the same."""
-    return re.compile(pattern.replace(r"(^|\G)", "(^)"))
-
-
-def _with_backreferences(pattern: str, groups: tuple[str | None, ...]) -> str:
-    """``pattern`` with each ``\\N`` replaced by the begin match's group N,
-    escaped, as the TextMate engine does for an end pattern."""
-
-    def group(reference: re.Match[str]) -> str:
-        return re.escape(groups[int(reference.group(1)) - 1] or "")
-
-    return re.sub(r"\\(\d)", group, pattern)
+    match ended) only ever appears as `(^|\\G)` at line start here."""
+    return re.compile(pattern.replace(r"(^|\G)", "^"))
 
 
 def _injected_blocks(markdown: str) -> list[str]:
     """The text the injection grammar colors as relevance, block by block,
-    following its begin/end rules line by line as the TextMate engine does
-    (end backreferences resolved against the begin match)."""
+    following its begin/end rules line by line as the TextMate engine does."""
     generator = load_tool(GENERATOR, "_generate_tmlanguage")
     grammar = generator.markdown_injection()
     rules = [
@@ -688,7 +676,10 @@ def _injected_blocks(markdown: str) -> list[str]:
                 begin = _anchored(rule["begin"]).match(line)
                 if begin:
                     open_rule = rule
-                    end = _anchored(_with_backreferences(rule["end"], begin.groups()))
+                    # No backreferences: each end pattern stands alone, so
+                    # this simulation need not resolve them against `begin`.
+                    assert not re.search(r"\\\d", rule["end"]), rule["end"]
+                    end = _anchored(rule["end"])
                     body = []
                     break
         elif end is not None and end.match(line):

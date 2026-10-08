@@ -261,8 +261,10 @@ def _document_path(uri: str, language_id: str | None) -> Path:
     path = _path_of(uri)
     if language_id == LANGUAGE_ID and not _is_recognized(path):
         # Plain relevance, the same as a `.rel` file: dialect from the content.
-        (untyped,) = _UNTYPED_TEXT_SUFFIXES
-        return path.with_name(f"{path.name}{untyped}")
+        # The suffix only picks the extractor, and every untyped suffix picks
+        # the same one, so any member will do. `min` rather than unpacking a
+        # single element: a second untyped suffix must not break this.
+        return path.with_name(f"{path.name}{min(_UNTYPED_TEXT_SUFFIXES)}")
     return path
 
 
