@@ -266,6 +266,26 @@ def test_the_workflow_exists_and_drives_both_runtimes() -> None:
     assert f"tools/playground-wasm/{PARITY_TEST}" in text
 
 
+def test_the_workflow_runs_only_when_an_input_of_the_pages_changes() -> None:
+    """Every input the jobs read, on both triggers; manual runs and the
+    release's call are not path-filtered, so they always run."""
+    text = WORKFLOW.read_text(encoding="utf-8")
+    for path in (
+        '"src/**"',
+        '"pyproject.toml"',
+        '"uv.lock"',
+        '"tools/playground-wasm/**"',
+        '"tests/corpus/**"',
+        '".pre-commit-config.yaml"',
+        '".github/workflows/wasm-html.yaml"',
+    ):
+        assert path in text, path
+    assert "paths: &inputs" in text
+    assert "paths: *inputs" in text
+    assert "workflow_dispatch:" in text
+    assert "workflow_call:" in text
+
+
 def _npm_package_dirs() -> list[Path]:
     """Every directory under tools/playground-wasm/ holding a package.json."""
     return sorted(

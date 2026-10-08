@@ -402,6 +402,7 @@ def test_the_workflow_runs_only_when_an_input_of_the_extension_changes() -> None
         '"uv.lock"',
         '"tools/vscode-extension/**"',
         '"tools/playground-wasm/componentize-py/build-playground/**"',
+        '".pre-commit-config.yaml"',
         '".github/workflows/vscode-extension.yaml"',
     ):
         assert path in text, path
