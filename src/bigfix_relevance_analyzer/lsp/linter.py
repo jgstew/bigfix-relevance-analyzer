@@ -16,10 +16,20 @@ the same content, through the same extractors and rules, but over the editor's
 buffer rather than the file on disk. The file type comes from the URI's suffix.
 A document whose suffix no extractor reads has no diagnostics.
 
-A diagnostic spans its whole line. A finding records a line, not a range, and
-the column a parse error has is already in its message. Precise ranges need
-findings to carry a span through extraction's source map, a change to
-:class:`~bigfix_relevance_analyzer.lint.Finding` worth making on its own.
+Where a diagnostic goes
+-----------------------
+Over the text a finding is about, wherever it has
+:attr:`~bigfix_relevance_analyzer.lint.Finding.spans` and every one of them
+maps into the buffer (:mod:`~bigfix_relevance_analyzer.lsp.positions`): one
+diagnostic per span, in finding order, then span order. That is one for most
+findings, and one per use of each unknown name for ``unknown-inspector``,
+which lint reports as a single finding per statement. Each of those names its
+own name in its message, unless the finding offered "did you mean" leads, which
+belong to all its names together and so stay in the finding's message whole.
+
+Otherwise -- a statement-level rule, an extraction problem, or a span that
+cannot be placed for certain -- the diagnostic covers the finding's whole line,
+as every diagnostic did before ranges existed.
 
 The per-site cache
 ------------------
@@ -48,7 +58,8 @@ Runs in WASM
 ------------
 This is the code an editor extension runs inside a componentize-py component,
 which has only the modules and codecs its build snapshot saw. Hence UTF-8 only,
-and UTF-16 lengths counted rather than encoded -- see :func:`_utf16_length`.
+and UTF-16 lengths counted rather than encoded -- see
+:func:`~bigfix_relevance_analyzer.lsp.positions.utf16_length`.
 """
 
 from __future__ import annotations
@@ -56,7 +67,6 @@ from __future__ import annotations
 import dataclasses
 import enum
 import logging
-import re
 from collections import OrderedDict
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
@@ -75,9 +85,11 @@ from bigfix_relevance_analyzer.lint import (
     Finding,
     LintConfig,
     Severity,
+    TextSpan,
     _judge_site,
     _lint_data,
 )
+from bigfix_relevance_analyzer.lsp.positions import DocumentIndex, Range, utf16_length
 
 logger = logging.getLogger(__name__)
 
@@ -103,10 +115,6 @@ contributes the language under this id; a test keeps the two equal."""
 
 DEFAULT_CACHE_SIZE: Final = 2048
 """Sites whose findings the linter keeps -- as many as lint keeps analyses."""
-
-_LINE_BREAK: Final = re.compile(r"\r\n|\r|\n")
-"""What LSP counts as a line break -- only these, unlike :meth:`str.splitlines`,
-which also breaks on form feeds and Unicode separators a client does not."""
 
 
 class _DiagnosticSeverity(enum.IntEnum):
@@ -199,23 +207,17 @@ class DocumentLinter:
             first = text[: next((i for i, c in enumerate(text) if c in "\r\n"), len(text))]
             return [
                 _diagnostic(
-                    [first], 0, _DiagnosticSeverity.INFORMATION, DOCUMENT_TOO_LARGE, message
+                    ((0, 0), (0, utf16_length(first))),
+                    _DiagnosticSeverity.INFORMATION,
+                    DOCUMENT_TOO_LARGE,
+                    message,
                 )
             ]
         findings = _lint_data(_document_path(uri, language_id), data, self.config, self._judge)
         if not findings:
             return []
-        lines = _LINE_BREAK.split(text)
-        return [
-            _diagnostic(
-                lines,
-                max(finding.line - 1, 0),
-                _SEVERITIES[finding.severity],
-                finding.code,
-                finding.message,
-            )
-            for finding in findings
-        ]
+        index = DocumentIndex(text, data)
+        return [diagnostic for finding in findings for diagnostic in _diagnostics(index, finding)]
 
     def _judge(
         self, file_path: Path | None, site: RelevanceSite, config: LintConfig
@@ -268,25 +270,47 @@ def _document_path(uri: str, language_id: str | None) -> Path:
     return path
 
 
-def _utf16_length(line: str) -> int:
-    """``line``'s length in UTF-16 code units: two for an astral character.
+def _diagnostics(index: DocumentIndex, finding: Finding) -> list[Diagnostic]:
+    """``finding``'s diagnostics: one per span when all of them map, else one
+    over its whole line. See the module docstring."""
+    severity = _SEVERITIES[finding.severity]
+    site = finding.site
+    if site is not None and finding.spans:
+        ranges = [index.site_range(site, span) for span in finding.spans]
+        if all(found is not None for found in ranges):
+            return [
+                _diagnostic(found, severity, finding.code, _message(finding, site.text, span))
+                for found, span in zip(ranges, finding.spans, strict=True)
+                if found is not None
+            ]
+    line = max(finding.line - 1, 0)
+    whole = ((line, 0), (line, index.line_length(line)))
+    return [_diagnostic(whole, severity, finding.code, finding.message)]
 
-    Counted rather than encoded on purpose. A WASM host has only the codecs its
-    build snapshot saw, and ``str.encode("utf-16-le")`` raised ``LookupError``
-    inside a componentize-py component, losing every diagnostic.
+
+def _message(finding: Finding, text: str, span: TextSpan) -> str:
+    """The message for ``span`` of ``finding``: its own, except an
+    ``unknown-inspector`` use, which names just its name when it can.
+
+    Not when the finding has leads -- they are for all its names together --
+    nor when the name as written does not read back as one the message names
+    (a comment inside it, say): the finding's own message is never wrong.
     """
-    return len(line) + sum(1 for char in line if ord(char) > 0xFFFF)
+    if finding.code != "unknown-inspector" or finding.suggestions:
+        return finding.message
+    name = " ".join(text[span.start : span.end].split()).lower()
+    if f"`{name}`" not in finding.message:
+        return finding.message
+    return f"no dump defines `{name}`"
 
 
-def _diagnostic(
-    lines: list[str], line: int, severity: _DiagnosticSeverity, code: str, message: str
-) -> Diagnostic:
-    """A diagnostic over the whole of ``line`` (0-based), in UTF-16 code units."""
-    end = _utf16_length(lines[line]) if line < len(lines) else 0
+def _diagnostic(found: Range, severity: _DiagnosticSeverity, code: str, message: str) -> Diagnostic:
+    """A diagnostic over ``found``: 0-based lines, UTF-16 code unit characters."""
+    (start_line, start), (end_line, end) = found
     return {
         "range": {
-            "start": {"line": line, "character": 0},
-            "end": {"line": line, "character": end},
+            "start": {"line": start_line, "character": start},
+            "end": {"line": end_line, "character": end},
         },
         "severity": int(severity),
         "code": code,

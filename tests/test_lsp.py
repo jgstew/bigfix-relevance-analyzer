@@ -212,14 +212,14 @@ def test_a_clean_document_publishes_an_empty_list() -> None:
     assert params == {"uri": uri("clean.rel"), "version": 1, "diagnostics": []}
 
 
-def test_a_broken_statement_is_an_error_spanning_its_line() -> None:
+def test_a_broken_statement_is_an_error_over_the_unterminated_string() -> None:
     found = diagnostics(did_open(started(), "broken.rel", BROKEN), "broken.rel")
     assert found
     for diagnostic in found:
         assert diagnostic["severity"] == 1
         assert diagnostic["source"] == SOURCE
         assert diagnostic["range"] == {
-            "start": {"line": 0, "character": 0},
+            "start": {"line": 0, "character": BROKEN.index('"')},
             "end": {"line": 0, "character": len(BROKEN)},
         }
     assert "error-token" in {diagnostic["code"] for diagnostic in found}
@@ -254,6 +254,12 @@ text = '"\\U0001f600" & exists file "unterminated'
 found = reply["params"]["diagnostics"]
 assert found, reply
 assert found[0]["range"]["end"]["character"] == len(text) + 1, found
+assert found[0]["range"]["start"]["character"] == text.index('"unterminated') + 1, found
+bes = '<BES><Task><Relevance>"\\U0001f600" &amp; exists bogus thing</Relevance></Task></BES>'
+(reply,) = server.handle({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {
+    "textDocument": {"uri": "file:///w/a.bes", "languageId": "x", "version": 1, "text": bes}}})
+(found,) = [d for d in reply["params"]["diagnostics"] if d["code"] == "unknown-inspector"]
+assert found["range"]["start"]["character"] == bes.index("bogus") + 1, found
 print("ok")
 """
     )

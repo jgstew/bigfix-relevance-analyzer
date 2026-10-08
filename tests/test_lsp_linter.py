@@ -19,7 +19,7 @@ from typing import Any
 import pytest
 from _helpers import BES_EXAMPLE, BROKEN, CLIENT, UNKNOWN_INSPECTOR, run_fresh_python, write
 
-from bigfix_relevance_analyzer.lint import LintConfig, Severity, lint_file
+from bigfix_relevance_analyzer.lint import LintConfig, Severity, lint_file, lint_text
 from bigfix_relevance_analyzer.lsp.linter import (
     DEFAULT_MAX_DOCUMENT_BYTES,
     DOCUMENT_TOO_LARGE,
@@ -29,6 +29,25 @@ from bigfix_relevance_analyzer.lsp.linter import (
 
 URI = "file:///workspace/doc.md"
 TWO_SITES = f"```relevance\n{UNKNOWN_INSPECTOR}\n```\n\n```relevance\n{BROKEN}\n```\n"
+
+
+def span_range(line: int, start: int, end_line: int, end: int) -> dict[str, Any]:
+    return {
+        "start": {"line": line, "character": start},
+        "end": {"line": end_line, "character": end},
+    }
+
+
+def whole_line(text: str, line: int) -> dict[str, Any]:
+    return span_range(line, 0, line, len(text.splitlines()[line]))
+
+
+def underlined(text: str, diagnostic: dict[str, Any]) -> str:
+    """The text a single-line diagnostic covers (no astral characters in these)."""
+    start: dict[str, int] = diagnostic["range"]["start"]
+    end: dict[str, int] = diagnostic["range"]["end"]
+    assert start["line"] == end["line"]
+    return text.splitlines()[start["line"]][start["character"] : end["character"]]
 
 
 def as_lint(found: list[dict[str, Any]]) -> list[tuple[str, str, int]]:
@@ -83,15 +102,14 @@ def test_an_unrecognized_file_type_has_no_diagnostics() -> None:
     assert DocumentLinter().diagnostics("file:///w/notes.txt", BROKEN) == []
 
 
-def test_a_broken_statement_is_an_error_over_its_line() -> None:
+def test_a_broken_statement_is_an_error_over_the_offending_text() -> None:
+    """``exists file "unterminated``: the string, not the line (issue #96, item 1)."""
     found = DocumentLinter().diagnostics("file:///w/a.rel", BROKEN)
+    assert {d["code"] for d in found} == {"parse-error", "error-token"}
     for diagnostic in found:
         assert diagnostic["severity"] == 1
         assert diagnostic["source"] == SOURCE
-        assert diagnostic["range"] == {
-            "start": {"line": 0, "character": 0},
-            "end": {"line": 0, "character": len(BROKEN)},
-        }
+        assert diagnostic["range"] == span_range(0, 12, 0, len(BROKEN))
 
 
 @pytest.mark.parametrize(
@@ -195,11 +213,10 @@ def test_an_oversized_document_is_never_split_into_lines(monkeypatch: pytest.Mon
     """The guard exists for documents too big to process; splitting one is processing it."""
     import bigfix_relevance_analyzer.lsp.linter as linter_module
 
-    class Refuse:
-        def split(self, text: str) -> list[str]:
-            raise AssertionError("split an oversized document")
+    def refuse(text: str, data: bytes) -> None:
+        raise AssertionError("indexed an oversized document")
 
-    monkeypatch.setattr(linter_module, "_LINE_BREAK", Refuse())
+    monkeypatch.setattr(linter_module, "DocumentIndex", refuse)
     (diagnostic,) = DocumentLinter(max_document_bytes=10).diagnostics("file:///w/a.rel", BROKEN)
     assert diagnostic["code"] == DOCUMENT_TOO_LARGE
     assert DocumentLinter().diagnostics("file:///w/a.rel", CLIENT) == []
@@ -251,3 +268,129 @@ def test_untitled_linting_survives_a_second_untyped_suffix(
     monkeypatch.setattr(linter_module, "_UNTYPED_TEXT_SUFFIXES", frozenset({".rel", ".relevance"}))
     found = DocumentLinter().diagnostics("untitled:Untitled-1", BROKEN, language_id=LANGUAGE_ID)
     assert "error-token" in {d["code"] for d in found}
+
+
+# ---------------------------------------------------------------------------
+# Precise ranges (issue #96, item 1)
+# ---------------------------------------------------------------------------
+
+BES_TYPE_ERROR = (
+    '<BES>\n<Task>\n\t<Relevance>exists file "x"\n'
+    '\twhose (version of it &gt; "1" AND size of it = "big")</Relevance>\n'
+    "</Task>\n</BES>\n"
+)
+
+
+def test_a_bes_type_error_covers_the_comparison_only() -> None:
+    (diagnostic,) = DocumentLinter().diagnostics("file:///w/a.bes", BES_TYPE_ERROR)
+    assert diagnostic["code"] == "type-error"
+    assert underlined(BES_TYPE_ERROR, diagnostic) == 'size of it = "big"'
+    assert diagnostic["range"]["start"]["line"] == 3
+
+
+def test_a_bes_range_counts_an_entity_as_written() -> None:
+    """``&gt;`` is one character in the statement and four in the buffer."""
+    (diagnostic,) = DocumentLinter().diagnostics("file:///w/a.bes", BES_TYPE_ERROR)
+    line = BES_TYPE_ERROR.splitlines()[3]
+    assert diagnostic["range"]["start"]["character"] == line.index("size")
+
+
+def test_unknown_inspector_gets_one_diagnostic_per_name() -> None:
+    text = "exists bogus one whose (exists bogus two)"
+    config = LintConfig(suggest=False)
+    found = DocumentLinter(config=config).diagnostics("file:///w/a.rel", text)
+    assert [d["code"] for d in found] == ["unknown-inspector", "unknown-inspector"]
+    assert [underlined(text, d) for d in found] == ["bogus one", "bogus two"]
+    # Each one names its own name: with no "did you mean" to attribute, the
+    # message is tailored to it.
+    assert [d["message"] for d in found] == [
+        "no dump defines `bogus one`",
+        "no dump defines `bogus two`",
+    ]
+    # ...while lint, and so the hook, still reports one finding.
+    (finding,) = lint_text(text, config)
+    assert finding.message == "no dump defines `bogus one`, `bogus two`"
+
+
+def test_every_use_of_an_unknown_name_is_underlined() -> None:
+    text = "exists bogus one and exists bogus one"
+    found = DocumentLinter(config=LintConfig()).diagnostics("file:///w/a.rel", text)
+    assert [underlined(text, d) for d in found] == ["bogus one", "bogus one"]
+    assert found[0]["range"] != found[1]["range"]
+
+
+def test_an_unknown_name_with_suggestions_keeps_the_findings_message() -> None:
+    """The "did you mean" leads are the finding's, for all its names together;
+    tailoring the message to one name would misattribute them, so it is kept."""
+    text = "exists oprating system and exists bogus two"
+    linter = DocumentLinter()
+    found = linter.diagnostics("file:///w/a.rel", text)
+    (finding,) = lint_text(text, linter.config)
+    assert finding.suggestions, "no lead for the typo; pick another"
+    assert [underlined(text, d) for d in found] == ["oprating system", "bogus two"]
+    assert {d["message"] for d in found} == {finding.message}
+
+
+def test_one_unknown_name_with_suggestions_keeps_the_findings_message() -> None:
+    text = "exists oprating system"
+    linter = DocumentLinter()
+    (diagnostic,) = linter.diagnostics("file:///w/a.rel", text)
+    (finding,) = lint_text(text, linter.config)
+    assert "did you mean" in diagnostic["message"]
+    assert diagnostic["message"] == finding.message
+    assert underlined(text, diagnostic) == "oprating system"
+
+
+def test_a_statement_level_finding_still_covers_its_line() -> None:
+    text = '  exists descendants of folder "c:\\"'
+    config = LintConfig(max_score=None, max_evaluation_cost=0.0)
+    (diagnostic,) = DocumentLinter(config=config).diagnostics("file:///w/a.rel", text)
+    assert diagnostic["code"] == "evaluation-cost"
+    assert diagnostic["range"] == whole_line(text, 0)
+
+
+def test_an_unmappable_span_falls_back_to_the_whole_line() -> None:
+    """The statement starts a line below its processing instruction: no column."""
+    text = "<p><?Relevance\n  names of bogus things ?></p>\n"
+    (diagnostic,) = DocumentLinter().diagnostics("file:///w/a.ojo", text)
+    assert diagnostic["code"] == "unknown-inspector"
+    assert diagnostic["range"] == whole_line(text, 0)
+
+
+def test_a_parse_error_at_the_end_covers_the_last_character() -> None:
+    text = 'exists file "x" whose (it\n    is'
+    (diagnostic,) = DocumentLinter().diagnostics("file:///w/a.rel", text)
+    assert diagnostic["code"] == "parse-error"
+    assert diagnostic["range"] == span_range(1, 5, 1, 6)
+
+
+def test_a_multi_line_span_is_one_multi_line_range() -> None:
+    text = 'exists file "x" whose (size of it\n    = "big")'
+    (diagnostic,) = DocumentLinter().diagnostics("file:///w/a.rel", text)
+    assert diagnostic["range"] == span_range(0, 23, 1, 11)
+
+
+def test_ranges_in_a_crlf_markdown_file() -> None:
+    text = '# T\r\n\r\n```relevance\r\nexists file "x"\r\n  whose (size of it = "big")\r\n```\r\n'
+    (diagnostic,) = DocumentLinter().diagnostics("file:///w/a.md", text)
+    assert diagnostic["range"] == span_range(4, 9, 4, 27)
+
+
+def test_a_cached_site_that_moved_sideways_keeps_its_range_right() -> None:
+    linter = DocumentLinter()
+    linter.diagnostics("file:///w/a.ojo", "<p><?Relevance exists bogus thing ?></p>")
+    text = "<div><p>moved <?Relevance exists bogus thing ?></p></div>"
+    (diagnostic,) = linter.diagnostics("file:///w/a.ojo", text)
+    assert linter.cache_stats().hits == 1
+    assert underlined(text, diagnostic) == "bogus thing"
+
+
+def test_diagnostics_stay_in_finding_order_then_span_order() -> None:
+    text = 'exists bogus one whose (size of it = "big") and exists bogus two'
+    found = DocumentLinter(config=LintConfig()).diagnostics("file:///w/a.rel", text)
+    codes = [d["code"] for d in found]
+    findings = lint_text(text, LintConfig())
+    expected: list[str] = []
+    for finding in findings:
+        expected.extend([finding.code] * max(len(finding.spans), 1))
+    assert codes == expected
