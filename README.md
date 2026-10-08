@@ -649,9 +649,11 @@ lint_paths_to_dict(changed_paths, LintConfig(max_score=350))
 all have `to_dict()`. `Inspector` and `RelevanceType` include the decoded
 `dialects` and `platforms` so no consumer parses `"client:windows"` for itself;
 `Finding` nests its `site` and carries a `text` key holding the same grep-able
-line the CLIs print, and a `spans` list of `{"start", "end"}` offsets into the
-site's text (or the bare statement) for the characters it is about - empty for
-a finding about the statement as a whole. `line` keeps its meaning; a span is
+line the CLIs print, and a `spans` list of `{"start", "end", "message"}`: offsets
+into the site's text (or the bare statement) for the characters it is about -
+empty for a finding about the statement as a whole - and, for an
+`unknown-inspector` use, a `message` naming just that name with just its own
+"did you mean" leads (`null` on every other rule's spans). `line` keeps its meaning; a span is
 relative to the statement, so turning it into a file position is the
 consumer's job (`lsp.positions` does it for an editor).
 
