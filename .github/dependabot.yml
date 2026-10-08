@@ -120,6 +120,17 @@ updates:
     labels:
       - "dependencies"
 
+  # @vscode/test-electron: the shared end-to-end smoke test
+  - package-ecosystem: "npm"
+    directory: "/tools/vscode-extension/common/smoke"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
   # vscode-languageclient
   - package-ecosystem: "npm"
     directory: "/tools/vscode-extension/python-stdio"

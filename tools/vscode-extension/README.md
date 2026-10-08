@@ -70,8 +70,8 @@ extension loaded. Open any `.bes`, `.rel` or relevance-fenced `.md` file there.
 `bigfix-relevance-developer.vsix` with `vsce`, runs the unit tests on the
 unzipped package, and uploads it as the `bigfix-relevance-developer-vsix`
 artifact. A second job runs the shared smoke test against that package in a
-headless VS Code (`xvfb-run`). VS Code is downloaded at a pinned version and
-checked against a pinned SHA-256.
+headless VS Code (`xvfb-run`), fetched by `@vscode/test-electron` at the
+version pinned in `common/smoke/package.json` and cached between runs.
 
 To install a build: download the artifact, unzip it, and in VS Code run
 **Extensions: Install from VSIX...** on the `.vsix`.
@@ -100,9 +100,16 @@ it did, the server exited before `initialize`.
 ## The smoke test
 
 ```bash
+cd tools/vscode-extension/common/smoke && npm ci && cd -
 node tools/vscode-extension/common/smoke/run.mjs tools/vscode-extension/componentize-py
 node tools/vscode-extension/common/smoke/run.mjs tools/vscode-extension/python-stdio
 ```
+
+`@vscode/test-electron` downloads the VS Code version pinned as `vscodeVersion`
+in `common/smoke/package.json` into `common/smoke/.vscode-test/` (gitignored,
+about 300 MB, reused afterwards). It retries a failed download and checks it
+against the update server's SHA-256. Pass `--code <path>` to use an installed
+VS Code instead.
 
 Each run starts an isolated VS Code instance with the extension loaded. A
 window opens briefly. Your own settings and extensions are not used. It opens

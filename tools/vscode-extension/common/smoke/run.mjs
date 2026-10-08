@@ -3,47 +3,53 @@
 // person involved. Both extensions run the same check, so their results compare
 // directly.
 //
-//     node common/smoke/run.mjs <extension-dir> [--code <VS Code executable>] [--server <command> [args...]]
+//     cd tools/vscode-extension/common/smoke && npm ci
+//     node run.mjs <extension-dir> [--code <VS Code executable>] [--server <command> [args...]]
 //
-// Starts an isolated VS Code instance (throwaway user-data and extensions
-// directories, so nothing of yours is read or changed) with the extension
-// under development and suite.js as its test runner. suite.js opens two files
-// and waits for the language server's diagnostics. A window opens briefly
-// while it runs.
+// @vscode/test-electron does the VS Code part. It downloads the version pinned
+// as `vscodeVersion` in this directory's package.json into ./.vscode-test/
+// (gitignored; reused on later runs), retrying a failed download and checking
+// it against the SHA-256 the update server publishes. Then it starts that VS
+// Code with the extension under development and suite.js as the test runner,
+// in a throwaway profile, so nothing of yours is read or changed. suite.js
+// opens two files and waits for the language server's diagnostics. A window
+// opens briefly; in CI, xvfb-run provides the display.
+//
+// --code skips the download and uses an installed VS Code instead.
 //
 // --server applies only to an extension that starts an external server
 // (python-stdio/, through `<prefix>.server.command`). It defaults to this
 // checkout's own `.venv/bin/bigfix-relevance-lsp` (from `uv sync`), so the run
 // tests the working tree rather than whatever is on PATH. The componentize-py/
 // extension needs its component built first; see its build-component/.
-//
-// No @vscode/test-electron: that downloads a separate VS Code build, which is
-// what CI would want but more than a proof of concept needs. Point --code at an
-// installed VS Code instead. It defaults to the standard macOS location.
 
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { runTests } from "@vscode/test-electron";
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "..", "..", "..", "..");
+const { vscodeVersion } = JSON.parse(readFileSync(join(HERE, "package.json"), "utf8"));
 
 const [extensionArg, ...argv] = process.argv.slice(2);
-if (!extensionArg) throw new Error("usage: node run.mjs <extension-dir> [--code <path>] [--server <command> [args...]]");
+if (!extensionArg) {
+  throw new Error("usage: node run.mjs <extension-dir> [--code <path>] [--server <command> [args...]]");
+}
 const EXTENSION = resolve(extensionArg);
 const manifest = JSON.parse(readFileSync(join(EXTENSION, "package.json"), "utf8"));
 const PREFIX = manifest.settingsPrefix;
 const SETTINGS = manifest.contributes.configuration.properties;
-let code = "/Applications/Visual Studio Code.app/Contents/MacOS/Code";
+
+let code;
 let server = [join(REPO, ".venv", "bin", "bigfix-relevance-lsp")];
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] === "--code") code = argv[++i];
-  else if (argv[i] === "--server") server = argv.slice(i + 1), (i = argv.length);
+  else if (argv[i] === "--server") (server = argv.slice(i + 1)), (i = argv.length);
   else throw new Error(`unknown argument ${argv[i]}`);
 }
-if (!existsSync(code)) throw new Error(`no VS Code at ${code}; pass --code`);
 
 const scratch = mkdtempSync(join(tmpdir(), "bigfix-relevance-smoke-"));
 try {
@@ -63,40 +69,42 @@ try {
   const result = join(scratch, "result.json");
 
   const started = Date.now();
-  const run = spawnSync(
-    code,
-    [
-      workspace,
-      `--extensionDevelopmentPath=${EXTENSION}`,
-      `--extensionTestsPath=${join(HERE, "suite.js")}`,
-      `--user-data-dir=${join(scratch, "user-data")}`,
-      `--extensions-dir=${join(scratch, "extensions")}`,
-      "--disable-workspace-trust",
-      "--disable-updates",
-      "--skip-welcome",
-      "--skip-release-notes",
-      "--new-window",
-      // A CI runner has no user namespaces for Chromium's sandbox, and no GPU.
-      // The same flags @vscode/test-electron passes on Linux.
-      ...(process.platform === "linux" ? ["--no-sandbox", "--disable-gpu-sandbox"] : []),
-    ],
-    {
-      stdio: ["ignore", "inherit", "inherit"],
-      env: { ...process.env, SMOKE_RESULT: result, ELECTRON_RUN_AS_NODE: undefined },
-      timeout: 180_000,
-    }
-  );
-  if (run.error) throw run.error;
-  if (!existsSync(result)) {
-    console.error(`smoke test failed: VS Code exited ${run.status} without a result`);
-    process.exit(1);
+  let failure;
+  try {
+    await runTests({
+      version: vscodeVersion,
+      cachePath: join(HERE, ".vscode-test"),
+      vscodeExecutablePath: code,
+      extensionDevelopmentPath: EXTENSION,
+      extensionTestsPath: join(HERE, "suite.js"),
+      extensionTestsEnv: { SMOKE_RESULT: result },
+      // A throwaway profile per run, rather than test-electron's default of
+      // one shared under the cache directory.
+      launchArgs: [
+        workspace,
+        `--user-data-dir=${join(scratch, "user-data")}`,
+        `--extensions-dir=${join(scratch, "extensions")}`,
+        "--new-window",
+      ],
+    });
+  } catch (error) {
+    failure = error;
   }
-  console.log(readFileSync(result, "utf8"));
-  if (run.status !== 0) {
-    console.error(`smoke test failed: VS Code exited ${run.status}`);
-    process.exit(1);
+  const seconds = ((Date.now() - started) / 1000).toFixed(1);
+  try {
+    console.log(readFileSync(result, "utf8"));
+  } catch {
+    console.error("smoke test failed: VS Code produced no result");
   }
-  console.log(`smoke test passed: ${manifest.displayName} (${((Date.now() - started) / 1000).toFixed(1)} s)`);
+  if (failure) {
+    console.error(`smoke test failed after ${seconds} s: ${failure.message ?? failure}`);
+    process.exitCode = 1;
+  } else {
+    console.log(
+      `smoke test passed: ${manifest.displayName} in VS Code ${vscodeVersion} ` +
+        `(${seconds} s, including any download)`
+    );
+  }
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }

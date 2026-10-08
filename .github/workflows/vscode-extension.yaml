@@ -9,8 +9,9 @@ name: vscode-extension
 #            packages the .vsix with vsce, unit-tests the *unzipped* .vsix in
 #            plain Node (seconds), then uploads it.
 #   e2e      downloads that artifact and runs the shared smoke test in a real,
-#            headless VS Code: the extension activates, starts its server, and
-#            the diagnostics for two files reach the editor.
+#            headless VS Code (fetched by @vscode/test-electron): the extension
+#            activates, starts its server, and the diagnostics for two files
+#            reach the editor.
 #
 # Both test what ships, not the source tree: the component lives under dist/,
 # which is gitignored, and is in the .vsix only because .vscodeignore lets it
@@ -126,14 +127,6 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     needs: package
-    env:
-      # Bump both together. The hash is the "sha256hash" field of
-      # https://update.code.visualstudio.com/api/versions/<version>/linux-x64/stable,
-      # and it was checked against a real download of this version. Pinned
-      # rather than "stable", so a VS Code release cannot change this job's
-      # result, and the download is verified before anything runs it.
-      VSCODE_VERSION: "1.140.0"
-      VSCODE_SHA256: "d32031e9e213d59532af3cf32fcb8b357a1cdd10417967b4f5b5ba30436dc0dc"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -142,6 +135,8 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: tools/vscode-extension/common/smoke/package-lock.json
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -151,31 +146,29 @@ jobs:
       - name: unzip the .vsix
         run: unzip -q dist/vsix/bigfix-relevance-developer.vsix -d dist/vsix-unpacked
 
-      # ~350 MB, so cached. The tarball is what is cached, not the unpacked
-      # tree, so the hash check below runs on every run, cache hit or not.
+      # @vscode/test-electron, pinned in this package, is what downloads and
+      # launches VS Code. run.mjs explains how.
+      - name: npm ci (smoke test)
+        working-directory: tools/vscode-extension/common/smoke
+        run: npm ci
+
+      # VS Code is ~350 MB. The version is pinned as `vscodeVersion` in the
+      # smoke package's package.json, so the key changes when it does.
+      # test-electron checks a download against the update server's SHA-256;
+      # a cache hit skips the download and so that check, which is the usual
+      # trade for actions/cache (writable only by this repository's runs).
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: .vscode-download
-          key: vscode-${{ env.VSCODE_VERSION }}-linux-x64-${{ env.VSCODE_SHA256 }}
+          path: tools/vscode-extension/common/smoke/.vscode-test
+          key: vscode-${{ runner.os }}-${{ hashFiles('tools/vscode-extension/common/smoke/package.json') }}
 
-      - name: download and verify VS Code
-        run: |
-          mkdir -p .vscode-download
-          if [ ! -f .vscode-download/vscode.tar.gz ]; then
-            curl -fsSL --retry 3 -o .vscode-download/vscode.tar.gz \
-              "https://update.code.visualstudio.com/${VSCODE_VERSION}/linux-x64/stable"
-          fi
-          echo "${VSCODE_SHA256}  .vscode-download/vscode.tar.gz" | sha256sum --check
-          mkdir -p .vscode-test
-          tar -xzf .vscode-download/vscode.tar.gz -C .vscode-test
-
-      # xvfb-run gives VS Code a display; the smoke test needs no other setup.
-      # Its report goes to the step summary too, including how long the run
-      # took. `tee` keeps a failing exit code because GitHub runs `run:` with
-      # `bash -eo pipefail`.
+      # xvfb-run gives VS Code a display. run.mjs downloads VS Code (retrying a
+      # failed download) on a cache miss, launches it against the unzipped
+      # .vsix, and prints the result and how long it took. Its output goes to
+      # the step summary too; `tee` keeps a failing exit code because GitHub
+      # runs `run:` with `bash -eo pipefail`.
       - name: smoke-test the packaged extension in headless VS Code
         run: |
           xvfb-run -a node tools/vscode-extension/common/smoke/run.mjs \
             dist/vsix-unpacked/extension \
-            --code .vscode-test/VSCode-linux-x64/code \
             | tee -a "$GITHUB_STEP_SUMMARY"

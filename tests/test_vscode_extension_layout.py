@@ -68,6 +68,10 @@ POC_PYTHON = VSCODE_EXTENSION / "python-stdio"
 COMMON_SMOKE = VSCODE_EXTENSION / "common" / "smoke"
 
 
+NPM_PACKAGES = [*EXTENSIONS, COMMON_SMOKE]
+"""Every npm package here: both extensions, and the shared smoke test."""
+
+
 def test_both_extensions_exist() -> None:
     """Guard the parametrized tests below against passing on an empty list."""
     assert EXTENSIONS == [PRIMARY, POC_PYTHON]
@@ -129,7 +133,7 @@ def test_the_directory_readme_describes_both_proofs_of_concept() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("extension", EXTENSIONS, ids=lambda path: path.name)
+@pytest.mark.parametrize("extension", NPM_PACKAGES, ids=lambda path: path.name)
 def test_every_extension_enforces_a_release_age_cooldown(extension: Path) -> None:
     """npm reads ``.npmrc`` from the working directory only, so one per package."""
     npmrc = extension / ".npmrc"
@@ -142,7 +146,7 @@ def test_every_extension_enforces_a_release_age_cooldown(extension: Path) -> Non
     assert _manifest(extension)["engines"]["npm"] == MIN_NPM
 
 
-@pytest.mark.parametrize("extension", EXTENSIONS, ids=lambda path: path.name)
+@pytest.mark.parametrize("extension", NPM_PACKAGES, ids=lambda path: path.name)
 def test_every_extension_pins_exactly_and_has_a_lockfile(extension: Path) -> None:
     manifest = _manifest(extension)
     assert manifest["private"] is True, "a proof of concept, never published to npm"
@@ -152,7 +156,7 @@ def test_every_extension_pins_exactly_and_has_a_lockfile(extension: Path) -> Non
             assert spec[0].isdigit(), f"{name} is {spec!r}, which is not an exact pin"
 
 
-@pytest.mark.parametrize("extension", EXTENSIONS, ids=lambda path: path.name)
+@pytest.mark.parametrize("extension", NPM_PACKAGES, ids=lambda path: path.name)
 def test_every_extension_is_watched_by_dependabot(extension: Path) -> None:
     relative = "/" + str(extension.relative_to(REPO_ROOT))
     assert f'directory: "{relative}"' in DEPENDABOT.read_text("utf-8")
@@ -288,15 +292,38 @@ def test_the_workflow_builds_packages_uploads_and_tests_the_vsix() -> None:
 
 
 def test_the_workflow_runs_the_shared_smoke_test_on_the_packaged_extension() -> None:
-    """A real, headless VS Code, against the unzipped ``.vsix`` -- what ships."""
+    """A real, headless VS Code, against the unzipped ``.vsix`` -- what ships.
+
+    VS Code comes from ``@vscode/test-electron`` through ``run.mjs``, not a
+    hand-written download, and the cache is keyed on the smoke package's
+    ``package.json``, where the VS Code version is pinned.
+    """
     text = WORKFLOW.read_text("utf-8")
     assert "xvfb-run" in text
     assert "tools/vscode-extension/common/smoke/run.mjs" in text
-    # VS Code is downloaded at a pinned version and checked against a pinned hash.
-    assert re.search(r"VSCODE_VERSION: \"\d+\.\d+\.\d+\"", text)
-    assert re.search(r"VSCODE_SHA256: \"[0-9a-f]{64}\"", text)
-    assert "sha256sum --check" in text
+    assert "working-directory: tools/vscode-extension/common/smoke" in text
+    assert "path: tools/vscode-extension/common/smoke/.vscode-test" in text
+    assert "hashFiles('tools/vscode-extension/common/smoke/package.json')" in text
+    assert "curl" not in text
     assert "permissions:\n  contents: read" in text
+
+
+def test_the_smoke_test_pins_test_electron_and_the_vscode_version() -> None:
+    manifest = _manifest(COMMON_SMOKE)
+    assert manifest["dependencies"]["@vscode/test-electron"][0].isdigit()
+    assert re.fullmatch(r"\d+\.\d+\.\d+", manifest["vscodeVersion"])
+    run = (COMMON_SMOKE / "run.mjs").read_text("utf-8")
+    assert 'from "@vscode/test-electron"' in run
+    assert "vscodeVersion" in run
+
+
+def test_the_downloaded_vscode_is_never_committed() -> None:
+    git = shutil.which("git")
+    if git is None or not (REPO_ROOT / ".git").exists():
+        pytest.skip("not a git checkout")
+    probe = COMMON_SMOKE / ".vscode-test" / "vscode-linux-x64-1.0.0" / "code"
+    result = subprocess.run([git, "check-ignore", "-q", str(probe)], cwd=REPO_ROOT)
+    assert result.returncode == 0, f"{probe} is not gitignored"
 
 
 def test_the_workflow_pins_every_action_to_a_commit() -> None:
