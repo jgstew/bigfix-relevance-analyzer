@@ -5,9 +5,11 @@ content corpus under `tests/examples/`.
 """
 
 import dataclasses
+import inspect
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 from _corpus import corpus_files
@@ -21,6 +23,7 @@ from bigfix_relevance_analyzer.extract import (
     _extract_data,
     _extract_file,
     _ExtractionProblem,
+    _html_sites,
     extract_relevance_from_actionscript,
     extract_relevance_from_bes_xml,
     extract_relevance_from_file,
@@ -1419,3 +1422,49 @@ def test_column_is_left_out_of_equality_hashing_and_to_dict() -> None:
     assert hash(site) == hash(other)
     assert "column" not in site.to_dict()
     assert "column" not in repr(site)
+
+
+@pytest.mark.parametrize(
+    ("extract", "text"),
+    [
+        (
+            lambda text, **kw: extract_relevance_from_html_text(
+                text, context=HtmlContext.CONSOLE, **kw
+            ),
+            "<?Relevance exists file ?>\n<?Relevance exists folder ?>",
+        ),
+        (extract_relevance_from_actionscript, "wait {exists file}\nwait {exists folder}"),
+    ],
+)
+def test_column_offset_moves_only_the_first_lines_columns(extract: Any, text: str) -> None:
+    """Like ``line_offset``, for a fragment that starts mid-line in its document:
+    only its first line is shifted, since every later line starts at column 1."""
+    plain = extract(text)
+    shifted = extract(text, line_offset=4, column_offset=10)
+    assert [site.column for site in shifted] == [plain[0].column + 10, plain[1].column]
+    assert [site.line for site in shifted] == [5, 6]
+
+
+@pytest.mark.parametrize(
+    "extract",
+    [
+        lambda text, **kw: extract_relevance_from_html_text(
+            text, context=HtmlContext.CONSOLE, **kw
+        ),
+        extract_relevance_from_actionscript,
+    ],
+)
+def test_no_column_offset_means_no_columns(extract: Any) -> None:
+    """``None``: the text's columns are not its document's -- a BES element's
+    body starts after a tag, and its entities are decoded."""
+    sites = extract("<?Relevance exists file ?>\nwait {exists folder}", column_offset=None)
+    assert sites
+    assert all(site.column is None for site in sites)
+
+
+def test_the_private_site_builders_agree_on_the_column_default() -> None:
+    """One mechanism, one default: no helper silently does the opposite."""
+    for helper in (_actionscript_sites, _html_sites):
+        parameters = inspect.signature(helper).parameters
+        assert "columns" not in parameters, helper.__name__
+        assert parameters["column_offset"].default == 0, helper.__name__

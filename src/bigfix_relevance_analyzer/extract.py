@@ -394,15 +394,25 @@ def _site_map(source: _TextSource | None, offset: int, text: str) -> SourceMap |
     return None if source is None else source.site_map(offset, len(text))
 
 
-def _column(text: str, offset: int, anchor: int) -> int | None:
-    """The 1-based column of ``text[offset]``, if it is on the line ``text[anchor]`` is on.
+def _column(text: str, offset: int, anchor: int, column_offset: int | None) -> int | None:
+    """The 1-based column of ``text[offset]`` in its document, when it is known.
 
     ``anchor`` is where the site's reported line was taken from -- a
-    ``<?Relevance``, a fence -- so ``None`` means the statement starts on a
+    ``<?Relevance``, a fence -- so ``None`` when the statement starts on a
     later line than the site says, where no column on the site's line is right.
+
+    ``column_offset`` is to columns what ``line_offset`` is to lines: how far
+    into its document's line ``text`` starts, so it shifts only ``text``'s
+    first line. ``None`` when ``text``'s columns are not its document's at
+    all -- a BES element's body, which starts after a tag and has its
+    entities decoded -- and then no site has a column.
     """
+    if column_offset is None:
+        return None
     line_start = text.rfind("\n", 0, offset) + 1
-    return offset - line_start + 1 if line_start <= anchor else None
+    if line_start > anchor:
+        return None
+    return offset - line_start + 1 + (column_offset if line_start == 0 else 0)
 
 
 def _stripped(text: str, start: int = 0, end: int | None = None) -> tuple[int, str]:
@@ -549,15 +559,22 @@ def extract_relevance_from_actionscript(
     context: str = "ActionScript",
     dialect: Dialect = Dialect.CLIENT,
     line_offset: int = 0,
+    column_offset: int | None = 0,
 ) -> list[RelevanceSite]:
     """Extract the `{...}` relevance substitutions from an ActionScript body.
 
     Lines are 1-based within ``body`` plus ``line_offset``, for a body embedded
-    in a larger file. ActionScript runs on the endpoint, so substitutions in it
-    are client relevance, which is what ``dialect`` says by default.
+    in a larger file; ``column_offset`` is how far into its line ``body``
+    starts there, or ``None`` if unknown (see :attr:`RelevanceSite.column`).
+    ActionScript runs on the endpoint, so substitutions in it are client
+    relevance, which is what ``dialect`` says by default.
     """
     return _actionscript_sites(
-        body, context=context, dialect=dialect, line_offset=line_offset, columns=True
+        body,
+        context=context,
+        dialect=dialect,
+        line_offset=line_offset,
+        column_offset=column_offset,
     )
 
 
@@ -616,11 +633,9 @@ def _actionscript_sites(
     line_offset: int,
     source: _TextSource | None = None,
     problems: list[_ExtractionProblem] | None = None,
-    columns: bool = False,
+    column_offset: int | None = 0,
 ) -> list[RelevanceSite]:
-    """The substitution sites of ``body``. ``columns`` when ``body`` is a
-    document of its own, whose lines start where its text's do -- not a BES
-    element's text, whose first line starts after the tag."""
+    """The substitution sites of ``body``; see :func:`_column` for ``column_offset``."""
     unterminated: list[int] = []
     sites = [
         _make_site(
@@ -631,7 +646,7 @@ def _actionscript_sites(
             context_dialect=dialect,
             source_map=_site_map(source, offset, text),
             # A substitution never spans lines, so it starts on its own line.
-            column=_column(body, offset, offset) if columns else None,
+            column=_column(body, offset, offset, column_offset),
         )
         for line, offset, text, is_condition in _iter_substitution_spans(body, unterminated)
     ]
@@ -683,7 +698,7 @@ def _line_of(text: str, index: int) -> int:
 
 
 def _iter_pi_spans(
-    text: str, unterminated: list[int] | None = None
+    text: str, unterminated: list[int] | None = None, column_offset: int | None = 0
 ) -> Iterator[tuple[int, int, str, int | None]]:
     """Yield ``(line, offset, relevance_text, column)`` for each `<?Relevance ?>` in ``text``.
 
@@ -704,7 +719,8 @@ def _iter_pi_spans(
             continue
         offset, body = _stripped(text, match.end(), end)
         if body:
-            yield _line_of(text, match.start()), offset, body, _column(text, offset, match.start())
+            column = _column(text, offset, match.start(), column_offset)
+            yield _line_of(text, match.start()), offset, body, column
         else:
             logger.debug(
                 "empty <?Relevance ?> processing instruction at line %d",
@@ -732,7 +748,9 @@ def _read_js_string_literal(text: str, start: int) -> tuple[str, int] | None:
     return None
 
 
-def _iter_js_call_spans(text: str) -> Iterator[tuple[int, int, str, int | None]]:
+def _iter_js_call_spans(
+    text: str, column_offset: int | None = 0
+) -> Iterator[tuple[int, int, str, int | None]]:
     """Yield ``(line, offset, relevance_text, column)`` for each JS relevance call in ``text``.
 
     Only a call whose argument is one complete string literal is yielded. A
@@ -765,7 +783,8 @@ def _iter_js_call_spans(text: str) -> Iterator[tuple[int, int, str, int | None]]
 
         offset, body = _stripped(text, position + 1, end - 1)
         if body:
-            yield _line_of(text, match.start()), offset, body, _column(text, offset, match.start())
+            column = _column(text, offset, match.start(), column_offset)
+            yield _line_of(text, match.start()), offset, body, column
 
 
 def extract_relevance_from_html_text(
@@ -774,6 +793,7 @@ def extract_relevance_from_html_text(
     context: HtmlContext,
     line_offset: int = 0,
     label: str | None = None,
+    column_offset: int | None = 0,
 ) -> list[RelevanceSite]:
     """Extract relevance from an HTML/text document, in document order.
 
@@ -788,9 +808,12 @@ def extract_relevance_from_html_text(
     content classifier, which may in turn have no opinion.
 
     ``line_offset`` is added to every line, for scanning a fragment embedded in
-    a larger file.
+    a larger file, and ``column_offset`` is how far into its line the fragment
+    starts there, or ``None`` if unknown (see :attr:`RelevanceSite.column`).
     """
-    return _html_sites(text, context=context, line_offset=line_offset, label=label)
+    return _html_sites(
+        text, context=context, line_offset=line_offset, label=label, column_offset=column_offset
+    )
 
 
 def _html_sites(
@@ -802,12 +825,12 @@ def _html_sites(
     source: _TextSource | None = None,
     problems: list[_ExtractionProblem] | None = None,
     problem_context: str = "HTML",
-    columns: bool = True,
+    column_offset: int | None = 0,
 ) -> list[RelevanceSite]:
-    """The sites of an HTML document or fragment. ``columns`` unless ``text``
-    is a BES element's, whose first line does not start at its text's start."""
+    """The sites of an HTML document or fragment; see :func:`_column` for
+    ``column_offset``."""
     unterminated: list[int] = []
-    pi_spans = list(_iter_pi_spans(text, unterminated))
+    pi_spans = list(_iter_pi_spans(text, unterminated, column_offset))
     if problems is not None:
         problems.extend(
             _ExtractionProblem(
@@ -818,7 +841,7 @@ def _html_sites(
             )
             for line in unterminated
         )
-    js_spans = list(_iter_js_call_spans(text))
+    js_spans = list(_iter_js_call_spans(text, column_offset))
 
     if context is HtmlContext.CLIENTUI and js_spans:
         pi_dialect = Dialect.UNCERTAIN
@@ -858,7 +881,7 @@ def _html_sites(
                 context=context,
                 context_dialect=dialect,
                 source_map=_site_map(source, offset, body),
-                column=column if columns else None,
+                column=column,
             )
             for line, offset, body, column in spans
         ]
@@ -949,7 +972,7 @@ def _markdown_sites(
                             line=block_start,
                             context="markdown code block",
                             context_dialect=context_dialect,
-                            column=_column(joined, offset, 0),
+                            column=_column(joined, offset, 0, 0),
                         )
                     )
             fence = None
@@ -985,7 +1008,7 @@ def _extract_plain_text(text: str, dialect: Dialect) -> list[RelevanceSite]:
             line=_line_of(text, offset),
             context="whole file",
             context_dialect=dialect,
-            column=_column(text, offset, offset),
+            column=_column(text, offset, offset, 0),
         )
     ]
 
@@ -1090,7 +1113,7 @@ def _sites_for_element(
             line_offset=element.line - 1,
             source=element.source,
             problems=problems,
-            columns=False,
+            column_offset=None,
         )
 
     if tag == "Description":
@@ -1107,7 +1130,7 @@ def _sites_for_element(
                 source=element.source,
                 problems=problems,
                 problem_context=context,
-                columns=False,
+                column_offset=None,
             )
         ]
 
