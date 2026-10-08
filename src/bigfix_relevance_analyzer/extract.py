@@ -160,7 +160,13 @@ class RelevanceSite:
     """The relevance statement itself, stripped of surrounding whitespace."""
 
     line: int
-    """1-based line of the source file the statement starts on."""
+    """1-based line of the source file the statement starts on.
+
+    The statement's own first line, not the line of whatever holds it: a
+    ``<Relevance>`` tag, fence or ``<?Relevance`` with a line break before the
+    statement opens a line or more above it. Every line inside the statement
+    is counted from this one, findings' included.
+    """
 
     context: str
     """Short label naming where this came from, for use in messages."""
@@ -214,9 +220,7 @@ class RelevanceSite:
     editor's buffer (:mod:`bigfix_relevance_analyzer.lsp.positions`).
 
     ``None`` for BES XML, whose :attr:`source_map` places every character
-    already, and whenever :attr:`text` does not start on :attr:`line`: a fence
-    or ``<?Relevance`` whose statement starts on a later line, after blank
-    ones. Left out of equality, hashing, ``repr`` and :meth:`to_dict` for the
+    already. Left out of equality, hashing, ``repr`` and :meth:`to_dict` for the
     reason :attr:`source_map` is: it says where a statement is, not what it
     is, and the editor's per-site cache must still hit for a statement that
     only moved sideways.
@@ -394,12 +398,8 @@ def _site_map(source: _TextSource | None, offset: int, text: str) -> SourceMap |
     return None if source is None else source.site_map(offset, len(text))
 
 
-def _column(text: str, offset: int, anchor: int, column_offset: int | None) -> int | None:
+def _column(text: str, offset: int, column_offset: int | None) -> int | None:
     """The 1-based column of ``text[offset]`` in its document, when it is known.
-
-    ``anchor`` is where the site's reported line was taken from -- a
-    ``<?Relevance``, a fence -- so ``None`` when the statement starts on a
-    later line than the site says, where no column on the site's line is right.
 
     ``column_offset`` is to columns what ``line_offset`` is to lines: how far
     into its document's line ``text`` starts, so it shifts only ``text``'s
@@ -410,8 +410,6 @@ def _column(text: str, offset: int, anchor: int, column_offset: int | None) -> i
     if column_offset is None:
         return None
     line_start = text.rfind("\n", 0, offset) + 1
-    if line_start > anchor:
-        return None
     return offset - line_start + 1 + (column_offset if line_start == 0 else 0)
 
 
@@ -649,7 +647,7 @@ def _actionscript_sites(
             context_dialect=dialect,
             source_map=_site_map(source, offset, text),
             # A substitution never spans lines, so it starts on its own line.
-            column=_column(body, offset, offset, column_offset),
+            column=_column(body, offset, column_offset),
         )
         for line, offset, text, is_condition in _iter_substitution_spans(body, unterminated)
     ]
@@ -722,8 +720,7 @@ def _iter_pi_spans(
             continue
         offset, body = _stripped(text, match.end(), end)
         if body:
-            column = _column(text, offset, match.start(), column_offset)
-            yield _line_of(text, match.start()), offset, body, column
+            yield _line_of(text, offset), offset, body, _column(text, offset, column_offset)
         else:
             logger.debug(
                 "empty <?Relevance ?> processing instruction at line %d",
@@ -786,8 +783,7 @@ def _iter_js_call_spans(
 
         offset, body = _stripped(text, position + 1, end - 1)
         if body:
-            column = _column(text, offset, match.start(), column_offset)
-            yield _line_of(text, match.start()), offset, body, column
+            yield _line_of(text, offset), offset, body, _column(text, offset, column_offset)
 
 
 def extract_relevance_from_html_text(
@@ -975,10 +971,10 @@ def _markdown_sites(
                         _make_site(
                             kind="markdown-codeblock",
                             text=body,
-                            line=block_start,
+                            line=block_start - 1 + _line_of(joined, offset),
                             context="markdown code block",
                             context_dialect=context_dialect,
-                            column=_column(joined, offset, 0, 0),
+                            column=_column(joined, offset, 0),
                         )
                     )
             fence = None
@@ -1014,7 +1010,7 @@ def _extract_plain_text(text: str, dialect: Dialect) -> list[RelevanceSite]:
             line=_line_of(text, offset),
             context="whole file",
             context_dialect=dialect,
-            column=_column(text, offset, offset, 0),
+            column=_column(text, offset, 0),
         )
     ]
 
@@ -1058,7 +1054,13 @@ class _Element:
 
 def _body_site(element: _Element, *, kind: SiteKind, context: str) -> list[RelevanceSite]:
     """The one client-relevance site an element's whole (stripped) body is,
-    or none when the body is blank."""
+    or none when the body is blank.
+
+    Its line counts the newlines before the statement in the *decoded* body,
+    as every other line inside a BES element is counted (a substitution's, a
+    finding's): so a leading ``&#10;`` moves it down a line the file does not
+    have, which lxml, keeping no bytes, could not do otherwise.
+    """
     offset, body = _stripped(element.text)
     if not body:
         return []
@@ -1066,7 +1068,7 @@ def _body_site(element: _Element, *, kind: SiteKind, context: str) -> list[Relev
         _make_site(
             kind=kind,
             text=body,
-            line=element.line,
+            line=element.line - 1 + _line_of(element.text, offset),
             context=context,
             context_dialect=Dialect.CLIENT,
             source_map=_site_map(element.source, offset, body),

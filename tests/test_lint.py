@@ -344,6 +344,30 @@ def test_lint_file_reports_absolute_line_numbers(tmp_path: Path) -> None:
     assert finding.path == path
 
 
+@pytest.mark.parametrize(
+    ("name", "text", "line"),
+    [
+        (
+            "t.bes",
+            '<BES><Fixlet><Relevance>\n  exists file "a"\n  and and\n</Relevance></Fixlet></BES>',
+            3,
+        ),
+        ("t.md", '# T\n```relevance\n\n  exists file "a"\n  and and\n```\n', 5),
+        ("t.html", '<p><?Relevance\n  exists file "a"\n  and and ?></p>', 3),
+    ],
+)
+def test_a_finding_inside_a_statement_below_its_opener_has_its_file_line(
+    tmp_path: Path, name: str, text: str, line: int
+) -> None:
+    """The statement's line is the base its findings' lines are counted from,
+    so a body opening a line early would put each one a line early too."""
+    path = tmp_path / name
+    path.write_text(text)
+    (finding,) = (f for f in lint_file(path, LintConfig()) if f.code == "parse-error")
+    assert finding.line == line
+    assert text.split("\n")[line - 1].strip().startswith("and and")
+
+
 def test_lint_file_on_real_bes_example_is_clean() -> None:
     findings = lint_file(BES_EXAMPLE, LintConfig())
     assert codes(findings) <= {"unknown-inspector"}  # dumps may not cover everything
