@@ -19,6 +19,13 @@ name: vscode-extension
 #
 # To install the artifact: unzip the download, then in VS Code run
 # "Extensions: Install from VSIX..." and pick the .vsix inside.
+#
+# Releases: tag_and_release.yaml calls this workflow with `release_artifact`,
+# the same way it calls wasm-html.yaml for the playground page. Then `package`
+# builds from the release's own wheel (verified against its SHA256SUMS.txt)
+# instead of rebuilding one, and only the quick unit tests run: `e2e` is
+# skipped so the headless VS Code job never holds up a release. The caller
+# attaches the uploaded .vsix to the release.
 
 # Runs only when something the extension is built from changes, so a docs-only
 # PR skips the ~350 MB VS Code download. Keep this list complete: a missing input
@@ -38,12 +45,23 @@ on:
       - main
     paths: *inputs
   workflow_dispatch:
+  # Called by tag_and_release.yaml while its release is still a draft; see the
+  # header. Needs only read access: the caller attaches the .vsix.
+  workflow_call:
+    inputs:
+      release_artifact:
+        description: "Name of an artifact in the calling run holding the release's dist/ (wheel + SHA256SUMS.txt)"
+        type: string
+        required: true
 
 permissions:
   contents: read
 
 concurrency:
-  group: vscode-extension-${{ github.ref }}
+  # github.workflow is the CALLER's name under workflow_call, so a release run
+  # and this workflow's own push-to-main run land in different groups instead
+  # of cancelling each other (the same arrangement as wasm-html.yaml).
+  group: vscode-extension-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -100,21 +118,41 @@ jobs:
         working-directory: tools/vscode-extension/componentize-py
         run: npm ci
 
-      # Wheel -> componentize-py (the playground's two-pass build) -> jco for
-      # Node -> a smoke check that the component boots and answers
-      # `initialize`. `--group wasm` is what puts the pinned componentize-py
-      # on PATH.
-      - name: build the language-server component
-        run: |
-          uv run --group wasm python \
-            tools/vscode-extension/componentize-py/build-component/build_component.py
+      # A release run uses the exact wheel that release published (the same
+      # dist/ that went to PyPI), checked against the SHA256SUMS.txt computed
+      # alongside it -- as wasm-html.yaml does for the playground.
+      - name: download the release's dist/
+        if: inputs.release_artifact != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ inputs.release_artifact }}
+          path: dist
 
-      # vsce does not create the --out directory itself.
-      - name: package the .vsix
-        working-directory: tools/vscode-extension/componentize-py
+      - name: verify the release's wheel
+        if: inputs.release_artifact != ''
         run: |
-          mkdir -p ../../../dist/vsix
-          npx vsce package --out ../../../dist/vsix/bigfix-relevance-developer.vsix
+          cd dist && sha256sum -c SHA256SUMS.txt
+
+      # Wheel -> componentize-py (the playground's two-pass build) -> jco for
+      # Node -> a smoke check that the component boots, reports the wheel's
+      # version, and answers `initialize` -> `vsce package`, with the .vsix
+      # versioned as that wheel: the extension's version is the analyzer's.
+      # Outside a release the script builds its own wheel from this checkout.
+      # `--group wasm` is what puts the pinned componentize-py on PATH.
+      - name: build and package the extension
+        env:
+          RELEASE_ARTIFACT: ${{ inputs.release_artifact }}
+        run: |
+          wheel=()
+          if [ -n "$RELEASE_ARTIFACT" ]; then
+            # Quoted: build_component.py resolves the pattern and insists on
+            # exactly one wheel, with a clear message otherwise.
+            wheel=(--wheel 'dist/*.whl')
+          fi
+          uv run --group wasm python \
+            tools/vscode-extension/componentize-py/build-component/build_component.py \
+            "${wheel[@]}" \
+            --package dist/vsix/bigfix-relevance-developer.vsix
 
       # Unzipped the way VS Code installs it: the extension is under extension/.
       - name: unzip the .vsix
@@ -139,6 +177,13 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     needs: package
+    # Not for a release, deliberately: only the quick unit tests in `package`
+    # gate a release, so a slow or flaky editor test cannot hold one up. The
+    # same commit is still tested here, by the push-to-main run that the
+    # version bump also triggers (pyproject.toml is one of this workflow's
+    # paths), but the release does not wait for it. A break that only shows in
+    # a real VS Code would reach that release.
+    if: inputs.release_artifact == ''
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

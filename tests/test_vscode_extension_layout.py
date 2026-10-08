@@ -19,6 +19,7 @@ Pure and cheap, like ``test_playground_layout.py``: paths and text, never a buil
 
 from __future__ import annotations
 
+import inspect
 import json
 import re
 import shutil
@@ -347,3 +348,164 @@ def test_the_workflow_runs_only_when_an_input_of_the_extension_changes() -> None
         assert path in text, path
     assert "paths: *inputs" in text
     assert "workflow_dispatch:" in text
+
+
+# ---------------------------------------------------------------------------
+# Releases: tag_and_release.yaml attaches the .vsix, built from the release's wheel
+# ---------------------------------------------------------------------------
+
+RELEASE = REPO_ROOT / ".github" / "workflows" / "tag_and_release.yaml"
+
+
+def test_the_build_can_take_a_given_wheel(tmp_path: Path) -> None:
+    """A release builds from the wheel it publishes, not from a rebuild of the tree."""
+    build = load_tool(PRIMARY / "build-component" / "build_component.py", "_build_component")
+    assert inspect.signature(build.build).parameters["wheel"].default is None
+    with pytest.raises(SystemExit, match=r"missing\.whl"):
+        build.main(["--wheel", str(tmp_path / "missing.whl")])
+
+
+def test_the_build_checks_the_component_against_the_wheels_version() -> None:
+    build = load_tool(PRIMARY / "build-component" / "build_component.py", "_build_component")
+    wheel = Path("dist/bigfix_relevance_analyzer-1.19.0-py3-none-any.whl")
+    assert build.wheel_version(wheel) == "1.19.0"
+
+
+def test_the_workflow_is_callable_for_a_release() -> None:
+    """Same shape as wasm-html.yaml: the release hands over its dist/ as an artifact."""
+    text = WORKFLOW.read_text("utf-8")
+    assert "workflow_call:" in text
+    assert "release_artifact:" in text
+    assert "sha256sum -c SHA256SUMS.txt" in text
+    assert "--wheel" in text
+    # Under workflow_call, github.workflow is the caller's name, so a release run
+    # and this workflow's own push-to-main run cannot cancel each other.
+    assert "group: vscode-extension-${{ github.workflow }}-${{ github.ref }}" in text
+
+
+def test_a_release_runs_only_the_quick_unit_tests() -> None:
+    """The headless VS Code job would hold up a release; the node tests do not."""
+    text = WORKFLOW.read_text("utf-8")
+    e2e = text[text.index("  e2e:") :]
+    assert "if: inputs.release_artifact == ''" in e2e.split("steps:")[0]
+    package = text[text.index("  package:") : text.index("  e2e:")]
+    assert "if:" not in package.split("steps:")[0], "the package job must run for a release"
+    assert "node --test" in package
+
+
+def test_the_release_attaches_the_vsix() -> None:
+    text = RELEASE.read_text("utf-8")
+    assert "uses: ./.github/workflows/vscode-extension.yaml" in text
+    job = text[text.index("  vscode-extension:") :]
+    assert "release_artifact: release-dist" in job.split("\n\n")[0]
+    finalize = text[text.index("  finalize:") :]
+    assert "vscode-extension" in finalize.split("steps:")[0]
+    assert "name: bigfix-relevance-developer-vsix" in finalize
+    assert "bigfix-relevance-developer.vsix assets/" in finalize
+
+
+def test_the_extension_takes_the_version_of_the_wheel_it_was_built_from(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The .vsix version is the analyzer version inside it, and the self-check
+    expects that same version. package.json in the tree is never rewritten."""
+    build = load_tool(PRIMARY / "build-component" / "build_component.py", "_build_component")
+    glue = tmp_path / "lsp.js"
+    checked: list[str] = []
+    commands: list[list[str]] = []
+    monkeypatch.setattr(build, "build", lambda wheel=None: (glue, "9.8.7"))
+    monkeypatch.setattr(build, "smoke", lambda glue, version: checked.append(version))
+    monkeypatch.setattr(build, "_run", lambda argv, label, cwd=None: commands.append(argv))
+    out = tmp_path / "out" / "bigfix-relevance-developer.vsix"
+
+    assert build.main(["--package", str(out)]) == 0
+
+    assert checked == ["9.8.7"]
+    (vsce,) = (argv for argv in commands if "vsce" in argv)
+    assert vsce[vsce.index("package") + 1] == "9.8.7"
+    for flag in ("--no-git-tag-version", "--no-update-package-json"):
+        assert flag in vsce
+    assert vsce[vsce.index("--out") + 1] == str(out)
+    assert out.parent.is_dir(), "vsce does not create the --out directory itself"
+
+
+def test_the_workflow_packages_through_the_build_script() -> None:
+    """One packaging path, so CI and a release stamp the version the same way."""
+    text = WORKFLOW.read_text("utf-8")
+    assert "--package" in text
+    assert "npx vsce package" not in text
+
+
+# ---------------------------------------------------------------------------
+# jco and preview2-shim move together
+# ---------------------------------------------------------------------------
+
+SHIM_PACKAGES = [PRIMARY, REPO_ROOT / "tools" / "playground-wasm" / "componentize-py" / "smoke"]
+"""Every npm package whose jco-generated glue imports @bytecodealliance/preview2-shim."""
+
+
+@pytest.mark.parametrize("package", SHIM_PACKAGES, ids=lambda path: path.parent.name)
+def test_the_glue_loads_the_shim_version_jco_is_built_against(package: Path) -> None:
+    """jco's transpiler declares the preview2-shim its output targets; the glue
+    imports the top-level copy. For 0.x, a different minor is a breaking change."""
+    packages = json.loads((package / "package-lock.json").read_text("utf-8"))["packages"]
+    wanted = packages["node_modules/@bytecodealliance/jco-transpile"]["dependencies"][
+        "@bytecodealliance/preview2-shim"
+    ]
+    loaded = packages["node_modules/@bytecodealliance/preview2-shim"]["version"]
+    major, minor = (int(part) for part in wanted.lstrip("^~=").split(".")[:2])
+    assert (major, minor) == tuple(int(part) for part in loaded.split(".")[:2]), (
+        f"glue loads preview2-shim {loaded}; jco-transpile wants {wanted}"
+    )
+
+
+@pytest.mark.parametrize("package", SHIM_PACKAGES, ids=lambda path: path.parent.name)
+def test_dependabot_updates_jco_and_the_shim_together(package: Path) -> None:
+    """Separate PRs for the two broke a lockfile once (#89 and #90)."""
+    text = DEPENDABOT.read_text("utf-8")
+    entry = text[text.index(f'directory: "/{package.relative_to(REPO_ROOT)}"') :]
+    entry = entry.split("- package-ecosystem:")[0]
+    assert "groups:" in entry
+    assert '"@bytecodealliance/*"' in entry
+
+
+# ---------------------------------------------------------------------------
+# build_component.py --wheel: one wheel, resolved clearly, never inside dist/
+# ---------------------------------------------------------------------------
+
+
+def _build_module(monkeypatch: pytest.MonkeyPatch, dist: Path) -> Any:
+    build = load_tool(PRIMARY / "build-component" / "build_component.py", "_build_component")
+    monkeypatch.setattr(build, "DIST", dist)
+    monkeypatch.setattr(build, "build", lambda wheel=None: pytest.fail("built anyway"))
+    return build
+
+
+def test_a_wheel_inside_the_build_output_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The build starts by deleting dist/, which would delete that wheel first."""
+    dist = tmp_path / "dist"
+    wheel = dist / "wheel" / "bigfix_relevance_analyzer-1.0.0-py3-none-any.whl"
+    wheel.parent.mkdir(parents=True)
+    wheel.touch()
+    build = _build_module(monkeypatch, dist)
+    with pytest.raises(SystemExit, match="inside"):
+        build.main(["--wheel", str(wheel)])
+
+
+@pytest.mark.parametrize(("count", "message"), [(0, "no wheel found"), (2, "exactly one wheel")])
+def test_a_wheel_pattern_must_match_exactly_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, count: int, message: str
+) -> None:
+    for version in range(count):
+        (tmp_path / f"bigfix_relevance_analyzer-1.0.{version}-py3-none-any.whl").touch()
+    build = _build_module(monkeypatch, tmp_path / "dist")
+    with pytest.raises(SystemExit, match=message):
+        build.main(["--wheel", str(tmp_path / "*.whl")])
+
+
+def test_the_workflow_passes_the_wheel_pattern_quoted() -> None:
+    """The script resolves it, so zero or two wheels fail with a clear message
+    rather than as argparse errors about stray arguments."""
+    assert "--wheel 'dist/*.whl'" in WORKFLOW.read_text("utf-8")

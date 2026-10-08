@@ -57,6 +57,14 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    # jco's transpiler targets one preview2-shim minor and the generated glue
+    # imports the top-level shim, so the two must move together. Separate PRs
+    # for them once left this lockfile inconsistent (#89, #90), and let the shim
+    # run ahead of what jco targets.
+    groups:
+      bytecodealliance:
+        patterns:
+          - "@bytecodealliance/*"
     labels:
       - "dependencies"
 
@@ -117,6 +125,14 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    # jco's transpiler targets one preview2-shim minor and the generated glue
+    # imports the top-level shim, so the two must move together. Separate PRs
+    # for them once left this lockfile inconsistent (#89, #90), and let the shim
+    # run ahead of what jco targets.
+    groups:
+      bytecodealliance:
+        patterns:
+          - "@bytecodealliance/*"
     labels:
       - "dependencies"
 

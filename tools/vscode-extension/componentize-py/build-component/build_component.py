@@ -3,19 +3,28 @@
 
     cd tools/vscode-extension/componentize-py && npm ci && cd -
     uv run --group wasm python \
-        tools/vscode-extension/componentize-py/build-component/build_component.py
+        tools/vscode-extension/componentize-py/build-component/build_component.py \
+        [--wheel dist/bigfix_relevance_analyzer-<version>-py3-none-any.whl] \
+        [--package dist/vsix/bigfix-relevance-developer.vsix]
 
 Four steps, everything under ``../dist/`` (gitignored), after copying the
 repository's LICENSE beside package.json for vsce to package (gitignored too):
 
-1. ``uv build --wheel`` of this checkout -> ``dist/wheel/``
+1. ``uv build --wheel`` of this checkout -> ``dist/wheel/``, unless ``--wheel``
+   names one. A release passes the wheel it publishes, so the extension it
+   attaches holds exactly that build (see .github/workflows/tag_and_release.yaml).
 2. componentize-py, through the playground's ``componentize.py`` so both share
    its two-pass build and the reasons for it -> ``dist/work/lsp.wasm``
 3. ``jco transpile`` for Node -> ``dist/component/lsp.js`` plus core modules,
    which server.js imports
-4. a smoke check in Node: the component boots, reports a real version, and
+4. a smoke check in Node: the component boots, reports the wheel's version, and
    answers ``initialize``. That proves the build snapshot holds what the server
    imports, which no host-side test can.
+
+With ``--package``, it then packages the extension with vsce, versioned as the
+analyzer it contains: the wheel's version is the extension's version, so a
+.vsix always says which analyzer build is inside. The committed package.json
+keeps a placeholder version and is never rewritten.
 
 ``uv run --group wasm`` is what puts ``componentize-py`` (pinned in
 pyproject.toml's ``wasm`` group) on ``PATH`` for step 2.
@@ -62,13 +71,25 @@ def copy_license(target_dir: Path = EXTENSION) -> Path:
     return Path(shutil.copyfile(REPO / "LICENSE", target_dir / "LICENSE"))
 
 
-def build() -> Path:
-    """Build the component and the Node glue under ``dist/``; return the glue's path."""
+def wheel_version(wheel: Path) -> str:
+    """The version in a wheel's file name: ``<name>-<version>-<tags>.whl`` (PEP 427)."""
+    return wheel.name.split("-")[1]
+
+
+def build(wheel: Path | None = None) -> tuple[Path, str]:
+    """Build the component and the Node glue under ``dist/``.
+
+    From ``wheel`` when given, else from a fresh build of this checkout.
+    Returns the glue's path and the version of the wheel it was built from.
+    """
     copy_license()
     shutil.rmtree(DIST, ignore_errors=True)
-    wheel_dir = DIST / "wheel"
-    _run(["uv", "build", "--wheel", "--quiet", "-o", str(wheel_dir)], "build the wheel", cwd=REPO)
-    (wheel,) = wheel_dir.glob("*.whl")
+    if wheel is None:
+        wheel_dir = DIST / "wheel"
+        _run(
+            ["uv", "build", "--wheel", "--quiet", "-o", str(wheel_dir)], "build the wheel", cwd=REPO
+        )
+        (wheel,) = wheel_dir.glob("*.whl")
 
     component = _componentize_module().componentize(
         wheel,
@@ -90,7 +111,7 @@ def build() -> Path:
     # (VS Code loads extension.js with `require`). A package.json beside the
     # glue makes Node load it as ESM.
     (glue_dir / "package.json").write_text(json.dumps({"type": "module"}) + "\n")
-    return glue_dir / f"{WORLD}.js"
+    return glue_dir / f"{WORLD}.js", wheel_version(wheel)
 
 
 SMOKE = """
@@ -107,22 +128,74 @@ console.log(`component ok: bigfix-relevance-analyzer ${version}`);
 """
 
 
-def smoke(glue: Path) -> None:
-    """Fail the build if the component cannot boot and answer ``initialize``."""
-    sys.path.insert(0, str(REPO / "src"))
-    from bigfix_relevance_analyzer import __version__
-
+def smoke(glue: Path, expected_version: str) -> None:
+    """Fail the build if the component cannot boot and answer ``initialize``,
+    or reports a version other than the wheel's."""
     _run(
-        ["node", "--input-type=module", "-e", SMOKE, glue.as_uri(), __version__],
+        ["node", "--input-type=module", "-e", SMOKE, glue.as_uri(), expected_version],
         "smoke check in Node",
     )
 
 
+def package(version: str, out: Path) -> None:
+    """Package the extension into ``out``, stamped with ``version``.
+
+    ``vsce package <version>`` sets the version in the .vsix;
+    ``--no-update-package-json`` and ``--no-git-tag-version`` keep it from
+    rewriting package.json or running ``npm version``'s commit and tag.
+    """
+    out.parent.mkdir(parents=True, exist_ok=True)  # vsce does not create it
+    _run(
+        [
+            "npx",
+            "vsce",
+            "package",
+            version,
+            "--no-git-tag-version",
+            "--no-update-package-json",
+            "--out",
+            str(out.resolve()),
+        ],
+        f"vsce package {version}",
+        cwd=EXTENSION,
+    )
+
+
+def resolve_wheel(pattern: str) -> Path:
+    """The one wheel ``pattern`` names, or exit with why not.
+
+    A glob is resolved here rather than by the shell, through the same helper
+    componentize.py uses, so zero or several matches fail with a clear message
+    instead of as stray arguments. A wheel inside ``dist/`` is refused: the
+    build starts by deleting that directory, which would delete the wheel first.
+    """
+    wheel = Path(_componentize_module()._resolve_single(pattern, kind="wheel")).resolve()
+    if wheel.is_relative_to(DIST.resolve()):
+        raise SystemExit(
+            f"{wheel} is inside {DIST}, which the build deletes first; copy it elsewhere"
+        )
+    return wheel
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.parse_args(argv)
-    glue = build()
-    smoke(glue)
+    parser.add_argument(
+        "--wheel",
+        metavar="PATH_OR_GLOB",
+        help="build from this wheel instead of building this checkout; a glob must match one",
+    )
+    parser.add_argument(
+        "--package",
+        type=Path,
+        metavar="OUT_VSIX",
+        help="then package the extension, versioned as the wheel, into this .vsix",
+    )
+    args = parser.parse_args(argv)
+    wheel = None if args.wheel is None else resolve_wheel(args.wheel)
+    glue, version = build(wheel)
+    smoke(glue, version)
+    if args.package is not None:
+        package(version, args.package)
     size = sum(path.stat().st_size for path in glue.parent.glob("*.wasm"))
     print(f"wrote {glue.parent} ({size / 1048576:.1f} MiB of core modules)")
     return 0
