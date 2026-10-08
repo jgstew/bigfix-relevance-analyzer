@@ -10,11 +10,16 @@ whenever the buffer cannot be shown to hold it.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
 
-from bigfix_relevance_analyzer.extract import RelevanceSite, _extract_data
+from bigfix_relevance_analyzer.extract import (
+    RelevanceSite,
+    _extract_data,
+    extract_relevance_from_bes_xml,
+)
 from bigfix_relevance_analyzer.lint import TextSpan
 from bigfix_relevance_analyzer.lsp.positions import DocumentIndex, Range
 
@@ -45,8 +50,6 @@ def utf16_to_index(line: str, character: int) -> int:
 
 def read(text: str, found: Range) -> str:
     """What the buffer holds over ``found``, with LSP's own line breaks."""
-    import re
-
     pieces = re.split(r"(\r\n|\r|\n)", text)
     lines, breaks = pieces[0::2], pieces[1::2]
     (start_line, start_char), (end_line, end_char) = found
@@ -295,8 +298,6 @@ def test_a_description_processing_instruction_in_bes() -> None:
 
 
 def test_a_bes_site_without_a_source_map_falls_back() -> None:
-    from bigfix_relevance_analyzer.extract import extract_relevance_from_bes_xml
-
     doc = bes("\t<Relevance>exists totally bogus</Relevance>")
     (site,) = extract_relevance_from_bes_xml(doc)  # a str: no source map
     assert site.source_map is None
