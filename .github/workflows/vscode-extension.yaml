@@ -8,10 +8,12 @@ name: vscode-extension
 #   package  builds the language-server component from this checkout's wheel,
 #            packages the .vsix with vsce, unit-tests the *unzipped* .vsix in
 #            plain Node (seconds), then uploads it.
-#   e2e      downloads that artifact and runs the shared smoke test in a real,
-#            headless VS Code (fetched by @vscode/test-electron): the extension
-#            activates, starts its server, and the diagnostics for two files
-#            reach the editor.
+#   e2e      downloads that artifact and runs the shared smoke test in a real
+#            VS Code (fetched by @vscode/test-electron), on Linux (headless,
+#            under xvfb-run) and on Windows: the extension activates, starts its
+#            server, and the diagnostics for its test files reach the editor.
+#            The one .vsix is meant for every platform, and was packaged on
+#            Linux, so Windows is where a platform-specific file would show.
 #
 # Both test what ships, not the source tree: the component lives under dist/,
 # which is gitignored, and is in the .vsix only because .vscodeignore lets it
@@ -175,8 +177,13 @@ jobs:
           if-no-files-found: error
 
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs: package
+    strategy:
+      # A failure on one platform still reports the other.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     # Not for a release, deliberately: only the quick unit tests in `package`
     # gate a release, so a slow or flaky editor test cannot hold one up. The
     # same commit is still tested here, by the push-to-main run that the
@@ -200,8 +207,9 @@ jobs:
           name: bigfix-relevance-developer-vsix
           path: dist/vsix
 
+      # Python's zipfile rather than `unzip`, which not every runner has.
       - name: unzip the .vsix
-        run: unzip -q dist/vsix/bigfix-relevance-developer.vsix -d dist/vsix-unpacked
+        run: python -m zipfile -e dist/vsix/bigfix-relevance-developer.vsix dist/vsix-unpacked
 
       # @vscode/test-electron, pinned in this package, is what downloads and
       # launches VS Code. run.mjs explains how.
@@ -219,13 +227,19 @@ jobs:
           path: tools/vscode-extension/common/smoke/.vscode-test
           key: vscode-${{ runner.os }}-${{ hashFiles('tools/vscode-extension/common/smoke/package.json') }}
 
-      # xvfb-run gives VS Code a display. run.mjs downloads VS Code (retrying a
-      # failed download) on a cache miss, launches it against the unzipped
-      # .vsix, and prints the result and how long it took. Its output goes to
-      # the step summary too; `tee` keeps a failing exit code because GitHub
-      # runs `run:` with `bash -eo pipefail`.
-      - name: smoke-test the packaged extension in headless VS Code
+      # On Linux, xvfb-run gives VS Code a display; a Windows runner has a
+      # desktop already. run.mjs downloads VS Code (retrying a failed download)
+      # on a cache miss, launches it against the unzipped .vsix, and prints the
+      # result and how long it took. Its output goes to the step summary too;
+      # `tee` keeps a failing exit code because `shell: bash` runs with
+      # `bash -eo pipefail` (Git Bash on Windows).
+      - name: smoke-test the packaged extension in VS Code
+        shell: bash
         run: |
-          xvfb-run -a node tools/vscode-extension/common/smoke/run.mjs \
+          display=()
+          if [ "$RUNNER_OS" = Linux ]; then
+            display=(xvfb-run -a)
+          fi
+          "${display[@]}" node tools/vscode-extension/common/smoke/run.mjs \
             dist/vsix-unpacked/extension \
             | tee -a "$GITHUB_STEP_SUMMARY"
