@@ -10,6 +10,7 @@ whenever the buffer cannot be shown to hold it.
 
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 
 import pytest
@@ -128,7 +129,9 @@ def test_a_multi_line_span() -> None:
 def test_a_site_with_no_column_falls_back() -> None:
     sites, index = sites_of("a.ojo", "<p><?Relevance\n  names of bogus things ?></p>")
     (site,) = sites
-    assert index.site_range(site, span_of(site, "bogus things")) is None
+    assert index.site_range(site, span_of(site, "bogus things")) == ((1, 11), (1, 23))
+    unplaced = dataclasses.replace(site, column=None)
+    assert index.site_range(unplaced, span_of(unplaced, "bogus things")) is None
 
 
 def test_the_guard_falls_back_when_decoding_replaced_a_character() -> None:
@@ -239,13 +242,12 @@ def test_a_multi_line_relevance_in_bes(break_: str) -> None:
 
 
 def test_a_relevance_body_starting_on_the_next_line_maps_where_it_is() -> None:
-    """``site.line`` (and so ``Finding.line``) is the element's body line here,
-    one above the statement; the source map knows better, and the editor
-    underlines the statement where it is."""
+    """``site.line`` (and so ``Finding.line``) is the statement's own line,
+    one below the ``<Relevance>`` tag, and the source map agrees."""
     doc = bes("\t<Relevance>\n\t\texists totally bogus\n\t</Relevance>")
     sites, index = sites_of("a.bes", doc)
     (site,) = sites
-    assert site.line == 5
+    assert site.line == 6
     found = index.site_range(site, span_of(site, "totally bogus"))
     assert found == ((5, 9), (5, 22))
 

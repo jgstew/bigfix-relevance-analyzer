@@ -893,6 +893,91 @@ def test_lxml_adapter_line_numbers_match_expat() -> None:
     ]
 
 
+# --------------------------------------------------------------------------
+# site.line is the statement's first line, not the line its body opens on
+# --------------------------------------------------------------------------
+
+STATEMENT_BELOW_ITS_TAG_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<BES>
+<Fixlet>
+<Relevance>
+  windows of operating system
+</Relevance>
+<Relevance
+  ID="multi-line start tag">
+
+  exists file "a"</Relevance>
+<DefaultAction><SuccessCriteria Option="CustomRelevance">
+\texists file "b"
+</SuccessCriteria></DefaultAction>
+</Fixlet>
+<Analysis>
+<Property Name="p" ID="1"><![CDATA[
+name of operating system]]></Property>
+</Analysis>
+</BES>
+"""
+
+
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_a_bes_statement_below_its_tag_reports_its_own_line(newline: str) -> None:
+    data = STATEMENT_BELOW_ITS_TAG_XML.replace("\n", newline).encode()
+    assert kinds_lines(extract_relevance_from_bes_xml(data)) == [
+        ("relevance", 5),
+        ("relevance", 10),
+        ("success-criteria", 12),
+        ("analysis-property", 17),
+    ]
+
+
+def test_lxml_agrees_on_a_statement_below_its_tag() -> None:
+    lxml_etree = pytest.importorskip("lxml.etree")
+    from bigfix_relevance_analyzer.extract import extract_relevance_from_lxml_tree
+
+    data = STATEMENT_BELOW_ITS_TAG_XML.encode()
+    tree = lxml_etree.fromstring(data).getroottree()
+    from_lxml = extract_relevance_from_lxml_tree(tree)
+    assert kinds_lines(from_lxml) == kinds_lines(extract_relevance_from_bes_xml(data))
+
+
+def test_a_decoded_newline_entity_counts_like_any_newline_in_the_body() -> None:
+    """Lines inside a BES element's body are counted in its decoded text --
+    the convention its ActionScript substitutions, its `<Description>`
+    relevance and every finding inside a statement already follow, and the
+    only one lxml (which keeps no bytes) can follow. A leading `&#10;` is the
+    same: it moves the statement down a line though the file has no newline."""
+    xml = "<BES><Fixlet><Relevance>&#10;exists file</Relevance></Fixlet></BES>"
+    (site,) = extract_relevance_from_bes_xml(xml.encode())
+    assert site.line == 2
+
+
+@pytest.mark.parametrize(
+    ("name", "text", "line"),
+    [
+        ("a.md", "```relevance\n\n  exists file\n```\n", 3),
+        ("a.md", "# T\n\n~~~relevance\n\n\n\texists file\n  and true\n~~~\n", 6),
+        ("a.ojo", "<p><?Relevance\n  names of bes computers ?></p>", 2),
+        ("a.html", "x\n<?Relevance\n\n names of bes computers\n ?>", 4),
+        ("a.rel", "\n\n   exists file\n", 3),
+    ],
+)
+def test_a_text_statement_below_its_opener_reports_its_own_line(
+    name: str, text: str, line: int
+) -> None:
+    (site,) = _text_sites(name, text)
+    assert site.line == line
+
+
+def test_a_description_statement_below_its_opener_reports_its_own_line() -> None:
+    xml = (
+        "<BES>\n<Task>\n"
+        "<Description><![CDATA[<P><?relevance\n  names of current fixlets?></P>]]>"
+        "</Description>\n"
+        "</Task>\n</BES>"
+    )
+    assert kinds_lines(extract_relevance_from_bes_xml(xml.encode())) == [("relevance-pi", 4)]
+
+
 def test_package_imports_without_lxml(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(sys.modules, "lxml", None)
     monkeypatch.setitem(sys.modules, "lxml.etree", None)
@@ -1381,15 +1466,21 @@ def test_a_js_call_with_an_escaped_quote_starts_at_the_literal() -> None:
     assert _starts_at(text, site).startswith(site.text)
 
 
-def test_a_site_whose_text_starts_below_its_line_has_no_column() -> None:
-    """``site.line`` is where the fence or processing instruction body starts;
-    when the statement itself starts lower, no column on that line is right."""
-    for name, text in (
-        ("a.md", "```relevance\n\n  exists file\n```\n"),
-        ("a.ojo", "<p><?Relevance\n  names of bes computers ?></p>"),
-    ):
-        (site,) = _text_sites(name, text)
-        assert site.column is None, name
+@pytest.mark.parametrize(
+    ("name", "text", "column"),
+    [
+        ("a.md", "```relevance\n\n  exists file\n```\n", 3),
+        ("a.ojo", "<p><?Relevance\n  names of bes computers ?></p>", 3),
+    ],
+)
+def test_a_site_whose_text_starts_below_its_opener_still_has_a_column(
+    name: str, text: str, column: int
+) -> None:
+    """``site.line`` is the statement's own line, so a column on it is right
+    even when the fence or processing instruction opened on an earlier one."""
+    (site,) = _text_sites(name, text)
+    assert site.column == column
+    assert _starts_at(text, site).startswith(site.text)
 
 
 def test_actionscript_substitutions_record_their_column() -> None:

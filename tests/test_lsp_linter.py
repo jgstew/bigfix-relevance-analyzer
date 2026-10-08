@@ -115,6 +115,22 @@ def test_a_broken_statement_is_an_error_over_the_offending_text() -> None:
 
 @pytest.mark.parametrize(
     ("name", "text"),
+    [
+        ("doc.md", f"```relevance\n\n  {BROKEN}\n```\n"),
+        ("doc.ojo", f"<p><?Relevance\n\n  {BROKEN} ?></p>"),
+    ],
+)
+def test_a_statement_below_its_opener_is_underlined_where_it_is(name: str, text: str) -> None:
+    """A blank line between the fence or ``<?Relevance`` and the statement
+    once put every diagnostic on the blank line, as a whole-line range."""
+    found = DocumentLinter().diagnostics(f"file:///w/{name}", text)
+    assert {d["code"] for d in found} == {"parse-error", "error-token"}
+    for diagnostic in found:
+        assert diagnostic["range"] == span_range(2, 2 + 12, 2, 2 + len(BROKEN))
+
+
+@pytest.mark.parametrize(
+    ("name", "text"),
     [("example.bes", BES_EXAMPLE.read_text()), ("doc.md", TWO_SITES)],
 )
 def test_diagnostics_carry_exactly_what_lint_finds(tmp_path: Path, name: str, text: str) -> None:
@@ -350,11 +366,19 @@ def test_a_statement_level_finding_still_covers_its_line() -> None:
 
 
 def test_an_unmappable_span_falls_back_to_the_whole_line() -> None:
-    """The statement starts a line below its processing instruction: no column."""
+    """A lone surrogate decodes to replacement characters, so offsets after it
+    no longer match the buffer and the read-back guard refuses the range."""
+    text = 'exists file "\ud800" whose (exists bogus thing) and exists file "y"\n'
+    (diagnostic,) = DocumentLinter().diagnostics("file:///w/a.rel", text)
+    assert diagnostic["code"] == "unknown-inspector"
+    assert diagnostic["range"] == whole_line(text, 0)
+
+
+def test_a_statement_below_its_processing_instruction_maps_where_it_is() -> None:
     text = "<p><?Relevance\n  names of bogus things ?></p>\n"
     (diagnostic,) = DocumentLinter().diagnostics("file:///w/a.ojo", text)
     assert diagnostic["code"] == "unknown-inspector"
-    assert diagnostic["range"] == whole_line(text, 0)
+    assert diagnostic_text(text, diagnostic) == "bogus things"
 
 
 def test_a_parse_error_at_the_end_covers_the_last_character() -> None:
