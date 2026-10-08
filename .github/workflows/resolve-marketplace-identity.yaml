@@ -9,7 +9,7 @@ permissions:
 jobs:
   resolve:
     runs-on: ubuntu-latest
-    environment: marketplace-publish
+    environment: vscode-ext-publisher
     steps:
       - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
