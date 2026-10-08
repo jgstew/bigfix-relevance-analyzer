@@ -8,8 +8,13 @@
 // keeps a slow lint from freezing the editor. IPC rather than stdio means
 // nothing the component writes to stdout can corrupt the protocol stream.
 //
-// This file only says which files to send and how to start the server. Every
-// protocol decision lives in Python. ../python-stdio/ is the same extension
+// This file says which files to send, when to start the server and how. Every
+// protocol decision lives in Python.
+//
+// It activates at startup in every window, cheaply: the language client is
+// loaded, and the server started, only once an open document passes gate.js.
+// Markdown and HTML pass only with relevance in them, so a window without
+// BigFix content never runs the ~170 MiB server process. ../python-stdio/ is the same extension
 // with the server run from a local Python instead: PoC 1, kept for comparison.
 
 "use strict";
@@ -17,8 +22,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const vscode = require("vscode");
-const { LanguageClient, TransportKind } = require("vscode-languageclient/node");
 
+const { needsServer } = require("./gate");
 const manifest = require("./package.json");
 // Kept in step with the analyzer's recognized suffixes by
 // tests/test_vscode_extension_layout.py.
@@ -33,21 +38,29 @@ const NAME = manifest.displayName;
 const SERVER = path.join(__dirname, "server.js");
 const COMPONENT = path.join(__dirname, "dist", "component", "lsp.js");
 
-/** @type {LanguageClient | undefined} */
+// Files by suffix, plus any buffer in the relevance language whatever its
+// scheme: that is what brings an unsaved `untitled:` buffer to the server,
+// which then lints it by its languageId.
+const DOCUMENT_SELECTOR = [
+  ...documentPatterns.map((pattern) => ({ scheme: "file", pattern })),
+  { language: LANGUAGE_ID },
+];
+
+/** @type {import("vscode-languageclient/node").LanguageClient | undefined} */
 let client;
+// Set once a document has passed the gate (or the restart command ran): from
+// then on the server is kept running, and the gate is not consulted again.
+let wanted = false;
 
 function createClient() {
+  // Here rather than at the top: loading the client is part of the cost the
+  // gate defers.
+  const { LanguageClient, TransportKind } = require("vscode-languageclient/node");
   const config = vscode.workspace.getConfiguration(PREFIX);
   const server = { module: SERVER, transport: TransportKind.ipc };
   const serverOptions = { run: server, debug: server };
   const clientOptions = {
-    // Files by suffix, plus any buffer in the relevance language whatever its
-    // scheme: that is what brings an unsaved `untitled:` buffer to the server,
-    // which then lints it by its languageId.
-    documentSelector: [
-      ...documentPatterns.map((pattern) => ({ scheme: "file", pattern })),
-      { language: LANGUAGE_ID },
-    ],
+    documentSelector: DOCUMENT_SELECTOR,
     initializationOptions: { maxDocumentBytes: config.get("maxDocumentBytes") },
   };
   return new LanguageClient(PREFIX, NAME, serverOptions, clientOptions);
@@ -86,15 +99,33 @@ function restart() {
   return restarting;
 }
 
+/** Start the server the first time a document the client would send passes the gate. */
+function consider(document) {
+  if (wanted || vscode.languages.match(DOCUMENT_SELECTOR, document) === 0) return;
+  if (!needsServer(document)) return;
+  wanted = true;
+  restart();
+}
+
 async function activate(context) {
   context.subscriptions.push(
-    vscode.commands.registerCommand(`${PREFIX}.restartServer`, restart),
-    // The limit is sent at `initialize`, so a change takes a new server.
+    // Explicit, so it starts the server even where nothing has passed the gate.
+    vscode.commands.registerCommand(`${PREFIX}.restartServer`, () => {
+      wanted = true;
+      return restart();
+    }),
+    // The limit is sent at `initialize`, so a change takes a new server; with
+    // no server yet, the next one reads the new value anyway.
     vscode.workspace.onDidChangeConfiguration((event) =>
-      event.affectsConfiguration(`${PREFIX}.maxDocumentBytes`) ? restart() : undefined
-    )
+      wanted && event.affectsConfiguration(`${PREFIX}.maxDocumentBytes`) ? restart() : undefined
+    ),
+    vscode.workspace.onDidOpenTextDocument(consider),
+    // Markdown or HTML can gain relevance as it is edited.
+    vscode.workspace.onDidChangeTextDocument((event) => consider(event.document))
   );
-  await start();
+  for (const document of vscode.workspace.textDocuments) consider(document);
+  // For tests (common/smoke/suite.js): whether the server has been started.
+  return { serverRunning: () => client?.isRunning() ?? false };
 }
 
 function deactivate() {

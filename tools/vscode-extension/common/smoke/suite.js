@@ -2,10 +2,16 @@
 // this file as the --extensionTestsPath and calls run(). Rejecting fails the
 // run, and VS Code exits non-zero.
 //
-// It opens two real files from the workspace run.mjs prepared and waits for the
-// language server's diagnostics on each. That proves the whole chain: the
-// extension activates, starts the configured server, sends the document, and
-// the server's diagnostics reach VS Code.
+// SMOKE_SCENARIO picks the check (run.mjs describes both):
+//
+//   lint  opens two real files from the workspace run.mjs prepared and waits
+//         for the language server's diagnostics on each. That proves the whole
+//         chain: the extension activates, starts the configured server, sends
+//         the document, and the server's diagnostics reach VS Code.
+//   idle  opens Markdown and HTML with no relevance in them and checks the
+//         extension has not started its language server (its activate()
+//         returns `serverRunning()`), then opens a relevance-fenced Markdown
+//         file and checks that starts it and gets diagnostics.
 
 "use strict";
 
@@ -15,6 +21,8 @@ const vscode = require("vscode");
 
 const SOURCE = "bigfix-relevance-analyzer";
 const TIMEOUT_MS = 60_000;
+// How long the idle scenario gives the server to (wrongly) start.
+const IDLE_MS = 3_000;
 
 function ours(uri) {
   return vscode.languages.getDiagnostics(uri).filter((d) => d.source === SOURCE);
@@ -40,7 +48,15 @@ function waitFor(uri, ready) {
   });
 }
 
-async function run() {
+const summary = (found) =>
+  found.map((d) => ({
+    code: typeof d.code === "object" ? d.code.value : d.code,
+    severity: vscode.DiagnosticSeverity[d.severity],
+    line: d.range.start.line + 1,
+    message: d.message,
+  }));
+
+async function lint() {
   const folder = vscode.workspace.workspaceFolders[0].uri.fsPath;
   const broken = vscode.Uri.file(path.join(folder, "broken.rel"));
   const fenced = vscode.Uri.file(path.join(folder, "fenced.md"));
@@ -53,13 +69,6 @@ async function run() {
   await vscode.window.showTextDocument(fenced);
   const fencedFound = await waitFor(fenced, (found) => found.length > 0);
 
-  const summary = (found) =>
-    found.map((d) => ({
-      code: typeof d.code === "object" ? d.code.value : d.code,
-      severity: vscode.DiagnosticSeverity[d.severity],
-      line: d.range.start.line + 1,
-      message: d.message,
-    }));
   // An unsaved buffer has no file name, so only its language says it is
   // relevance (see LANGUAGE_ID in src/bigfix_relevance_analyzer/lsp/linter.py).
   let untitledFound;
@@ -91,6 +100,42 @@ async function run() {
   if (!fencedFound.some((d) => d.range.start.line === 3)) {
     throw new Error(`fenced.md: expected a diagnostic on line 4, got ${JSON.stringify(summary(fencedFound))}`);
   }
+}
+
+async function idle() {
+  const id = process.env.SMOKE_EXTENSION_ID;
+  const extension = vscode.extensions.getExtension(id);
+  if (!extension) throw new Error(`extension ${id} is not loaded`);
+  const api = await extension.activate();
+  const folder = vscode.workspace.workspaceFolders[0].uri.fsPath;
+  const uri = (name) => vscode.Uri.file(path.join(folder, name));
+  const quiet = [uri("plain.md"), uri("page.html")];
+  for (const file of quiet) await vscode.window.showTextDocument(file);
+  await new Promise((resolve) => setTimeout(resolve, IDLE_MS));
+  const result = {
+    vscode: vscode.version,
+    serverRunningWithoutRelevance: api?.serverRunning?.(),
+    diagnosticsWithoutRelevance: quiet.flatMap((file) => summary(ours(file))),
+  };
+  const write = () => fs.writeFileSync(process.env.SMOKE_RESULT, JSON.stringify(result, null, 2));
+  if (result.serverRunningWithoutRelevance !== false || result.diagnosticsWithoutRelevance.length) {
+    write();
+    throw new Error("the server started for Markdown and HTML with no relevance in them");
+  }
+
+  const fenced = uri("fenced.md");
+  await vscode.window.showTextDocument(fenced);
+  result["fenced.md"] = summary(await waitFor(fenced, (found) => found.length > 0));
+  result.serverRunningAfterFence = api.serverRunning();
+  write();
+  if (!result.serverRunningAfterFence) throw new Error("serverRunning() is false after diagnostics arrived");
+}
+
+function run() {
+  const scenario = process.env.SMOKE_SCENARIO;
+  if (scenario === "lint") return lint();
+  if (scenario === "idle") return idle();
+  return Promise.reject(new Error(`unknown SMOKE_SCENARIO ${scenario}`));
 }
 
 module.exports = { run };

@@ -126,5 +126,15 @@ window opens briefly. Your own settings and extensions are not used. It opens
 a broken `.rel` and a relevance-fenced `.md`, then checks the diagnostics,
 including that a fenced statement's finding lands on its line in the document.
 
+For BigFix Relevance Developer, a second instance checks when its language
+server starts. The extension activates at startup, cheaply, and `gate.js`
+starts the server only for an open document worth linting: any BigFix file type
+or relevance-language buffer, but Markdown and HTML only with relevance in them.
+The instance opens Markdown and HTML without relevance, which must leave the
+server unstarted, then a relevance-fenced Markdown file, which must start it and
+get diagnostics. `test/gate.test.mjs` unit-tests the gate, and a test in
+`tests/` checks it passes every tracked Markdown and HTML file the extractor
+finds relevance in.
+
 Either extension's `trace.server` setting set to `"verbose"` logs every LSP
 message to its output channel.

@@ -84,6 +84,9 @@ exists file "C:\Windows\notepad.exe"
 - Hover information and completion are not available yet.
 - A file is checked when its name ends in one of the file types above, or when
   its language is set to BigFix Relevance. Other files are left alone.
+- The checker starts the first time you open a file with relevance to check,
+  so it uses no memory in windows without any. Markdown and HTML files count
+  only once they contain relevance, as described above.
 
 ## Feedback
 
