@@ -265,6 +265,12 @@ jobs:
   # Re-running this job is safe: a draft's assets can be replaced (--clobber).
   # If a run fails before here, use "Re-run failed jobs" on that run: a fresh
   # run would see no tag (drafts have none) and try to create a second draft.
+  #
+  # Every asset job gates publishing, and PyPI went live in `release` before
+  # any of them ran. So a failing playground or VS Code extension build (a
+  # Dependabot lockfile mismatch breaking `npm ci`, say) leaves the package on
+  # PyPI and the GitHub release as a draft until it is fixed and "Re-run failed
+  # jobs" finishes it. That is the trade made for putting PyPI out early.
   finalize:
     name: Finalize and publish the release
     needs: [version, release, playground, vscode-extension]

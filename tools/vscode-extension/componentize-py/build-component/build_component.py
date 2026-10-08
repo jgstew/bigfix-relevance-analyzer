@@ -161,10 +161,28 @@ def package(version: str, out: Path) -> None:
     )
 
 
+def resolve_wheel(pattern: str) -> Path:
+    """The one wheel ``pattern`` names, or exit with why not.
+
+    A glob is resolved here rather than by the shell, through the same helper
+    componentize.py uses, so zero or several matches fail with a clear message
+    instead of as stray arguments. A wheel inside ``dist/`` is refused: the
+    build starts by deleting that directory, which would delete the wheel first.
+    """
+    wheel = Path(_componentize_module()._resolve_single(pattern, kind="wheel")).resolve()
+    if wheel.is_relative_to(DIST.resolve()):
+        raise SystemExit(
+            f"{wheel} is inside {DIST}, which the build deletes first; copy it elsewhere"
+        )
+    return wheel
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
-        "--wheel", type=Path, help="build from this wheel instead of building this checkout"
+        "--wheel",
+        metavar="PATH_OR_GLOB",
+        help="build from this wheel instead of building this checkout; a glob must match one",
     )
     parser.add_argument(
         "--package",
@@ -173,9 +191,8 @@ def main(argv: list[str] | None = None) -> int:
         help="then package the extension, versioned as the wheel, into this .vsix",
     )
     args = parser.parse_args(argv)
-    if args.wheel is not None and not args.wheel.is_file():
-        raise SystemExit(f"no such wheel: {args.wheel}")
-    glue, version = build(args.wheel)
+    wheel = None if args.wheel is None else resolve_wheel(args.wheel)
+    glue, version = build(wheel)
     smoke(glue, version)
     if args.package is not None:
         package(version, args.package)

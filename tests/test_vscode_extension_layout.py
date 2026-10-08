@@ -434,3 +434,78 @@ def test_the_workflow_packages_through_the_build_script() -> None:
     text = WORKFLOW.read_text("utf-8")
     assert "--package" in text
     assert "npx vsce package" not in text
+
+
+# ---------------------------------------------------------------------------
+# jco and preview2-shim move together
+# ---------------------------------------------------------------------------
+
+SHIM_PACKAGES = [PRIMARY, REPO_ROOT / "tools" / "playground-wasm" / "componentize-py" / "smoke"]
+"""Every npm package whose jco-generated glue imports @bytecodealliance/preview2-shim."""
+
+
+@pytest.mark.parametrize("package", SHIM_PACKAGES, ids=lambda path: path.parent.name)
+def test_the_glue_loads_the_shim_version_jco_is_built_against(package: Path) -> None:
+    """jco's transpiler declares the preview2-shim its output targets; the glue
+    imports the top-level copy. For 0.x, a different minor is a breaking change."""
+    packages = json.loads((package / "package-lock.json").read_text("utf-8"))["packages"]
+    wanted = packages["node_modules/@bytecodealliance/jco-transpile"]["dependencies"][
+        "@bytecodealliance/preview2-shim"
+    ]
+    loaded = packages["node_modules/@bytecodealliance/preview2-shim"]["version"]
+    major, minor = (int(part) for part in wanted.lstrip("^~=").split(".")[:2])
+    assert (major, minor) == tuple(int(part) for part in loaded.split(".")[:2]), (
+        f"glue loads preview2-shim {loaded}; jco-transpile wants {wanted}"
+    )
+
+
+@pytest.mark.parametrize("package", SHIM_PACKAGES, ids=lambda path: path.parent.name)
+def test_dependabot_updates_jco_and_the_shim_together(package: Path) -> None:
+    """Separate PRs for the two broke a lockfile once (#89 and #90)."""
+    text = DEPENDABOT.read_text("utf-8")
+    entry = text[text.index(f'directory: "/{package.relative_to(REPO_ROOT)}"') :]
+    entry = entry.split("- package-ecosystem:")[0]
+    assert "groups:" in entry
+    assert '"@bytecodealliance/*"' in entry
+
+
+# ---------------------------------------------------------------------------
+# build_component.py --wheel: one wheel, resolved clearly, never inside dist/
+# ---------------------------------------------------------------------------
+
+
+def _build_module(monkeypatch: pytest.MonkeyPatch, dist: Path) -> Any:
+    build = load_tool(PRIMARY / "build-component" / "build_component.py", "_build_component")
+    monkeypatch.setattr(build, "DIST", dist)
+    monkeypatch.setattr(build, "build", lambda wheel=None: pytest.fail("built anyway"))
+    return build
+
+
+def test_a_wheel_inside_the_build_output_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The build starts by deleting dist/, which would delete that wheel first."""
+    dist = tmp_path / "dist"
+    wheel = dist / "wheel" / "bigfix_relevance_analyzer-1.0.0-py3-none-any.whl"
+    wheel.parent.mkdir(parents=True)
+    wheel.touch()
+    build = _build_module(monkeypatch, dist)
+    with pytest.raises(SystemExit, match="inside"):
+        build.main(["--wheel", str(wheel)])
+
+
+@pytest.mark.parametrize(("count", "message"), [(0, "no wheel found"), (2, "exactly one wheel")])
+def test_a_wheel_pattern_must_match_exactly_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, count: int, message: str
+) -> None:
+    for version in range(count):
+        (tmp_path / f"bigfix_relevance_analyzer-1.0.{version}-py3-none-any.whl").touch()
+    build = _build_module(monkeypatch, tmp_path / "dist")
+    with pytest.raises(SystemExit, match=message):
+        build.main(["--wheel", str(tmp_path / "*.whl")])
+
+
+def test_the_workflow_passes_the_wheel_pattern_quoted() -> None:
+    """The script resolves it, so zero or two wheels fail with a clear message
+    rather than as argparse errors about stray arguments."""
+    assert "--wheel 'dist/*.whl'" in WORKFLOW.read_text("utf-8")
