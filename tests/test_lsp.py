@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from _helpers import BES_EXAMPLE, BROKEN, CLIENT, UNKNOWN_INSPECTOR, write
+from _helpers import BES_EXAMPLE, BROKEN, CLIENT, UNKNOWN_INSPECTOR, run_fresh_python, write
 
 from bigfix_relevance_analyzer import __version__
 from bigfix_relevance_analyzer.lint import LintConfig, lint_file
@@ -229,6 +229,33 @@ def test_line_end_is_counted_in_utf16_code_units() -> None:
     text = '"\U0001f600" & ' + BROKEN
     (first, *_) = diagnostics(did_open(started(), "emoji.rel", text), "emoji.rel")
     assert first["range"]["end"] == {"line": 0, "character": len(text) + 1}
+
+
+def test_diagnostics_need_no_codec_beyond_utf8() -> None:
+    """A WASM host has no codecs it was not built with.
+
+    componentize-py snapshots the interpreter at build time, so a codec first
+    looked up at runtime is missing there: ``str.encode("utf-16-le")`` raised
+    ``LookupError`` inside the component and every diagnostic was lost. Blocking
+    the UTF-16 codecs in a fresh interpreter reproduces that on the host.
+    """
+    run_fresh_python(
+        """
+import sys
+for name in ("encodings.utf_16", "encodings.utf_16_le", "encodings.utf_16_be"):
+    sys.modules[name] = None
+from bigfix_relevance_analyzer.lsp.server import Server
+server = Server()
+server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
+text = '"\\U0001f600" & exists file "unterminated'
+(reply,) = server.handle({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {
+    "textDocument": {"uri": "file:///w/a.rel", "languageId": "x", "version": 1, "text": text}}})
+found = reply["params"]["diagnostics"]
+assert found, reply
+assert found[0]["range"]["end"]["character"] == len(text) + 1, found
+print("ok")
+"""
+    )
 
 
 def test_a_warning_is_severity_two() -> None:

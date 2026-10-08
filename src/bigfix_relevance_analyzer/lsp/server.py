@@ -338,7 +338,13 @@ def _path_of(uri: str) -> Path:
 
 
 def _utf16_length(line: str) -> int:
-    return len(line.encode("utf-16-le", errors="surrogatepass")) // 2
+    """``line``'s length in UTF-16 code units: two for an astral character.
+
+    Counted rather than encoded on purpose. A WASM host has only the codecs its
+    build snapshot saw, and ``str.encode("utf-16-le")`` raised ``LookupError``
+    inside a componentize-py component, losing every diagnostic.
+    """
+    return len(line) + sum(1 for char in line if ord(char) > 0xFFFF)
 
 
 def _diagnostic(
