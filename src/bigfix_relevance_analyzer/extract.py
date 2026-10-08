@@ -566,6 +566,9 @@ def extract_relevance_from_actionscript(
     Lines are 1-based within ``body`` plus ``line_offset``, for a body embedded
     in a larger file; ``column_offset`` is how far into its line ``body``
     starts there, or ``None`` if unknown (see :attr:`RelevanceSite.column`).
+    It defaults to 0, which says ``body`` starts at the start of a line: a
+    caller embedding a fragment that starts mid-line, and not knowing where,
+    should pass ``None`` rather than get a wrong first-line column.
     ActionScript runs on the endpoint, so substitutions in it are client
     relevance, which is what ``dialect`` says by default.
     """
@@ -810,6 +813,9 @@ def extract_relevance_from_html_text(
     ``line_offset`` is added to every line, for scanning a fragment embedded in
     a larger file, and ``column_offset`` is how far into its line the fragment
     starts there, or ``None`` if unknown (see :attr:`RelevanceSite.column`).
+    It defaults to 0, which says ``text`` starts at the start of a line: a
+    caller embedding a fragment that starts mid-line, and not knowing where,
+    should pass ``None`` rather than get a wrong first-line column.
     """
     return _html_sites(
         text, context=context, line_offset=line_offset, label=label, column_offset=column_offset
