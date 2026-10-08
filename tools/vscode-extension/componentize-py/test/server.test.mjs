@@ -139,3 +139,25 @@ test("exit without shutdown ends the process with 1", async () => {
   server.send({ method: "exit" });
   assert.equal(await server.exited, 1);
 });
+
+// The shim's default gives the component the whole host filesystem (preopen
+// "/"; every drive on Windows). The server lints the text it is sent and opens
+// no files, so server.js takes that away before the component loads, and says
+// so on stderr from the shim's own state.
+test("the component is given no filesystem access", async () => {
+  const server = startServer();
+  await initialized(server);
+  server.send({ method: "exit" });
+  await server.exited;
+  assert.match(server.stderr(), /filesystem access: none/);
+});
+
+// Likewise the shim passes the host's environment through by default, which
+// can hold tokens and credentials. The server reads no environment variables.
+test("the component sees no environment variables", async () => {
+  const server = startServer();
+  await initialized(server);
+  server.send({ method: "exit" });
+  await server.exited;
+  assert.match(server.stderr(), /environment variables: none/);
+});

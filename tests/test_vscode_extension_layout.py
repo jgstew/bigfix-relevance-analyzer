@@ -116,6 +116,25 @@ def test_the_built_component_is_never_committed() -> None:
     assert result.returncode == 0, f"{probe} is not gitignored"
 
 
+def test_the_server_takes_the_filesystem_away_before_the_component_loads() -> None:
+    """preview2-shim preopens the whole host filesystem unless told otherwise.
+
+    server.js clears it on the very shim module instance the glue imports
+    (resolved from the glue's own location), before importing the glue, so the
+    component never sees a directory. test/server.test.mjs checks the result.
+    """
+    server = (PRIMARY / "server.js").read_text("utf-8")
+    assert "createRequire(COMPONENT)" in server
+    cleared = server.index("_clearPreopens()")
+    assert cleared < server.index("await import(pathToFileURL(COMPONENT)")
+
+
+def test_the_server_takes_the_environment_away_before_the_component_loads() -> None:
+    """preview2-shim passes the host's environment variables through by default."""
+    server = (PRIMARY / "server.js").read_text("utf-8")
+    assert server.index("_setEnv({})") < server.index("await import(pathToFileURL(COMPONENT)")
+
+
 def test_both_extensions_share_one_smoke_test() -> None:
     """The same files and the same expectations, so the two PoCs compare directly."""
     assert (COMMON_SMOKE / "run.mjs").is_file()
