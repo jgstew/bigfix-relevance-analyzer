@@ -61,7 +61,7 @@ extension loaded. Open any `.bes`, `.rel` or relevance-fenced `.md` file there.
   the `app.py` that componentize-py compiles, and the build script.
 
 - `test/server.test.mjs`: unit tests for the server process in plain Node,
-  with no VS Code (`node --test test/`, about a second). Set `EXTENSION_DIR`
+  with no VS Code (`node --test test/server.test.mjs`, about a second). Set `EXTENSION_DIR`
   to test another copy, such as an unzipped `.vsix`.
 
 ### In CI

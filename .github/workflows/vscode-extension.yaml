@@ -113,7 +113,9 @@ jobs:
       - name: unit-test the packaged extension
         env:
           EXTENSION_DIR: ${{ github.workspace }}/dist/vsix-unpacked/extension
-        run: node --test tools/vscode-extension/componentize-py/test/
+        # The file, not the directory: Node 22 runs a directory argument as a
+        # module and fails with MODULE_NOT_FOUND (later Node versions expand it).
+        run: node --test tools/vscode-extension/componentize-py/test/server.test.mjs
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

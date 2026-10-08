@@ -1,5 +1,6 @@
 // Unit tests for server.js and the component behind it, in plain Node: no VS
-// Code. Run with `node --test test/`.
+// Code. Run with `node --test test/server.test.mjs` (name the file: Node 22
+// does not accept a directory here).
 //
 // Each test forks server.js with Node IPC, exactly as vscode-languageclient
 // does for this extension's `TransportKind.ipc`, and exchanges raw LSP message

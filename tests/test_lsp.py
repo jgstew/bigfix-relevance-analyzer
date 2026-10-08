@@ -283,7 +283,7 @@ def test_an_unsaved_buffer_is_linted_not_the_file_on_disk(tmp_path: Path) -> Non
     server = started()
     document = {"uri": on_disk.as_uri(), "languageId": "x", "version": 1, "text": BROKEN}
     messages = server.handle(notification("textDocument/didOpen", {"textDocument": document}))
-    (params,) = [m["params"] for m in messages]
+    (params,) = (m["params"] for m in messages)
     assert params["diagnostics"]
 
 
