@@ -70,7 +70,9 @@ const UNTITLED_LANGUAGE = manifest.contributes.languages?.[0]?.id ?? "";
 const scenarios = {
   lint: {
     "broken.rel": 'exists file "unterminated\n',
-    "fenced.md": "# Example\n\n```relevance\ntotally bogus made up inspector\n```\n",
+    // The name starts at character 7, so a range that starts there is not a
+    // whole-line one that happens to.
+    "fenced.md": "# Example\n\n```relevance\nexists totally bogus made up inspector\n```\n",
   },
   ...(UNTITLED_LANGUAGE
     ? {

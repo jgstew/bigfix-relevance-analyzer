@@ -53,6 +53,7 @@ const summary = (found) =>
     code: typeof d.code === "object" ? d.code.value : d.code,
     severity: vscode.DiagnosticSeverity[d.severity],
     line: d.range.start.line + 1,
+    characters: [d.range.start.character, d.range.end.character],
     message: d.message,
   }));
 
@@ -91,14 +92,28 @@ async function lint() {
   };
   fs.writeFileSync(process.env.SMOKE_RESULT, JSON.stringify(result, null, 2));
 
-  const codes = new Set(brokenFound.map((d) => (typeof d.code === "object" ? d.code.value : d.code)));
+  const codeOf = (d) => (typeof d.code === "object" ? d.code.value : d.code);
+  const codes = new Set(brokenFound.map(codeOf));
   if (!codes.has("error-token")) {
     throw new Error(`broken.rel: expected an error-token diagnostic, got ${[...codes]}`);
+  }
+  // Precise ranges (issue #96, item 1): the unterminated string, not the line.
+  for (const [name, found] of [["broken.rel", brokenFound], ["untitled", untitledFound]]) {
+    if (!found) continue;
+    const token = found.find((d) => codeOf(d) === "error-token");
+    if (!token || token.range.start.character !== 12) {
+      throw new Error(`${name}: expected error-token from character 12, got ${JSON.stringify(summary(found))}`);
+    }
   }
   // The fence opens on line 3, so its statement is on line 4: proves line
   // mapping from an extracted site back to the document.
   if (!fencedFound.some((d) => d.range.start.line === 3)) {
     throw new Error(`fenced.md: expected a diagnostic on line 4, got ${JSON.stringify(summary(fencedFound))}`);
+  }
+  // ...and the column: the unknown name, after `exists `, within the fence.
+  const unknown = fencedFound.find((d) => codeOf(d) === "unknown-inspector");
+  if (!unknown || unknown.range.start.line !== 3 || unknown.range.start.character !== 7) {
+    throw new Error(`fenced.md: expected unknown-inspector at line 4, character 7, got ${JSON.stringify(summary(fencedFound))}`);
   }
 }
 
