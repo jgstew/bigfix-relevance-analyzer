@@ -25,14 +25,15 @@ from _helpers import BES_EXAMPLE, BROKEN, CLIENT, UNKNOWN_INSPECTOR, run_fresh_p
 
 from bigfix_relevance_analyzer import __version__
 from bigfix_relevance_analyzer.lint import LintConfig, lint_file
-from bigfix_relevance_analyzer.lsp import server as server_module
+from bigfix_relevance_analyzer.lsp import linter as linter_module
 from bigfix_relevance_analyzer.lsp import stdio
-from bigfix_relevance_analyzer.lsp.server import (
+from bigfix_relevance_analyzer.lsp.linter import (
     DEFAULT_MAX_DOCUMENT_BYTES,
     DOCUMENT_TOO_LARGE,
     SOURCE,
-    Server,
+    DocumentLinter,
 )
+from bigfix_relevance_analyzer.lsp.server import Server
 
 Message = dict[str, Any]
 
@@ -195,7 +196,7 @@ def test_a_failing_handler_is_logged_and_does_not_escape(
         raise RuntimeError("boom")
 
     server = started()
-    monkeypatch.setattr(server_module, "_lint_data", explode)
+    monkeypatch.setattr(linter_module, "_lint_data", explode)
     with caplog.at_level(logging.ERROR, logger="bigfix_relevance_analyzer"):
         assert did_open(server, "a.rel", BROKEN) == []
     assert "boom" in caplog.text
@@ -349,9 +350,9 @@ TWO_SITES = f"```relevance\n{UNKNOWN_INSPECTOR}\n```\n\n```relevance\n{BROKEN}\n
 def test_an_unchanged_site_is_served_from_the_cache() -> None:
     server = started()
     did_open(server, "doc.md", TWO_SITES)
-    assert server.cache_stats().misses == 2
+    assert server.linter.cache_stats().misses == 2
     did_change(server, "doc.md", TWO_SITES.replace(BROKEN, CLIENT), version=2)
-    stats = server.cache_stats()
+    stats = server.linter.cache_stats()
     assert (stats.hits, stats.misses) == (1, 3)
 
 
@@ -360,7 +361,7 @@ def test_a_cached_site_that_moved_reports_its_new_line(tmp_path: Path) -> None:
     did_open(server, "doc.md", TWO_SITES)
     moved = "intro\n\n\n" + TWO_SITES
     found = diagnostics(did_change(server, "doc.md", moved, version=2), "doc.md")
-    assert server.cache_stats().misses == 2
+    assert server.linter.cache_stats().misses == 2
     assert as_lint(found) == lint_expected(write(tmp_path, "doc.md", moved))
 
 
@@ -369,16 +370,16 @@ def test_the_same_statement_in_two_documents_keeps_each_documents_lines(tmp_path
     did_open(server, "a.md", TWO_SITES)
     shifted = "\n\n\n\n" + TWO_SITES
     found = diagnostics(did_open(server, "b.md", shifted), "b.md")
-    assert server.cache_stats().misses == 2
+    assert server.linter.cache_stats().misses == 2
     assert as_lint(found) == lint_expected(write(tmp_path, "b.md", shifted))
 
 
 def test_the_cache_is_bounded() -> None:
-    server = Server(cache_size=2)
+    server = Server(DocumentLinter(cache_size=2))
     initialize(server)
     for index in range(4):
         did_open(server, f"{index}.rel", f"{UNKNOWN_INSPECTOR} {index}")
-    assert server.cache_stats().size == 2
+    assert server.linter.cache_stats().size == 2
 
 
 # ---------------------------------------------------------------------------
@@ -393,7 +394,7 @@ def test_the_default_limit_is_one_mebibyte() -> None:
 def test_an_oversized_document_is_reported_not_linted() -> None:
     server = started(maxDocumentBytes=10)
     found = diagnostics(did_open(server, "big.rel", BROKEN), "big.rel")
-    assert server.cache_stats().misses == 0
+    assert server.linter.cache_stats().misses == 0
     (diagnostic,) = found
     assert diagnostic["code"] == DOCUMENT_TOO_LARGE
     assert diagnostic["severity"] == 3
@@ -419,7 +420,7 @@ def test_an_invalid_limit_keeps_the_default(
 ) -> None:
     with caplog.at_level(logging.WARNING, logger="bigfix_relevance_analyzer"):
         server = started(maxDocumentBytes=value)
-    assert server.max_document_bytes == DEFAULT_MAX_DOCUMENT_BYTES
+    assert server.linter.max_document_bytes == DEFAULT_MAX_DOCUMENT_BYTES
     assert "maxDocumentBytes" in caplog.text
 
 
@@ -485,7 +486,10 @@ def test_run_answers_unparsable_json_with_a_parse_error_and_carries_on() -> None
     assert response["error"]["code"] == -32700
 
 
-def test_the_server_runs_over_stdio_as_a_module() -> None:
+@pytest.mark.parametrize("flags", [[], ["--stdio"]], ids=["bare", "--stdio"])
+def test_the_server_runs_over_stdio_as_a_module(flags: list[str]) -> None:
+    """``--stdio`` too: vscode-languageclient appends it for a stdio transport,
+    as many clients do, and rejecting it killed the server in PoC 1."""
     document = {"uri": uri("a.rel"), "languageId": "x", "version": 1, "text": BROKEN}
     stdin = (
         frame(request("initialize", {"capabilities": {}}, id_=1))
@@ -495,7 +499,7 @@ def test_the_server_runs_over_stdio_as_a_module() -> None:
         + frame(notification("exit"))
     )
     result = subprocess.run(
-        [sys.executable, "-m", "bigfix_relevance_analyzer.lsp"],
+        [sys.executable, "-m", "bigfix_relevance_analyzer.lsp", *flags],
         input=stdin,
         capture_output=True,
         check=False,

@@ -1,0 +1,67 @@
+{
+  "name": "bigfix-relevance-python-stdio",
+  "displayName": "BigFix Relevance (PoC 1: Python over stdio)",
+  "description": "Proof of concept: BigFix Relevance lint diagnostics from bigfix-relevance-lsp, run from a local Python. See tools/vscode-extension/README.md.",
+  "version": "0.0.1",
+  "private": true,
+  "publisher": "jgstew",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jgstew/bigfix-relevance-analyzer"
+  },
+  "engines": {
+    "vscode": "^1.91.0",
+    "npm": ">=11.10.0"
+  },
+  "main": "./extension.js",
+  "settingsPrefix": "bigfixRelevancePython",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "bigfixRelevancePython.restartServer",
+        "title": "BigFix Relevance (Python): Restart Language Server"
+      }
+    ],
+    "configuration": {
+      "title": "BigFix Relevance (PoC 1: Python over stdio)",
+      "properties": {
+        "bigfixRelevancePython.server.command": {
+          "type": "string",
+          "default": "bigfix-relevance-lsp",
+          "markdownDescription": "The language server executable. The default needs `bigfix-relevance-analyzer` installed so that `bigfix-relevance-lsp` is on `PATH`. To run a checkout instead, set this to `uv` and the arguments to `[\"run\", \"--project\", \"/path/to/bigfix-relevance-analyzer\", \"bigfix-relevance-lsp\"]`."
+        },
+        "bigfixRelevancePython.server.args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Arguments passed to the server command."
+        },
+        "bigfixRelevancePython.maxDocumentBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1048576,
+          "description": "Documents larger than this (UTF-8 bytes) are not linted; they get one informational diagnostic instead."
+        },
+        "bigfixRelevancePython.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Log the LSP messages between VS Code and the server to the extension's output channel."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "10.1.2"
+  }
+}

@@ -25,6 +25,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         choices=("DEBUG", "INFO", "WARNING", "ERROR"),
         help="logging threshold; logs go to stderr, never stdout (default: %(default)s)",
     )
+    # Accepted and ignored: stdio is the only transport. Many clients append it
+    # anyway -- vscode-languageclient always does for a stdio transport -- so
+    # refusing it would make the server exit before `initialize`.
+    parser.add_argument("--stdio", action="store_true", help="use stdio (the only transport)")
     args = parser.parse_args(argv)
     logging.basicConfig(stream=sys.stderr, level=args.log_level)
     return run(Server(), sys.stdin.buffer, sys.stdout.buffer)

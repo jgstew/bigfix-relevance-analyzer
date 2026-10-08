@@ -590,6 +590,17 @@ not linted. It gets one informational `document-too-large` diagnostic instead,
 because one real 13 MB generated task takes about 19 s. Change the limit with
 the `maxDocumentBytes` initialization option.
 
+The protocol layer is a thin adapter. Everything the editor is told (the
+diagnostics, the cache, the size guard and their options) comes from
+`DocumentLinter`, which has no JSON-RPC in it: `diagnostics(uri, text)` returns
+plain dicts in LSP's field names. Moving to a library such as pygls would mean
+writing another adapter over it, not porting it.
+
+A proof-of-concept VS Code extension that runs this server is in
+`tools/vscode-extension/python-stdio/`. A version running the server as a
+WebAssembly component, with no Python needed, will sit beside it. See
+`tools/vscode-extension/README.md`.
+
 For hover-style questions, `node_at(tree, offset)` returns the innermost node
 under a character offset of the parsed statement. `nodes_at` returns the whole
 chain from the root down.
