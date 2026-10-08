@@ -322,3 +322,25 @@ def test_every_npm_package_is_watched_by_dependabot(package_dir: Path) -> None:
     relative = "/" + str(package_dir.relative_to(REPO_ROOT))
     text = DEPENDABOT.read_text(encoding="utf-8")
     assert f'directory: "{relative}"' in text, f"{DEPENDABOT.name} has no npm entry for {relative}"
+
+
+def test_a_release_skips_the_browser_test_but_keeps_the_node_smoke_check() -> None:
+    """Installing Chromium and driving the page is the slow part of the job; a
+    release (workflow_call with `release_artifact`) skips it. Pull requests and
+    pushes still run it. The quick Node smoke check still gates the release."""
+    text = WORKFLOW.read_text(encoding="utf-8")
+    job = text[text.index("  componentize-py:") : text.index("  parity:")]
+    steps = job.split("      - ")[1:]
+
+    def step(name: str) -> str:
+        (found,) = (s for s in steps if f"name: {name}" in s.split("\n")[0])
+        return found
+
+    not_in_release = "if: inputs.release_artifact == ''"
+    for name in (
+        "npm ci (playground browser test)",
+        "install headless Chromium for the playground test",
+        "test the playground page in a real browser",
+    ):
+        assert not_in_release in step(name), name
+    assert "if:" not in step("run the analyzer as a component in Node")
