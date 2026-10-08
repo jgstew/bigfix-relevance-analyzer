@@ -87,18 +87,26 @@ repos:
     hooks:
       - id: bes-schema-validate
         stages: [pre-push]
+        # Deliberately broken: inputs for tests/test_downstream_pre_commit_bigfix.py.
+        exclude: ^tests/golden/pre_commit_bigfix/
       - id: bes-actionscript-lint-schclass
         stages: [pre-push]
+        # Deliberately broken: inputs for tests/test_downstream_pre_commit_bigfix.py.
+        exclude: ^tests/golden/pre_commit_bigfix/
       - id: bes-actionscript-validate-script
         stages: [pre-push]
+        # Deliberately broken: inputs for tests/test_downstream_pre_commit_bigfix.py.
+        exclude: ^tests/golden/pre_commit_bigfix/
       - id: bes-actionscript-validate-prefetch
         stages: [pre-push]
+        # Deliberately broken: inputs for tests/test_downstream_pre_commit_bigfix.py.
+        exclude: ^tests/golden/pre_commit_bigfix/
         # args: [--auto-fix-network, "yes"]
         args: [--disable, "E401"]
       - id: bes-conventions-check
         stages: [pre-push]
         args: [--strict]
-        exclude: ^tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript\.bes$
+        exclude: ^(tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript\.bes|tests/golden/pre_commit_bigfix/.*)$
 
   # ruff replaces black + flake8 + isort: `ruff-check` lints (and fixes),
   # `ruff-format` is the formatter. Config lives in pyproject.toml.
