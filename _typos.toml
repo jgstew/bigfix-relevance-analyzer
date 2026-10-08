@@ -33,4 +33,5 @@ extend-exclude = [
     "tests/examples/**",
     "src/bigfix_relevance_analyzer/_inspector_data.py",
     "tools/playground-wasm/**/package-lock.json",
+    "tools/vscode-extension/**/package-lock.json",
 ]

@@ -1,16 +1,21 @@
 #!/usr/bin/env node
-// End-to-end smoke test for PoC 1, in a real VS Code with no person involved.
+// End-to-end smoke test for either VS Code extension, in a real VS Code, with no
+// person involved. Both extensions run the same check, so their results compare
+// directly.
 //
-//     node smoke/run.mjs [--code <VS Code executable>] [--server <command> [args...]]
+//     node common/smoke/run.mjs <extension-dir> [--code <VS Code executable>] [--server <command> [args...]]
 //
 // Starts an isolated VS Code instance (throwaway user-data and extensions
-// directories, so nothing of yours is read or changed) with this extension
-// under development and smoke/suite.js as its test runner. suite.js opens two
-// files and waits for the language server's diagnostics. A window opens
-// briefly while it runs.
+// directories, so nothing of yours is read or changed) with the extension
+// under development and suite.js as its test runner. suite.js opens two files
+// and waits for the language server's diagnostics. A window opens briefly
+// while it runs.
 //
-// The server defaults to this checkout's own `.venv/bin/bigfix-relevance-lsp`
-// (from `uv sync`), so the run tests the working tree, not whatever is on PATH.
+// --server applies only to an extension that starts an external server
+// (python-stdio/, through `<prefix>.server.command`). It defaults to this
+// checkout's own `.venv/bin/bigfix-relevance-lsp` (from `uv sync`), so the run
+// tests the working tree rather than whatever is on PATH. The componentize-py/
+// extension needs its component built first; see its build-component/.
 //
 // No @vscode/test-electron: that downloads a separate VS Code build, which is
 // what CI would want but more than a proof of concept needs. Point --code at an
@@ -23,11 +28,14 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const EXTENSION = resolve(HERE, "..");
-const REPO = resolve(EXTENSION, "..", "..", "..");
-const PREFIX = JSON.parse(readFileSync(join(EXTENSION, "package.json"), "utf8")).settingsPrefix;
+const REPO = resolve(HERE, "..", "..", "..", "..");
 
-const argv = process.argv.slice(2);
+const [extensionArg, ...argv] = process.argv.slice(2);
+if (!extensionArg) throw new Error("usage: node run.mjs <extension-dir> [--code <path>] [--server <command> [args...]]");
+const EXTENSION = resolve(extensionArg);
+const manifest = JSON.parse(readFileSync(join(EXTENSION, "package.json"), "utf8"));
+const PREFIX = manifest.settingsPrefix;
+const SETTINGS = manifest.contributes.configuration.properties;
 let code = "/Applications/Visual Studio Code.app/Contents/MacOS/Code";
 let server = [join(REPO, ".venv", "bin", "bigfix-relevance-lsp")];
 for (let i = 0; i < argv.length; i++) {
@@ -46,13 +54,12 @@ try {
     join(workspace, "fenced.md"),
     "# Example\n\n```relevance\ntotally bogus made up inspector\n```\n"
   );
-  writeFileSync(
-    join(workspace, ".vscode", "settings.json"),
-    JSON.stringify({
-      [`${PREFIX}.server.command`]: server[0],
-      [`${PREFIX}.server.args`]: server.slice(1),
-    })
-  );
+  const settings = {};
+  if (`${PREFIX}.server.command` in SETTINGS) {
+    settings[`${PREFIX}.server.command`] = server[0];
+    settings[`${PREFIX}.server.args`] = server.slice(1);
+  }
+  writeFileSync(join(workspace, ".vscode", "settings.json"), JSON.stringify(settings));
   const result = join(scratch, "result.json");
 
   const run = spawnSync(
@@ -84,7 +91,7 @@ try {
     console.error(`smoke test failed: VS Code exited ${run.status}`);
     process.exit(1);
   }
-  console.log("smoke test passed");
+  console.log(`smoke test passed: ${manifest.displayName}`);
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }

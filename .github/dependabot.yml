@@ -109,6 +109,17 @@ updates:
   # extension is packaged, so a compromised dependency would run in their
   # editor. tests/test_vscode_extension_layout.py holds an entry here for each.
 
+  # vscode-languageclient, vscode-jsonrpc, preview2-shim; jco (build only)
+  - package-ecosystem: "npm"
+    directory: "/tools/vscode-extension/componentize-py"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
   # vscode-languageclient
   - package-ecosystem: "npm"
     directory: "/tools/vscode-extension/python-stdio"

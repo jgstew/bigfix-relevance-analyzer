@@ -4,8 +4,9 @@
 // Deliberately thin. Every protocol decision lives in the Python server
 // (src/bigfix_relevance_analyzer/lsp/), and vscode-languageclient speaks LSP to
 // it, so this file only says which files to send and how to start the server.
-// PoC 2 (../componentize-py/, planned) keeps all of that and changes only how
-// the server is started.
+// ../componentize-py/ is the primary extension, "BigFix Relevance Developer":
+// the same server compiled to WebAssembly, so no Python is needed. This one is
+// kept as a proof of concept to compare against.
 //
 // Plain CommonJS JavaScript rather than TypeScript, so there is no build step:
 // VS Code loads this file as is.

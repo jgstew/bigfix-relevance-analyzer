@@ -596,10 +596,11 @@ diagnostics, the cache, the size guard and their options) comes from
 plain dicts in LSP's field names. Moving to a library such as pygls would mean
 writing another adapter over it, not porting it.
 
-A proof-of-concept VS Code extension that runs this server is in
-`tools/vscode-extension/python-stdio/`. A version running the server as a
-WebAssembly component, with no Python needed, will sit beside it. See
-`tools/vscode-extension/README.md`.
+Two proof-of-concept VS Code extensions run this server; see
+`tools/vscode-extension/README.md`. **BigFix Relevance Developer**
+(`componentize-py/`) is the primary one. It compiles the server, with a
+CPython, into a WebAssembly component, so nothing needs installing beyond VS
+Code. `python-stdio/` starts `bigfix-relevance-lsp` from a local Python instead.
 
 For hover-style questions, `node_at(tree, offset)` returns the innermost node
 under a character offset of the parsed statement. `nodes_at` returns the whole

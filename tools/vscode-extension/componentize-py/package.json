@@ -1,0 +1,59 @@
+{
+  "name": "bigfix-relevance-developer",
+  "displayName": "BigFix Relevance Developer",
+  "description": "BigFix Relevance lint diagnostics, with the analyzer built in: no Python needed. Proof of concept; see tools/vscode-extension/README.md.",
+  "version": "0.0.1",
+  "private": true,
+  "publisher": "jgstew",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jgstew/bigfix-relevance-analyzer"
+  },
+  "engines": {
+    "vscode": "^1.91.0",
+    "npm": ">=11.10.0"
+  },
+  "main": "./extension.js",
+  "settingsPrefix": "bigfixRelevance",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "bigfixRelevance.restartServer",
+        "title": "BigFix Relevance: Restart Language Server"
+      }
+    ],
+    "configuration": {
+      "title": "BigFix Relevance Developer",
+      "properties": {
+        "bigfixRelevance.maxDocumentBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1048576,
+          "description": "Documents larger than this (UTF-8 bytes) are not linted; they get one informational diagnostic instead."
+        },
+        "bigfixRelevance.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Log the LSP messages between VS Code and the server to the extension's output channel."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "@bytecodealliance/preview2-shim": "0.26.0",
+    "vscode-jsonrpc": "9.0.3",
+    "vscode-languageclient": "10.1.2"
+  },
+  "devDependencies": {
+    "@bytecodealliance/jco": "1.34.0"
+  }
+}

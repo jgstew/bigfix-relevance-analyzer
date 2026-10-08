@@ -61,9 +61,59 @@ def _settings(extension: Path) -> dict[str, Any]:
 EXTENSIONS = _extension_dirs()
 
 
-def test_poc_1_exists() -> None:
+PRIMARY = VSCODE_EXTENSION / "componentize-py"
+POC_PYTHON = VSCODE_EXTENSION / "python-stdio"
+COMMON_SMOKE = VSCODE_EXTENSION / "common" / "smoke"
+
+
+def test_both_extensions_exist() -> None:
     """Guard the parametrized tests below against passing on an empty list."""
-    assert VSCODE_EXTENSION / "python-stdio" in EXTENSIONS
+    assert EXTENSIONS == [PRIMARY, POC_PYTHON]
+
+
+def test_the_wasm_extension_is_the_primary_one() -> None:
+    """It needs nothing installed, so it gets the plain name and settings."""
+    manifest = _manifest(PRIMARY)
+    assert manifest["name"] == "bigfix-relevance-developer"
+    assert manifest["displayName"] == "BigFix Relevance Developer"
+    assert manifest["settingsPrefix"] == "bigfixRelevance"
+
+
+def test_the_python_extension_is_labelled_a_proof_of_concept() -> None:
+    assert "PoC" in _manifest(POC_PYTHON)["displayName"]
+    assert _manifest(POC_PYTHON)["settingsPrefix"] == "bigfixRelevancePython"
+
+
+def test_the_component_world_exports_what_server_js_calls() -> None:
+    wit = (PRIMARY / "build-component" / "wit" / "lsp.wit").read_text("utf-8")
+    for export in (
+        "export handle: func(message: string) -> string;",
+        "export exit-code: func() -> option<s32>;",
+        "export version: func() -> string;",
+    ):
+        assert export in wit
+    assert (PRIMARY / "build-component" / "app.py").is_file()
+    assert (PRIMARY / "build-component" / "build_component.py").is_file()
+
+
+def test_the_built_component_is_never_committed() -> None:
+    """~22 MiB, rebuilt from the wheel: ``build_component.py`` writes it under ``dist/``."""
+    git = shutil.which("git")
+    if git is None or not (REPO_ROOT / ".git").exists():
+        pytest.skip("not a git checkout")
+    probe = PRIMARY / "dist" / "lsp.wasm"
+    result = subprocess.run(
+        [git, "check-ignore", "-q", str(probe)], cwd=REPO_ROOT, capture_output=True
+    )
+    assert result.returncode == 0, f"{probe} is not gitignored"
+
+
+def test_both_extensions_share_one_smoke_test() -> None:
+    """The same files and the same expectations, so the two PoCs compare directly."""
+    assert (COMMON_SMOKE / "run.mjs").is_file()
+    assert (COMMON_SMOKE / "suite.js").is_file()
+    for extension in EXTENSIONS:
+        assert not (extension / "smoke").exists(), f"{extension.name} has its own smoke/"
 
 
 def test_the_directory_readme_describes_both_proofs_of_concept() -> None:
@@ -112,14 +162,19 @@ def test_every_extension_is_watched_by_dependabot(extension: Path) -> None:
 
 
 @pytest.mark.parametrize("extension", EXTENSIONS, ids=lambda path: path.name)
-def test_the_entry_point_exists_and_parses(extension: Path) -> None:
-    main = extension / _manifest(extension)["main"]
-    assert main.is_file()
+def test_the_entry_points_exist_and_parse(extension: Path) -> None:
+    scripts = [extension / _manifest(extension)["main"]]
+    if extension == PRIMARY:
+        scripts.append(extension / "server.js")
+    scripts += sorted(COMMON_SMOKE.glob("*.*js"))
+    for script in scripts:
+        assert script.is_file(), script
     node = shutil.which("node")
     if node is None:
         pytest.skip("node is not installed")
-    result = subprocess.run([node, "--check", str(main)], capture_output=True, text=True)
-    assert result.returncode == 0, result.stderr
+    for script in scripts:
+        result = subprocess.run([node, "--check", str(script)], capture_output=True, text=True)
+        assert result.returncode == 0, f"{script}: {result.stderr}"
 
 
 @pytest.mark.parametrize("extension", EXTENSIONS, ids=lambda path: path.name)
@@ -155,7 +210,7 @@ def test_extensions_can_be_installed_side_by_side() -> None:
 
 
 def test_poc_1_launches_the_console_script_by_default() -> None:
-    extension = VSCODE_EXTENSION / "python-stdio"
+    extension = POC_PYTHON
     prefix = _manifest(extension)["settingsPrefix"]
     default = _settings(extension)[f"{prefix}.server.command"]["default"]
     scripts = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text("utf-8"))["project"]["scripts"]

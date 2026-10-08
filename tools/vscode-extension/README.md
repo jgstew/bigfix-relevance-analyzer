@@ -1,16 +1,19 @@
-# VS Code extension proofs of concept
+# VS Code extensions
 
 Two ways to get the analyzer's language server
 (`src/bigfix_relevance_analyzer/lsp/`) into VS Code. They sit side by side so
 they can be compared. Background and measurements are in
 [issue #10](https://github.com/jgstew/bigfix-relevance-analyzer/issues/10).
 
-| | `python-stdio/` (PoC 1) | `componentize-py/` (PoC 2, planned) |
+| | `componentize-py/`: **BigFix Relevance Developer** | `python-stdio/`: PoC 1 |
 |---|---|---|
-| Server runs as | a child process: `bigfix-relevance-lsp` over stdio | a WebAssembly component inside the extension's own Node host |
-| Needs on the user's machine | Python with `bigfix-relevance-analyzer` installed | nothing beyond VS Code |
-| Ships | ~3.5 MB of JavaScript, ~0.5 MB gzip (measured) | that, plus the component: ~22 MiB, ~8 MiB gzip (issue #10 spike) |
-| Status | working: `smoke/run.mjs` passes in VS Code 1.140.0 | not started |
+| Role | the primary extension | proof of concept, kept for comparison |
+| Server runs as | the Python package's `Server`, compiled with a CPython into a WebAssembly component. `server.js` runs it in a Node process VS Code forks, over Node IPC. | a child process, `bigfix-relevance-lsp` over stdio |
+| Needs on the user's machine | nothing beyond VS Code | Python with `bigfix-relevance-analyzer` installed |
+| Settings | `bigfixRelevance.*` | `bigfixRelevancePython.*` |
+| Status | working: the shared smoke test passes in VS Code 1.140.0 | working: the shared smoke test passes in VS Code 1.140.0 |
+
+Both are proofs of concept: neither is packaged as a `.vsix` or published yet.
 
 ## The contract both share
 
@@ -21,30 +24,50 @@ and differ only in how the server is started:
   recognizes. The server picks the file type from the URI's suffix, so the two
   lists must agree. `tests/test_vscode_extension_layout.py` checks them against
   `extract._RECOGNIZED_SUFFIXES`.
-- **How the server is started:** a stdio transport makes `vscode-languageclient`
-  append `--stdio` to the server's arguments. `bigfix-relevance-lsp` accepts it
-  for that reason. Before it did, the server exited before `initialize`.
 - **What the server is told:** `initializationOptions.maxDocumentBytes`, the
   one option the server reads today (see `lsp/linter.py`).
 - **Side by side:** each extension has its own `name` and puts every setting
-  under its own `settingsPrefix` (a field of `package.json`). PoC 1 uses
-  `bigfixRelevancePython.*`, so both can be installed at once. The layout test
-  checks that no two extensions share a setting.
+  under its own `settingsPrefix` (a field of `package.json`), so both can be
+  installed at once. The layout test checks that no two extensions share a
+  setting. With both installed, each file gets each diagnostic twice, once
+  from each.
+- **One smoke test:** `common/smoke/` opens the same files in a real VS Code and
+  checks the same diagnostics for either extension.
 - **Supply chain:** the same rules as `tools/playground-wasm/`: exact pins, a
   lockfile, `min-release-age=7` in a per-package `.npmrc`, and a dependabot
   entry for each package.
 
-## Trying PoC 1
+## BigFix Relevance Developer (`componentize-py/`)
+
+```bash
+cd tools/vscode-extension/componentize-py && npm ci && cd -
+uv run --group wasm python tools/vscode-extension/componentize-py/build-component/build_component.py
+```
+
+The second command builds this checkout's wheel and compiles it into
+`dist/component/` (gitignored). It uses the playground's two-pass
+`componentize.py`, then jco. It finishes by checking that the component boots
+in Node and answers `initialize`. Rebuild after changing the Python package:
+the extension runs the component, not the source.
+
+Then open `tools/vscode-extension/componentize-py/` in VS Code and press F5
+(*Run Extension*). That opens an Extension Development Host window with the
+extension loaded. Open any `.bes`, `.rel` or relevance-fenced `.md` file there.
+
+- `extension.js`: which files to send, and how to start the server.
+- `server.js`: the server process. It passes each LSP message to the
+  component's `handle` export and sends back what it returns.
+- `build-component/`: the WIT world (`handle`, `exit-code`, `version`),
+  the `app.py` that componentize-py compiles, and the build script.
+
+## PoC 1 (`python-stdio/`)
 
 ```bash
 cd tools/vscode-extension/python-stdio && npm ci
 ```
 
-Then open `tools/vscode-extension/python-stdio/` in VS Code and press F5
-(*Run Extension*). That opens an Extension Development Host window with the
-extension loaded. Open any `.bes`, `.rel` or relevance-fenced `.md` file there.
-
-The server comes from `bigfixRelevancePython.server.command`, which defaults to
+Open the directory in VS Code and press F5. The server comes from
+`bigfixRelevancePython.server.command`, which defaults to
 `bigfix-relevance-lsp` on `PATH`. To run this checkout instead, set:
 
 ```json
@@ -54,8 +77,21 @@ The server comes from `bigfixRelevancePython.server.command`, which defaults to
 }
 ```
 
-`bigfixRelevancePython.trace.server: "verbose"` logs every LSP message to the
-extension's output channel.
+With a stdio transport, `vscode-languageclient` appends `--stdio` to the
+server's arguments. `bigfix-relevance-lsp` accepts it for that reason. Before
+it did, the server exited before `initialize`.
 
-`python-stdio/smoke/` runs the same check without a person, in an isolated VS
-Code instance. See that directory's `run.mjs`.
+## The smoke test
+
+```bash
+node tools/vscode-extension/common/smoke/run.mjs tools/vscode-extension/componentize-py
+node tools/vscode-extension/common/smoke/run.mjs tools/vscode-extension/python-stdio
+```
+
+Each run starts an isolated VS Code instance with the extension loaded. A
+window opens briefly. Your own settings and extensions are not used. It opens
+a broken `.rel` and a relevance-fenced `.md`, then checks the diagnostics,
+including that a fenced statement's finding lands on its line in the document.
+
+Either extension's `trace.server` setting set to `"verbose"` logs every LSP
+message to its output channel.
