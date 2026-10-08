@@ -509,3 +509,25 @@ def test_the_server_runs_over_stdio_as_a_module(flags: list[str]) -> None:
     messages = unframe(result.stdout)
     assert [message.get("id") for message in messages] == [1, None, 2]
     assert diagnostics(messages, "a.rel")
+
+
+def test_read_message_refuses_a_negative_content_length() -> None:
+    """``read(-1)`` reads to EOF: the server would swallow every later message."""
+    with pytest.raises(ValueError, match="negative"):
+        stdio.read_message(io.BytesIO(b"Content-Length: -1\r\n\r\n{}"))
+
+
+def test_run_stops_on_a_negative_content_length() -> None:
+    stdin = io.BytesIO(b"Content-Length: -1\r\n\r\n{}" + frame(notification("exit")))
+    assert stdio.run(Server(), stdin, io.BytesIO()) == 1
+
+
+@pytest.mark.parametrize("params", [[], [1], "x", 3])
+def test_params_that_are_not_an_object_are_invalid(params: object) -> None:
+    server = Server()
+    (response,) = server.handle(
+        {"jsonrpc": "2.0", "id": 5, "method": "initialize", "params": params}
+    )
+    assert response["id"] == 5
+    assert response["error"]["code"] == -32602
+    assert server.handle(notification("textDocument/didOpen", params)) == []

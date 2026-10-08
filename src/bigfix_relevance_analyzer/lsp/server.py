@@ -50,6 +50,7 @@ class ErrorCode(enum.IntEnum):
     PARSE_ERROR = -32700
     INVALID_REQUEST = -32600
     METHOD_NOT_FOUND = -32601
+    INVALID_PARAMS = -32602
     INTERNAL_ERROR = -32603
     SERVER_NOT_INITIALIZED = -32002
 
@@ -93,7 +94,19 @@ class Server:
             if has_id and ("result" in message or "error" in message):
                 return []
             return [error_response(message.get("id"), ErrorCode.INVALID_REQUEST, "no method")]
-        params = message.get("params") or {}
+        # Absent means empty; only `None` does. `or {}` would also turn `[]` into `{}`.
+        params = message.get("params")
+        if params is None:
+            params = {}
+        # JSON-RPC also allows an array, but LSP defines only object params.
+        if not isinstance(params, Mapping):
+            if has_id:
+                return [
+                    error_response(
+                        message["id"], ErrorCode.INVALID_PARAMS, "params must be an object"
+                    )
+                ]
+            return []
         try:
             if has_id:
                 return self._request(message["id"], method, params)

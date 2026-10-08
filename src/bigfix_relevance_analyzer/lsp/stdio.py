@@ -47,6 +47,9 @@ def read_message(stream: IO[bytes]) -> Any:
         name, _, value = line.partition(b":")
         if name.strip().lower() == _CONTENT_LENGTH:
             length = int(value.strip())
+            # `read(-1)` reads to end of input, swallowing every later message.
+            if length < 0:
+                raise ValueError(f"a negative Content-Length: {length}")
     if length is None:
         raise ValueError("a message header with no Content-Length")
     body = stream.read(length)
