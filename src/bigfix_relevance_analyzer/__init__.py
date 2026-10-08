@@ -78,7 +78,7 @@ from bigfix_relevance_analyzer.lint import (
     lint_text,
     rules,
 )
-from bigfix_relevance_analyzer.nodes import to_mermaid, to_sexpr
+from bigfix_relevance_analyzer.nodes import node_at, nodes_at, to_mermaid, to_sexpr
 from bigfix_relevance_analyzer.parser import MAX_PARSE_DEPTH, ParseError, ParseResult
 from bigfix_relevance_analyzer.parser import parse as parse_relevance
 from bigfix_relevance_analyzer.parser import try_parse as try_parse_relevance
@@ -188,6 +188,8 @@ __all__ = [
     "lint_text",
     "looks_like_clientui",
     "lookup",
+    "node_at",
+    "nodes_at",
     "parse_relevance",
     "relevance_types",
     "resolve_it_bindings",

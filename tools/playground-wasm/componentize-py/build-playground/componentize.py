@@ -66,12 +66,25 @@ def _resolve_single(pattern: str, *, kind: str) -> Path:
     return Path(matches[0])
 
 
-def componentize(wheel_path: Path, work_dir: Path) -> Path:
-    """Build the component into ``work_dir`` and return its path."""
+def componentize(
+    wheel_path: Path,
+    work_dir: Path,
+    *,
+    wit_dir: Path = WIT_DIR,
+    world: str = WORLD,
+    app_module: Path = APP_MODULE,
+) -> Path:
+    """Build the component into ``work_dir`` and return its path.
+
+    The defaults build this playground's ``analyzer`` world. The VS Code
+    extension (tools/vscode-extension/componentize-py/build-component/) passes
+    its own WIT directory, world and app module, to get the same two-pass build
+    for a different set of exports.
+    """
     deps = work_dir / "deps"
     bindings = work_dir / "bindings"
     app_dir = work_dir / "app"
-    out_path = work_dir / f"{WORLD}.wasm"
+    out_path = work_dir / f"{world}.wasm"
 
     # A stale staging directory would silently contribute to the component.
     for stale in (deps, bindings, app_dir):
@@ -91,19 +104,19 @@ def componentize(wheel_path: Path, work_dir: Path) -> Path:
     # for the module (`wit_world.WitWorld`), not for the WIT world, and the
     # implementing class in app.py must match it exactly.
     _run(
-        ["componentize-py", "-d", str(WIT_DIR), "-w", WORLD, "bindings", str(bindings)],
+        ["componentize-py", "-d", str(wit_dir), "-w", world, "bindings", str(bindings)],
         "generate bindings",
     )
 
     # Only the app module, nothing else from this source directory.
-    shutil.copy2(APP_MODULE, app_dir / APP_MODULE.name)
+    shutil.copy2(app_module, app_dir / app_module.name)
 
     componentize_argv = [
         "componentize-py",
         "-d",
-        str(WIT_DIR),
+        str(wit_dir),
         "-w",
-        WORLD,
+        world,
         "componentize",
         "-p",
         str(app_dir),
@@ -111,7 +124,7 @@ def componentize(wheel_path: Path, work_dir: Path) -> Path:
         str(bindings),
         "-p",
         str(deps),
-        APP_MODULE.stem,
+        app_module.stem,
         "-o",
     ]
 
@@ -137,7 +150,7 @@ def componentize(wheel_path: Path, work_dir: Path) -> Path:
     # bytes across runs on byte-identical inputs (measured). That is upstream
     # and nothing here can fix it, so do not write a test asserting two builds
     # are identical -- assert on size instead.
-    warmup_path = work_dir / f"{WORLD}.warmup.wasm"
+    warmup_path = work_dir / f"{world}.warmup.wasm"
     _run([*componentize_argv, str(warmup_path)], "componentize (warm-up pass, discarded)")
     warmup_size = warmup_path.stat().st_size
     warmup_path.unlink()

@@ -1,0 +1,14 @@
+[
+  "**/*.bes",
+  "**/*.bes.xml",
+  "**/*.besrpt",
+  "**/*.beswrpt",
+  "**/*.bsr",
+  "**/*.htm",
+  "**/*.html",
+  "**/*.markdown",
+  "**/*.md",
+  "**/*.ojo",
+  "**/*.rel",
+  "**/*.webreport"
+]

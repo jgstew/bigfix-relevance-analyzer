@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from _corpus import corpus_files
 
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.extract import (
@@ -16,6 +17,7 @@ from bigfix_relevance_analyzer.extract import (
     RelevanceSite,
     _actionscript_sites,
     _extract_bes_xml,
+    _extract_data,
     _extract_file,
     _ExtractionProblem,
     extract_relevance_from_actionscript,
@@ -1289,3 +1291,43 @@ def test_lxml_element_without_a_source_line_warns(caplog: pytest.LogCaptureFixtu
     assert texts(sites) == ["windows of operating system"]
     assert sites[0].line == 0
     assert any(record.levelno == logging.WARNING for record in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# Extracting from content in memory (an editor buffer)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("path", corpus_files(), ids=lambda path: path.name)
+def test_extract_data_matches_extract_file(path: Path) -> None:
+    """The in-memory path is the on-disk path minus the read: same sites, same
+    problems, same source maps."""
+    on_disk = _extract_file(path)
+    in_memory = _extract_data(path, path.read_bytes())
+    assert in_memory == on_disk
+    assert [site.source_map for site in in_memory[0]] == [site.source_map for site in on_disk[0]]
+
+
+def test_extract_data_never_opens_the_path(tmp_path: Path) -> None:
+    """Only the suffix is read off the path, so a buffer never saved works."""
+    missing = tmp_path / "never-saved.rel"
+    sites, problems = _extract_data(missing, b"windows of operating system")
+    assert texts(sites) == ["windows of operating system"]
+    assert problems == []
+
+
+@pytest.mark.parametrize("ending", ["\r\n", "\r"])
+def test_extract_data_folds_line_endings_like_a_text_read(tmp_path: Path, ending: str) -> None:
+    """Text types used to be read in text mode, which folds CRLF and lone CR to
+    LF; lines a finding reports depend on that staying true."""
+    text = ending.join(["intro", "", "```relevance", "windows of operating system", "```", ""])
+    path = tmp_path / "doc.md"
+    path.write_bytes(text.encode())
+    sites, _ = _extract_data(path, text.encode())
+    assert texts(sites) == ["windows of operating system"]
+    assert sites[0].line == 4
+    assert _extract_file(path)[0] == sites
+
+
+def test_extract_file_skips_an_unrecognized_type_without_opening_it(tmp_path: Path) -> None:
+    assert _extract_file(tmp_path / "missing.txt") == ([], [])

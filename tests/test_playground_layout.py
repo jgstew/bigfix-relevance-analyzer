@@ -27,6 +27,7 @@ the stage is *not* called ``build/``: ``.gitignore`` line 11 is a bare
 
 from __future__ import annotations
 
+import inspect
 import json
 import shutil
 import subprocess
@@ -145,6 +146,20 @@ def test_pyodide_build_script_finds_its_version_pin() -> None:
 
     assert module.PACKAGE_JSON.is_file(), f"pin cross-check points at {module.PACKAGE_JSON}"
     module._check_pinned_version_matches()
+
+
+def test_componentize_script_takes_a_world_and_defaults_to_the_playgrounds() -> None:
+    """The VS Code extension builds a different world with the same two-pass build.
+
+    It passes its own WIT directory, world and app module; the playground passes
+    none and must get exactly what it always built.
+    """
+    script = PLAYGROUND_WASM / "componentize-py" / "build-playground" / "componentize.py"
+    module = load_tool(script, "_componentize_py_componentize")
+    parameters = inspect.signature(module.componentize).parameters
+    assert parameters["wit_dir"].default == module.WIT_DIR == script.parent / "wit"
+    assert parameters["world"].default == module.WORLD == "analyzer"
+    assert parameters["app_module"].default == module.APP_MODULE == script.parent / "app.py"
 
 
 def test_no_tracked_file_references_the_retired_paths() -> None:

@@ -1,0 +1,15 @@
+// The whole boundary between server.js and the Python language server inside
+// the component: JSON strings in and out, nothing richer. The same shape as the
+// playground's `analyzer` world (../../../playground-wasm/componentize-py/), and
+// for the same reason: jco turns world-level exports into plain functions.
+package local:relevance-lsp;
+
+world lsp {
+    /// One JSON-RPC message in; a JSON array of the messages to send back.
+    export handle: func(message: string) -> string;
+    /// None until the client sends `exit`; then the process exit code the LSP
+    /// spec asks for: 0 if `shutdown` came first, 1 if not.
+    export exit-code: func() -> option<s32>;
+    /// The bigfix-relevance-analyzer version inside the component.
+    export version: func() -> string;
+}

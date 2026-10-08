@@ -116,7 +116,7 @@ import enum
 import functools
 import heapq
 import os
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
@@ -129,6 +129,7 @@ from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 from bigfix_relevance_analyzer.extract import (
     _RECOGNIZED_SUFFIXES,
     RelevanceSite,
+    _extract_data,
     _extract_file,
     _ExtractionProblem,
     _is_recognized,
@@ -1437,16 +1438,29 @@ def _unlintable(
     return None
 
 
+SiteJudge = Callable[[Path | None, RelevanceSite, LintConfig], tuple[Finding, ...]]
+"""How one extracted site becomes findings: :func:`_judge_site`, or a caller's
+wrapper around it (the language server caches per site)."""
+
+
+def _judge_site(
+    file_path: Path | None, site: RelevanceSite, config: LintConfig
+) -> tuple[Finding, ...]:
+    """Every finding for one extracted site of ``file_path``."""
+    report = _analyze_site(site, config)
+    return lint_analysis(report, config, path=file_path, base_line=site.line, site=site)
+
+
 def _lint_sites(
-    file_path: Path, sites: Iterable[RelevanceSite], config: LintConfig
+    file_path: Path,
+    sites: Iterable[RelevanceSite],
+    config: LintConfig,
+    judge: SiteJudge = _judge_site,
 ) -> tuple[Finding, ...]:
     """Judge sites already extracted from ``file_path``: :func:`lint_file`'s second half."""
     findings: list[Finding] = []
     for site in sites:
-        report = _analyze_site(site, config)
-        findings.extend(
-            lint_analysis(report, config, path=file_path, base_line=site.line, site=site)
-        )
+        findings.extend(judge(file_path, site, config))
     return tuple(findings)
 
 
@@ -1467,6 +1481,7 @@ def _lint_extracted(
     sites: Iterable[RelevanceSite],
     problems: Iterable[_ExtractionProblem],
     config: LintConfig,
+    judge: SiteJudge = _judge_site,
 ) -> tuple[Finding, ...]:
     """Every finding for one extracted file, sites and problems together.
 
@@ -1477,10 +1492,26 @@ def _lint_extracted(
     return tuple(
         heapq.merge(
             _problem_findings(file_path, problems, config),
-            _lint_sites(file_path, sites, config),
+            _lint_sites(file_path, sites, config, judge),
             key=lambda finding: finding.line,
         )
     )
+
+
+def _lint_data(
+    file_path: Path, data: bytes, config: LintConfig, judge: SiteJudge = _judge_site
+) -> tuple[Finding, ...]:
+    """:func:`lint_file` over ``data`` instead of the file's contents on disk.
+
+    ``file_path`` only names the content -- its suffix picks the extractor,
+    and findings carry it -- and is never opened, so it need not exist. An
+    unrecognized suffix yields no findings rather than a ``file-error``: the
+    caller chose to hand this content over, it did not name a path to lint.
+    """
+    if not _is_recognized(file_path):
+        return ()
+    sites, problems = _extract_data(file_path, data)
+    return _lint_extracted(file_path, sites, problems, config, judge)
 
 
 def lint_text(text: str, config: LintConfig) -> tuple[Finding, ...]:

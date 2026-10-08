@@ -1,0 +1,12 @@
+{
+  "name": "bigfix-relevance-vscode-smoke",
+  "description": "End-to-end smoke test for the VS Code extensions in tools/vscode-extension/, in a real VS Code. Not published; see run.mjs.",
+  "private": true,
+  "vscodeVersion": "1.140.0",
+  "engines": {
+    "npm": ">=11.10.0"
+  },
+  "dependencies": {
+    "@vscode/test-electron": "3.1.0"
+  }
+}
