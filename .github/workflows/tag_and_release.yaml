@@ -15,6 +15,7 @@ on:
       - "src/**"
       - ".github/workflows/tag_and_release.yaml"
       - ".github/workflows/test.yaml"
+      - ".github/workflows/wasm-html.yaml"
   # a re-run path for when a release run failed after the version was already
   # merged; the tag check below still makes it a no-op if the tag exists
   workflow_dispatch:
@@ -23,8 +24,18 @@ permissions:
   contents: read
 
 concurrency:
-  # deliberately no cancel-in-progress: never kill a release mid-flight
-  group: release-${{ github.ref }}
+  # One release at a time, repo-wide. Not keyed on github.ref: releases only
+  # happen from main (see the `version` job), so a per-ref group would add
+  # nothing but a way to overlap if that guard ever changed. Serializing also
+  # keeps the tag check sound: a draft
+  # has no tag until `finalize` publishes it, so a second run that started
+  # mid-release would see no tag and try to release the same version again.
+  # Deliberately no cancel-in-progress: never kill a release mid-flight.
+  # GitHub keeps at most ONE pending run per group: a newer queued run
+  # replaces an older queued one (never the running one). The newer run
+  # releases whatever version its own commit has, so an intermediate bump
+  # whose run got replaced is skipped, not released late.
+  group: release
 
 jobs:
   # Decides whether there is anything to do, so the expensive jobs below can be
@@ -33,8 +44,13 @@ jobs:
   version:
     name: Check for an untagged version
     runs-on: ubuntu-latest
-    # fork guard: a fork that pushes to its own main should not try to release
-    if: github.repository == 'jgstew/bigfix-relevance-analyzer'
+    # fork guard: a fork that pushes to its own main should not try to release.
+    # main guard: `push` is already limited to main, but workflow_dispatch can
+    # be started from any branch, and would release that branch's version.
+    # Every later job needs this one, so skipping it skips the whole release.
+    if: >-
+      github.repository == 'jgstew/bigfix-relevance-analyzer'
+      && github.ref == 'refs/heads/main'
     outputs:
       version: ${{ steps.getversion.outputs.version }}
       release_needed: ${{ steps.tagged.outputs.release_needed }}
@@ -155,15 +171,119 @@ jobs:
       - name: uv build (wheel + sdist)
         run: uv build
 
-      # `sha256sum -c SHA256SUMS.txt`-verifiable, and with no dist/ prefix in
-      # it, so it checks out wherever the assets are downloaded to. Globs are
-      # listed explicitly rather than `./*` so the output file can never end up
-      # listing itself.
-      - name: Compute SHA-256 checksums
+      # Checksums for dist/ only, used to verify the hand-off to the playground
+      # build (wasm-html.yaml runs `sha256sum -c` against this). The release's
+      # published SHA256SUMS.txt is computed later, in `finalize`, over every
+      # asset including the ones built after this job.
+      - name: Compute SHA-256 checksums for dist/
         working-directory: dist
         run: |
           sha256sum ./*.whl ./*.tar.gz > SHA256SUMS.txt
           cat SHA256SUMS.txt
+
+      # Later jobs (the playground build, finalize) take dist/ from here rather
+      # than from the release: a draft release is invisible to wasm-html.yaml's
+      # read-only token, and this keeps every job on the exact same bytes.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-dist
+          path: dist/
+          if-no-files-found: error
+
+      # Created as a DRAFT and only published by `finalize`, once every asset
+      # exists. That keeps this compatible with GitHub's immutable releases,
+      # which lock a release's assets at publication. A draft does not create
+      # its tag either: `--target` is recorded now, the tag appears on publish.
+      # Using the gh CLI (preinstalled on the runner) also means one less
+      # third-party action to pin, and no git push from this checkout.
+      - name: Create the draft GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          gh release create "v${VERSION}" \
+            --draft \
+            --target "${GITHUB_SHA}" \
+            --title "v${VERSION}" \
+            --notes "Draft: assets still being built." \
+            dist/*.whl dist/*.tar.gz
+
+      # Inert until all of these are true, so nothing can publish by accident:
+      #   1. a PyPI trusted publisher exists for this repo with workflow name
+      #      `tag_and_release.yaml` and environment name `pypi`, matching the
+      #      `environment:` above (https://docs.pypi.org/trusted-publishers/)
+      #   2. the repository variable PYPI_PUBLISH is set to `true`
+      #      (Settings > Secrets and variables > Actions > Variables)
+      #   3. whatever protection rules the `pypi` environment carries have been
+      #      satisfied - those gate this entire job, tagging included
+      # `uv publish` speaks OIDC natively given the id-token: write permission
+      # above, so there is no long-lived API token to store and no
+      # pypa/gh-action-pypi-publish pin to maintain.
+      #
+      # Deliberately here and not in `finalize`: PyPI goes live as early as
+      # possible so the published package can be tried by hand (uvx) while the
+      # playground is still building. The cost is that a later failure leaves
+      # PyPI ahead of a still-draft GitHub release until it is re-run.
+      - name: Publish to PyPI (trusted publishing)
+        if: vars.PYPI_PUBLISH == 'true'
+        # the explicit globs keep SHA256SUMS.txt (which lives in dist/ too) out
+        # of the upload; uv publish would otherwise take everything in dist/
+        run: uv publish --trusted-publishing always dist/*.whl dist/*.tar.gz
+
+  # Builds the componentize-py HTML playground from the release's wheel (via
+  # the release-dist artifact). wasm-html.yaml stays read-only; its page comes
+  # back as an artifact for `finalize` to attach.
+  playground:
+    name: Build HTML playground
+    needs: release
+    uses: ./.github/workflows/wasm-html.yaml
+    with:
+      release_artifact: release-dist
+
+  # Gathers every release asset into one directory, checksums all of them,
+  # attaches whatever the draft does not have yet, and publishes. To add a new
+  # release asset (e.g. a VS Code extension): build it in its own job, add that
+  # job to `needs` below, and drop its file into assets/ in the gather step.
+  # Re-running this job is safe: a draft's assets can be replaced (--clobber).
+  # If a run fails before here, use "Re-run failed jobs" on that run: a fresh
+  # run would see no tag (drafts have none) and try to create a second draft.
+  finalize:
+    name: Finalize and publish the release
+    needs: [version, release, playground]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-dist
+          path: dist
+
+      # artifacts uploaded by a called workflow belong to this same run
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: bigfix-relevance-analyzer-component-playground
+          path: playground
+
+      # Everything in assets/ is published and checksummed; nothing else is.
+      # The component page takes the generic playground name: componentize-py
+      # is the preferred runtime, so its page is THE playground.
+      - name: Gather release assets
+        run: |
+          mkdir assets
+          cp dist/*.whl dist/*.tar.gz assets/
+          cp playground/bigfix-relevance-analyzer-component-playground.html \
+             assets/bigfix-relevance-analyzer-playground.html
+          ls -l assets
+
+      # `sha256sum -c SHA256SUMS.txt`-verifiable, with no directory prefix, so
+      # it checks out wherever the assets are downloaded to. Written outside
+      # assets/ first so the file can never end up listing itself.
+      - name: Compute SHA-256 checksums
+        run: |
+          (cd assets && sha256sum ./*) > "${RUNNER_TEMP}/SHA256SUMS.txt"
+          mv "${RUNNER_TEMP}/SHA256SUMS.txt" assets/SHA256SUMS.txt
+          cat assets/SHA256SUMS.txt
 
       # Release notes: GitHub's own generated notes (same content the Releases
       # UI would produce) with the checksums appended, so the hashes are
@@ -193,42 +313,22 @@ jobs:
             # shellcheck disable=SC2016
             printf 'Verify with `sha256sum -c SHA256SUMS.txt`:\n\n'
             printf '```\n'
-            cat dist/SHA256SUMS.txt
+            cat assets/SHA256SUMS.txt
             printf '```\n'
           } >> "$notes_file"
           echo "NOTES_FILE=$notes_file" >> "$GITHUB_ENV"
           cat "$notes_file"
 
-      # `gh release create --target` creates the tag itself, so this needs no
-      # git push and the checkout above can stay credential-less. Using the gh
-      # CLI (preinstalled on the runner) also means one less third-party action
-      # to pin and keep updated.
-      - name: Create the GitHub release
+      # Uploads every asset (--clobber makes the ones `release` already put on
+      # the draft a harmless overwrite with identical bytes), then publishes.
+      # Publishing is the last step and the point where the tag is created and,
+      # with immutable releases on, everything is locked.
+      - name: Upload assets and publish the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
-          gh release create "v${VERSION}" \
-            --target "${GITHUB_SHA}" \
-            --title "v${VERSION}" \
+          gh release upload "v${VERSION}" --repo "$GITHUB_REPOSITORY" --clobber assets/*
+          gh release edit "v${VERSION}" --repo "$GITHUB_REPOSITORY" \
             --notes-file "${NOTES_FILE}" \
-            dist/*.whl dist/*.tar.gz dist/SHA256SUMS.txt
-
-      # Inert until all of these are true, so nothing can publish by accident:
-      #   1. a PyPI trusted publisher exists for this repo with workflow name
-      #      `tag_and_release.yaml` and environment name `pypi`, matching the
-      #      `environment:` above (https://docs.pypi.org/trusted-publishers/)
-      #   2. the repository variable PYPI_PUBLISH is set to `true`
-      #      (Settings > Secrets and variables > Actions > Variables)
-      #   3. whatever protection rules the `pypi` environment carries have been
-      #      satisfied - those gate this entire job, tagging included
-      # `uv publish` speaks OIDC natively given the id-token: write permission
-      # above, so there is no long-lived API token to store and no
-      # pypa/gh-action-pypi-publish pin to maintain. The release is already
-      # created at this point: a failure here leaves the GitHub release intact
-      # and is re-run by hand, not by re-running the whole workflow.
-      - name: Publish to PyPI (trusted publishing)
-        if: vars.PYPI_PUBLISH == 'true'
-        # the explicit globs keep SHA256SUMS.txt (which lives in dist/ too) out
-        # of the upload; uv publish would otherwise take everything in dist/
-        run: uv publish --trusted-publishing always dist/*.whl dist/*.tar.gz
+            --draft=false
