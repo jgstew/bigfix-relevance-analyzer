@@ -324,15 +324,25 @@ jobs:
       # the only place preview2-shim's *browser* build, DecompressionStream and
       # the page's fetch intercept are exercised at all. Placed after the
       # artifact upload for the same reason as in the pyodide job.
+      #
+      # Skipped in a release, deliberately: installing Chromium is the slow
+      # part of this job, and the release waits for the whole job before it
+      # can publish. Pull requests and pushes to main still run it, including
+      # the push of the version bump that triggers the release; the release
+      # just does not wait for that run. The Node smoke check above still
+      # gates the release's page. Same trade as vscode-extension.yaml's e2e.
       - name: npm ci (playground browser test)
+        if: inputs.release_artifact == ''
         working-directory: tools/playground-wasm/componentize-py/browser-test
         run: npm ci
 
       - name: install headless Chromium for the playground test
+        if: inputs.release_artifact == ''
         working-directory: tools/playground-wasm/componentize-py/browser-test
         run: npx playwright install --with-deps chromium
 
       - name: test the playground page in a real browser
+        if: inputs.release_artifact == ''
         working-directory: tools/playground-wasm/componentize-py/browser-test
         run: node test_playground.mjs ../../../../playground/bigfix-relevance-analyzer-component-playground.html
 
