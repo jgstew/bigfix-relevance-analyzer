@@ -27,8 +27,7 @@
   "main": "./extension.js",
   "settingsPrefix": "bigfixRelevance",
   "activationEvents": [
-    "onStartupFinished",
-    "onLanguage:bigfix-relevance"
+    "onStartupFinished"
   ],
   "contributes": {
     "commands": [
