@@ -157,8 +157,9 @@ class Server:
         if method == "exit":
             self.exit_code = 0 if self._shutdown else 1
             return []
-        # Before `initialize`, the spec says to drop every notification but `exit`.
-        if not self._initialized:
+        # Before `initialize`, the spec says to drop every notification but
+        # `exit`; after `shutdown`, the server does no more work.
+        if not self._initialized or self._shutdown:
             return []
         if method == "textDocument/didOpen":
             document = params["textDocument"]
@@ -185,11 +186,13 @@ class Server:
         changes = params.get("contentChanges") or []
         if any("range" in change for change in changes):
             # Only full sync is advertised, so this is a client that ignored it.
-            # The stored text no longer matches the buffer, so forget it rather
-            # than publish stale findings on the next save.
+            # The stored text no longer matches the buffer, so the findings on
+            # screen are stale: clear them, and forget the document so a later
+            # save cannot publish new stale ones. It is linted again once the
+            # client reopens it.
             logger.warning("ignoring a ranged change to %s: only full sync is supported", uri)
             del self._documents[uri]
-            return []
+            return [_notify("textDocument/publishDiagnostics", {"uri": uri, "diagnostics": []})]
         if not changes:
             return []
         document.text = changes[-1]["text"]

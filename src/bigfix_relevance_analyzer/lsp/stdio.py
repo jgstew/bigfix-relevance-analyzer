@@ -63,13 +63,18 @@ def read_message(stream: IO[bytes]) -> Any:
         return None
     try:
         return json.loads(body.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+    # RecursionError: JSON nested deeper than the decoder recurses, e.g.
+    # `[[[[...` a hundred thousand levels down. Answerable like any bad body.
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
         raise _UnparsableError(str(error)) from error
 
 
 def write_message(stream: IO[bytes], message: Message) -> None:
     """Frame ``message`` onto ``stream`` and flush it."""
-    body = json.dumps(message, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    # ASCII-only on purpose: JSON from the client can carry a lone surrogate
+    # (`"\\ud800"`), which strict UTF-8 cannot encode, and echoing it back (a
+    # document URI, say) would otherwise kill the process.
+    body = json.dumps(message, ensure_ascii=True, separators=(",", ":")).encode("ascii")
     stream.write(b"Content-Length: %d\r\n\r\n" % len(body))
     stream.write(body)
     stream.flush()

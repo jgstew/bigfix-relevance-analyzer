@@ -336,7 +336,13 @@ def test_a_ranged_change_is_ignored_since_only_full_sync_is_offered(
                 {"textDocument": {"uri": uri("a.rel"), "version": 2}, "contentChanges": [change]},
             )
         )
-    assert messages == []
+    assert messages == [
+        {
+            "jsonrpc": "2.0",
+            "method": "textDocument/publishDiagnostics",
+            "params": {"uri": uri("a.rel"), "diagnostics": []},
+        }
+    ]
     assert "ranged" in caplog.text
 
 
@@ -543,19 +549,22 @@ def test_a_second_initialize_is_refused() -> None:
     assert server.linter.max_document_bytes == 5
 
 
-def test_a_ranged_change_forgets_the_document_so_saves_publish_nothing_stale() -> None:
+def test_a_ranged_change_clears_and_forgets_so_nothing_stale_stays_or_returns() -> None:
+    """The findings on screen describe text the server no longer has: clear them,
+    and publish nothing more for the document until it is opened again."""
     server = started()
-    did_open(server, "a.rel", BROKEN)
+    assert diagnostics(did_open(server, "a.rel", BROKEN), "a.rel")
     change = {
         "range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
         "text": "x",
     }
-    server.handle(
+    cleared = server.handle(
         notification(
             "textDocument/didChange",
             {"textDocument": {"uri": uri("a.rel"), "version": 2}, "contentChanges": [change]},
         )
     )
+    assert diagnostics(cleared, "a.rel") == []
     saved = server.handle(
         notification("textDocument/didSave", {"textDocument": {"uri": uri("a.rel")}})
     )
@@ -566,3 +575,44 @@ def test_read_message_refuses_an_implausible_content_length() -> None:
     """A bogus huge length would block on stdin until EOF with no explanation."""
     with pytest.raises(ValueError, match="Content-Length"):
         stdio.read_message(io.BytesIO(b"Content-Length: 9999999999\r\n\r\n{}"))
+
+
+def test_notifications_after_shutdown_do_no_work() -> None:
+    """LSP: after `shutdown` the server does nothing but wait for `exit`."""
+    server = started()
+    server.handle(request("shutdown", id_=2))
+    assert did_open(server, "a.rel", BROKEN) == []
+    server.handle(notification("exit"))
+    assert server.exit_code == 0
+
+
+def test_run_survives_a_lone_surrogate_in_a_reply() -> None:
+    """JSON may carry ``\\ud800``; echoing it back must not kill the process."""
+    document = {"uri": "file:///w/a\ud800.rel", "languageId": "x", "version": 1, "text": BROKEN}
+    stdin = io.BytesIO(
+        frame(request("initialize", {}, id_=1))
+        + frame(notification("textDocument/didOpen", {"textDocument": document}))
+        + frame(request("shutdown", id_=2))
+        + frame(notification("exit"))
+    )
+    stdout = io.BytesIO()
+    assert stdio.run(Server(), stdin, stdout) == 0
+    replies = unframe(stdout.getvalue())
+    assert [reply.get("id") for reply in replies] == [1, None, 2]
+    assert replies[1]["params"]["uri"] == document["uri"]
+
+
+def test_run_answers_absurdly_nested_json_with_a_parse_error_and_carries_on() -> None:
+    nested = b"[" * 100_000 + b"]" * 100_000
+    stdin = io.BytesIO(
+        frame(request("initialize", {}, id_=1))
+        + frame(nested)
+        + frame(request("shutdown", id_=2))
+        + frame(notification("exit"))
+    )
+    stdout = io.BytesIO()
+    assert stdio.run(Server(), stdin, stdout) == 0
+    initialized, refused, shut_down = unframe(stdout.getvalue())
+    assert initialized["id"] == 1
+    assert refused["error"]["code"] == -32700
+    assert shut_down == {"jsonrpc": "2.0", "id": 2, "result": None}
