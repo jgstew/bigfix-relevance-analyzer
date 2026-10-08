@@ -568,7 +568,13 @@ language server over stdio, still with no dependencies. It publishes the
 linter's findings as diagnostics on open, change and save, using the same
 extractors and rules as `bigfix-relevance-lint`, but over the editor's unsaved
 buffer. The file type comes from the document URI's suffix. Diagnostics only,
-for now. Each one spans its whole line: findings carry a line, not a range.
+for now. Each one covers the text its finding is about - the unterminated
+string, the `it` with nothing to bind to, the comparison a type error is in,
+each use of an unknown name - counted in UTF-16 code units, with entities,
+CDATA and CRLF line endings as the buffer has them. A statement-level finding
+(`complexity`, `mixed-dialect`, a substitution's type, ...) and a problem in
+the file around the relevance (an unclosed fence) still cover their whole
+line, as does any span that cannot be placed for certain.
 
 The protocol logic does no I/O, so it can also run without stdio. A host such
 as a WASM runtime inside an editor extension passes each parsed JSON-RPC
@@ -643,7 +649,11 @@ lint_paths_to_dict(changed_paths, LintConfig(max_score=350))
 all have `to_dict()`. `Inspector` and `RelevanceType` include the decoded
 `dialects` and `platforms` so no consumer parses `"client:windows"` for itself;
 `Finding` nests its `site` and carries a `text` key holding the same grep-able
-line the CLIs print.
+line the CLIs print, and a `spans` list of `{"start", "end"}` offsets into the
+site's text (or the bare statement) for the characters it is about - empty for
+a finding about the statement as a whole. `line` keeps its meaning; a span is
+relative to the statement, so turning it into a file position is the
+consumer's job (`lsp.positions` does it for an editor).
 
 `json.dumps(payload)` works with no `default=`. There is deliberately no
 `to_json()`: the encoder is the server's choice.

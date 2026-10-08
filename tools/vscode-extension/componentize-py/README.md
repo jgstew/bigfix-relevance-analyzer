@@ -78,8 +78,10 @@ exists file "C:\Windows\notepad.exe"
 
 ## Known limitations
 
-- An underline covers the whole line that a problem is on, not just the
-  offending word. The message says what is wrong.
+- A problem with a statement as a whole, such as one that is too complex, and
+  a problem in the file around the relevance, such as an unclosed code fence,
+  underline the whole line they are on. Every other problem underlines just
+  the text it is about.
 - Highlighting colors keywords and operators, not inspector names.
 - Hover information and completion are not available yet.
 - A file is checked when its name ends in one of the file types above, or when
