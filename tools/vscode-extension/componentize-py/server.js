@@ -9,6 +9,7 @@
 
 "use strict";
 
+const { createRequire } = require("node:module");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const { IPCMessageReader, IPCMessageWriter } = require("vscode-jsonrpc/node");
@@ -17,11 +18,41 @@ const { IPCMessageReader, IPCMessageWriter } = require("vscode-jsonrpc/node");
 const COMPONENT = path.join(__dirname, "dist", "component", "lsp.js");
 const INTERNAL_ERROR = -32603;
 
+/**
+ * Take away what preview2-shim would otherwise hand the component.
+ *
+ * By default the shim preopens the host's root (every drive on Windows), so
+ * the component could read and write any file this process can, and passes
+ * through this process's environment variables, which can hold tokens and
+ * credentials. The server lints the text it is sent: it opens no files and
+ * reads no variables, so it gets neither. Network sockets are left as the
+ * shim provides them; nothing uses them yet.
+ *
+ * Each shim module is resolved from the glue's own location, so this changes
+ * the very module instances the glue imports; it must run before the glue
+ * loads. Returns those modules, to report what the component can reach.
+ */
+async function sandbox() {
+  const shim = (name) =>
+    import(pathToFileURL(createRequire(COMPONENT).resolve(`@bytecodealliance/preview2-shim/${name}`)).href);
+  const [filesystem, cli] = await Promise.all([shim("filesystem"), shim("cli")]);
+  filesystem._clearPreopens();
+  cli._setEnv({});
+  return { filesystem, cli };
+}
+
 async function main() {
+  const { filesystem, cli } = await sandbox();
   const component = await import(pathToFileURL(COMPONENT).href);
   const reader = new IPCMessageReader(process);
   const writer = new IPCMessageWriter(process);
-  console.error(`bigfix-relevance-analyzer ${component.version()} (WebAssembly component)`);
+  const directories = filesystem.preopens.getDirectories().map(([, guestPath]) => guestPath);
+  const variables = cli.environment.getEnvironment().map(([name]) => name);
+  const listed = (names) => (names.length ? names.join(", ") : "none");
+  console.error(
+    `bigfix-relevance-analyzer ${component.version()} (WebAssembly component; ` +
+      `filesystem access: ${listed(directories)}; environment variables: ${listed(variables)})`
+  );
 
   // `handle` is synchronous, so messages are answered strictly in the order
   // they arrive, which is what the Python server assumes.
