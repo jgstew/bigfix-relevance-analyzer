@@ -22,11 +22,10 @@ Regenerate deliberately, and read the diff::
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
-import pytest
+from _helpers import golden_text
 
 from bigfix_relevance_analyzer.extract import _is_recognized
 from bigfix_relevance_analyzer.lint import LintConfig, lint_file
@@ -96,11 +95,7 @@ def _dump(value: Any, indent: str = "") -> str:
 
 
 def _check(golden: Path, actual: dict[str, Any]) -> None:
-    if os.environ.get("UPDATE_GOLDEN"):
-        golden.write_text(_dump(actual) + "\n", encoding="utf-8")
-        pytest.fail(f"{golden.name} rewritten -- review the diff, then rerun without UPDATE_GOLDEN")
-    assert golden.is_file(), f"missing {golden}; regenerate with UPDATE_GOLDEN=1"
-    expected = json.loads(golden.read_text(encoding="utf-8"))
+    expected = json.loads(golden_text(golden, _dump(actual) + "\n"))
     actual = json.loads(json.dumps(actual))
     # Key by key, so a failure names the file that moved.
     for key in expected:

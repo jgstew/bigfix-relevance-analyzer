@@ -24,12 +24,12 @@ from __future__ import annotations
 
 import enum
 import json
-import os
 from collections.abc import Iterator
 from pathlib import Path, PurePath
 from typing import Any
 
 import pytest
+from _helpers import golden_text
 
 from bigfix_relevance_analyzer import inspectors
 from bigfix_relevance_analyzer.analyzer import analyze, analyze_to_dict
@@ -110,12 +110,9 @@ def test_the_analysis_payload_is_unchanged() -> None:
     values, so a new key fails only until the golden is regenerated on purpose.
     """
     payloads = _payloads()
-    if os.environ.get("UPDATE_GOLDEN"):
-        GOLDEN.write_text(json.dumps(payloads, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        pytest.fail("golden rewritten -- review the diff, then rerun without UPDATE_GOLDEN")
-
-    assert GOLDEN.is_file(), f"missing {GOLDEN}; regenerate with UPDATE_GOLDEN=1"
-    expected = json.loads(GOLDEN.read_text(encoding="utf-8"))
+    expected = json.loads(
+        golden_text(GOLDEN, json.dumps(payloads, indent=2, sort_keys=True) + "\n")
+    )
     # Compare what a consumer actually receives, not what we handed the
     # encoder: a tuple and a list are the same JSON array but not the same
     # Python object, and it is the array that is the API. `test_no_tuples`
