@@ -97,17 +97,22 @@ jobs:
   # blocked by the exact same jobs that guard PRs, with no third-party
   # wait-for-checks action and no polling. Both run in parallel off `version`
   # so a release is no slower than the slower of the two.
+  #
+  # The reusable-workflow calls in this file keep `./` and silence zizmor's
+  # self-repository audit, which wants GitHub's newer `$/` syntax. actionlint
+  # v1.7.12 rejects `$/` (rhysd/actionlint#711, #732). Switch to `$/` and drop
+  # the ignores once an actionlint release supports it.
   test:
     name: Test
     needs: version
     if: needs.version.outputs.release_needed == 'true'
-    uses: ./.github/workflows/test.yaml
+    uses: ./.github/workflows/test.yaml # zizmor: ignore[self-repository]
 
   pre-commit:
     name: pre-commit
     needs: version
     if: needs.version.outputs.release_needed == 'true'
-    uses: ./.github/workflows/pre-commit.yaml
+    uses: ./.github/workflows/pre-commit.yaml # zizmor: ignore[self-repository]
 
   release:
     name: Tag and Release
@@ -236,7 +241,7 @@ jobs:
   playground:
     name: Build HTML playground
     needs: release
-    uses: ./.github/workflows/wasm-html.yaml
+    uses: ./.github/workflows/wasm-html.yaml # zizmor: ignore[self-repository]
     with:
       release_artifact: release-dist
 
