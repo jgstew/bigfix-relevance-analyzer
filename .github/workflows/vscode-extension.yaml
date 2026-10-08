@@ -135,10 +135,11 @@ jobs:
 
       # Wheel -> componentize-py (the playground's two-pass build) -> jco for
       # Node -> a smoke check that the component boots, reports the wheel's
-      # version, and answers `initialize`. Outside a release the script builds
-      # its own wheel from this checkout. `--group wasm` is what puts the
-      # pinned componentize-py on PATH.
-      - name: build the language-server component
+      # version, and answers `initialize` -> `vsce package`, with the .vsix
+      # versioned as that wheel: the extension's version is the analyzer's.
+      # Outside a release the script builds its own wheel from this checkout.
+      # `--group wasm` is what puts the pinned componentize-py on PATH.
+      - name: build and package the extension
         env:
           RELEASE_ARTIFACT: ${{ inputs.release_artifact }}
         run: |
@@ -148,14 +149,8 @@ jobs:
           fi
           uv run --group wasm python \
             tools/vscode-extension/componentize-py/build-component/build_component.py \
-            "${wheel[@]}"
-
-      # vsce does not create the --out directory itself.
-      - name: package the .vsix
-        working-directory: tools/vscode-extension/componentize-py
-        run: |
-          mkdir -p ../../../dist/vsix
-          npx vsce package --out ../../../dist/vsix/bigfix-relevance-developer.vsix
+            "${wheel[@]}" \
+            --package dist/vsix/bigfix-relevance-developer.vsix
 
       # Unzipped the way VS Code installs it: the extension is under extension/.
       - name: unzip the .vsix

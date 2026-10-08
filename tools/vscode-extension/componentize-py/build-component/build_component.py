@@ -4,7 +4,8 @@
     cd tools/vscode-extension/componentize-py && npm ci && cd -
     uv run --group wasm python \
         tools/vscode-extension/componentize-py/build-component/build_component.py \
-        [--wheel dist/bigfix_relevance_analyzer-<version>-py3-none-any.whl]
+        [--wheel dist/bigfix_relevance_analyzer-<version>-py3-none-any.whl] \
+        [--package dist/vsix/bigfix-relevance-developer.vsix]
 
 Four steps, everything under ``../dist/`` (gitignored), after copying the
 repository's LICENSE beside package.json for vsce to package (gitignored too):
@@ -19,6 +20,11 @@ repository's LICENSE beside package.json for vsce to package (gitignored too):
 4. a smoke check in Node: the component boots, reports the wheel's version, and
    answers ``initialize``. That proves the build snapshot holds what the server
    imports, which no host-side test can.
+
+With ``--package``, it then packages the extension with vsce, versioned as the
+analyzer it contains: the wheel's version is the extension's version, so a
+.vsix always says which analyzer build is inside. The committed package.json
+keeps a placeholder version and is never rewritten.
 
 ``uv run --group wasm`` is what puts ``componentize-py`` (pinned in
 pyproject.toml's ``wasm`` group) on ``PATH`` for step 2.
@@ -131,16 +137,48 @@ def smoke(glue: Path, expected_version: str) -> None:
     )
 
 
+def package(version: str, out: Path) -> None:
+    """Package the extension into ``out``, stamped with ``version``.
+
+    ``vsce package <version>`` sets the version in the .vsix;
+    ``--no-update-package-json`` and ``--no-git-tag-version`` keep it from
+    rewriting package.json or running ``npm version``'s commit and tag.
+    """
+    out.parent.mkdir(parents=True, exist_ok=True)  # vsce does not create it
+    _run(
+        [
+            "npx",
+            "vsce",
+            "package",
+            version,
+            "--no-git-tag-version",
+            "--no-update-package-json",
+            "--out",
+            str(out.resolve()),
+        ],
+        f"vsce package {version}",
+        cwd=EXTENSION,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "--wheel", type=Path, help="build from this wheel instead of building this checkout"
+    )
+    parser.add_argument(
+        "--package",
+        type=Path,
+        metavar="OUT_VSIX",
+        help="then package the extension, versioned as the wheel, into this .vsix",
     )
     args = parser.parse_args(argv)
     if args.wheel is not None and not args.wheel.is_file():
         raise SystemExit(f"no such wheel: {args.wheel}")
     glue, version = build(args.wheel)
     smoke(glue, version)
+    if args.package is not None:
+        package(version, args.package)
     size = sum(path.stat().st_size for path in glue.parent.glob("*.wasm"))
     print(f"wrote {glue.parent} ({size / 1048576:.1f} MiB of core modules)")
     return 0

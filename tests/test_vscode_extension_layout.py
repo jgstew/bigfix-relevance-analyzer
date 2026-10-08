@@ -402,3 +402,35 @@ def test_the_release_attaches_the_vsix() -> None:
     assert "vscode-extension" in finalize.split("steps:")[0]
     assert "name: bigfix-relevance-developer-vsix" in finalize
     assert "bigfix-relevance-developer.vsix assets/" in finalize
+
+
+def test_the_extension_takes_the_version_of_the_wheel_it_was_built_from(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The .vsix version is the analyzer version inside it, and the self-check
+    expects that same version. package.json in the tree is never rewritten."""
+    build = load_tool(PRIMARY / "build-component" / "build_component.py", "_build_component")
+    glue = tmp_path / "lsp.js"
+    checked: list[str] = []
+    commands: list[list[str]] = []
+    monkeypatch.setattr(build, "build", lambda wheel=None: (glue, "9.8.7"))
+    monkeypatch.setattr(build, "smoke", lambda glue, version: checked.append(version))
+    monkeypatch.setattr(build, "_run", lambda argv, label, cwd=None: commands.append(argv))
+    out = tmp_path / "out" / "bigfix-relevance-developer.vsix"
+
+    assert build.main(["--package", str(out)]) == 0
+
+    assert checked == ["9.8.7"]
+    (vsce,) = (argv for argv in commands if "vsce" in argv)
+    assert vsce[vsce.index("package") + 1] == "9.8.7"
+    for flag in ("--no-git-tag-version", "--no-update-package-json"):
+        assert flag in vsce
+    assert vsce[vsce.index("--out") + 1] == str(out)
+    assert out.parent.is_dir(), "vsce does not create the --out directory itself"
+
+
+def test_the_workflow_packages_through_the_build_script() -> None:
+    """One packaging path, so CI and a release stamp the version the same way."""
+    text = WORKFLOW.read_text("utf-8")
+    assert "--package" in text
+    assert "npx vsce package" not in text
