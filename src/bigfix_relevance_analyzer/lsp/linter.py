@@ -64,7 +64,13 @@ from typing import Any, Final, NamedTuple
 from urllib.parse import unquote, urlparse
 from urllib.request import url2pathname
 
-from bigfix_relevance_analyzer.extract import RelevanceSite, _is_recognized
+# Underscore-private on purpose: this package's modules share extract's
+# helpers this way (lint.py imports _extract_data and _is_recognized too).
+from bigfix_relevance_analyzer.extract import (
+    _UNTYPED_TEXT_SUFFIXES,
+    RelevanceSite,
+    _is_recognized,
+)
 from bigfix_relevance_analyzer.lint import (
     Finding,
     LintConfig,
@@ -254,8 +260,9 @@ def _document_path(uri: str, language_id: str | None) -> Path:
     """The path whose suffix picks the extractor for this document."""
     path = _path_of(uri)
     if language_id == LANGUAGE_ID and not _is_recognized(path):
-        # Plain relevance, the same as a `.rel` file (dialect from the content).
-        return path.with_name(f"{path.name}.rel")
+        # Plain relevance, the same as a `.rel` file: dialect from the content.
+        (untyped,) = _UNTYPED_TEXT_SUFFIXES
+        return path.with_name(f"{path.name}{untyped}")
     return path
 
 

@@ -549,7 +549,9 @@ def test_the_primary_extension_contributes_the_relevance_language() -> None:
     assert language["id"] == LANGUAGE_ID
     assert sorted(language["extensions"]) == sorted(_SESSION_TEXT_SUFFIXES | _UNTYPED_TEXT_SUFFIXES)
     assert (PRIMARY / language["configuration"]).is_file()
-    assert f"onLanguage:{LANGUAGE_ID}" in _manifest(PRIMARY)["activationEvents"]
+    # VS Code (1.74+) activates on a contributed language by itself; listing
+    # `onLanguage:` too is redundant.
+    assert f"onLanguage:{LANGUAGE_ID}" not in _manifest(PRIMARY)["activationEvents"]
 
 
 def test_only_one_extension_defines_the_language() -> None:
@@ -568,6 +570,9 @@ def test_the_language_configuration_matches_relevance_syntax() -> None:
     assert config["brackets"] == [["(", ")"]]
     pairs = {(pair["open"], pair["close"]) for pair in config["autoClosingPairs"]}
     assert pairs == {("(", ")"), ('"', '"')}
+    # Typing `(` in "Program Files (x86)" or a comment must not add a `)`.
+    for pair in config["autoClosingPairs"]:
+        assert pair["notIn"] == ["string", "comment"], pair
 
 
 def test_every_contributed_grammar_exists_and_is_registered_correctly() -> None:
@@ -633,11 +638,90 @@ def test_the_grammar_does_not_color_inside_a_longer_word() -> None:
         assert not any(p.search(text) for p in words), text
 
 
-def test_the_markdown_injection_colors_exactly_the_fences_the_extractor_reads() -> None:
-    from bigfix_relevance_analyzer.extract import _MARKDOWN_RELEVANCE_TAGS
+MARKDOWN_SAMPLES = {
+    "plain": "```relevance\nname of it\n```\n",
+    "tilde, dialect tag, any case": "~~~Session_Relevance\nnumber of bes computers\n~~~\n",
+    "info after the tag": "```relevance foo\nnot read\n```\n",
+    "other language": "```python\nnot read\n```\n",
+    "longer opener, shorter closer": "````relevance\nfour\n```\nafter the fence\n",
+    "longer closer, trailing space": "```relevance\nlonger\n```` \nafter\n",
+    "other fence character inside": "```relevance\nE\n~~~\nF\n```\n",
+    "indented": "  ```relevance  \nindented\n  ```\n",
+    "two blocks": "```python\nx\n```\n\n```RELEVANCE\nsecond\n```\n",
+}
 
+
+def _anchored(pattern: str) -> re.Pattern[str]:
+    """A TextMate pattern for Python's `re`: `\\G` (continue where the last
+    match ended) only ever appears as `(^|\\G)` at line start here. Kept a
+    group, so backreference numbers stay the same."""
+    return re.compile(pattern.replace(r"(^|\G)", "(^)"))
+
+
+def _with_backreferences(pattern: str, groups: tuple[str | None, ...]) -> str:
+    """``pattern`` with each ``\\N`` replaced by the begin match's group N,
+    escaped, as the TextMate engine does for an end pattern."""
+
+    def group(reference: re.Match[str]) -> str:
+        return re.escape(groups[int(reference.group(1)) - 1] or "")
+
+    return re.sub(r"\\(\d)", group, pattern)
+
+
+def _injected_blocks(markdown: str) -> list[str]:
+    """The text the injection grammar colors as relevance, block by block,
+    following its begin/end rules line by line as the TextMate engine does
+    (end backreferences resolved against the begin match)."""
     generator = load_tool(GENERATOR, "_generate_tmlanguage")
-    assert generator.fence_tags() == sorted(_MARKDOWN_RELEVANCE_TAGS)
+    grammar = generator.markdown_injection()
+    rules = [
+        grammar["repository"][include["include"].removeprefix("#")]
+        for include in grammar["patterns"]
+    ]
+    blocks: list[str] = []
+    open_rule: dict[str, Any] | None = None
+    end: re.Pattern[str] | None = None
+    body: list[str] = []
+    for line in markdown.split("\n"):
+        if open_rule is None:
+            for rule in rules:
+                begin = _anchored(rule["begin"]).match(line)
+                if begin:
+                    open_rule = rule
+                    end = _anchored(_with_backreferences(rule["end"], begin.groups()))
+                    body = []
+                    break
+        elif end is not None and end.match(line):
+            text = "\n".join(body).strip()
+            if text:
+                blocks.append(text)
+            open_rule = None
+        else:
+            body.append(line)
+    return blocks
+
+
+@pytest.mark.parametrize("name", MARKDOWN_SAMPLES)
+def test_the_markdown_injection_colors_exactly_the_fences_the_extractor_reads(name: str) -> None:
+    from bigfix_relevance_analyzer.extract import extract_relevance_from_markdown
+
+    markdown = MARKDOWN_SAMPLES[name]
+    read = [site.text for site in extract_relevance_from_markdown(markdown)]
+    assert _injected_blocks(markdown) == read
+
+
+def test_the_embedded_block_continues_past_a_fence_of_the_other_character() -> None:
+    """Inside a backtick block a `~~~` line is relevance to the extractor, so
+    the embedded content must not stop there either (and vice versa)."""
+    generator = load_tool(GENERATOR, "_generate_tmlanguage")
+    repository = generator.markdown_injection()["repository"]
+    for rule in repository.values():
+        (inner,) = rule["patterns"]
+        keep_going = _anchored(inner["while"])
+        own = "```" if "`" in rule["begin"] else "~~~"
+        other = "~~~" if own == "```" else "```"
+        assert keep_going.match(other), rule["begin"]
+        assert not keep_going.match(own), rule["begin"]
 
 
 def test_the_extension_sends_relevance_buffers_whatever_their_scheme() -> None:

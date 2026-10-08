@@ -4,13 +4,16 @@
   "injectionSelector": "L:text.html.markdown",
   "patterns": [
     {
-      "include": "#fenced-relevance"
+      "include": "#backtick-fence"
+    },
+    {
+      "include": "#tilde-fence"
     }
   ],
   "repository": {
-    "fenced-relevance": {
+    "backtick-fence": {
       "name": "markup.fenced_code.block.markdown",
-      "begin": "(^|\\G)(\\s*)(`{3,}|~{3,})\\s*(?i:(client_relevance|relevance|session_relevance))\\s*$",
+      "begin": "(^|\\G)(\\s*)(`{3,})\\s*(?i:(client_relevance|relevance|session_relevance))\\s*$",
       "beginCaptures": {
         "3": {
           "name": "punctuation.definition.markdown"
@@ -19,16 +22,46 @@
           "name": "fenced_code.block.language.markdown"
         }
       },
-      "end": "(^|\\G)(\\2|\\s{0,3})(\\3)\\s*$",
+      "end": "(^|\\G)\\s*(`{3,})\\s*$",
       "endCaptures": {
-        "3": {
+        "2": {
           "name": "punctuation.definition.markdown"
         }
       },
       "patterns": [
         {
           "begin": "(^|\\G)(\\s*)(.*)",
-          "while": "(^|\\G)(?!\\s*([`~]{3,})\\s*$)",
+          "while": "(^|\\G)(?!\\s*`{3,}\\s*$)",
+          "contentName": "meta.embedded.block.bigfix-relevance",
+          "patterns": [
+            {
+              "include": "source.bigfix-relevance"
+            }
+          ]
+        }
+      ]
+    },
+    "tilde-fence": {
+      "name": "markup.fenced_code.block.markdown",
+      "begin": "(^|\\G)(\\s*)(~{3,})\\s*(?i:(client_relevance|relevance|session_relevance))\\s*$",
+      "beginCaptures": {
+        "3": {
+          "name": "punctuation.definition.markdown"
+        },
+        "4": {
+          "name": "fenced_code.block.language.markdown"
+        }
+      },
+      "end": "(^|\\G)\\s*(~{3,})\\s*$",
+      "endCaptures": {
+        "2": {
+          "name": "punctuation.definition.markdown"
+        }
+      },
+      "patterns": [
+        {
+          "begin": "(^|\\G)(\\s*)(.*)",
+          "while": "(^|\\G)(?!\\s*~{3,}\\s*$)",
           "contentName": "meta.embedded.block.bigfix-relevance",
           "patterns": [
             {
