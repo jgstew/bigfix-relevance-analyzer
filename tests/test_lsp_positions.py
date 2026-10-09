@@ -464,3 +464,17 @@ def test_locate_only_maps_the_sites_that_can_hold_the_position(
     assert found is not None
     assert found[0].text.endswith("three")
     assert calls == [found[0].text]
+
+
+@pytest.mark.parametrize(
+    ("name", "doc"),
+    [("a.md", "```relevance\nexists bogus\n```\n"), ("a.rel", "exists bogus")],
+)
+def test_site_offset_on_a_text_site_builds_no_byte_index(name: str, doc: str) -> None:
+    """Only a BES site maps through bytes; a text site must not pay for them."""
+    sites, index = sites_of(name, doc)
+    (site,) = sites
+    line = 1 if name == "a.md" else 0
+    assert index.site_offset(site, (line, 7)) == 7
+    assert index.locate(sites, (line, 7)) == (site, 7)
+    assert index._byte_starts is None
