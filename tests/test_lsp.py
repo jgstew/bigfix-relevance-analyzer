@@ -711,3 +711,37 @@ def test_hover_with_a_malformed_position_is_invalid_params() -> None:
     params = {"textDocument": {"uri": uri("a.rel")}, "position": {"line": "0"}}
     (response,) = server.handle(request("textDocument/hover", params))
     assert response["error"]["code"] == -32602
+
+
+@pytest.mark.parametrize("ranged", [False, True])
+def test_a_closed_or_dropped_document_is_forgotten_by_the_linter(
+    monkeypatch: pytest.MonkeyPatch, ranged: bool
+) -> None:
+    """didClose, and a ranged change (which drops the document), free what the
+    linter kept for it rather than holding it until other documents push it out."""
+    server = started()
+    forgotten: list[str] = []
+    real = server.linter.forget
+
+    def forget(document_uri: str) -> None:
+        forgotten.append(document_uri)
+        real(document_uri)
+
+    monkeypatch.setattr(server.linter, "forget", forget)
+    did_open(server, "a.rel", CLIENT)
+    if ranged:
+        change = {
+            "range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+            "text": "x",
+        }
+        server.handle(
+            notification(
+                "textDocument/didChange",
+                {"textDocument": {"uri": uri("a.rel"), "version": 2}, "contentChanges": [change]},
+            )
+        )
+    else:
+        server.handle(
+            notification("textDocument/didClose", {"textDocument": {"uri": uri("a.rel")}})
+        )
+    assert forgotten == [uri("a.rel")]

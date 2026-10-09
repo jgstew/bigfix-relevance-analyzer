@@ -80,6 +80,7 @@ async function lint() {
     .flatMap((hover) => hover.contents)
     .map((content) => (typeof content === "string" ? content : content.value))
     .join("\n");
+  const hoverRange = hovers[0]?.range;
 
   // An unsaved buffer has no file name, so only its language says it is
   // relevance (see LANGUAGE_ID in src/bigfix_relevance_analyzer/lsp/linter.py).
@@ -100,6 +101,10 @@ async function lint() {
     "broken.rel": summary(brokenFound),
     "fenced.md": summary(fencedFound),
     "fenced.md hover": hoverText,
+    "fenced.md hover range": hoverRange && [
+      [hoverRange.start.line, hoverRange.start.character],
+      [hoverRange.end.line, hoverRange.end.character],
+    ],
     ...(untitledFound ? { [`untitled (${language})`]: summary(untitledFound) } : {}),
   };
   fs.writeFileSync(process.env.SMOKE_RESULT, JSON.stringify(result, null, 2));
@@ -123,12 +128,18 @@ async function lint() {
     throw new Error(`fenced.md: expected a diagnostic on line 4, got ${JSON.stringify(summary(fencedFound))}`);
   }
   // ...and the column: the unknown name, after `exists `, within the fence.
-  if (!hoverText.includes("`totally bogus made up inspector`") || !hoverText.includes("not defined")) {
-    throw new Error(`fenced.md: expected a hover on the unknown name, got ${JSON.stringify(hoverText)}`);
-  }
   const unknown = fencedFound.find((d) => codeOf(d) === "unknown-inspector");
   if (!unknown || unknown.range.start.line !== 3 || unknown.range.start.character !== 7) {
     throw new Error(`fenced.md: expected unknown-inspector at line 4, character 7, got ${JSON.stringify(summary(fencedFound))}`);
+  }
+  // Hover (issue #96, item 2) on that same unknown name: its text, and a range
+  // over exactly the name (characters 7 to 38), mapped back through the fence.
+  if (!hoverText.includes("`totally bogus made up inspector`") || !hoverText.includes("not defined")) {
+    throw new Error(`fenced.md: expected a hover on the unknown name, got ${JSON.stringify(hoverText)}`);
+  }
+  const expectedRange = [[3, 7], [3, 38]];
+  if (JSON.stringify(result["fenced.md hover range"]) !== JSON.stringify(expectedRange)) {
+    throw new Error(`fenced.md: expected the hover over ${JSON.stringify(expectedRange)}, got ${JSON.stringify(result["fenced.md hover range"])}`);
   }
 }
 

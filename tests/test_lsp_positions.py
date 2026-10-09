@@ -419,3 +419,48 @@ def test_locate_finds_the_site_holding_a_position() -> None:
     assert index.locate(sites, (0, doc.index("one"))) == (sites[0], sites[0].text.index("one"))
     assert index.locate(sites, (0, doc.index("two"))) == (sites[1], sites[1].text.index("two"))
     assert index.locate(sites, (0, doc.index(" and "))) is None
+
+
+@pytest.mark.parametrize(
+    ("name", "doc", "route"),
+    [
+        (
+            "a.bes",
+            bes(
+                "\t<Relevance>exists bogus one</Relevance>\n"
+                "\t<Relevance>exists bogus two</Relevance>\n"
+                "\t<Relevance>exists bogus three</Relevance>"
+            ),
+            "_mapped_offset",
+        ),
+        (
+            "a.md",
+            (
+                "```relevance\nbogus one\n```\n```relevance\nbogus two\n```\n"
+                "```relevance\nbogus three\n```\n"
+            ),
+            "_text_offset",
+        ),
+    ],
+)
+def test_locate_only_maps_the_sites_that_can_hold_the_position(
+    monkeypatch: pytest.MonkeyPatch, name: str, doc: str, route: str
+) -> None:
+    """A hover near the end of a long document must not walk every earlier
+    site: BES sites are ruled out by their bytes, text sites by their lines."""
+    sites, index = sites_of(name, doc)
+    calls: list[str] = []
+    real = getattr(DocumentIndex, route)
+
+    def counted(self: DocumentIndex, site: RelevanceSite, *args: object) -> object:
+        calls.append(site.text)
+        return real(self, site, *args)
+
+    monkeypatch.setattr(DocumentIndex, route, counted)
+    lines = doc.split("\n")
+    line = next(number for number, text in enumerate(lines) if "three" in text)
+    column = lines[line].index("three")
+    found = index.locate(sites, (line, column))
+    assert found is not None
+    assert found[0].text.endswith("three")
+    assert calls == [found[0].text]

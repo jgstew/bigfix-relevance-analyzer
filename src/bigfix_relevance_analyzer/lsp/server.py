@@ -200,6 +200,7 @@ class Server:
         if method == "textDocument/didClose":
             uri = params["textDocument"]["uri"]
             self._documents.pop(uri, None)
+            self.linter.forget(uri)
             return [_notify("textDocument/publishDiagnostics", {"uri": uri, "diagnostics": []})]
         return []
 
@@ -218,6 +219,7 @@ class Server:
             # client reopens it.
             logger.warning("ignoring a ranged change to %s: only full sync is supported", uri)
             del self._documents[uri]
+            self.linter.forget(uri)
             return [_notify("textDocument/publishDiagnostics", {"uri": uri, "diagnostics": []})]
         if not changes:
             return []

@@ -121,16 +121,59 @@ class DocumentIndex:
         entity such as ``&gt;`` is the one character it stands for, and either
         half of a surrogate pair is the astral character it encodes.
         """
+        point = self._point(position)
+        if point is None:
+            return None
+        return self._offset_at(site, position, point, self._byte_at(*point))
+
+    def locate(
+        self, sites: Iterable[RelevanceSite], position: Position
+    ) -> tuple[RelevanceSite, int] | None:
+        """The first of ``sites`` with a character at ``position``, and its offset.
+
+        The position is resolved once, and a site that cannot hold it is
+        skipped without mapping: a BES site by its source map's bytes, a text
+        site by the lines its text spans. Not by a BES site's ``line``, which an
+        encoded line feed can shift (#111); the bytes are exact.
+        """
+        point = self._point(position)
+        if point is None:
+            return None
+        line, _ = point
+        byte: int | None = None
+        for site in sites:
+            if site.source_map is not None:
+                if byte is None:
+                    byte = self._byte_at(*point)
+                spans = site.source_map.spans
+                if not spans or not spans[0].raw_start <= byte < spans[-1].raw_end:
+                    continue
+            elif site.column is not None:
+                first = site.line - 1
+                if line < first or line > first + site.text.count("\n"):
+                    continue
+            offset = self._offset_at(site, position, point, byte)
+            if offset is not None:
+                return site, offset
+        return None
+
+    def _point(self, position: Position) -> tuple[int, int] | None:
+        """``(line, code point index in it)`` of ``position``, if it is on a character."""
         line, character = position
         if not 0 <= line < len(self.lines):
             return None
         index = _code_point_at(self.lines[line], character)
-        if index is None:
-            return None
+        return None if index is None else (line, index)
+
+    def _offset_at(
+        self, site: RelevanceSite, position: Position, point: tuple[int, int], byte: int | None
+    ) -> int | None:
+        """:meth:`site_offset` for a resolved ``point``; ``byte`` is its byte
+        offset when known (a BES site needs it, and works it out otherwise)."""
         if site.source_map is not None:
-            offset = self._mapped_offset(site, line, index)
+            offset = self._mapped_offset(site, byte if byte is not None else self._byte_at(*point))
         elif site.column is not None:
-            offset = self._text_offset(site, line, index)
+            offset = self._text_offset(site, *point)
         else:
             return None
         if offset is None:
@@ -140,16 +183,6 @@ class DocumentIndex:
         if found is None or not found[0] <= position < found[1]:
             return None
         return offset
-
-    def locate(
-        self, sites: Iterable[RelevanceSite], position: Position
-    ) -> tuple[RelevanceSite, int] | None:
-        """The first of ``sites`` with a character at ``position``, and its offset."""
-        for site in sites:
-            offset = self.site_offset(site, position)
-            if offset is not None:
-                return site, offset
-        return None
 
     # -- BES XML: through the source map's bytes ---------------------------
 
@@ -186,14 +219,18 @@ class DocumentIndex:
             return None
         return line, utf16_length(prefix)
 
-    def _mapped_offset(self, site: RelevanceSite, line: int, index: int) -> int | None:
-        """The offset in ``site.text`` whose bytes hold code point ``index`` of ``line``."""
-        assert site.source_map is not None
+    def _byte_at(self, line: int, index: int) -> int:
+        """The byte offset of code point ``index`` of ``line``, in :attr:`data`."""
         starts = self._line_byte_starts()
         if line >= len(starts):
-            return None
+            # Not this buffer's bytes (a caller-built index): matches no source map.
+            return -1
         prefix = self.lines[line][:index].encode("utf-8", errors="surrogatepass")
-        byte = starts[line] + len(prefix)
+        return starts[line] + len(prefix)
+
+    def _mapped_offset(self, site: RelevanceSite, byte: int) -> int | None:
+        """The offset in ``site.text`` whose bytes hold byte ``byte`` of the file."""
+        assert site.source_map is not None
         for span in site.source_map.spans:
             if not span.raw_start <= byte < span.raw_end:
                 continue

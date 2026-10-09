@@ -129,7 +129,6 @@ from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 from bigfix_relevance_analyzer.extract import (
     _RECOGNIZED_SUFFIXES,
     RelevanceSite,
-    _extract_data,
     _extract_file,
     _ExtractionProblem,
     _is_recognized,
@@ -1613,22 +1612,6 @@ def _lint_extracted(
             key=lambda finding: finding.line,
         )
     )
-
-
-def _lint_data(
-    file_path: Path, data: bytes, config: LintConfig, judge: SiteJudge = _judge_site
-) -> tuple[Finding, ...]:
-    """:func:`lint_file` over ``data`` instead of the file's contents on disk.
-
-    ``file_path`` only names the content -- its suffix picks the extractor,
-    and findings carry it -- and is never opened, so it need not exist. An
-    unrecognized suffix yields no findings rather than a ``file-error``: the
-    caller chose to hand this content over, it did not name a path to lint.
-    """
-    if not _is_recognized(file_path):
-        return ()
-    sites, problems = _extract_data(file_path, data)
-    return _lint_extracted(file_path, sites, problems, config, judge)
 
 
 def lint_text(text: str, config: LintConfig) -> tuple[Finding, ...]:
