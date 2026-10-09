@@ -15,6 +15,7 @@ the file. Every single-line rule is checked against that below.
 from __future__ import annotations
 
 import functools
+import json
 import os
 import re
 from pathlib import Path
@@ -372,6 +373,11 @@ def test_an_override_block_holds_only_option_lines() -> None:
         assert not end.match(line), line
     for line in ("wait cmd.exe", "run x=y", "]]></ActionScript>", "hidden"):
         assert end.match(line), line
+    # Blank and comment lines pass through, as pre-commit-bigfix's lint reads
+    # the block (bes_actionscript_lint_schclass.py): only a command closes it.
+    for line in ("", "   ", "// note", "  //"):
+        assert not end.match(line), repr(line)
+    assert {"include": "#comment"} in rule["patterns"]
     # Zero-width, so the line that ends the block is still read as a command.
     assert end.match("wait cmd.exe").group() == ""  # type: ignore[union-attr]
     found = end.search("hidden=true]]>")
@@ -434,31 +440,65 @@ def _bes_begin(name: str) -> re.Pattern[str]:
     return _python(_bes_repository()[name]["begin"])
 
 
+def _actionscript_kind(tag: str) -> str:
+    """What the two-stage `<ActionScript>` element makes of a start tag:
+    ``actionscript``, ``xml`` (another MIME type), ``empty`` (self-closing)
+    or ``none`` (not the element at all). The tag may span lines: each stage
+    is a rule of its own, so only the name has to be on the first line."""
+    opened = _bes_begin("actionscript").match(tag)
+    if opened is None:
+        return "none"
+    rest = tag[opened.end() :]
+    if _bes_begin("actionscript-other-language").search(rest):
+        return "xml"
+    if rest.rstrip().endswith("/>"):
+        return "empty"
+    return "actionscript"
+
+
 @pytest.mark.parametrize(
     ("tag", "expected"),
     [
-        ("<ActionScript>", True),
-        ('<ActionScript MIMEType="application/x-Fixlet-Windows-Shell">', True),
-        ("<ActionScript MIMEType='application/x-fixlet-windows-shell'>", True),
-        ('<ActionScript ID="1" MIMEType="APPLICATION/X-FIXLET-WINDOWS-SHELL" >', True),
-        ('<ActionScript MIMEType="application/x-sh">', False),
-        ('<ActionScript MIMEType="application/x-Fixlet-Windows-PowerShell">', False),
-        ('<ActionScript MIMEType="application/x-AppleScript">', False),
-        ('<ActionScript MIMEType="text/x-uri">', False),
-        ("<ActionScript/>", False),
-        ('<ActionScript MIMEType="application/x-Fixlet-Windows-Shell" />', False),
-        ("<ActionScriptX>", False),
+        ("<ActionScript>", "actionscript"),
+        ('<ActionScript MIMEType="application/x-Fixlet-Windows-Shell">', "actionscript"),
+        ("<ActionScript MIMEType='application/x-fixlet-windows-shell'>", "actionscript"),
+        ('<ActionScript ID="1" MIMEType="APPLICATION/X-FIXLET-WINDOWS-SHELL" >', "actionscript"),
+        ('<ActionScript\n\tMIMEType="application/x-Fixlet-Windows-Shell">', "actionscript"),
+        ('<ActionScript Comment="a > b">', "actionscript"),
+        ('<ActionScript MIMEType="application/x-sh">', "xml"),
+        ('<ActionScript\n  MIMEType="application/x-sh">', "xml"),
+        ('<ActionScript MIMEType="application/x-Fixlet-Windows-PowerShell">', "xml"),
+        ('<ActionScript MIMEType="application/x-AppleScript">', "xml"),
+        ('<ActionScript MIMEType="text/x-uri">', "xml"),
+        ("<ActionScript/>", "empty"),
+        ("<ActionScript\n/>", "empty"),
+        ("<ActionScriptX>", "none"),
     ],
 )
-def test_only_windows_shell_actionscript_is_actionscript(tag: str, expected: bool) -> None:
-    assert bool(_bes_begin("actionscript").match(tag)) is expected
+def test_only_windows_shell_actionscript_is_actionscript(tag: str, expected: str) -> None:
+    assert _actionscript_kind(tag) == expected
 
 
 def test_the_mimetypes_come_from_the_extractor() -> None:
-    begin = _bes_begin("actionscript")
     for mimetype in _ACTIONSCRIPT_MIMETYPES:
-        for written in (mimetype, mimetype.upper()):
-            assert begin.match(f'<ActionScript MIMEType="{written}">'), written
+        for written in (mimetype, mimetype.upper(), mimetype.title()):
+            assert _actionscript_kind(f'<ActionScript MIMEType="{written}">') == "actionscript"
+
+
+def test_an_actionscript_start_tag_may_span_lines() -> None:
+    """641 of 7,759 Windows-Shell action scripts in real content put the
+    MIMEType on the line after `<ActionScript` (PR #119 review). The element
+    opens on the name alone; its body opens on the tag's own `>`."""
+    repository = _bes_repository()
+    assert _bes_begin("actionscript").match("<ActionScript")
+    element = repository["actionscript"]
+    assert [p["include"] for p in element["patterns"]] == [
+        "#actionscript-other-language",
+        "#actionscript-self-closing",
+        "#attributes",
+        "#actionscript-body",
+    ]
+    assert repository["actionscript-body"]["begin"] == "(>)"
 
 
 @pytest.mark.parametrize(
@@ -474,10 +514,16 @@ def test_the_mimetypes_come_from_the_extractor() -> None:
         ("<RelevanceX>", False),
         ("<Relevance/>", False),
         ("<Properties>", False),
+        ('<Relevance Comment="a > b">', True),
+        ('<SuccessCriteria Comment=">" Option="CustomRelevance">', True),
+        ('<SuccessCriteria Comment="Option=\'CustomRelevance\'" Option="Other">', False),
     ],
 )
 def test_the_relevance_bodies_are_the_ones_the_extractor_reads(tag: str, expected: bool) -> None:
-    assert bool(_bes_begin("relevance").match(tag)) is expected
+    found = _bes_begin("relevance").match(tag)
+    assert bool(found) is expected
+    if found:
+        assert found.end() == len(tag), "the tag ended inside an attribute value"
 
 
 def test_the_bes_grammar_colors_only_tags_the_extractor_reads() -> None:
@@ -498,25 +544,32 @@ def test_cdata_and_entity_bodies_both_embed() -> None:
     """In or out of `<![CDATA[ ]]>`: the CDATA rule comes first, then the body
     language itself, so an entity-escaped body is embedded too."""
     repository = _bes_repository()
-    for name, scope in (
-        ("actionscript", "source.bigfix-actionscript"),
-        ("relevance", "source.bigfix-relevance"),
+    for name, body in (
+        ("actionscript-body", {"include": "source.bigfix-actionscript"}),
+        ("relevance", {"include": "#relevance-body"}),
     ):
         rule = repository[name]
         patterns = rule["patterns"]
         assert patterns[0]["include"].startswith("#cdata"), name
-        assert patterns[-1] == {"include": scope}, name
+        assert patterns[1] == {"include": "#entity"}, name
+        assert patterns[2:] == [body], name
         cdata = repository[patterns[0]["include"].removeprefix("#")]
-        assert cdata["patterns"][-1] == {"include": scope}
-        assert cdata["patterns"] == patterns[2:]  # the same body, less CDATA and entities
+        assert cdata["patterns"] == [body]  # the same body, less CDATA and entities
         assert rule["contentName"].startswith("meta.embedded.block.")
         assert "contentName" not in cdata  # the element's covers it
+
+
+def test_the_relevance_body_is_generated_once() -> None:
+    """One repository entry that both the element and its CDATA include."""
+    text = json.dumps(_generator().bes_grammar())
+    assert text.count("CustomRelevance") == 2  # the start-tag lookahead's two quotings
+    assert text.count("SuccessCriteria)\\\\s*>") == 2  # the string and comment guards
 
 
 def test_a_relevance_string_or_comment_left_open_ends_with_its_body() -> None:
     """The relevance grammar's own rules, with the end widened to the body's."""
     relevance = _generator().relevance_grammar()["repository"]
-    guards = _bes_repository()["relevance"]["patterns"][2:-1]
+    guards = _bes_repository()["relevance-body"]["patterns"][:-1]
     assert [guard["name"] for guard in guards] == [
         relevance["string"]["name"],
         relevance["comment"]["name"],
@@ -531,5 +584,9 @@ def test_a_relevance_string_or_comment_left_open_ends_with_its_body() -> None:
 def test_an_end_tag_closes_whatever_its_start_tag_opened() -> None:
     """The start tag's attribute conditions (`Option="CustomRelevance"`)
     cannot apply to an end tag: the end is a backreference to the name."""
-    for name in ("actionscript", "relevance"):
-        assert _bes_repository()[name]["end"] == r"(</)(\2)\s*(>)"
+    assert _bes_repository()["relevance"]["end"] == r"(</)(\2)\s*(>)"
+    end = _python(_bes_repository()["actionscript"]["end"])
+    assert end.match("</ActionScript>") and end.match("</ActionScript >")
+    # After a self-closing `/>`, the element ends without an end tag.
+    found = end.search("<ActionScript />", len("<ActionScript />"))
+    assert found is not None and found.group() == ""
