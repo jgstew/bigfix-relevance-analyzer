@@ -10,11 +10,26 @@ safe fixes.
 
 | Where | What you get |
 | --- | --- |
+| [Browser playground](#browser-playground) | Paste relevance into a self-contained [web page](https://www.jgstew.com/files/bigfix-relevance-analyzer-playground.html); nothing to install, nothing sent anywhere |
+| [VS Code extension](#vs-code-extension) | Diagnostics, hover and fixes [as you type](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer) |
 | [Command Line `uvx`](#command-line-via-uvx) | Analyse one statement, or lint files, with nothing installed |
 | [pre-commit hook](#pre-commit-hook) | Lint the relevance in a BigFix content repo on every commit |
 | [Python library](#python-library) | `import` it from PyPI into your own tool |
-| [Browser playground](#browser-playground) | Paste relevance into a self-contained web page; nothing to install, nothing sent anywhere |
-| [VS Code extension](#vs-code-extension) | Diagnostics, hover and fixes as you type |
+
+### Browser playground
+
+[bigfix-relevance-analyzer-playground.html](https://www.jgstew.com/files/bigfix-relevance-analyzer-playground.html)
+runs this package in the browser as WebAssembly, so nothing needs installing.
+The page is a single self-contained file (the only thing it fetches is its
+icon), so the relevance you paste never leaves your browser. It is updated on
+each release.
+
+### VS Code extension
+
+Install
+[BigFix Relevance Developer](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer)
+from the Marketplace. It runs this package's [language server](#language-server)
+as WebAssembly, so it needs nothing else installed.
 
 ### Command line, via `uvx`
 
@@ -62,21 +77,6 @@ report.parsed, report.check.value.types  # (True, frozenset({'boolean'}))
 
 See [Analysing one statement](#analysing-one-statement) and the sections after
 it for the API.
-
-### Browser playground
-
-[www.jgstew.com/files/bigfix-relevance-analyzer-playground.html](https://www.jgstew.com/files/bigfix-relevance-analyzer-playground.html)
-runs this package in the browser as WebAssembly, so nothing needs installing.
-The page is a single self-contained file (the only thing it fetches is its
-icon), so the relevance you paste never leaves your browser. It is updated on
-each release.
-
-### VS Code extension
-
-Install
-[BigFix Relevance Developer](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer)
-from the Marketplace. It runs this package's [language server](#language-server)
-as WebAssembly, so it needs nothing else installed.
 
 ## Design notes
 
