@@ -91,6 +91,7 @@ from bigfix_relevance_analyzer.extract import (
     _UNTYPED_TEXT_SUFFIXES,
     RelevanceSite,
     _extract_data,
+    _ExtractionProblem,
     _is_recognized,
 )
 from bigfix_relevance_analyzer.lint import (
@@ -99,7 +100,7 @@ from bigfix_relevance_analyzer.lint import (
     Severity,
     _analyze_site,
     _judge_site,
-    _lint_data,
+    _lint_extracted,
 )
 from bigfix_relevance_analyzer.lsp.hover import describe
 from bigfix_relevance_analyzer.lsp.positions import DocumentIndex, Position, Range, utf16_length
@@ -131,6 +132,28 @@ contributes the language under this id; a test keeps the two equal."""
 
 DEFAULT_CACHE_SIZE: Final = 2048
 """Sites whose findings the linter keeps -- as many as lint keeps analyses."""
+
+EXTRACTION_CACHE_SIZE: Final = 8
+"""Documents whose last extraction the linter keeps, for hover to reuse."""
+
+
+@dataclasses.dataclass(slots=True)
+class _Extraction:
+    """One document's text, as extracted: what diagnostics and hover share."""
+
+    path: Path
+    text: str
+    data: bytes
+    sites: list[RelevanceSite]
+    problems: list[_ExtractionProblem]
+    _index: DocumentIndex | None = None
+
+    @property
+    def index(self) -> DocumentIndex:
+        """Built on first use: a clean document never needs one."""
+        if self._index is None:
+            self._index = DocumentIndex(self.text, self.data)
+        return self._index
 
 
 class _DiagnosticSeverity(enum.IntEnum):
@@ -176,6 +199,7 @@ class DocumentLinter:
         self._cache_size = cache_size
         self._hits = 0
         self._misses = 0
+        self._extractions: OrderedDict[str, _Extraction] = OrderedDict()
 
     def apply_options(self, options: object) -> None:
         """Take what applies from a client's ``initializationOptions``.
@@ -229,11 +253,19 @@ class DocumentLinter:
                     message,
                 )
             ]
-        findings = _lint_data(_document_path(uri, language_id), data, self.config, self._judge)
+        extracted = self._extract(uri, text, data, language_id)
+        if extracted is None:
+            return []
+        findings = _lint_extracted(
+            extracted.path, extracted.sites, extracted.problems, self.config, self._judge
+        )
         if not findings:
             return []
-        index = DocumentIndex(text, data)
-        return [diagnostic for finding in findings for diagnostic in _diagnostics(index, finding)]
+        return [
+            diagnostic
+            for finding in findings
+            for diagnostic in _diagnostics(extracted.index, finding)
+        ]
 
     def hover(
         self, uri: str, text: str, position: Position, language_id: str | None = None
@@ -248,12 +280,11 @@ class DocumentLinter:
         data = text.encode("utf-8", errors="surrogatepass")
         if len(data) > self.max_document_bytes:
             return None
-        path = _document_path(uri, language_id)
-        if not _is_recognized(path):
+        extracted = self._extract(uri, text, data, language_id)
+        if extracted is None:
             return None
-        sites, _ = _extract_data(path, data)
-        index = DocumentIndex(text, data)
-        located = index.locate(sites, position)
+        index = extracted.index
+        located = index.locate(extracted.sites, position)
         if located is None:
             return None
         site, offset = located
@@ -269,6 +300,33 @@ class DocumentLinter:
                 "end": {"line": end_line, "character": end},
             }
         return result
+
+    def _extract(
+        self, uri: str, text: str, data: bytes, language_id: str | None
+    ) -> _Extraction | None:
+        """The document's sites and index, reused while its text and type are
+        unchanged; ``None`` for a type no extractor reads.
+
+        Hover asks on every pause of the mouse, and re-extracting a large BES
+        file each time is an XML parse per hover: about 50 ms of a 60 ms hover
+        on a 382 KiB task. Keyed by URI and checked against the whole text --
+        a comparison, far cheaper than the parse -- and the file type, which
+        picks the extractor and can change under the same URI and text.
+        """
+        path = _document_path(uri, language_id)
+        if not _is_recognized(path):
+            return None
+        cached = self._extractions.get(uri)
+        if cached is not None and cached.path == path and cached.text == text:
+            self._extractions.move_to_end(uri)
+            return cached
+        sites, problems = _extract_data(path, data)
+        extracted = _Extraction(path, text, data, sites, problems)
+        self._extractions[uri] = extracted
+        self._extractions.move_to_end(uri)
+        if len(self._extractions) > EXTRACTION_CACHE_SIZE:
+            self._extractions.popitem(last=False)
+        return extracted
 
     def _judge(
         self, file_path: Path | None, site: RelevanceSite, config: LintConfig

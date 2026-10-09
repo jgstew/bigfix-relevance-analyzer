@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from typing import Final, NamedTuple
 
-from bigfix_relevance_analyzer import inspectors
+from bigfix_relevance_analyzer import __version__, inspectors
 from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis
 from bigfix_relevance_analyzer.binding import Binder
 from bigfix_relevance_analyzer.dialect import Dialect
@@ -52,11 +52,16 @@ from bigfix_relevance_analyzer.nodes import (
 )
 from bigfix_relevance_analyzer.tokenizer import Token, TokenKind
 
-DOCS_URL: Final = "https://github.com/jgstew/bigfix-relevance-analyzer/blob/main/docs/reference/"
-"""Where hover links point: the reference pages, on the default branch.
+DOCS_URL: Final = (
+    f"https://github.com/jgstew/bigfix-relevance-analyzer/blob/v{__version__}/docs/reference/"
+)
+"""Where hover links point: the reference pages at this version's release tag.
 
-Not a tag: a build between releases has no tag to point at. A test holds every
-linked anchor to a heading in this checkout's ``docs/reference/``."""
+A tag rather than ``main``, so a heading renamed later cannot break the links
+in an extension already installed. A test holds every linked anchor to a
+heading in this checkout's ``docs/reference/``, which is what the release tags.
+The price: a build of a version not yet released links to a tag that does not
+exist until it is."""
 
 MAX_ROWS: Final = 8
 """Inspector rows listed before the rest are summarized as a count."""
@@ -100,25 +105,86 @@ def describe(analysis: RelevanceAnalysis, offset: int) -> Hover | None:
     node = node_at(root, offset)
     if node is None:
         return None
-    markdown = _markdown(analysis, node)
+    words = _keywords(analysis.tokens, node)
+    spelled = " ".join(word.text for word in words) if words else None
+    markdown = _markdown(analysis, node, spelled)
     if markdown is None:
         return None
     if isinstance(node, (Reference, StringLiteral, NumberLiteral, It)):
-        span = TextSpan(node.span.start, node.span.end)
+        span = _ungrouped(analysis.tokens, node)
+    elif words:
+        span = TextSpan(words[0].offset, _end(words[-1]))
     else:
         # A construct spans its operands; what the cursor is on is its keyword.
-        span = TextSpan(token.offset, token.offset + len(token.text))
+        span = TextSpan(token.offset, _end(token))
     return Hover(markdown, span)
 
 
 def _token_at(tokens: tuple[Token, ...], offset: int) -> Token | None:
     for token in tokens:
-        if token.offset <= offset < token.offset + len(token.text):
+        if token.offset <= offset < _end(token):
             return token
     return None
 
 
-def _markdown(analysis: RelevanceAnalysis, node: Node) -> str | None:
+def _end(token: Token) -> int:
+    return token.offset + len(token.text)
+
+
+def _significant(tokens: tuple[Token, ...], start: int, end: int) -> list[Token]:
+    """The tokens in ``[start, end)`` that are not trivia or a parenthesis."""
+    return [
+        token
+        for token in tokens
+        if start <= token.offset
+        and _end(token) <= end
+        and token.kind not in _NO_HOVER_TOKENS
+        and token.text not in ("(", ")")
+    ]
+
+
+def _keywords(tokens: tuple[Token, ...], node: Node) -> list[Token]:
+    """The words a construct is spelled with, as written, when they are one run
+    between its operands: ``IS NOT EQUAL TO``, ``NOT EXISTS``, ``as integer``,
+    ``item 0 of``. Empty for anything else, which highlights the one token
+    under the cursor -- ``if`` ... ``then`` ... ``else`` are three places.
+
+    Read from the tokens because a node keeps its operator normalized
+    (``and`` for ``AND``), and the author's spelling is the one to show."""
+    match node:
+        case Binary(left=left, right=right):
+            return _significant(tokens, left.span.end, right.span.start)
+        case Unary(operand=operand) | Exists(operand=operand) | NumberOf(operand=operand):
+            return _significant(tokens, node.span.start, operand.span.start)
+        case ItemOf(operand=operand):
+            return _significant(tokens, node.span.start, operand.span.start)
+        case Cast(operand=operand):
+            return _significant(tokens, operand.span.end, node.span.end)
+    return []
+
+
+def _ungrouped(tokens: tuple[Token, ...], node: Node) -> TextSpan:
+    """A leaf's span without the grouping parentheses the parser folds into it.
+
+    ``exists (1)`` gives the ``1`` the span ``(1)``. Pairs come off only from
+    both ends at once, so an index's own parentheses -- ``file ("x")`` -- stay.
+    """
+    inside = [
+        token
+        for token in tokens
+        if node.span.start <= token.offset
+        and _end(token) <= node.span.end
+        and token.kind not in _NO_HOVER_TOKENS
+    ]
+    while len(inside) > 2 and inside[0].text == "(" and inside[-1].text == ")":
+        inside = inside[1:-1]
+    if not inside:
+        return TextSpan(node.span.start, node.span.end)
+    return TextSpan(inside[0].offset, _end(inside[-1]))
+
+
+def _markdown(analysis: RelevanceAnalysis, node: Node, spelled: str | None) -> str | None:
+    """``spelled`` is the construct's words as written; see :func:`_keywords`."""
     match node:
         case Reference():
             return _reference(analysis, node)
@@ -140,7 +206,8 @@ def _markdown(analysis: RelevanceAnalysis, node: Node) -> str | None:
                 _WHOSE_LINK,
             )
         case Cast(target=target):
-            return _lines(f"**`as {target}`** - cast to `{target}`", _CAST_LINK)
+            written = _code(spelled or f"as {target}")
+            return _lines(f"**{written}** - cast to `{target}`", _CAST_LINK)
         case Bar():
             return _lines(
                 "**`|`** - error fallback: the right side is evaluated only when the left "
@@ -148,20 +215,20 @@ def _markdown(analysis: RelevanceAnalysis, node: Node) -> str | None:
                 _BAR_LINK,
             )
         case Binary(op=op):
-            return _lines(f"**{_code(op)}** - binary operator", _OPERATOR_LINK)
+            return _lines(f"**{_code(spelled or op)}** - binary operator", _OPERATOR_LINK)
         case Unary(op=op):
-            return _lines(f"**{_code(op)}** - unary operator", _OPERATOR_LINK)
+            return _lines(f"**{_code(spelled or op)}** - unary operator", _OPERATOR_LINK)
         case Exists(negated=negated):
-            spelled = "not exists" if negated else "exists"
-            meaning = "none" if negated else "at least one"
-            return f"**`{spelled}`** - true when its operand has {meaning} value"
+            written = _code(spelled or ("not exists" if negated else "exists"))
+            meaning = "no value" if negated else "at least one value"
+            return f"**{written}** - true when its operand has {meaning}"
         case NumberOf():
-            return "**`number of`** - how many values its operand has"
+            written = _code(spelled or "number of")
+            return f"**{written}** - how many values its operand has"
         case ItemOf(index=index, plural=plural):
-            word = "items" if plural else "item"
+            written = _code(spelled or f"{'items' if plural else 'item'} {index.text} of")
             return _lines(
-                f"**`{word} {index.text} of`** - tuple element {index.text}, counting from 0",
-                _TUPLE_LINK,
+                f"**{written}** - tuple element {index.text}, counting from 0", _TUPLE_LINK
             )
         case If():
             return "**`if` ... `then` ... `else`** - conditional expression"

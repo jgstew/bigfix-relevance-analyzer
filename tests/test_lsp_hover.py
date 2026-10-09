@@ -17,6 +17,9 @@ from typing import Any
 import pytest
 from _helpers import REPO_ROOT, lsp_text
 
+from bigfix_relevance_analyzer import __version__
+from bigfix_relevance_analyzer.extract import _extract_data
+from bigfix_relevance_analyzer.lsp import linter as linter_module
 from bigfix_relevance_analyzer.lsp.hover import DOCS_URL, MAX_QUOTED, MAX_ROWS
 from bigfix_relevance_analyzer.lsp.linter import DocumentLinter
 
@@ -171,22 +174,73 @@ def test_a_word_operator_highlights_the_whole_word() -> None:
 
 
 @pytest.mark.parametrize(
-    ("text", "needle", "expected"),
+    ("text", "needle", "expected", "words"),
     [
-        (FILES, "of", "`of`"),
-        (FILES, "whose", "`whose`"),
-        ('exists file "x" | false', "|", "`|`"),
-        ('("1" as integer) > 0', "as", "`as integer`"),
-        ('if exists file "x" then 1 else 2', "then", "`if`"),
-        ('number of files of folder "x"', "number", "`number of`"),
-        ('not exists file "x"', "exists", "`not exists`"),
-        ('item 0 of ("a", "b")', "item", "`item 0 of`"),
+        (FILES, "of", "`of`", "of"),
+        (FILES, "whose", "`whose`", "whose"),
+        ('exists file "x" | false', "|", "`|`", "|"),
+        ('("1" as integer) > 0', "as", "`as integer`", "as integer"),
+        ('if exists file "x" then 1 else 2', "then", "`if`", "then"),
+        ('number of files of folder "x"', "number", "`number of`", "number of"),
+        ('not exists file "x"', "exists", "`not exists`", "not exists"),
+        ('item 0 of ("a", "b")', "item", "`item 0 of`", "item 0 of"),
     ],
 )
-def test_a_keyword_shows_its_construct(text: str, needle: str, expected: str) -> None:
+def test_a_keyword_shows_its_construct(text: str, needle: str, expected: str, words: str) -> None:
+    """A construct spelled in several words highlights all of them, wherever
+    in them the cursor is; one spelled in separate places (`if`) just the word."""
     markdown, highlighted = shown("a.rel", text, needle)
+    assert highlighted == words
+    assert expected in markdown
+
+
+@pytest.mark.parametrize(
+    ("text", "needle", "expected", "shift"),
+    [
+        ('("a") AND ("b")', "AND", "**`AND`**", 0),
+        ('"a" IS NOT EQUAL TO "b"', "IS NOT EQUAL TO", "**`IS NOT EQUAL TO`**", 7),
+        ('NOT ("a" = "b")', "NOT", "**`NOT`**", 0),
+        ('NOT EXISTS file "x"', "NOT EXISTS", "**`NOT EXISTS`**", 5),
+        ('exist file "x"', "exist", "**`exist`**", 0),
+        ('"1" AS INTEGER', "AS INTEGER", "**`AS INTEGER`**", 3),
+        ('NUMBER OF files of folder "x"', "NUMBER OF", "**`NUMBER OF`**", 0),
+        ('"a" is /* why */ not "b"', "is /* why */ not", "**`is not`**", 0),
+    ],
+)
+def test_an_operator_is_shown_and_highlighted_as_the_author_wrote_it(
+    text: str, needle: str, expected: str, shift: int
+) -> None:
+    """The author's casing and spelling, every word of it, comments left out
+    of the name but inside the highlight."""
+    markdown, highlighted = shown("a.rel", text, needle, shift=shift)
     assert highlighted == needle
     assert expected in markdown
+
+
+def test_not_exists_reads_no_value() -> None:
+    markdown, _ = shown("a.rel", 'not exists file "x"', "exists")
+    assert "has no value" in markdown
+
+
+@pytest.mark.parametrize(
+    ("text", "needle", "highlight"),
+    [
+        ("exists (1)", "1", "1"),
+        ('(it) of file "x"', "it", "it"),
+        ('( it /* c */ ) of file "x"', "it", "it"),
+        ('exists ((name)) of file "x"', "name", "name"),
+        ('exists ("x")', '"x"', '"x"'),
+        ('exists file ("x")', "file", 'file ("x")'),
+    ],
+)
+def test_a_grouped_leaf_highlights_itself_not_its_parentheses(
+    text: str, needle: str, highlight: str
+) -> None:
+    """The parser folds grouping parentheses into a leaf's span; the hover
+    leaves them out, as it gives none on a parenthesis. An index's own
+    parentheses are part of the name and stay."""
+    _, highlighted = shown("a.rel", text, needle)
+    assert highlighted == highlight
 
 
 @pytest.mark.parametrize(
@@ -312,3 +366,73 @@ def test_the_keywords_link_to_the_syntax_reference() -> None:
     for needle in ("of", "whose", "it"):
         markdown, _ = shown("a.rel", FILES, needle)
         assert f"{DOCS_URL}syntax.md#" in markdown, needle
+
+
+def test_links_point_at_this_versions_release_tag() -> None:
+    """Not ``main``: a heading renamed there later must not break the links in
+    an extension already installed. A release tags exactly this checkout, which
+    is what the anchor test above reads."""
+    assert (
+        f"https://github.com/jgstew/bigfix-relevance-analyzer/blob/v{__version__}/docs/reference/"
+    ) == DOCS_URL
+
+
+# ---------------------------------------------------------------------------
+# Extraction is shared between diagnostics and hover
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def extractions(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """The URIs' paths each extraction ran for, in order."""
+    calls: list[str] = []
+    real = _extract_data
+
+    def counted(path: Any, data: bytes) -> Any:
+        calls.append(str(path))
+        return real(path, data)
+
+    monkeypatch.setattr(linter_module, "_extract_data", counted)
+    return calls
+
+
+def test_hovers_reuse_the_extraction_diagnostics_made(extractions: list[str]) -> None:
+    linter = DocumentLinter()
+    uri = "file:///workspace/a.rel"
+    linter.diagnostics(uri, FILES)
+    for character in (8, 14, 21, 29, 42):
+        linter.hover(uri, FILES, (0, character))
+    assert len(extractions) == 1
+
+
+def test_a_changed_text_is_extracted_again(extractions: list[str]) -> None:
+    linter = DocumentLinter()
+    uri = "file:///workspace/a.rel"
+    linter.diagnostics(uri, FILES)
+    changed = FILES.replace('"x"', '"y"')
+    found = linter.hover(uri, changed, (0, changed.index('"y"')))
+    assert found is not None
+    assert '"y"' in found["contents"]["value"]
+    assert len(extractions) == 2
+
+
+def test_the_same_text_under_another_language_is_extracted_as_that(
+    extractions: list[str],
+) -> None:
+    """The extractor follows the file type, so the type is part of the key."""
+    linter = DocumentLinter()
+    uri = "untitled:Untitled-1"
+    assert linter.hover(uri, FILES, (0, 8), "bigfix-relevance") is not None
+    assert linter.hover(uri, FILES, (0, 8), "plaintext") is None
+    assert linter.hover(uri, FILES, (0, 8), "bigfix-relevance") is not None
+
+
+def test_the_extraction_cache_is_bounded(extractions: list[str]) -> None:
+    linter = DocumentLinter()
+    uris = [f"file:///workspace/{n}.rel" for n in range(linter_module.EXTRACTION_CACHE_SIZE + 1)]
+    for uri in uris:
+        linter.diagnostics(uri, FILES)
+    linter.hover(uris[-1], FILES, (0, 8))
+    assert len(extractions) == len(uris)
+    linter.hover(uris[0], FILES, (0, 8))
+    assert len(extractions) == len(uris) + 1
