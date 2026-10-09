@@ -373,6 +373,14 @@ content classifier.
 
 ### Optional lxml adapter
 
+> **Planned for deprecation and removal.** Once
+> [#111](https://github.com/jgstew/bigfix-relevance-analyzer/issues/111) lands,
+> this adapter will be deprecated and then removed entirely, along with the
+> `[lxml]` extra. That issue fixes line numbers shifted by encoded line feeds
+> (`&#10;`) inside BES elements, which needs the raw bytes that expat keeps
+> and an lxml tree has already discarded. New code should use
+> `extract_relevance_from_file` (the expat path) instead.
+
 Extraction uses stdlib expat by default. Projects that already parse BES XML
 with lxml can hand over their existing tree instead of having it parsed twice:
 
