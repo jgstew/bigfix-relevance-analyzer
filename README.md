@@ -10,7 +10,7 @@ safe fixes.
 
 | Where | What you get |
 | --- | --- |
-| [Command line, via `uvx`](#command-line-via-uvx) | Analyse one statement, or lint files, with nothing installed |
+| [Command Line `uvx`](#command-line-via-uvx) | Analyse one statement, or lint files, with nothing installed |
 | [pre-commit hook](#pre-commit-hook) | Lint the relevance in a BigFix content repo on every commit |
 | [Python library](#python-library) | `import` it from PyPI into your own tool |
 | [Browser playground](#browser-playground) | Paste relevance into a self-contained web page; nothing to install, nothing sent anywhere |
