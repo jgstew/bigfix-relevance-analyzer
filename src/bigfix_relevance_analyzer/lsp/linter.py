@@ -86,7 +86,7 @@ from urllib.parse import unquote, urlparse
 from urllib.request import url2pathname
 
 # Underscore-private on purpose: this package's modules share extract's
-# helpers this way (lint.py imports _extract_data and _is_recognized too).
+# helpers this way (lint.py imports _extract_file and _is_recognized too).
 from bigfix_relevance_analyzer.extract import (
     _UNTYPED_TEXT_SUFFIXES,
     RelevanceSite,
@@ -300,6 +300,11 @@ class DocumentLinter:
                 "end": {"line": end_line, "character": end},
             }
         return result
+
+    def forget(self, uri: str) -> None:
+        """Drop what is kept for ``uri``: the client closed it, or its text is
+        no longer known. Nothing happens for a URI never seen."""
+        self._extractions.pop(uri, None)
 
     def _extract(
         self, uri: str, text: str, data: bytes, language_id: str | None

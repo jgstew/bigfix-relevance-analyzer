@@ -22,10 +22,11 @@ the per-document plumbing is
 
 from __future__ import annotations
 
+import itertools
 from typing import Final, NamedTuple
 
 from bigfix_relevance_analyzer import __version__, inspectors
-from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis
+from bigfix_relevance_analyzer.analyzer import ReferenceReport, RelevanceAnalysis
 from bigfix_relevance_analyzer.binding import Binder
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.lint import TextSpan
@@ -49,6 +50,7 @@ from bigfix_relevance_analyzer.nodes import (
     Unary,
     Whose,
     node_at,
+    nodes_at,
 )
 from bigfix_relevance_analyzer.tokenizer import Token, TokenKind
 
@@ -107,7 +109,7 @@ def describe(analysis: RelevanceAnalysis, offset: int) -> Hover | None:
         return None
     words = _keywords(analysis.tokens, node)
     spelled = " ".join(word.text for word in words) if words else None
-    markdown = _markdown(analysis, node, spelled)
+    markdown = _markdown(analysis, node, spelled or token.text)
     if markdown is None:
         return None
     if isinstance(node, (Reference, StringLiteral, NumberLiteral, It)):
@@ -154,9 +156,12 @@ def _keywords(tokens: tuple[Token, ...], node: Node) -> list[Token]:
     match node:
         case Binary(left=left, right=right):
             return _significant(tokens, left.span.end, right.span.start)
-        case Unary(operand=operand) | Exists(operand=operand) | NumberOf(operand=operand):
-            return _significant(tokens, node.span.start, operand.span.start)
-        case ItemOf(operand=operand):
+        case (
+            Unary(operand=operand)
+            | Exists(operand=operand)
+            | NumberOf(operand=operand)
+            | ItemOf(operand=operand)
+        ):
             return _significant(tokens, node.span.start, operand.span.start)
         case Cast(operand=operand):
             return _significant(tokens, operand.span.end, node.span.end)
@@ -183,8 +188,10 @@ def _ungrouped(tokens: tuple[Token, ...], node: Node) -> TextSpan:
     return TextSpan(inside[0].offset, _end(inside[-1]))
 
 
-def _markdown(analysis: RelevanceAnalysis, node: Node, spelled: str | None) -> str | None:
-    """``spelled`` is the construct's words as written; see :func:`_keywords`."""
+def _markdown(analysis: RelevanceAnalysis, node: Node, spelled: str) -> str | None:
+    """``spelled`` is what the author wrote: the construct's words (see
+    :func:`_keywords`), else the token under the cursor. Every title shows the
+    author's spelling, so two hovers in one document never disagree on it."""
     match node:
         case Reference():
             return _reference(analysis, node)
@@ -193,68 +200,117 @@ def _markdown(analysis: RelevanceAnalysis, node: Node, spelled: str | None) -> s
         case NumberLiteral():
             return _number(node)
         case It():
-            return _it(analysis, node)
+            return _it(analysis, node, spelled)
         case Of():
             return _lines(
-                "**`of`** - property access: the left side is a property of the right side",
+                f"**{_code(spelled)}** - property access: the left side is a property of the "
+                "right side",
                 _OF_LINK,
             )
         case Whose():
             return _lines(
-                "**`whose`** - filter: keeps the values on its left for which the condition "
-                "in parentheses is true, with `it` as each value",
+                f"**{_code(spelled)}** - filter: keeps the values on its left for which the "
+                "condition in parentheses is true, with `it` as each value",
                 _WHOSE_LINK,
             )
         case Cast(target=target):
-            written = _code(spelled or f"as {target}")
+            written = _code(spelled)
             return _lines(f"**{written}** - cast to `{target}`", _CAST_LINK)
         case Bar():
             return _lines(
-                "**`|`** - error fallback: the right side is evaluated only when the left "
-                "side errors",
+                f"**{_code(spelled)}** - error fallback: the right side is evaluated only when "
+                "the left side errors",
                 _BAR_LINK,
             )
-        case Binary(op=op):
-            return _lines(f"**{_code(spelled or op)}** - binary operator", _OPERATOR_LINK)
-        case Unary(op=op):
-            return _lines(f"**{_code(spelled or op)}** - unary operator", _OPERATOR_LINK)
+        case Binary():
+            return _lines(f"**{_code(spelled)}** - binary operator", _OPERATOR_LINK)
+        case Unary():
+            return _lines(f"**{_code(spelled)}** - unary operator", _OPERATOR_LINK)
         case Exists(negated=negated):
-            written = _code(spelled or ("not exists" if negated else "exists"))
+            written = _code(spelled)
             meaning = "no value" if negated else "at least one value"
             return f"**{written}** - true when its operand has {meaning}"
         case NumberOf():
-            written = _code(spelled or "number of")
-            return f"**{written}** - how many values its operand has"
-        case ItemOf(index=index, plural=plural):
-            written = _code(spelled or f"{'items' if plural else 'item'} {index.text} of")
+            return f"**{_code(spelled)}** - how many values its operand has"
+        case ItemOf(index=index):
             return _lines(
-                f"**{written}** - tuple element {index.text}, counting from 0", _TUPLE_LINK
+                f"**{_code(spelled)}** - tuple element {index.text}, counting from 0", _TUPLE_LINK
             )
-        case If():
-            return "**`if` ... `then` ... `else`** - conditional expression"
+        case If(condition=condition, then_branch=then_branch, else_branch=else_branch):
+            # Three keywords in three places, each in the author's spelling.
+            tokens = analysis.tokens
+            keywords = [
+                _significant(tokens, start, end)
+                for start, end in (
+                    (node.span.start, condition.span.start),
+                    (condition.span.end, then_branch.span.start),
+                    (then_branch.span.end, else_branch.span.start),
+                )
+            ]
+            spelled_if, spelled_then, spelled_else = (
+                words[0].text if words else default
+                for words, default in zip(keywords, ("if", "then", "else"), strict=True)
+            )
+            return (
+                f"**{_code(spelled_if)} ... {_code(spelled_then)} ... {_code(spelled_else)}** "
+                "- conditional expression"
+            )
         case TupleExpr(items=items):
-            return _lines(f"**`,`** - tuple of {len(items)} items", _TUPLE_LINK)
+            return _lines(f"**{_code(spelled)}** - tuple of {len(items)} items", _TUPLE_LINK)
         case Collection(items=items):
-            return _lines(f"**`;`** - collection of {len(items)} expressions", _TUPLE_LINK)
+            return _lines(
+                f"**{_code(spelled)}** - collection of {len(items)} expressions", _TUPLE_LINK
+            )
     return None
 
 
 def _reference(analysis: RelevanceAnalysis, node: Reference) -> str:
     report = next((r for r in analysis.references if r.reference is node), None)
-    title = f"**{_code(node.phrase)}**"
+    title = f"**{_code(_written_name(analysis, node))}**"
     if report is None or not report.known:
         return f"{title} - not defined in any inspector table this analyzer knows"
     rows = report.resolved
-    if report.narrowed:
-        what = "inspector" if len(rows) == 1 else f"inspector, {len(rows)} overloads here"
+    if len(rows) == 1 and (report.narrowed or report.visible):
+        what = "inspector"
+    elif report.narrowed:
+        what = f"inspector, {len(rows)} overloads here"
     elif report.visible:
         what = f"inspector, one of {len(rows)} definitions"
     else:
-        what = f"defined, but not in {analysis.dialect.value} relevance"
+        what = _not_visible(analysis, report)
     listed = [f"- {_row(row, node.phrase)}" for row in rows[:MAX_ROWS]]
     if len(rows) > MAX_ROWS:
         listed.append(f"- ... and {len(rows) - MAX_ROWS} more")
     return _lines(f"{title} - {what}", "\n".join(listed), _DIALECT_LINKS.get(analysis.dialect))
+
+
+def _written_name(analysis: RelevanceAnalysis, node: Reference) -> str:
+    """The name as the author wrote it -- its words, without an index argument,
+    joined by one space -- rather than the case-folded :attr:`Reference.phrase`."""
+    stop = node.index.span.start if node.index is not None else node.span.end
+    words = [
+        token.text
+        for token in analysis.tokens
+        if token.kind is TokenKind.WORD and node.span.start <= token.offset < stop
+    ]
+    return " ".join(words) or node.phrase
+
+
+def _not_visible(analysis: RelevanceAnalysis, report: ReferenceReport) -> str:
+    """Why a name some table defines resolves to nothing here.
+
+    :attr:`~bigfix_relevance_analyzer.analyzer.ReferenceReport.visible` is
+    empty for two reasons: the name is the other dialect's, or the platform
+    selected rules out every row of this one. Naming the dialect is only true
+    for the first, and only when the analysis settled on one.
+    """
+    dialect = analysis.dialect
+    platform = analysis.environment.platform
+    if platform is not None and any(dialect in row.dialects for row in report.matches):
+        return f"defined, but not on {platform}"
+    if dialect in _DIALECT_LINKS:
+        return f"defined, but not in {dialect.value} relevance"
+    return "defined, but not visible here"
 
 
 def _row(row: inspectors.Inspector, phrase: str) -> str:
@@ -290,15 +346,35 @@ def _number(node: NumberLiteral) -> str:
     return f"{_code(_elide(node.text))} - **{kind.value}** literal"
 
 
-def _it(analysis: RelevanceAnalysis, node: It) -> str:
+def _it(analysis: RelevanceAnalysis, node: It, spelled: str) -> str:
+    title = f"**{_code(spelled)}**"
     binding = next((b for b in analysis.it_bindings if b.it is node), None)
     if binding is None or binding.context is None or binding.binder is None:
-        return "**`it`** - nothing binds it here: there is no `of` or `whose` around it"
+        if _is_an_object(analysis, node):
+            return _lines(
+                f"{title} - nothing binds it here: it is on the right of an `of`, as the "
+                "object, and only the left side of an `of` or a `whose` condition binds `it`",
+                _WHOSE_LINK,
+            )
+        return _lines(
+            f"{title} - nothing binds it here: there is no `of` or `whose` around it",
+            _WHOSE_LINK,
+        )
     context = analysis.text[binding.context.span.start : binding.context.span.end]
     quoted = _code(_elide(" ".join(context.split())))
     if binding.binder is Binder.WHOSE:
-        return _lines(f"**`it`** - each value of {quoted}, bound by `whose`", _WHOSE_LINK)
-    return _lines(f"**`it`** - {quoted}, bound by `of`", _WHOSE_LINK)
+        return _lines(f"{title} - each value of {quoted}, bound by `whose`", _WHOSE_LINK)
+    return _lines(f"{title} - {quoted}, bound by `of`", _WHOSE_LINK)
+
+
+def _is_an_object(analysis: RelevanceAnalysis, node: It) -> bool:
+    """Whether ``node`` sits in the object (right side) of some ``of``."""
+    assert analysis.node is not None
+    chain = nodes_at(analysis.node, node.span.start)
+    return any(
+        isinstance(parent, Of) and child is parent.obj
+        for parent, child in itertools.pairwise(chain)
+    )
 
 
 def _lines(*parts: str | None) -> str:

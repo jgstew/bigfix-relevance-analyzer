@@ -18,9 +18,11 @@ import pytest
 from _helpers import REPO_ROOT, lsp_text
 
 from bigfix_relevance_analyzer import __version__
+from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.extract import _extract_data
+from bigfix_relevance_analyzer.lint import LintConfig, _analyze_cached
 from bigfix_relevance_analyzer.lsp import linter as linter_module
-from bigfix_relevance_analyzer.lsp.hover import DOCS_URL, MAX_QUOTED, MAX_ROWS
+from bigfix_relevance_analyzer.lsp.hover import DOCS_URL, MAX_QUOTED, MAX_ROWS, describe
 from bigfix_relevance_analyzer.lsp.linter import DocumentLinter
 
 FILES = 'exists files whose (name of it = "x") of folder "/tmp"'
@@ -436,3 +438,84 @@ def test_the_extraction_cache_is_bounded(extractions: list[str]) -> None:
     assert len(extractions) == len(uris)
     linter.hover(uris[0], FILES, (0, 8))
     assert len(extractions) == len(uris) + 1
+
+
+# ---------------------------------------------------------------------------
+# Second review of #114
+# ---------------------------------------------------------------------------
+
+
+def test_a_name_filtered_out_by_platform_says_so_not_dialect() -> None:
+    """``wmi`` is client relevance, Windows only: under macOS it is hidden by
+    the platform, and blaming the dialect would be false."""
+    linter = DocumentLinter(config=LintConfig(suggest=True, platform="macos"))
+    found = linter.hover("file:///workspace/a.rel", "exists wmi", (0, 8))
+    assert found is not None
+    markdown = found["contents"]["value"]
+    assert "not in client relevance" not in markdown
+    assert "macos" in markdown
+
+
+def test_a_name_from_the_other_dialect_names_the_dialect() -> None:
+    """The control: a session inspector in a BES ``<Relevance>``, which is client."""
+    markdown, _ = shown("a.bes", BES.format(body="exists bes computers"), "bes computers")
+    assert "not in client relevance" in markdown
+
+
+@pytest.mark.parametrize("dialect", [Dialect.UNCERTAIN, Dialect.BOTH])
+def test_an_unresolved_dialect_is_never_named_as_one(dialect: Dialect) -> None:
+    text = "name of operating system"
+    found = describe(_analyze_cached(text, dialect, None), text.index("operating"))
+    assert found is not None
+    assert f"{dialect.value} relevance" not in found.markdown
+
+
+@pytest.mark.parametrize("text", ["x of it", "exists x of it"])
+def test_an_it_on_the_right_of_of_is_not_said_to_have_no_of(text: str) -> None:
+    """Only the left side of an ``of`` binds ``it``; on the right, as the
+    object, nothing outside it does -- but there is an ``of`` right there."""
+    markdown, _ = shown("a.rel", text, "it")
+    assert "no `of`" not in markdown
+    assert "right" in markdown
+
+
+def test_an_it_with_no_construct_around_it_still_says_so() -> None:
+    markdown, _ = shown("a.rel", "exists it", "it")
+    assert "nothing binds it" in markdown
+
+
+def test_one_visible_unnarrowed_definition_is_not_one_of_one() -> None:
+    doc = '<script>Relevance("name of operating system")</script>'
+    markdown, _ = shown("a.html", doc, "operating")
+    assert "one of 1" not in markdown
+    assert markdown.startswith("**`operating system`** - inspector\n")
+
+
+@pytest.mark.parametrize(
+    ("text", "needle", "expected"),
+    [
+        ("NAME OF OPERATING SYSTEM", "OF", "**`OF`**"),
+        ('EXISTS FILE "x" WHOSE (TRUE)', "WHOSE", "**`WHOSE`**"),
+        ("IF TRUE THEN 1 ELSE 2", "THEN", "**`IF` ... `THEN` ... `ELSE`**"),
+        ('"a" | "b"', "|", "**`|`**"),
+        ('EXISTS FILE "x"', "FILE", "**`FILE`**"),
+        ("NAME OF Operating   System", "System", "**`Operating System`**"),
+        ('EXISTS FILE "x" WHOSE (SIZE OF IT > 0)', "IT", "**`IT`**"),
+    ],
+)
+def test_every_title_uses_the_authors_spelling(text: str, needle: str, expected: str) -> None:
+    """Not just operators: keywords, names and ``it`` too, so two hovers in one
+    document never disagree on whose spelling they show. A name's words are
+    joined by one space; signatures in the rows stay as the table writes them."""
+    markdown, _ = shown("a.rel", text, needle)
+    assert markdown.startswith(expected)
+
+
+def test_closing_a_document_forgets_its_extraction(extractions: list[str]) -> None:
+    linter = DocumentLinter()
+    uri = "file:///workspace/a.rel"
+    linter.diagnostics(uri, FILES)
+    linter.forget(uri)
+    linter.hover(uri, FILES, (0, 8))
+    assert len(extractions) == 2
+    linter.forget("file:///workspace/never-seen.rel")  # no error
