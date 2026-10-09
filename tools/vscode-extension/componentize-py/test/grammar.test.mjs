@@ -337,6 +337,31 @@ test("a > inside an attribute value does not end the start tag", async () => {
   assertPlainXml(t, "<Title>after</Title>");
 });
 
+test("another MIME type's start tag is still colored as a tag", async () => {
+  // 26 real PowerShell and text/x-uri action scripts (PR #119 review).
+  const text = [
+    "<BES><Fixlet>",
+    '<ActionScript MIMEType="application/x-Fixlet-Windows-PowerShell" ID="7"><![CDATA[$x = "{y}"',
+    "]]></ActionScript>",
+    "<Title>after</Title>",
+    "</Fixlet></BES>",
+  ].join("\n");
+  const t = await tokenize("text.xml.bigfix-bes", text);
+  assert.ok(has(scopesOf(t, "PowerShell", 'ID'), "entity.other.attribute-name"));
+  assert.ok(has(scopesOf(t, '"7">', '>'), "punctuation.definition.tag"));
+  assertPlainXml(t, '$x = "{y}"');
+  assertPlainXml(t, "<Title>after</Title>");
+  assert.equal(t.state.depth, 1);
+});
+
+test("a self-closing ActionScript of another MIME type ends its element", async () => {
+  const text = '<BES><ActionScript MIMEType="application/x-sh"/>\n<ActionScript>wait x</ActionScript>\n<Title>after</Title></BES>';
+  const t = await tokenize("text.xml.bigfix-bes", text);
+  assert.ok(scopesOf(t, "wait x", "wait").includes(COMMAND));
+  assertPlainXml(t, "<Title>after</Title>");
+  assert.equal(t.state.depth, 1);
+});
+
 test("a self-closing ActionScript has no body", async () => {
   const t = await tokenize("text.xml.bigfix-bes", "<BES><ActionScript/>\n<ActionScript\n />\n<Title>after</Title></BES>");
   assertPlainXml(t, "<Title>after</Title>");
@@ -365,6 +390,8 @@ test("XML outside the bodies is left to the XML grammar", async () => {
 const BROKEN_BODIES = {
   "unclosed heredoc": "createfile until END\nnever closed",
   "unclosed heredoc on the CDATA line": "createfile until END\nx]]>",
+  // The marker itself touching the end of the body (PR #119 review).
+  "heredoc marker against the body end": "createfile until END",
   "unterminated string": 'run "open',
   "unclosed substitution": "run {exists file",
   "unclosed substitution string": 'run {exists file "x}',

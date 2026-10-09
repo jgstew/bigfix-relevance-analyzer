@@ -71,7 +71,7 @@ support for them. To have another XML extension handle them instead, map them
 back to XML in your settings (you lose the ActionScript and relevance colors):
 
 ```json
-"files.associations": { "*.bes": "xml" }
+"files.associations": { "*.bes": "xml", "*.bes.xml": "xml" }
 ```
 
 ### A language for relevance

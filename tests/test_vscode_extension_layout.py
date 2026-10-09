@@ -1070,6 +1070,11 @@ def test_the_readme_covers_every_file_type_setting_and_command() -> None:
             assert f"`{extension}`" in text, extension
     assert "ActionScript" in text
     assert "files.associations" in text
+    # The way back to XML covers every suffix the BES language takes.
+    (example,) = re.findall(r'"files\.associations": (\{[^}]*\})', text)
+    associations = json.loads(example)
+    for extension in _language(PRIMARY, BES_ID)["extensions"]:
+        assert associations.get(f"*{extension}") == "xml", extension
 
 
 def test_the_user_facing_text_leaves_out_how_the_extension_is_built() -> None:

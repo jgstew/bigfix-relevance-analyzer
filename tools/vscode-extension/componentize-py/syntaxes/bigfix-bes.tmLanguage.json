@@ -65,6 +65,26 @@
           "name": "string.quoted.xml"
         }
       },
+      "end": "(?=</ActionScript\\s*>)|(?<=/>)",
+      "patterns": [
+        {
+          "include": "#actionscript-self-closing"
+        },
+        {
+          "include": "#attributes"
+        },
+        {
+          "include": "#actionscript-other-body"
+        }
+      ]
+    },
+    "actionscript-other-body": {
+      "begin": "(>)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.xml"
+        }
+      },
       "end": "(?=</ActionScript\\s*>)",
       "patterns": [
         {

@@ -44,7 +44,7 @@
       "match": "(?:^|\\G)\\s*//(?:(?!\\]\\]>|</ActionScript\\s*>).)*"
     },
     "heredoc": {
-      "begin": "(?i)(?:^|\\G)\\s*((?:create|append)file\\s+until)\\s+(\\S+)\\s*$",
+      "begin": "(?i)(?:^|\\G)\\s*((?:create|append)file\\s+until)\\s+((?:(?!\\]\\]>|</ActionScript\\s*>)\\S)+)\\s*(?:$|(?=\\]\\]>|</ActionScript\\s*>))",
       "beginCaptures": {
         "1": {
           "name": "keyword.other.command.bigfix-actionscript"
