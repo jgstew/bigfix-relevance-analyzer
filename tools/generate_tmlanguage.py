@@ -356,7 +356,12 @@ def _heredoc_begin() -> str:
     expected = r"^\s*(?:create|append)file\s+until\s+(\S+)\s*$"
     if _HEREDOC_RE.pattern != expected or not _HEREDOC_RE.flags & re.IGNORECASE:
         raise SystemExit("extract._HEREDOC_RE changed; update _heredoc_begin() to match")
-    return rf"(?i){_LINE_START}((?:create|append)file\s+until)\s+(\S+)\s*$"
+    # In a `.bes`, the end of the body is the end of its last line: the marker
+    # stops there, as the extractor (which sees the decoded body) reads it.
+    return (
+        rf"(?i){_LINE_START}((?:create|append)file\s+until)\s+"
+        rf"((?:(?!{_HOST_END})\S)+)\s*(?:$|(?={_HOST_END}))"
+    )
 
 
 def actionscript_grammar() -> dict[str, Any]:
@@ -534,8 +539,13 @@ def _cdata(body: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+# The elements whose bodies are relevance, as the extractor reads them. Both
+# the start rule and the body-end guard are built from this one list, so a tag
+# cannot open a body that its guard does not close.
+RELEVANCE_TAGS = ("Relevance", "Property", "SuccessCriteria")
+
 # Where a relevance body ends: its element's end tag, or its CDATA section's.
-_RELEVANCE_BODY_END = r"(?=</(?:Relevance|Property|SuccessCriteria)\s*>|\]\]>)"
+_RELEVANCE_BODY_END = rf"(?=</(?:{'|'.join(RELEVANCE_TAGS)})\s*>|\]\]>)"
 
 
 def _relevance_body() -> dict[str, Any]:
@@ -562,8 +572,9 @@ def _actionscript_element(mimetypes: str) -> dict[str, dict[str, Any]]:
     TextMate rule's begin sees one line. So the element opens on the name
     alone, and inside it, in order of priority:
 
-    * a MIMEType naming another language turns the rest of the element over to
-      the XML grammar (the extractor skips those bodies too);
+    * a MIMEType naming another language ends the tag as a tag (attributes,
+      then ``/>`` or ``>``) and hands the body to the XML grammar (the
+      extractor skips those bodies too);
     * a ``/>`` ends an element with no body;
     * attributes are colored as attributes;
     * the tag's own ``>`` opens the ActionScript body, which runs to the end tag.
@@ -598,6 +609,18 @@ def _actionscript_element(mimetypes: str) -> dict[str, dict[str, Any]]:
                 "2": {"name": "punctuation.separator.key-value.xml"},
                 "3": {"name": "string.quoted.xml"},
             },
+            # The end tag, or straight after a self-closing `/>`; the body, once
+            # open, hides both from this rule.
+            "end": r"(?=</ActionScript\s*>)|(?<=/>)",
+            "patterns": [
+                {"include": "#actionscript-self-closing"},
+                {"include": "#attributes"},
+                {"include": "#actionscript-other-body"},
+            ],
+        },
+        "actionscript-other-body": {
+            "begin": "(>)",
+            "beginCaptures": {"1": {"name": _TAG}},
             "end": up_to_end_tag,
             "patterns": [{"include": "text.xml"}],
         },
@@ -634,7 +657,10 @@ def _relevance_element() -> dict[str, dict[str, Any]]:
     custom_relevance = (
         rf"(?={_ATTRIBUTE_TEXT}?\bOption\s*=\s*(?:\"CustomRelevance\"|'CustomRelevance'))"
     )
-    tags = rf"(?:Relevance|Property|SuccessCriteria(?=\s){custom_relevance})(?=[\s>])"
+    # Only `SuccessCriteria` has a condition: `Option="CustomRelevance"`.
+    conditions = {"SuccessCriteria": rf"(?=\s){custom_relevance}"}
+    names = "|".join(f"{tag}{conditions.get(tag, '')}" for tag in RELEVANCE_TAGS)
+    tags = rf"(?:{names})(?=[\s>])"
     return {
         "relevance": {
             "begin": rf"(<)({tags})((?:\s{_ATTRIBUTE_TEXT})?)(?<!/)(>)",

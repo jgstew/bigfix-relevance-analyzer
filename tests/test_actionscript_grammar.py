@@ -335,6 +335,20 @@ def _heredoc_end(marker: str) -> re.Pattern[str]:
     return _python(end.replace(r"\2", re.escape(marker)))
 
 
+def test_a_heredoc_marker_stops_at_the_end_of_the_body() -> None:
+    """`createfile until END]]>`: the marker is `END`, as the extractor reads
+    the decoded body, and the heredoc may open at all only because the body's
+    end counts as the end of the line (PR #119 review)."""
+    begin = _python(_repository()["heredoc"]["begin"])
+    for line in (
+        "createfile until END]]>",
+        "createfile until END</ActionScript>",
+        "createfile until END ]]>",
+    ):
+        found = begin.match(line)
+        assert found is not None and found.group(2) == "END", line
+
+
 def test_a_heredoc_ends_only_on_its_bare_marker_line() -> None:
     end = _heredoc_end("END.x")
     assert end.search("END.x") and end.search("  END.x  ")
@@ -501,6 +515,20 @@ def test_an_actionscript_start_tag_may_span_lines() -> None:
     assert repository["actionscript-body"]["begin"] == "(>)"
 
 
+def test_another_mime_type_finishes_its_start_tag_before_handing_over() -> None:
+    """The rest of the tag stays a tag: attributes, then `/>` (no body) or
+    `>` and a body for the XML grammar (PR #119 review)."""
+    rule = _bes_repository()["actionscript-other-language"]
+    assert [p["include"] for p in rule["patterns"]] == [
+        "#actionscript-self-closing",
+        "#attributes",
+        "#actionscript-other-body",
+    ]
+    assert rule["end"] == r"(?=</ActionScript\s*>)|(?<=/>)"
+    body = _bes_repository()["actionscript-other-body"]
+    assert body["begin"] == "(>)" and body["patterns"] == [{"include": "text.xml"}]
+
+
 @pytest.mark.parametrize(
     ("tag", "expected"),
     [
@@ -579,6 +607,20 @@ def test_a_relevance_string_or_comment_left_open_ends_with_its_body() -> None:
         for line in ("</Relevance>", "</Property>", "</SuccessCriteria>", "]]>"):
             found = end.search(f"open{line}")
             assert found is not None and found.start() == len("open"), (guard["name"], line)
+
+
+def test_the_relevance_tags_open_and_close_from_one_list() -> None:
+    """A tag added to the start rule but not to the body-end guard would let
+    an unclosed string in it run into the rest of the file."""
+    tags = _generator().RELEVANCE_TAGS
+    begin = _bes_begin("relevance")
+    guards = _bes_repository()["relevance-body"]["patterns"][:-1]
+    for tag in tags:
+        written = f'<{tag} Option="CustomRelevance">' if tag == "SuccessCriteria" else f"<{tag}>"
+        assert begin.match(written), tag
+        for guard in guards:
+            found = _python(guard["end"]).search(f"open</{tag}>")
+            assert found is not None and found.start() == len("open"), (tag, guard["name"])
 
 
 def test_an_end_tag_closes_whatever_its_start_tag_opened() -> None:
