@@ -3,17 +3,23 @@
 
     uv run python tools/generate_tmlanguage.py
 
-Writes two grammars into the "BigFix Relevance Developer" extension
+Writes four grammars into the "BigFix Relevance Developer" extension
 (tools/vscode-extension/componentize-py/syntaxes/):
 
 * ``bigfix-relevance.tmLanguage.json``: whole-file relevance (``.rel``,
   ``.bsr``, and untitled buffers in the language).
 * ``markdown-relevance.injection.json``: relevance inside the markdown fences
   the extractor reads (```` ```relevance ```` and its dialect-tagged forms).
+* ``bigfix-actionscript.tmLanguage.json``: ActionScript (``.actionscript``),
+  with relevance inside ``{...}`` substitutions.
+* ``bigfix-bes.tmLanguage.json``: BES XML (``.bes``), XML with the
+  ActionScript and relevance bodies the extractor reads embedded.
 
 Generated, never hand-edited: the vocabulary comes from the parser's own tables
-in ``grammar.py``, the articles from ``tokenizer.py`` and the fence tags from
-``extract.py``, so the editor colors what the analyzer parses.
+in ``grammar.py``, the articles from ``tokenizer.py``, the fence tags, heredoc
+rule and ActionScript MIME types from ``extract.py``, and the ActionScript verbs
+from ``tools/data/actionscript_verbs.txt``, so the editor colors what the
+analyzer parses.
 tests/test_vscode_extension_layout.py fails when a committed grammar differs
 from this script's output; rerun it after changing any of those tables.
 
@@ -35,7 +41,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from bigfix_relevance_analyzer.extract import _MARKDOWN_RELEVANCE_TAGS
+from bigfix_relevance_analyzer.extract import (
+    _ACTIONSCRIPT_MIMETYPES,
+    _HEREDOC_RE,
+    _MARKDOWN_RELEVANCE_TAGS,
+)
 from bigfix_relevance_analyzer.grammar import (
     BP_AND,
     BP_MULTIPLICATIVE,
@@ -56,6 +66,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SYNTAXES = Path("tools/vscode-extension/componentize-py/syntaxes")
 RELEVANCE_PATH = SYNTAXES / "bigfix-relevance.tmLanguage.json"
 MARKDOWN_PATH = SYNTAXES / "markdown-relevance.injection.json"
+ACTIONSCRIPT_PATH = SYNTAXES / "bigfix-actionscript.tmLanguage.json"
+BES_PATH = SYNTAXES / "bigfix-bes.tmLanguage.json"
+VERBS_PATH = Path("tools/data/actionscript_verbs.txt")
 
 SCOPE = "source.bigfix-relevance"
 EMBEDDED = "meta.embedded.block.bigfix-relevance"
@@ -247,9 +260,375 @@ def markdown_injection() -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------------------
+# ActionScript
+# ---------------------------------------------------------------------------
+
+ACTIONSCRIPT_SCOPE = "source.bigfix-actionscript"
+SUBSTITUTION_CONTENT = "meta.embedded.line.bigfix-relevance"
+
+# Flow control, colored apart from the commands. Every other verb in the data
+# file is a command.
+CONTROL_VERBS = frozenset({"if", "elseif", "else", "endif", "continue if", "pause while"})
+
+# Verbs with a rule of their own: what follows them is not ordinary arguments.
+BLOCK_VERBS = frozenset({"createfile until", "appendfile", "override run", "override wait"})
+
+# The `keyword=value` options an `override run|wait` block takes, one per line
+# until the command itself. A closed set: from pre-commit-bigfix's
+# bes_actionscript_lint_schclass.py (E303), as the BigFix action guide lists them.
+OVERRIDE_OPTIONS = (
+    "asadmin",
+    "completion",
+    "detached",
+    "disposition",
+    "hidden",
+    "password",
+    "priority",
+    "runas",
+    "targetuser",
+    "timeout_seconds",
+    "user",
+)
+
+# The end of a `.bes` body. No ActionScript ever reaches past one, so no rule
+# may run over it either: the BES grammar has to see it to close the element,
+# and a rule that swallowed it would color the rest of the file as
+# ActionScript. Harmless in a raw `.actionscript` file, which never has one.
+_HOST_END = r"\]\]>|</ActionScript\s*>"
+_REST = rf"(?:(?!{_HOST_END}).)"
+"""One character of the rest of the line, up to the end of a `.bes` body."""
+
+# A line's first token, the way the action engine reads one: verbs, `//`, a
+# heredoc are recognized only there. `\G` also lets the first line of a body
+# that starts right after `<![CDATA[` count as a line start.
+_LINE_START = r"(?:^|\G)\s*"
+
+# After a verb: whitespace, the end of the line or body, or the `{` of a
+# condition written against its keyword (`if{...}`, as real content does).
+_VERB_END = rf"(?=[\s{{]|$|{_HOST_END})"
+
+# A `{...}` substitution, scanned as the extractor scans one
+# (`_find_substitution_end`): on one line, `}}` is a literal brace, a `}`
+# inside a relevance string does not close it, and an unclosed string or brace
+# makes it no substitution at all. Possessive, so `}}` is never split.
+_SUBSTITUTION_BODY = rf'(?:"[^"]*"|\}}\}}|(?!{_HOST_END})[^}}"])*+'
+_SUBSTITUTION = rf"(\{{)({_SUBSTITUTION_BODY})(\}})"
+
+# A string's content: `{{`, whole substitutions (quotes and all), or any other
+# character but a quote, up to the end of the body.
+_STRING_BODY = rf'(?:\{{\{{|\{{{_SUBSTITUTION_BODY}\}}|(?!{_HOST_END})[^"])*+'
+
+
+def actionscript_verbs() -> list[str]:
+    """Every ActionScript command verb, from the committed data file."""
+    text = (REPO_ROOT / VERBS_PATH).read_text(encoding="utf-8")
+    return [line for line in text.splitlines() if line and not line.startswith("#")]
+
+
+def _verb_alternation(verbs: list[str]) -> str:
+    """``verbs`` longest first, any whitespace between a phrase's words."""
+    ordered = sorted(verbs, key=lambda verb: (-len(verb), verb))
+    return "|".join(r"\s+".join(re.escape(word) for word in verb.split()) for verb in ordered)
+
+
+def _verb_rule(verbs: list[str], scope: str) -> dict[str, Any]:
+    return {
+        "match": rf"(?i){_LINE_START}({_verb_alternation(verbs)}){_VERB_END}",
+        "captures": {"1": {"name": f"{scope}.bigfix-actionscript"}},
+    }
+
+
+_RAW_TEXT_PATTERNS = [{"include": "#substitution-escape"}, {"include": "#substitution"}]
+"""File content (heredoc and ``appendfile`` text): raw, but still substituted."""
+
+
+def _heredoc_begin() -> str:
+    """``extract._HEREDOC_RE``, with the verb captured and the anchor widened.
+
+    Its source is checked here rather than rewritten blindly, so a change to
+    the extractor's rule fails generation instead of drifting.
+    """
+    expected = r"^\s*(?:create|append)file\s+until\s+(\S+)\s*$"
+    if _HEREDOC_RE.pattern != expected or not _HEREDOC_RE.flags & re.IGNORECASE:
+        raise SystemExit("extract._HEREDOC_RE changed; update _heredoc_begin() to match")
+    return rf"(?i){_LINE_START}((?:create|append)file\s+until)\s+(\S+)\s*$"
+
+
+def actionscript_grammar() -> dict[str, Any]:
+    """ActionScript: whole files, and the body the BES grammar embeds.
+
+    Every rule is a single-line ``match``, which cannot leak past its line,
+    except the two block constructs, each of which also stops at the end of a
+    ``.bes`` body. Unknown words are left uncolored, as the console leaves
+    them; a mid-line ``//`` is not a comment (URLs hold one, and the action
+    engine reads comments only at line start).
+    """
+    verbs = actionscript_verbs()
+    missing = sorted((CONTROL_VERBS | BLOCK_VERBS) - set(verbs))
+    if missing:
+        raise SystemExit(f"{VERBS_PATH} lacks {missing}; regenerate it")
+    commands = [verb for verb in verbs if verb not in CONTROL_VERBS | BLOCK_VERBS]
+    options = "|".join(OVERRIDE_OPTIONS)
+    repository: dict[str, Any] = {
+        "comment": {
+            "name": "comment.line.double-slash.bigfix-actionscript",
+            "match": rf"{_LINE_START}//{_REST}*",
+        },
+        "heredoc": {
+            "begin": _heredoc_begin(),
+            "beginCaptures": {
+                "1": {"name": "keyword.other.command.bigfix-actionscript"},
+                "2": {"name": "constant.other.heredoc-marker.bigfix-actionscript"},
+            },
+            # The marker alone on a line (the extractor strips the line), or
+            # the end of a `.bes` body for a heredoc left open.
+            "end": rf"^\s*(\2)\s*$|(?={_HOST_END})",
+            "endCaptures": {"1": {"name": "constant.other.heredoc-marker.bigfix-actionscript"}},
+            "contentName": "string.unquoted.heredoc.bigfix-actionscript",
+            "patterns": _RAW_TEXT_PATTERNS,
+        },
+        "appendfile": {
+            "match": rf"(?i){_LINE_START}(appendfile){_VERB_END}({_REST}*)",
+            "captures": {
+                "1": {"name": "keyword.other.command.bigfix-actionscript"},
+                "2": {
+                    "name": "string.unquoted.file-content.bigfix-actionscript",
+                    "patterns": _RAW_TEXT_PATTERNS,
+                },
+            },
+        },
+        # The block lasts as long as each next line is an option: it ends,
+        # without consuming anything, at the start of the first line that is
+        # not (the command it overrides) or at the end of a `.bes` body. Not
+        # a `while` rule: inside one the engine never tries the body's own
+        # end, so an override left open at `</ActionScript>` would leak.
+        "override": {
+            "begin": rf"(?i){_LINE_START}(override\s+(?:run|wait)){_VERB_END}",
+            "beginCaptures": {"1": {"name": "keyword.other.command.bigfix-actionscript"}},
+            "end": rf"(?i)^(?!\s*(?:{options})\s*=)|(?={_HOST_END})",
+            "patterns": [
+                {
+                    "match": rf"(?i)(?:^|\G)\s*({options})\s*(=)({_REST}*)",
+                    "captures": {
+                        "1": {"name": "variable.parameter.option.bigfix-actionscript"},
+                        "2": {"name": "keyword.operator.assignment.bigfix-actionscript"},
+                        "3": {
+                            "name": "string.unquoted.option-value.bigfix-actionscript",
+                            "patterns": _RAW_TEXT_PATTERNS,
+                        },
+                    },
+                }
+            ],
+        },
+        "control": _verb_rule(sorted(CONTROL_VERBS), "keyword.control"),
+        "command": _verb_rule(commands, "keyword.other.command"),
+        "substitution-escape": {
+            "name": "constant.character.escape.brace.bigfix-actionscript",
+            "match": r"\{\{",
+        },
+        "substitution": {
+            "name": "meta.interpolation.substitution.bigfix-actionscript",
+            "match": _SUBSTITUTION,
+            "captures": {
+                "1": {"name": "punctuation.section.embedded.begin.bigfix-actionscript"},
+                "2": {"name": SUBSTITUTION_CONTENT, "patterns": [{"include": SCOPE}]},
+                "3": {"name": "punctuation.section.embedded.end.bigfix-actionscript"},
+            },
+        },
+        # No escape character (pre-commit-bigfix#16): `"C:\Bes\"` is closed.
+        # A substitution inside may hold quotes of its own, and the string
+        # ends at the line, or the body, when it is never closed.
+        "string": {
+            "name": "string.quoted.double.bigfix-actionscript",
+            "match": rf'(")({_STRING_BODY})("|(?={_HOST_END})|$)',
+            "captures": {
+                "1": {"name": "punctuation.definition.string.begin.bigfix-actionscript"},
+                "2": {"patterns": [*_RAW_TEXT_PATTERNS, {"include": "#url"}]},
+                "3": {"name": "punctuation.definition.string.end.bigfix-actionscript"},
+            },
+        },
+        # The console's `url` and `url_https` classes, ended as its overrides
+        # end them: at a space, tab, `*`, `"`, `}` or the line's end.
+        "url": {
+            "name": "markup.underline.link.bigfix-actionscript",
+            "match": rf"(?i)(?<![\w]){_url_body()}",
+        },
+        # Never matches. The engine loads an embedded grammar only when it
+        # finds the include among `patterns`, never among `captures` (both
+        # vscode-textmate's dependency walk and so VS Code's), and the
+        # relevance in a substitution is only ever included from captures.
+        # Without this, a `.actionscript` file opened on its own would leave
+        # every substitution uncolored.
+        "relevance-dependency": {
+            "begin": "(?!)",
+            "end": "(?!)",
+            "patterns": [{"include": SCOPE}],
+        },
+    }
+    order = [
+        "comment",
+        "heredoc",
+        "appendfile",
+        "override",
+        "control",
+        "command",
+        "substitution-escape",
+        "substitution",
+        "string",
+        "url",
+        "relevance-dependency",
+    ]
+    return {
+        "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+        "name": "BigFix ActionScript",
+        "scopeName": ACTIONSCRIPT_SCOPE,
+        "comment": "Generated by tools/generate_tmlanguage.py; do not edit by hand.",
+        "patterns": [{"include": f"#{name}"} for name in order],
+        "repository": repository,
+    }
+
+
+def _url_body() -> str:
+    return rf"https?:(?:(?!{_HOST_END})[^\s*\"}}])+"
+
+
+# ---------------------------------------------------------------------------
+# BES XML
+# ---------------------------------------------------------------------------
+
+BES_SCOPE = "text.xml.bigfix-bes"
+
+
+def _attributes() -> list[dict[str, Any]]:
+    """An XML start tag's attributes, scoped as VS Code's own XML grammar does."""
+    return [
+        {
+            "match": r"([-\w.:]+)\s*(=)",
+            "captures": {
+                "1": {"name": "entity.other.attribute-name.localname.xml"},
+                "2": {"name": "punctuation.separator.key-value.xml"},
+            },
+        },
+        {"name": "string.quoted.double.xml", "match": r'"[^"]*"'},
+        {"name": "string.quoted.single.xml", "match": r"'[^']*'"},
+    ]
+
+
+def _element(tag: str, condition: str, body_scope: str, cdata: str) -> dict[str, Any]:
+    """``<tag ...>`` to ``</tag>``, its body embedded in ``body_scope``.
+
+    ``condition`` is a lookahead over the start tag's attributes. A
+    self-closing tag has no body, so it is left to the XML grammar.
+    """
+    language = body_scope.removeprefix("source.")
+    return {
+        "begin": rf"(<)({tag}){condition}((?:\s[^>]*)?)(?<!/)(>)",
+        "beginCaptures": {
+            "1": {"name": "punctuation.definition.tag.xml"},
+            "2": {"name": "entity.name.tag.localname.xml"},
+            "3": {"patterns": _attributes()},
+            "4": {"name": "punctuation.definition.tag.xml"},
+        },
+        # The name the start tag matched: its attribute conditions say
+        # nothing about an end tag.
+        "end": r"(</)(\2)\s*(>)",
+        "endCaptures": {
+            "1": {"name": "punctuation.definition.tag.xml"},
+            "2": {"name": "entity.name.tag.localname.xml"},
+            "3": {"name": "punctuation.definition.tag.xml"},
+        },
+        "contentName": f"meta.embedded.block.{language}",
+        "patterns": [{"include": f"#{cdata}"}, {"include": "#entity"}, *_body(body_scope)],
+    }
+
+
+def _cdata(body_scope: str) -> dict[str, Any]:
+    """A CDATA section in a body: the element's own embedded scope covers it."""
+    return {
+        "begin": r"<!\[CDATA\[",
+        "beginCaptures": {"0": {"name": "punctuation.definition.string.begin.xml"}},
+        "end": r"\]\]>",
+        "endCaptures": {"0": {"name": "punctuation.definition.string.end.xml"}},
+        "patterns": _body(body_scope),
+    }
+
+
+# Where a relevance body ends: its element's end tag, or its CDATA section's.
+_RELEVANCE_BODY_END = r"(?=</(?:Relevance|Property|SuccessCriteria)\s*>|\]\]>)"
+
+
+def _body(body_scope: str) -> list[dict[str, Any]]:
+    """The patterns of a body in ``body_scope``.
+
+    Relevance strings and comments may span lines, so in a ``.bes`` one left
+    open would run on to the next quote anywhere in the file. Here they also
+    end at the end of the body: the relevance grammar's own rules, with the
+    end widened, listed first so they win where both would start.
+    """
+    if body_scope != SCOPE:
+        return [{"include": body_scope}]
+    repository = relevance_grammar()["repository"]
+    guarded = [
+        {**repository[name], "end": f"{repository[name]['end']}|{_RELEVANCE_BODY_END}"}
+        for name in ("string", "comment")
+    ]
+    return [*guarded, {"include": body_scope}]
+
+
+def bes_grammar() -> dict[str, Any]:
+    """BES XML: VS Code's XML grammar, with the bodies the extractor reads embedded.
+
+    Windows-Shell ``<ActionScript>`` (or one with no MIMEType) is ActionScript;
+    any other MIMEType is another language and stays XML. ``<Relevance>``,
+    ``<Property>`` and ``<SuccessCriteria Option="CustomRelevance">`` bodies
+    are relevance. A ``<Property>`` is an analysis property only inside an
+    ``<Analysis>``, which a lexical grammar cannot see; BES puts one nowhere
+    else. Session relevance in ``<Description>`` HTML is not colored.
+    """
+    mimetypes = "|".join(re.escape(mimetype) for mimetype in sorted(_ACTIONSCRIPT_MIMETYPES))
+    # No MIMEType attribute, or one naming an ActionScript MIME type.
+    windows_shell = (
+        r"(?![^>]*\bMIMEType\s*=\s*(?:"
+        rf"\"(?!(?i:{mimetypes})\")|'(?!(?i:{mimetypes})')))"
+    )
+    # The extractor compares the option exactly, so the grammar does too. No
+    # capture groups here: they would renumber the begin rule's captures.
+    custom_relevance = r"(?=[^>]*\bOption\s*=\s*(?:\"CustomRelevance\"|'CustomRelevance'))"
+    relevance_tags = rf"(?:Relevance|Property|SuccessCriteria(?=\s){custom_relevance})"
+    return {
+        "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+        "name": "BigFix BES XML",
+        "scopeName": BES_SCOPE,
+        "comment": "Generated by tools/generate_tmlanguage.py; do not edit by hand.",
+        "patterns": [
+            {"include": "#actionscript"},
+            {"include": "#relevance"},
+            {"include": "text.xml"},
+        ],
+        "repository": {
+            "actionscript": _element(
+                r"ActionScript(?=[\s>])", windows_shell, ACTIONSCRIPT_SCOPE, "cdata-actionscript"
+            ),
+            "relevance": _element(rf"{relevance_tags}(?=[\s>])", "", SCOPE, "cdata-relevance"),
+            "cdata-actionscript": _cdata(ACTIONSCRIPT_SCOPE),
+            "cdata-relevance": _cdata(SCOPE),
+            "entity": {
+                "name": "constant.character.entity.xml",
+                "match": r"&(?:[A-Za-z_:][\w:.-]*|#[0-9]+|#x[0-9A-Fa-f]+);",
+            },
+        },
+    }
+
+
 def render() -> dict[Path, dict[str, Any]]:
     """Every generated grammar, keyed by its path relative to the repository."""
-    return {RELEVANCE_PATH: relevance_grammar(), MARKDOWN_PATH: markdown_injection()}
+    return {
+        RELEVANCE_PATH: relevance_grammar(),
+        MARKDOWN_PATH: markdown_injection(),
+        ACTIONSCRIPT_PATH: actionscript_grammar(),
+        BES_PATH: bes_grammar(),
+    }
 
 
 def main() -> int:

@@ -1,7 +1,7 @@
 {
   "name": "bigfix-relevance-developer",
   "displayName": "BigFix Relevance Developer",
-  "description": "Live diagnostics, hover and syntax highlighting for BigFix Relevance in fixlets, tasks, analyses, dashboards, .rel files and Markdown.",
+  "description": "Live diagnostics, hover and syntax highlighting for BigFix Relevance and ActionScript in fixlets, tasks, analyses, dashboards, .rel files and Markdown.",
   "version": "0.0.1",
   "private": true,
   "publisher": "jgstew",
@@ -17,6 +17,7 @@
   "keywords": [
     "bigfix",
     "relevance",
+    "actionscript",
     "fixlet",
     "bes"
   ],
@@ -48,6 +49,29 @@
           ".bsr"
         ],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "bigfix-actionscript",
+        "aliases": [
+          "BigFix ActionScript",
+          "bigfix-actionscript"
+        ],
+        "extensions": [
+          ".actionscript"
+        ],
+        "configuration": "./language-configuration-actionscript.json"
+      },
+      {
+        "id": "bigfix-bes",
+        "aliases": [
+          "BigFix BES XML",
+          "bigfix-bes"
+        ],
+        "extensions": [
+          ".bes",
+          ".bes.xml"
+        ],
+        "configuration": "./language-configuration-bes.json"
       }
     ],
     "grammars": [
@@ -64,6 +88,24 @@
         ],
         "embeddedLanguages": {
           "meta.embedded.block.bigfix-relevance": "bigfix-relevance"
+        }
+      },
+      {
+        "language": "bigfix-actionscript",
+        "scopeName": "source.bigfix-actionscript",
+        "path": "./syntaxes/bigfix-actionscript.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.line.bigfix-relevance": "bigfix-relevance"
+        }
+      },
+      {
+        "language": "bigfix-bes",
+        "scopeName": "text.xml.bigfix-bes",
+        "path": "./syntaxes/bigfix-bes.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.block.bigfix-actionscript": "bigfix-actionscript",
+          "meta.embedded.block.bigfix-relevance": "bigfix-relevance",
+          "meta.embedded.line.bigfix-relevance": "bigfix-relevance"
         }
       }
     ],
@@ -96,6 +138,8 @@
   },
   "devDependencies": {
     "@bytecodealliance/jco": "1.35.0",
-    "@vscode/vsce": "4.0.0"
+    "@vscode/vsce": "4.0.0",
+    "vscode-oniguruma": "2.0.1",
+    "vscode-textmate": "9.3.2"
   }
 }

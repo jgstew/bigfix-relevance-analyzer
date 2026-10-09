@@ -16,9 +16,11 @@
 //
 // Scenarios, one VS Code launch each (suite.js reads SMOKE_SCENARIO):
 //
-//   lint  a workspace with a .rel and a fenced .md: the extension activates,
-//         and the language server's diagnostics reach both files (and an
-//         unsaved buffer, for an extension contributing the relevance language).
+//   lint  a workspace with a .rel, a fenced .md and a .bes: the extension
+//         activates, and the language server's diagnostics reach all three
+//         (and an unsaved buffer, for an extension contributing the relevance
+//         language). The .bes opens in the BES language when the extension
+//         contributes one.
 //   idle  only for an extension contributing that language (the primary
 //         one): Markdown and HTML with no relevance in them must leave its
 //         language server unstarted, and then a relevance-fenced Markdown file
@@ -66,6 +68,8 @@ for (let i = 0; i < argv.length; i++) {
 }
 
 const UNTITLED_LANGUAGE = manifest.contributes.languages?.[0]?.id ?? "";
+const BES_LANGUAGE =
+  manifest.contributes.languages?.find((language) => language.extensions?.includes(".bes"))?.id ?? "";
 
 const scenarios = {
   lint: {
@@ -73,6 +77,9 @@ const scenarios = {
     // The name starts at character 7, so a range that starts there is not a
     // whole-line one that happens to.
     "fenced.md": "# Example\n\n```relevance\nexists totally bogus made up inspector\n```\n",
+    "task.bes":
+      '<?xml version="1.0" encoding="UTF-8"?>\n<BES><Task><Title>t</Title>\n' +
+      '<Relevance>exists file "unterminated</Relevance>\n</Task></BES>\n',
   },
   ...(UNTITLED_LANGUAGE
     ? {
@@ -115,6 +122,7 @@ async function launch(scenario, files) {
           SMOKE_SCENARIO: scenario,
           SMOKE_RESULT: result,
           SMOKE_UNTITLED_LANGUAGE: UNTITLED_LANGUAGE,
+          SMOKE_BES_LANGUAGE: BES_LANGUAGE,
           SMOKE_EXTENSION_ID: `${manifest.publisher}.${manifest.name}`,
         },
         // A throwaway profile per run, rather than test-electron's default of

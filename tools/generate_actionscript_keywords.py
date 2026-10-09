@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Regenerate ``src/bigfix_relevance_analyzer/_actionscript_keywords.py`` from the schclass.
+"""Regenerate the ActionScript word lists from the console's schclass.
+
+Two outputs, both committed:
+
+* ``src/bigfix_relevance_analyzer/_actionscript_keywords.py``: the command
+  words that can never be relevance (the lint guard, below);
+* ``tools/data/actionscript_verbs.txt``: every command verb, for the VS Code
+  ActionScript grammar (``tools/generate_tmlanguage.py``, issue #116). CI has
+  no pre-commit-bigfix checkout, so the grammar generator reads this file.
 
 The source is the BigFix console's own ActionScript lexical grammar, as
 vendored by pre-commit-bigfix (``pre_commit_bigfix/schclass_data/``): every
@@ -8,7 +16,7 @@ vendored by pre-commit-bigfix (``pre_commit_bigfix/schclass_data/``): every
 the result is a small word list, so only the list is embedded, and this script
 reads a pre-commit-bigfix checkout to rebuild it.
 
-A command word is kept only if it can never be relevance:
+For the lint guard, a command word is kept only if it can never be relevance:
 
 * a single word -- a multi-word verb's first word is often an inspector
   (`action ...`, `setting ...`), and the parser reads those as ordinary
@@ -20,8 +28,8 @@ A command word is kept only if it can never be relevance:
 
 Usage::
 
-    python tools/generate_actionscript_keywords.py --schclass-dir DIR          # write the module
-    python tools/generate_actionscript_keywords.py --schclass-dir DIR --check  # exit 1 if stale
+    python tools/generate_actionscript_keywords.py --schclass-dir DIR          # write both
+    python tools/generate_actionscript_keywords.py --schclass-dir DIR --check  # 1 if stale
 
 where ``DIR`` is ``pre_commit_bigfix/schclass_data`` in a pre-commit-bigfix checkout.
 """
@@ -29,12 +37,14 @@ where ``DIR`` is ``pre_commit_bigfix/schclass_data`` in a pre-commit-bigfix chec
 from __future__ import annotations
 
 import argparse
+import hashlib
 import re
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TARGET = REPO_ROOT / "src" / "bigfix_relevance_analyzer" / "_actionscript_keywords.py"
+VERBS_TARGET = REPO_ROOT / "tools" / "data" / "actionscript_verbs.txt"
 SCHCLASS_FILES = ("ExpandedActionScript.schclass", "bigfix_overrides.schclass")
 
 # `token:tag = 'download now as'`; one value per line in both files.
@@ -46,7 +56,7 @@ def command_words(schclass_dir: Path) -> set[str]:
     words: set[str] = set()
     for name in SCHCLASS_FILES:
         text = (schclass_dir / name).read_text(encoding="utf-8")
-        words.update(tag.strip().lower() for tag in _TOKEN_TAG.findall(text))
+        words.update(" ".join(tag.lower().split()) for tag in _TOKEN_TAG.findall(text))
     return words
 
 
@@ -105,20 +115,48 @@ def render(words: list[str]) -> str:
     )
 
 
+def render_verbs(schclass_dir: Path) -> str:
+    """Every command verb, one per line, under a header naming its source.
+
+    The source files are named by content hash rather than by commit, so the
+    check stays exact without failing on unrelated pre-commit-bigfix commits.
+    """
+    sources = "".join(
+        f"# {name} sha256 {hashlib.sha256((schclass_dir / name).read_bytes()).hexdigest()}\n"
+        for name in SCHCLASS_FILES
+    )
+    words = sorted(command_words(schclass_dir))
+    return (
+        "# Every BigFix ActionScript command verb, lowercased and single-spaced.\n"
+        "# Do not edit by hand: regenerate with tools/generate_actionscript_keywords.py\n"
+        "# from a jgstew/pre-commit-bigfix checkout (pre_commit_bigfix/schclass_data/):\n"
+        f"{sources}"
+        f"# {len(words)} verbs\n" + "".join(f"{word}\n" for word in words)
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Regenerate the ActionScript keyword list.")
+    parser = argparse.ArgumentParser(description="Regenerate the ActionScript word lists.")
     parser.add_argument("--schclass-dir", type=Path, required=True)
-    parser.add_argument("--check", action="store_true", help="exit 1 if the module is stale")
+    parser.add_argument("--check", action="store_true", help="exit 1 if either file is stale")
     args = parser.parse_args(argv)
-    rendered = render(keywords(args.schclass_dir))
+    outputs = {
+        TARGET: render(keywords(args.schclass_dir)),
+        VERBS_TARGET: render_verbs(args.schclass_dir),
+    }
     if args.check:
-        current = TARGET.read_text(encoding="utf-8") if TARGET.exists() else ""
-        if current != rendered:
-            print(f"{TARGET} is out of date", file=sys.stderr)
-            return 1
-        return 0
-    TARGET.write_text(rendered, encoding="utf-8")
-    print(f"wrote {TARGET}")
+        stale = [
+            target
+            for target, rendered in outputs.items()
+            if (target.read_text(encoding="utf-8") if target.exists() else "") != rendered
+        ]
+        for target in stale:
+            print(f"{target} is out of date", file=sys.stderr)
+        return 1 if stale else 0
+    for target, rendered in outputs.items():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(rendered, encoding="utf-8")
+        print(f"wrote {target}")
     return 0
 
 
