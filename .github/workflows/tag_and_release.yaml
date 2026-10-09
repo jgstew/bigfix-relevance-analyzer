@@ -389,3 +389,35 @@ jobs:
     uses: ./.github/workflows/publish-vscode-extension.yaml # zizmor: ignore[self-repository]
     with:
       version: ${{ needs.version.outputs.version }}
+
+  # Asks jgstew/jgstew.github.io to pick up the playground from the release
+  # that just went public. That repo's own workflow does the work: it downloads
+  # the asset from the public release, verifies it against SHA256SUMS.txt, and
+  # commits it with its own GITHUB_TOKEN. All this job does is start that run,
+  # so SITE_DISPATCH_TOKEN needs only a fine-grained PAT with "Actions: Read
+  # and write" on that one repository - it cannot push content.
+  #
+  # Needs the secret SITE_DISPATCH_TOKEN. Without it this job succeeds without
+  # dispatching, and the site's weekly schedule picks the release up instead.
+  # After `finalize` so the version is already public when the site fetches it.
+  # If dispatching fails the release is unaffected: re-run this job with "Re-run
+  # failed jobs", or run the site's workflow by hand.
+  notify-site:
+    name: Ask jgstew.github.io to pick up the release
+    needs: [version, finalize]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Dispatch update-bigfix-relevance-analyzer-playground.yaml
+        env:
+          GH_TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::SITE_DISPATCH_TOKEN is not set - not dispatching; the site's weekly schedule will pick up v${VERSION}"
+            exit 0
+          fi
+          # the exact version, not "latest", so a newer release cannot race this one
+          gh workflow run update-bigfix-relevance-analyzer-playground.yaml \
+            --repo jgstew/jgstew.github.io --ref master \
+            -f "version=${VERSION}"
