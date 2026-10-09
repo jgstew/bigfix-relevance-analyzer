@@ -40,7 +40,8 @@ What keeps a fix from doing damage, in order:
    written;
 4. the fixed file is linted again, and no rule may report more findings than
    it did before: a fix may not trade a warning for a new error (adding
-   ``unique value of`` raises a statement's complexity, say);
+   ``unique value of`` raises a statement's complexity, say). A fix that adds
+   one at its own statement is refused alone, and the rest still go in;
 5. the file is read back before writing and must still be what was planned,
    and is read back after writing and restored to its original bytes if it
    does not hold what was written.
@@ -61,7 +62,7 @@ import itertools
 import os
 import re
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
@@ -409,8 +410,8 @@ def _placed(
 
     Through the site's line and column: text extractors keep text as written
     but for line endings, which move no character within a line. The bytes
-    found must be the text expected -- the characters either side of an
-    insertion, the whole of a replaced range -- since an extractor that does
+    found must be the text expected -- the site's whole text on an
+    insertion's line, the whole of a replaced range -- since an extractor that does
     unescape something would put the offsets out. ``None`` for a read-back
     that does not match, which the caller words.
     """
@@ -420,12 +421,13 @@ def _placed(
     number, first_byte, line, index = first
     text = site.text
     if start == end:
-        checks = []
-        if start < len(text) and text[start] != "\n":
-            checks.append(index < len(line) and line[index] == text[start])
-        if start > 0 and text[start - 1] != "\n":
-            checks.append(index > 0 and line[index - 1] == text[start - 1])
-        return (first_byte, first_byte) if checks and all(checks) else None
+        # The whole of the site's text on this line, not just the characters
+        # either side: a drifted column can land between the same two.
+        segment_start = text.rfind("\n", 0, start) + 1
+        segment_end = text.find("\n", start)
+        segment = text[segment_start : len(text) if segment_end == -1 else segment_end]
+        column = index - (start - segment_start)
+        return (first_byte, first_byte) if line[column : column + len(segment)] == segment else None
     last = _text_point(site, end, lines)
     if last is None or isinstance(last, Unmapped):
         return last
@@ -477,7 +479,9 @@ def _ignored_rules(autofix: AutofixResult, config: LintConfig) -> tuple[str, ...
 def _extract(file_path: Path, data: bytes) -> tuple[list[RelevanceSite], list[_ExtractionProblem]]:
     """``file_path``'s sites and extraction problems, from ``data``: never the disk.
 
-    The one place planning extracts, before a fix and after it alike.
+    The one place planning extracts, before a fix and after it alike, kept as
+    its own name so tests can patch it (a re-extract that disagrees) and so
+    nothing here can reach the disk-reading ``_extract_file`` by accident.
     """
     return _extract_data(file_path, data)
 
@@ -548,6 +552,11 @@ def _plan(
     :func:`_site_anchor` values, plans just those sites -- one quick fix.
     Sites outside ``only`` stay as written and are not reported, while the
     re-extract and finding-count checks still cover the whole file.
+
+    A fix that would add a finding at its own site is refused alone, and the
+    rest are planned again without it. Overlapping edits, a re-extract
+    mismatch, or a finding that rose with no site to blame still refuse every
+    fix in the file: none has been seen in real content.
     """
     wanted = None if only is None else frozenset(only)
     sites, problems = _extract(file_path, data)
@@ -630,8 +639,62 @@ def _plan(
         if count > before[code]
     )
     if added:
-        return plan(f"the fix would add {_findings_named(added)}")
+        culprits = _culprits(planned, sites, findings, new_sites, after, fixed_text)
+        if not culprits:
+            return plan(f"the fix would add {_findings_named(added)}")
+        # Drop the fixes that added findings and plan the rest again: one wrap
+        # over a ceiling must not block the safe fixes beside it. Each round
+        # drops at least one fix, so this ends.
+        refused = [
+            record(fix, f"the fix would add {_findings_named(culprits[id(fix.site)])}")
+            for fix, _ in planned
+            if id(fix.site) in culprits
+        ]
+        keep = {_site_anchor(fix.site) for fix, _ in planned if id(fix.site) not in culprits}
+        if keep:
+            rest = _plan(file_path, data, config, judge=judge, only=keep)
+        else:
+            planned.clear()  # every planned fix is in `refused`
+            rest = plan()
+        return dataclasses.replace(
+            rest,
+            unapplied=tuple(
+                sorted([*unapplied, *refused, *rest.unapplied], key=lambda fix: fix.line)
+            ),
+        )
     return plan(fixed=fixed, after=after, edits=byte_edits)
+
+
+def _culprits(
+    planned: Sequence[tuple[SiteFix, tuple[ByteEdit, ...]]],
+    sites: Sequence[RelevanceSite],
+    findings: Sequence[Finding],
+    new_sites: Sequence[RelevanceSite],
+    after: Sequence[Finding],
+    fixed_text: dict[int, str],
+) -> dict[int, list[str]]:
+    """The planned fixes whose own site reports more of some rule after the fix,
+    by ``id`` of the site, with those rules.
+
+    Each fixed site is paired with the site it was, in extraction order: pieces
+    never add a line or move one site past another. Empty when that pairing
+    does not hold, or when what rose has no site (an extraction problem), so
+    the caller refuses the whole file instead.
+    """
+    if len(new_sites) != len(sites) or any(
+        _site_key(new) != _site_key(old, fixed_text.get(id(old)))
+        for old, new in zip(sites, new_sites, strict=True)
+    ):
+        return {}
+    was = {id(new): old for old, new in zip(sites, new_sites, strict=True)}
+    before = Counter((id(f.site), f.code) for f in findings if f.site is not None)
+    now = Counter((id(f.site), f.code) for f in after if f.site is not None)
+    culprits: dict[int, list[str]] = {}
+    for (new_id, code), count in sorted(now.items(), key=lambda item: item[0][1]):
+        old = was.get(new_id)
+        if old is not None and id(old) in fixed_text and count > before[(id(old), code)]:
+            culprits.setdefault(id(old), []).append(code)
+    return culprits
 
 
 def _findings_named(codes: Sequence[str]) -> str:
@@ -642,8 +705,9 @@ def write_fix(plan: FixPlan) -> FileFixResult:
     """Write ``plan`` into its file, and report what that did.
 
     Writes only if the plan changes the file, and only if the file still holds
-    what was planned from: one changed since is left alone, its fixes reported
-    unapplied. The file is rewritten in place -- mode, owner and links kept --
+    what was planned from: one changed since is left alone, planned again
+    without writing, and its fixes reported unapplied against what it now
+    holds. The file is rewritten in place -- mode, owner and links kept --
     read back, and restored to its original bytes if it does not hold what was
     written.
     """
@@ -676,11 +740,14 @@ def write_fix(plan: FixPlan) -> FileFixResult:
             plan.original_findings + _file_error(path, detail, plan.config),
         )
     if current != data:
-        sites, problems = _extract(path, current)
-        return refuse(
-            "file changed since it was planned",
-            _lint_extracted(path, sites, problems, plan.config),
-        )
+        # Planned again from what is there now, and nothing written: the
+        # refused fixes and the findings then describe the same bytes.
+        now = _plan(path, current, plan.config)
+        stale = [
+            dataclasses.replace(fix, reason="file changed since it was planned")
+            for fix in now.applied
+        ]
+        return result(now.original_findings, (), [*now.unapplied, *stale])
 
     try:
         _write(path, plan.fixed)
@@ -721,7 +788,28 @@ def fix_paths(paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfi
     Each path is taken literally, as :func:`~bigfix_relevance_analyzer.lint.lint_paths`
     takes it; :func:`fix_directory` is the one that walks.
     """
-    return _combine([fix_file(path, config) for path in paths])
+    return _combine([write_fix(plan) for plan in _plan_paths(paths, config)])
+
+
+def _plan_paths(
+    paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfig
+) -> Iterator[FixPlan]:
+    """:func:`plan_fix` over many paths, in order, one at a time."""
+    return (plan_fix(path, config) for path in paths)
+
+
+def _plan_directory(
+    root: Path, config: LintConfig, *, max_depth: int
+) -> tuple[Iterator[FixPlan], tuple[Finding, ...]]:
+    """A plan per file under ``root``, walked as ``lint_directory`` walks it,
+    one at a time, and the depth findings for wherever the walk stopped.
+
+    Shared by :func:`fix_directory` and ``--fix --diff``, so the dry run walks
+    exactly what the fix would.
+    """
+    files, exceeded = _walk_files(root, max_depth)
+    plans = (_plan_path(file_path, config, explicit=False) for file_path in files)
+    return plans, _depth_findings(root, exceeded, max_depth, config)
 
 
 def fix_directory(
@@ -733,16 +821,10 @@ def fix_directory(
     """:func:`fix_file` over every file under ``root``, walked as
     :func:`~bigfix_relevance_analyzer.lint.lint_directory` walks it, depth
     findings included."""
-    root_path = _as_path(root)
-    files, exceeded = _walk_files(root_path, max_depth)
-    combined = _combine(
-        [write_fix(_plan_path(file_path, config, explicit=False)) for file_path in files]
-    )
+    plans, depth = _plan_directory(_as_path(root), config, max_depth=max_depth)
+    combined = _combine([write_fix(plan) for plan in plans])
     return FixResult(
-        combined.applied,
-        combined.unapplied,
-        _depth_findings(root_path, exceeded, max_depth, config) + combined.findings,
-        combined.changed,
+        combined.applied, combined.unapplied, depth + combined.findings, combined.changed
     )
 
 

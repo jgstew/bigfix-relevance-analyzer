@@ -732,3 +732,66 @@ def test_site_anchors_are_stable_and_tell_equal_sites_apart(name: str, data: byt
     assert anchors[0] != anchors[1]
     assert anchors == [fixfile._site_anchor(site) for site in again]
     hash(anchors[0])
+
+
+# -- review of #123 ------------------------------------------------------------------
+
+TWO_FENCES = (
+    b"# x\n\n```relevance\n"
+    b'exists values of setting "x" of client\n'  # line 4: `+s`, adds nothing
+    b"```\n\n```relevance\n"
+    b'pathnames of files "x" | "y"\n'  # line 8: a wrap, score 12 -> 20
+    b"```\n"
+)
+
+
+def test_a_fix_that_adds_a_finding_refuses_only_its_own_site(tmp_path: Path) -> None:
+    """One wrap over the ceiling must not block the safe respelling beside it:
+    `--fix`, the hook and the editor's "Fix all" all plan the whole file."""
+    path = write(tmp_path, TWO_FENCES, "t.md")
+    plan = plan_fix(path, LintConfig(max_score=15))
+    assert [fix.line for fix in plan.applied] == [4]
+    assert [(fix.line, fix.reason) for fix in plan.unapplied] == [
+        (8, "the fix would add a complexity finding")
+    ]
+    assert b"settings" in plan.fixed and b"unique value of" not in plan.fixed
+    _assert_only_new_text_inserted(plan)
+    assert write_fix(plan).changed
+    assert path.read_bytes() == TWO_FENCES.replace(b"setting ", b"settings ")
+
+
+def test_an_only_plan_still_refuses_just_the_culprit(tmp_path: Path) -> None:
+    path = write(tmp_path, TWO_FENCES, "t.md")
+    sites, _ = fixfile._extract(path, TWO_FENCES)
+    anchors = {fixfile._site_anchor(site) for site in sites}
+    plan = fixfile._plan(path, TWO_FENCES, LintConfig(max_score=15), only=anchors)
+    assert [fix.line for fix in plan.applied] == [4]
+    assert [fix.line for fix in plan.unapplied] == [8]
+
+
+def test_source_edits_read_back_the_whole_line_of_the_site(tmp_path: Path) -> None:
+    """A drifted column whose point sits between the same two characters as the
+    right one (`g` and a space) must still be refused, not written as `bigs`."""
+    data = f"{SETTING}\n".encode()
+    path = write(tmp_path, data, "t.rel")
+    (fix,) = site_fixes(lint_file(path, LintConfig()))
+    assert source_edits(fix.site, fix.autofix, data) == (ByteEdit(24, 24, b"s"),)
+    drifted = dataclasses.replace(fix.site, column=19)
+    result = source_edits(drifted, fix.autofix, f"{SETTING} big \n".encode())
+    assert isinstance(result, Unmapped)
+    assert "does not read back" in result.reason
+
+
+def test_a_file_changed_since_planning_reports_one_set_of_lines(tmp_path: Path) -> None:
+    """The refused fixes and the findings both describe the file as it is now."""
+    data = f"true and\n{SETTING}\n".encode()
+    path = write(tmp_path, data, "t.rel")
+    plan = plan_fix(path, LintConfig())
+    assert [fix.line for fix in plan.applied] == [1]
+    path.write_bytes(b"\n\n" + data)
+    result = write_fix(plan)
+    assert path.read_bytes() == b"\n\n" + data
+    assert [(fix.line, fix.reason) for fix in result.unapplied] == [
+        (3, "file changed since it was planned")
+    ]
+    assert {f.line for f in result.findings if f.code == "plural-preferred"} == {4}
