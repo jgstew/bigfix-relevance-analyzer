@@ -16,42 +16,16 @@
   ],
   "repository": {
     "actionscript": {
-      "begin": "(<)(ActionScript(?=[\\s>]))(?![^>]*\\bMIMEType\\s*=\\s*(?:\\\"(?!(?i:application/x\\-fixlet\\-windows\\-shell)\\\")|'(?!(?i:application/x\\-fixlet\\-windows\\-shell)')))((?:\\s[^>]*)?)(?<!/)(>)",
+      "begin": "(<)(ActionScript)(?=[\\s>/]|$)",
       "beginCaptures": {
         "1": {
           "name": "punctuation.definition.tag.xml"
         },
         "2": {
           "name": "entity.name.tag.localname.xml"
-        },
-        "3": {
-          "patterns": [
-            {
-              "match": "([-\\w.:]+)\\s*(=)",
-              "captures": {
-                "1": {
-                  "name": "entity.other.attribute-name.localname.xml"
-                },
-                "2": {
-                  "name": "punctuation.separator.key-value.xml"
-                }
-              }
-            },
-            {
-              "name": "string.quoted.double.xml",
-              "match": "\"[^\"]*\""
-            },
-            {
-              "name": "string.quoted.single.xml",
-              "match": "'[^']*'"
-            }
-          ]
-        },
-        "4": {
-          "name": "punctuation.definition.tag.xml"
         }
       },
-      "end": "(</)(\\2)\\s*(>)",
+      "end": "(</)(ActionScript)\\s*(>)|(?<=/>)",
       "endCaptures": {
         "1": {
           "name": "punctuation.definition.tag.xml"
@@ -63,6 +37,53 @@
           "name": "punctuation.definition.tag.xml"
         }
       },
+      "patterns": [
+        {
+          "include": "#actionscript-other-language"
+        },
+        {
+          "include": "#actionscript-self-closing"
+        },
+        {
+          "include": "#attributes"
+        },
+        {
+          "include": "#actionscript-body"
+        }
+      ]
+    },
+    "actionscript-other-language": {
+      "begin": "\\b(MIMEType)\\s*(=)\\s*(\\\"(?!(?i:application/x\\-fixlet\\-windows\\-shell)\\\")[^\\\"]*\\\"|'(?!(?i:application/x\\-fixlet\\-windows\\-shell)')[^']*')",
+      "beginCaptures": {
+        "1": {
+          "name": "entity.other.attribute-name.localname.xml"
+        },
+        "2": {
+          "name": "punctuation.separator.key-value.xml"
+        },
+        "3": {
+          "name": "string.quoted.xml"
+        }
+      },
+      "end": "(?=</ActionScript\\s*>)",
+      "patterns": [
+        {
+          "include": "text.xml"
+        }
+      ]
+    },
+    "actionscript-self-closing": {
+      "name": "punctuation.definition.tag.xml",
+      "match": "/>"
+    },
+    "actionscript-body": {
+      "begin": "(>)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.tag.xml"
+        }
+      },
+      "end": "(?=</ActionScript\\s*>)",
       "contentName": "meta.embedded.block.bigfix-actionscript",
       "patterns": [
         {
@@ -76,8 +97,27 @@
         }
       ]
     },
+    "cdata-actionscript": {
+      "begin": "<!\\[CDATA\\[",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.begin.xml"
+        }
+      },
+      "end": "\\]\\]>",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end.xml"
+        }
+      },
+      "patterns": [
+        {
+          "include": "source.bigfix-actionscript"
+        }
+      ]
+    },
     "relevance": {
-      "begin": "(<)((?:Relevance|Property|SuccessCriteria(?=\\s)(?=[^>]*\\bOption\\s*=\\s*(?:\\\"CustomRelevance\\\"|'CustomRelevance')))(?=[\\s>]))((?:\\s[^>]*)?)(?<!/)(>)",
+      "begin": "(<)((?:Relevance|Property|SuccessCriteria(?=\\s)(?=(?:\"[^\"]*\"|'[^']*'|[^>\"'])*?\\bOption\\s*=\\s*(?:\\\"CustomRelevance\\\"|'CustomRelevance')))(?=[\\s>]))((?:\\s(?:\"[^\"]*\"|'[^']*'|[^>\"'])*)?)(?<!/)(>)",
       "beginCaptures": {
         "1": {
           "name": "punctuation.definition.tag.xml"
@@ -88,23 +128,7 @@
         "3": {
           "patterns": [
             {
-              "match": "([-\\w.:]+)\\s*(=)",
-              "captures": {
-                "1": {
-                  "name": "entity.other.attribute-name.localname.xml"
-                },
-                "2": {
-                  "name": "punctuation.separator.key-value.xml"
-                }
-              }
-            },
-            {
-              "name": "string.quoted.double.xml",
-              "match": "\"[^\"]*\""
-            },
-            {
-              "name": "string.quoted.single.xml",
-              "match": "'[^']*'"
+              "include": "#attributes"
             }
           ]
         },
@@ -133,6 +157,13 @@
           "include": "#entity"
         },
         {
+          "include": "#relevance-body"
+        }
+      ]
+    },
+    "relevance-body": {
+      "patterns": [
+        {
           "name": "string.quoted.double.bigfix-relevance",
           "begin": "\"",
           "end": "\"|(?=</(?:Relevance|Property|SuccessCriteria)\\s*>|\\]\\]>)",
@@ -150,25 +181,6 @@
         },
         {
           "include": "source.bigfix-relevance"
-        }
-      ]
-    },
-    "cdata-actionscript": {
-      "begin": "<!\\[CDATA\\[",
-      "beginCaptures": {
-        "0": {
-          "name": "punctuation.definition.string.begin.xml"
-        }
-      },
-      "end": "\\]\\]>",
-      "endCaptures": {
-        "0": {
-          "name": "punctuation.definition.string.end.xml"
-        }
-      },
-      "patterns": [
-        {
-          "include": "source.bigfix-actionscript"
         }
       ]
     },
@@ -187,23 +199,30 @@
       },
       "patterns": [
         {
-          "name": "string.quoted.double.bigfix-relevance",
-          "begin": "\"",
-          "end": "\"|(?=</(?:Relevance|Property|SuccessCriteria)\\s*>|\\]\\]>)",
-          "patterns": [
-            {
-              "name": "constant.character.escape.bigfix-relevance",
-              "match": "%[0-9A-Fa-f]{2}"
+          "include": "#relevance-body"
+        }
+      ]
+    },
+    "attributes": {
+      "patterns": [
+        {
+          "match": "([-\\w.:]+)\\s*(=)",
+          "captures": {
+            "1": {
+              "name": "entity.other.attribute-name.localname.xml"
+            },
+            "2": {
+              "name": "punctuation.separator.key-value.xml"
             }
-          ]
+          }
         },
         {
-          "name": "comment.block.bigfix-relevance",
-          "begin": "/\\*",
-          "end": "\\*/|(?=</(?:Relevance|Property|SuccessCriteria)\\s*>|\\]\\]>)"
+          "name": "string.quoted.double.xml",
+          "match": "\"[^\"]*\""
         },
         {
-          "include": "source.bigfix-relevance"
+          "name": "string.quoted.single.xml",
+          "match": "'[^']*'"
         }
       ]
     },

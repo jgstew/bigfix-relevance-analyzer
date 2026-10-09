@@ -709,7 +709,30 @@ def test_the_bes_configuration_keeps_the_xml_conveniences() -> None:
     assert config["comments"] == {"blockComment": ["<!--", "-->"]}
     assert ["<", ">"] in config["brackets"]
     opens = {pair["open"] for pair in config["autoClosingPairs"]}
-    assert {"<!--", '"', "{", "("} <= opens
+    assert {"<!--", '"', "'", "{", "("} <= opens
+    surrounds = {pair[0] for pair in config["surroundingPairs"]}
+    assert opens - {"<!--"} <= surrounds
+
+
+XML_FIXTURE = PRIMARY / "test" / "fixtures" / "xml"
+
+
+def test_the_grammar_test_runs_against_a_vendored_vscode_xml_grammar() -> None:
+    """CI has no VS Code in the package job, so the .bes grammar's interplay
+    with VS Code's XML grammar is tested against a copy of it, from VS Code's
+    MIT-licensed source, with both licenses it carries (PR #119 review)."""
+    grammar = json.loads((XML_FIXTURE / "xml.tmLanguage.json").read_text("utf-8"))
+    assert grammar["scopeName"] == "text.xml"
+    readme = (XML_FIXTURE / "README.md").read_text("utf-8")
+    assert "microsoft/vscode" in readme and "atom/language-xml" in readme
+    assert re.search(r"\b[0-9a-f]{40}\b", readme), "record the commit it came from"
+    for license_file in ("LICENSE-vscode.txt", "LICENSE-atom-language-xml.md"):
+        assert "Permission is hereby granted" in (XML_FIXTURE / license_file).read_text("utf-8")
+    assert "fixtures/xml/xml.tmLanguage.json" in (PRIMARY / "test" / "grammar.test.mjs").read_text(
+        "utf-8"
+    )
+    # Never packaged: `.vscodeignore` leaves out test/**.
+    assert "test/**" in (PRIMARY / ".vscodeignore").read_text("utf-8").splitlines()
 
 
 def test_the_grammars_and_language_files_are_packaged() -> None:

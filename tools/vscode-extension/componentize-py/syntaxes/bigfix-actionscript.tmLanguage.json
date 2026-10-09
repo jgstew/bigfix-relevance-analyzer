@@ -95,8 +95,11 @@
           "name": "keyword.other.command.bigfix-actionscript"
         }
       },
-      "end": "(?i)^(?!\\s*(?:asadmin|completion|detached|disposition|hidden|password|priority|runas|targetuser|timeout_seconds|user)\\s*=)|(?=\\]\\]>|</ActionScript\\s*>)",
+      "end": "(?i)^(?!\\s*(?:(?:asadmin|completion|detached|disposition|hidden|password|priority|runas|targetuser|timeout_seconds|user)\\s*=|//)|\\s*$)|(?=\\]\\]>|</ActionScript\\s*>)",
       "patterns": [
+        {
+          "include": "#comment"
+        },
         {
           "match": "(?i)(?:^|\\G)\\s*(asadmin|completion|detached|disposition|hidden|password|priority|runas|targetuser|timeout_seconds|user)\\s*(=)((?:(?!\\]\\]>|</ActionScript\\s*>).)*)",
           "captures": {
@@ -188,7 +191,7 @@
     },
     "url": {
       "name": "markup.underline.link.bigfix-actionscript",
-      "match": "(?i)(?<![\\w])https?:(?:(?!\\]\\]>|</ActionScript\\s*>)[^\\s*\\\"}])+"
+      "match": "(?i)(?<![\\w])https?:(?:(?!\\]\\]>|</ActionScript\\s*>)[^\\s*\"}])+"
     },
     "relevance-dependency": {
       "begin": "(?!)",

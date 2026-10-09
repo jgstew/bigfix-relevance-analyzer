@@ -119,7 +119,11 @@ exists file "C:\Windows\notepad.exe"
   the text it is about.
 - Highlighting colors keywords and operators, not inspector names.
 - In `.bes` files, relevance in descriptions, and in `<?Relevance ...?>`
-  blocks of dashboards and reports, is checked but not colored.
+  blocks of dashboards and reports, is checked but not colored. Nor is a
+  relevance element whose start tag is split across lines (an action script's
+  may be).
+- A new, unsaved file set to BigFix BES XML is colored, but not checked until
+  it is saved as a `.bes` file.
 - Completion is not available yet. Hover needs a statement that parses; on one
   with a syntax error there is no hover until it is fixed.
 - A file is checked when its name ends in one of the file types above, or when

@@ -34,6 +34,12 @@ end_of_line = crlf
 indent_style = unset
 indent_size = unset
 
+# VS Code's XML grammar, vendored verbatim for the extension's grammar tests
+# (see the README there): upstream indents it with tabs, and reindenting it
+# would misrepresent what was copied. Its final newline is the only change.
+[tools/vscode-extension/componentize-py/test/fixtures/xml/xml.tmLanguage.json]
+indent_style = unset
+
 # The inspector dumps end a row with an empty tab column where a type is
 # absent -- that trailing tab is data, not stray whitespace. Matches the
 # `trailing-whitespace` hook's exclude in .pre-commit-config.yaml.

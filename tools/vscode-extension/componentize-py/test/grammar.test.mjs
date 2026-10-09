@@ -12,11 +12,11 @@
 // tree by default, the unzipped .vsix in CI.
 //
 // The .bes grammar defers everything outside its bodies to VS Code's built-in
-// XML grammar (`text.xml`). That grammar ships with VS Code, not with this
-// extension, so it is read from VSCODE_XML_GRAMMAR, or from the VS Code the
-// smoke test downloads; without either (or with VSCODE_XML_GRAMMAR=none), an
-// empty stand-in takes its place, and the tests still pin everything this
-// extension contributes.
+// XML grammar (`text.xml`), which ships with VS Code, not with this extension.
+// The tests run against a copy vendored from VS Code's source in
+// test/fixtures/xml/ (see its README), so every run, CI's included, checks the
+// interplay with the real thing. VSCODE_XML_GRAMMAR names another copy (say,
+// a newer VS Code's), and VSCODE_XML_GRAMMAR=none swaps in an empty stand-in.
 
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -42,16 +42,7 @@ const SCOPES = {
 /** VS Code's own XML grammar, if one is at hand. */
 function xmlGrammarPath() {
   if (process.env.VSCODE_XML_GRAMMAR === "none") return undefined;
-  if (process.env.VSCODE_XML_GRAMMAR) return process.env.VSCODE_XML_GRAMMAR;
-  const downloads = join(HERE, "../../common/smoke/.vscode-test");
-  if (!existsSync(downloads)) return undefined;
-  for (const build of readdirSync(downloads)) {
-    for (const app of ["Visual Studio Code.app/Contents/Resources/app", "resources/app"]) {
-      const candidate = join(downloads, build, app, "extensions/xml/syntaxes/xml.tmLanguage.json");
-      if (existsSync(candidate)) return candidate;
-    }
-  }
-  return undefined;
+  return process.env.VSCODE_XML_GRAMMAR || join(HERE, "fixtures/xml/xml.tmLanguage.json");
 }
 
 const XML_GRAMMAR = xmlGrammarPath();
@@ -217,6 +208,15 @@ test("appendfile text is file content", async () => {
   assert.ok(scopesOf(t, "run x", "run").includes(COMMAND));
 });
 
+test("blank and comment lines inside an override block do not end it", async () => {
+  // As pre-commit-bigfix's lint reads the block: only a command line closes it.
+  const text = "override wait\nhidden=true\n\n// note\n  \ncompletion=job\nwait foo.exe";
+  const t = await tokenize("source.bigfix-actionscript", text);
+  assert.ok(has(scopesOf(t, "completion=job", "completion"), "variable.parameter.option"));
+  assert.ok(has(scopesOf(t, "// note"), "comment.line.double-slash"));
+  assert.ok(scopesOf(t, "wait foo", "wait").includes(COMMAND));
+});
+
 test("an override block holds option lines up to its command", async () => {
   const t = await tokenize("source.bigfix-actionscript", "override wait\nhidden=true\nRunAs={x}\nwait cmd.exe\nhidden=x");
   assert.ok(has(scopesOf(t, "hidden=true", "hidden"), "variable.parameter.option"));
@@ -276,6 +276,82 @@ test("relevance bodies carry relevance scopes, CDATA or not", async () => {
   assert.ok(scopesOf(t, "version of client", "of").includes(REL_BODY));
 });
 
+test("the real XML grammar is the one in use, unless the stand-in is asked for", async () => {
+  // Guards against a fixture path that quietly falls back to the stand-in.
+  const t = await tokenize("text.xml.bigfix-bes", "<BES><Title>t</Title></BES>");
+  const tag = has(scopesOf(t, "<BES>", "BES"), "entity.name.tag");
+  assert.equal(tag, XML_GRAMMAR !== undefined);
+});
+
+test("an ActionScript start tag may span lines", async () => {
+  const text = [
+    "<BES><Fixlet>",
+    "<ActionScript",
+    '\tMIMEType="application/x-Fixlet-Windows-Shell"><![CDATA[',
+    "wait {x}",
+    "]]></ActionScript>",
+    "<ActionScript",
+    '   ID="2"',
+    "   >run y</ActionScript>",
+    "<Title>after</Title>",
+    "</Fixlet></BES>",
+  ].join("\n");
+  const t = await tokenize("text.xml.bigfix-bes", text);
+  assert.ok(scopesOf(t, "wait {x}", "wait").includes(COMMAND));
+  assert.ok(scopesOf(t, "wait {x}", "x").includes(RELEVANCE));
+  assert.ok(has(scopesOf(t, "MIMEType=", "MIMEType"), "entity.other.attribute-name"));
+  assert.ok(scopesOf(t, ">run y", "run").includes(COMMAND));
+  assertPlainXml(t, "<Title>after</Title>");
+  assert.equal(t.state.depth, 1);
+});
+
+test("another MIME type on a later line of the start tag stays XML", async () => {
+  const text = [
+    "<BES><Fixlet>",
+    "<ActionScript",
+    '  MIMEType="application/x-sh"><![CDATA[run {not relevance}',
+    "wait x]]></ActionScript>",
+    "<Title>after</Title>",
+    "</Fixlet></BES>",
+  ].join("\n");
+  const t = await tokenize("text.xml.bigfix-bes", text);
+  assertPlainXml(t, "run {not relevance}");
+  assertPlainXml(t, "wait x");
+  assertPlainXml(t, "<Title>after</Title>");
+  assert.equal(t.state.depth, 1);
+});
+
+test("a > inside an attribute value does not end the start tag", async () => {
+  const text = [
+    '<BES><Fixlet><Relevance Comment="a > b">exists x</Relevance>',
+    '<ActionScript Comment="a > b">wait y</ActionScript>',
+    '<SuccessCriteria Comment=">" Option="CustomRelevance">exists z</SuccessCriteria>',
+    "<Title>after</Title></Fixlet></BES>",
+  ].join("\n");
+  const t = await tokenize("text.xml.bigfix-bes", text);
+  assert.ok(has(scopesOf(t, "exists x", "exists"), "keyword.operator.logical.bigfix-relevance"));
+  assert.ok(!scopesOf(t, "<Relevance Comment", " b").includes(REL_BODY));
+  assert.ok(scopesOf(t, "wait y", "wait").includes(COMMAND));
+  assert.ok(!scopesOf(t, "<ActionScript Comment", " b").includes(AS_BODY));
+  assert.ok(scopesOf(t, "exists z", "exists").includes(REL_BODY));
+  assertPlainXml(t, "<Title>after</Title>");
+});
+
+test("a self-closing ActionScript has no body", async () => {
+  const t = await tokenize("text.xml.bigfix-bes", "<BES><ActionScript/>\n<ActionScript\n />\n<Title>after</Title></BES>");
+  assertPlainXml(t, "<Title>after</Title>");
+  assert.equal(t.state.depth, 1);
+});
+
+test("a relevance start tag split across lines is left uncolored, without leaking", async () => {
+  // A known limitation (README): no real content splits these tags, unlike
+  // <ActionScript>, and the Option="CustomRelevance" check needs the whole tag.
+  const t = await tokenize("text.xml.bigfix-bes", "<BES><Relevance\n>exists x</Relevance>\n<Title>after</Title></BES>");
+  assertPlainXml(t, ">exists x</Relevance>");
+  assertPlainXml(t, "<Title>after</Title>");
+  assert.equal(t.state.depth, 1);
+});
+
 test("XML outside the bodies is left to the XML grammar", async () => {
   const t = await tokenize("text.xml.bigfix-bes", BES);
   for (const marker of ["<Title>t</Title>", "after the bodies", "</BES>", 'Option="OriginalRelevance"']) {
@@ -295,6 +371,7 @@ const BROKEN_BODIES = {
   "comment on the last line": "// done",
   "appendfile on the last line": "appendfile text",
   "open override": "override wait\nhidden=true",
+  "open override ending in a blank line": "override wait\nhidden=true\n",
   "url on the last line": "download http://h/x",
 };
 

@@ -319,6 +319,10 @@ _SUBSTITUTION = rf"(\{{)({_SUBSTITUTION_BODY})(\}})"
 # character but a quote, up to the end of the body.
 _STRING_BODY = rf'(?:\{{\{{|\{{{_SUBSTITUTION_BODY}\}}|(?!{_HOST_END})[^"])*+'
 
+# The console's `url` and `url_https` classes, ended as its overrides end them:
+# at a space, tab, `*`, `"`, `}` or the line's end.
+_URL = rf'https?:(?:(?!{_HOST_END})[^\s*"}}])+'
+
 
 def actionscript_verbs() -> list[str]:
     """Every ActionScript command verb, from the committed data file."""
@@ -398,16 +402,18 @@ def actionscript_grammar() -> dict[str, Any]:
                 },
             },
         },
-        # The block lasts as long as each next line is an option: it ends,
-        # without consuming anything, at the start of the first line that is
-        # not (the command it overrides) or at the end of a `.bes` body. Not
+        # The block lasts while lines are options: it ends, without consuming
+        # anything, at the start of the first line that is not an option, a
+        # `//` comment or blank (the command it overrides, as pre-commit-
+        # bigfix's lint reads the block), or at the end of a `.bes` body. Not
         # a `while` rule: inside one the engine never tries the body's own
         # end, so an override left open at `</ActionScript>` would leak.
         "override": {
             "begin": rf"(?i){_LINE_START}(override\s+(?:run|wait)){_VERB_END}",
             "beginCaptures": {"1": {"name": "keyword.other.command.bigfix-actionscript"}},
-            "end": rf"(?i)^(?!\s*(?:{options})\s*=)|(?={_HOST_END})",
+            "end": rf"(?i)^(?!\s*(?:(?:{options})\s*=|//)|\s*$)|(?={_HOST_END})",
             "patterns": [
+                {"include": "#comment"},
                 {
                     "match": rf"(?i)(?:^|\G)\s*({options})\s*(=)({_REST}*)",
                     "captures": {
@@ -418,7 +424,7 @@ def actionscript_grammar() -> dict[str, Any]:
                             "patterns": _RAW_TEXT_PATTERNS,
                         },
                     },
-                }
+                },
             ],
         },
         "control": _verb_rule(sorted(CONTROL_VERBS), "keyword.control"),
@@ -448,11 +454,9 @@ def actionscript_grammar() -> dict[str, Any]:
                 "3": {"name": "punctuation.definition.string.end.bigfix-actionscript"},
             },
         },
-        # The console's `url` and `url_https` classes, ended as its overrides
-        # end them: at a space, tab, `*`, `"`, `}` or the line's end.
         "url": {
             "name": "markup.underline.link.bigfix-actionscript",
-            "match": rf"(?i)(?<![\w]){_url_body()}",
+            "match": rf"(?i)(?<![\w]){_URL}",
         },
         # Never matches. The engine loads an embedded grammar only when it
         # finds the include among `patterns`, never among `captures` (both
@@ -489,15 +493,19 @@ def actionscript_grammar() -> dict[str, Any]:
     }
 
 
-def _url_body() -> str:
-    return rf"https?:(?:(?!{_HOST_END})[^\s*\"}}])+"
-
-
 # ---------------------------------------------------------------------------
 # BES XML
 # ---------------------------------------------------------------------------
 
 BES_SCOPE = "text.xml.bigfix-bes"
+
+
+# A start tag's attributes, quote-aware: a `>` inside a quoted value does not
+# end the tag. One pattern for every place a start tag is read.
+_ATTRIBUTE_TEXT = r"""(?:"[^"]*"|'[^']*'|[^>"'])*"""
+
+_TAG = "punctuation.definition.tag.xml"
+_TAG_NAME = "entity.name.tag.localname.xml"
 
 
 def _attributes() -> list[dict[str, Any]]:
@@ -515,42 +523,14 @@ def _attributes() -> list[dict[str, Any]]:
     ]
 
 
-def _element(tag: str, condition: str, body_scope: str, cdata: str) -> dict[str, Any]:
-    """``<tag ...>`` to ``</tag>``, its body embedded in ``body_scope``.
-
-    ``condition`` is a lookahead over the start tag's attributes. A
-    self-closing tag has no body, so it is left to the XML grammar.
-    """
-    language = body_scope.removeprefix("source.")
-    return {
-        "begin": rf"(<)({tag}){condition}((?:\s[^>]*)?)(?<!/)(>)",
-        "beginCaptures": {
-            "1": {"name": "punctuation.definition.tag.xml"},
-            "2": {"name": "entity.name.tag.localname.xml"},
-            "3": {"patterns": _attributes()},
-            "4": {"name": "punctuation.definition.tag.xml"},
-        },
-        # The name the start tag matched: its attribute conditions say
-        # nothing about an end tag.
-        "end": r"(</)(\2)\s*(>)",
-        "endCaptures": {
-            "1": {"name": "punctuation.definition.tag.xml"},
-            "2": {"name": "entity.name.tag.localname.xml"},
-            "3": {"name": "punctuation.definition.tag.xml"},
-        },
-        "contentName": f"meta.embedded.block.{language}",
-        "patterns": [{"include": f"#{cdata}"}, {"include": "#entity"}, *_body(body_scope)],
-    }
-
-
-def _cdata(body_scope: str) -> dict[str, Any]:
+def _cdata(body: list[dict[str, Any]]) -> dict[str, Any]:
     """A CDATA section in a body: the element's own embedded scope covers it."""
     return {
         "begin": r"<!\[CDATA\[",
         "beginCaptures": {"0": {"name": "punctuation.definition.string.begin.xml"}},
         "end": r"\]\]>",
         "endCaptures": {"0": {"name": "punctuation.definition.string.end.xml"}},
-        "patterns": _body(body_scope),
+        "patterns": body,
     }
 
 
@@ -558,22 +538,130 @@ def _cdata(body_scope: str) -> dict[str, Any]:
 _RELEVANCE_BODY_END = r"(?=</(?:Relevance|Property|SuccessCriteria)\s*>|\]\]>)"
 
 
-def _body(body_scope: str) -> list[dict[str, Any]]:
-    """The patterns of a body in ``body_scope``.
+def _relevance_body() -> dict[str, Any]:
+    """A relevance body, in or out of CDATA.
 
     Relevance strings and comments may span lines, so in a ``.bes`` one left
     open would run on to the next quote anywhere in the file. Here they also
     end at the end of the body: the relevance grammar's own rules, with the
     end widened, listed first so they win where both would start.
     """
-    if body_scope != SCOPE:
-        return [{"include": body_scope}]
     repository = relevance_grammar()["repository"]
     guarded = [
         {**repository[name], "end": f"{repository[name]['end']}|{_RELEVANCE_BODY_END}"}
         for name in ("string", "comment")
     ]
-    return [*guarded, {"include": body_scope}]
+    return {"patterns": [*guarded, {"include": SCOPE}]}
+
+
+def _actionscript_element(mimetypes: str) -> dict[str, dict[str, Any]]:
+    """``<ActionScript>``, in two stages, so its start tag may span lines.
+
+    Real content often puts the MIMEType on the line after ``<ActionScript``
+    (641 of 7,759 Windows-Shell action scripts in a local corpus), and a
+    TextMate rule's begin sees one line. So the element opens on the name
+    alone, and inside it, in order of priority:
+
+    * a MIMEType naming another language turns the rest of the element over to
+      the XML grammar (the extractor skips those bodies too);
+    * a ``/>`` ends an element with no body;
+    * attributes are colored as attributes;
+    * the tag's own ``>`` opens the ActionScript body, which runs to the end tag.
+    """
+    other_language = (
+        r"\b(MIMEType)\s*(=)\s*"
+        rf"(\"(?!(?i:{mimetypes})\")[^\"]*\"|'(?!(?i:{mimetypes})')[^']*')"
+    )
+    up_to_end_tag = r"(?=</ActionScript\s*>)"
+    return {
+        "actionscript": {
+            "begin": r"(<)(ActionScript)(?=[\s>/]|$)",
+            "beginCaptures": {"1": {"name": _TAG}, "2": {"name": _TAG_NAME}},
+            # The end tag, or straight after a self-closing `/>`.
+            "end": r"(</)(ActionScript)\s*(>)|(?<=/>)",
+            "endCaptures": {
+                "1": {"name": _TAG},
+                "2": {"name": _TAG_NAME},
+                "3": {"name": _TAG},
+            },
+            "patterns": [
+                {"include": "#actionscript-other-language"},
+                {"include": "#actionscript-self-closing"},
+                {"include": "#attributes"},
+                {"include": "#actionscript-body"},
+            ],
+        },
+        "actionscript-other-language": {
+            "begin": other_language,
+            "beginCaptures": {
+                "1": {"name": "entity.other.attribute-name.localname.xml"},
+                "2": {"name": "punctuation.separator.key-value.xml"},
+                "3": {"name": "string.quoted.xml"},
+            },
+            "end": up_to_end_tag,
+            "patterns": [{"include": "text.xml"}],
+        },
+        "actionscript-self-closing": {"name": _TAG, "match": "/>"},
+        "actionscript-body": {
+            "begin": "(>)",
+            "beginCaptures": {"1": {"name": _TAG}},
+            "end": up_to_end_tag,
+            "contentName": "meta.embedded.block.bigfix-actionscript",
+            "patterns": [
+                {"include": "#cdata-actionscript"},
+                {"include": "#entity"},
+                {"include": ACTIONSCRIPT_SCOPE},
+            ],
+        },
+        "cdata-actionscript": _cdata([{"include": ACTIONSCRIPT_SCOPE}]),
+    }
+
+
+def _relevance_element() -> dict[str, dict[str, Any]]:
+    """``<Relevance>``, ``<Property>``, ``<SuccessCriteria Option="CustomRelevance">``.
+
+    One rule whose begin holds the whole start tag, so ``Option`` can be
+    checked: such a tag split across lines is left uncolored (a documented
+    limitation; no real content splits these tags). ``<Property>`` holds
+    relevance at the top level of a BES file (a global property) and inside
+    an ``<Analysis>``. The schema also allows a ``<Property>`` naming a
+    property inside an action's ``<Whose>`` settings, which is not relevance;
+    a lexical grammar cannot tell them apart, and no file in a 6,295-file
+    corpus has one, so it is colored too.
+    """
+    # The extractor compares the option exactly, so the grammar does too. No
+    # capture groups here: they would renumber the begin rule's captures.
+    custom_relevance = (
+        rf"(?={_ATTRIBUTE_TEXT}?\bOption\s*=\s*(?:\"CustomRelevance\"|'CustomRelevance'))"
+    )
+    tags = rf"(?:Relevance|Property|SuccessCriteria(?=\s){custom_relevance})(?=[\s>])"
+    return {
+        "relevance": {
+            "begin": rf"(<)({tags})((?:\s{_ATTRIBUTE_TEXT})?)(?<!/)(>)",
+            "beginCaptures": {
+                "1": {"name": _TAG},
+                "2": {"name": _TAG_NAME},
+                "3": {"patterns": [{"include": "#attributes"}]},
+                "4": {"name": _TAG},
+            },
+            # The name the start tag matched: its attribute conditions say
+            # nothing about an end tag.
+            "end": r"(</)(\2)\s*(>)",
+            "endCaptures": {
+                "1": {"name": _TAG},
+                "2": {"name": _TAG_NAME},
+                "3": {"name": _TAG},
+            },
+            "contentName": "meta.embedded.block.bigfix-relevance",
+            "patterns": [
+                {"include": "#cdata-relevance"},
+                {"include": "#entity"},
+                {"include": "#relevance-body"},
+            ],
+        },
+        "relevance-body": _relevance_body(),
+        "cdata-relevance": _cdata([{"include": "#relevance-body"}]),
+    }
 
 
 def bes_grammar() -> dict[str, Any]:
@@ -582,20 +670,9 @@ def bes_grammar() -> dict[str, Any]:
     Windows-Shell ``<ActionScript>`` (or one with no MIMEType) is ActionScript;
     any other MIMEType is another language and stays XML. ``<Relevance>``,
     ``<Property>`` and ``<SuccessCriteria Option="CustomRelevance">`` bodies
-    are relevance. A ``<Property>`` is an analysis property only inside an
-    ``<Analysis>``, which a lexical grammar cannot see; BES puts one nowhere
-    else. Session relevance in ``<Description>`` HTML is not colored.
+    are relevance. Session relevance in ``<Description>`` HTML is not colored.
     """
     mimetypes = "|".join(re.escape(mimetype) for mimetype in sorted(_ACTIONSCRIPT_MIMETYPES))
-    # No MIMEType attribute, or one naming an ActionScript MIME type.
-    windows_shell = (
-        r"(?![^>]*\bMIMEType\s*=\s*(?:"
-        rf"\"(?!(?i:{mimetypes})\")|'(?!(?i:{mimetypes})')))"
-    )
-    # The extractor compares the option exactly, so the grammar does too. No
-    # capture groups here: they would renumber the begin rule's captures.
-    custom_relevance = r"(?=[^>]*\bOption\s*=\s*(?:\"CustomRelevance\"|'CustomRelevance'))"
-    relevance_tags = rf"(?:Relevance|Property|SuccessCriteria(?=\s){custom_relevance})"
     return {
         "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
         "name": "BigFix BES XML",
@@ -607,12 +684,9 @@ def bes_grammar() -> dict[str, Any]:
             {"include": "text.xml"},
         ],
         "repository": {
-            "actionscript": _element(
-                r"ActionScript(?=[\s>])", windows_shell, ACTIONSCRIPT_SCOPE, "cdata-actionscript"
-            ),
-            "relevance": _element(rf"{relevance_tags}(?=[\s>])", "", SCOPE, "cdata-relevance"),
-            "cdata-actionscript": _cdata(ACTIONSCRIPT_SCOPE),
-            "cdata-relevance": _cdata(SCOPE),
+            **_actionscript_element(mimetypes),
+            **_relevance_element(),
+            "attributes": {"patterns": _attributes()},
             "entity": {
                 "name": "constant.character.entity.xml",
                 "match": r"&(?:[A-Za-z_:][\w:.-]*|#[0-9]+|#x[0-9A-Fa-f]+);",
