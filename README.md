@@ -13,6 +13,11 @@ This is a library first: it is meant to be depended on by other projects
   so it is safe to import inside a stdio MCP server, where stray output would
   corrupt the JSON-RPC stream.
 
+To use it in an editor, install the
+[BigFix Relevance Developer](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer)
+extension for VS Code. It runs this package's [language server](#language-server)
+as WebAssembly, so it needs nothing else installed.
+
 ## Origin
 
 This project starts from
@@ -68,11 +73,13 @@ The parser follows suit and raises that error for any index that isn't an
 integer literal, parenthesized or not (`item (1) of (1, 2)` is still `2`).
 
 The long-term goal may be to **translate the core to Rust**, exposed as PyO3
-wheels for Python consumers and as WebAssembly for a VS Code extension. That is
-the honest end-state for "one implementation, every consumer": today a Python
-package can serve pre-commit hooks, `besapi`, and MCP servers, but it cannot
-serve an editor. Rust would let the same grammar back both without maintaining
-two implementations that drift.
+wheels for Python consumers and as WebAssembly for editors and browsers. The
+Python package already serves pre-commit hooks, `besapi`, MCP servers, and an
+editor: the
+[VS Code extension](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer)
+compiles it, with a CPython, into a WebAssembly component. Rust could make that
+WebAssembly smaller and faster to start, while one grammar still backs
+every consumer without two implementations that drift.
 
 Deliberately not started yet: porting during the grammar-research phase would
 slow the part that is actually hard. Keeping the grammar in declarative tables
@@ -604,11 +611,13 @@ diagnostics, the cache, the size guard and their options) comes from
 plain dicts in LSP's field names. Moving to a library such as pygls would mean
 writing another adapter over it, not porting it.
 
-Two proof-of-concept VS Code extensions run this server; see
-`tools/vscode-extension/README.md`. **BigFix Relevance Developer**
-(`componentize-py/`) is the primary one. It compiles the server, with a
+**[BigFix Relevance Developer](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer)**,
+on the VS Code Marketplace, runs this server. It compiles the server, with a
 CPython, into a WebAssembly component, so nothing needs installing beyond VS
-Code. `python-stdio/` starts `bigfix-relevance-lsp` from a local Python instead.
+Code. Its source is `tools/vscode-extension/componentize-py/`. Beside it,
+`tools/vscode-extension/python-stdio/` is a proof of concept that starts
+`bigfix-relevance-lsp` from a local Python instead; see
+`tools/vscode-extension/README.md`.
 
 For hover-style questions, `node_at(tree, offset)` returns the innermost node
 under a character offset of the parsed statement. `nodes_at` returns the whole

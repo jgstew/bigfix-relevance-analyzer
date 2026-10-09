@@ -7,13 +7,15 @@ they can be compared. Background and measurements are in
 
 | | `componentize-py/`: **BigFix Relevance Developer** | `python-stdio/`: PoC 1 |
 |---|---|---|
-| Role | the primary extension | proof of concept, kept for comparison |
+| Role | the shipped extension, [on the Marketplace](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer) | proof of concept, kept for comparison |
 | Server runs as | the Python package's `Server`, compiled with a CPython into a WebAssembly component. `server.js` runs it in a Node process VS Code forks, over Node IPC. | a child process, `bigfix-relevance-lsp` over stdio |
 | Needs on the user's machine | nothing beyond VS Code | Python with `bigfix-relevance-analyzer` installed |
 | Settings | `bigfixRelevance.*` | `bigfixRelevancePython.*` |
-| Status | working: the shared smoke test passes in VS Code 1.140.0 | working: the shared smoke test passes in VS Code 1.140.0 |
+| Status | published; the shared smoke test passes in VS Code 1.140.0 | unpublished; the shared smoke test passes in VS Code 1.140.0 |
 
-Both are proofs of concept: neither is packaged as a `.vsix` or published yet.
+BigFix Relevance Developer is published on the
+[VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer).
+`python-stdio/` is still a proof of concept, and is not packaged or published.
 
 ## The contract both share
 
@@ -83,8 +85,19 @@ artifact. A second job runs the shared smoke test against that package in a
 headless VS Code (`xvfb-run`), fetched by `@vscode/test-electron` at the
 version pinned in `common/smoke/package.json` and cached between runs.
 
-To install a build: download the artifact, unzip it, and in VS Code run
-**Extensions: Install from VSIX...** on the `.vsix`.
+A release (`tag_and_release.yaml`) runs the same workflow on the release's own
+wheel and attaches the `.vsix` to the GitHub release. Once the release is
+published, its `marketplace` job calls `publish-vscode-extension.yaml`, which
+publishes that same `.vsix` to the Marketplace. It checks the file against the
+release's `SHA256SUMS.txt` and signs in through Entra ID over GitHub OIDC, so
+no PAT is stored. The `vsce publish` step runs only when the repository variable
+`VSCE_PUBLISH` is `true`. To publish an existing release again by hand, run
+`publish-vscode-extension.yaml` with its version.
+
+To install the released extension, use the
+[Marketplace](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer).
+To install a build from CI instead: download the artifact, unzip it, and in VS
+Code run **Extensions: Install from VSIX...** on the `.vsix`.
 
 ## PoC 1 (`python-stdio/`)
 
