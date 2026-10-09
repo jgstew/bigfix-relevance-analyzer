@@ -20,7 +20,7 @@ linter, not porting any of it.
 
 What is served
 --------------
-Diagnostics and hover. A document is linted on open, change and
+Diagnostics, hover and quick fixes. A document is linted on open, change and
 save, and its diagnostics are published as ``textDocument/publishDiagnostics``;
 closing it publishes an empty list. Sync is full-document only: relevance
 statements are short, and incrementality pays off per *site* (the linter's
@@ -31,6 +31,13 @@ if it was renamed.
 ``textDocument/hover`` answers from the stored text of an open document, with
 a null result for a document that is not open or a position with nothing to
 say. Hover params that are not a URI and two integers are invalid params.
+
+``textDocument/codeAction`` answers with the linter's quick fixes for the
+requested range, as ``CodeAction`` literals carrying a ``WorkspaceEdit``. It is
+advertised only to a client that takes literals (``codeActionLiteralSupport``);
+there is no ``Command`` fallback. The edit is versioned (``documentChanges``,
+with the document's version) when the client supports that, so it refuses an
+edit made for text that has since changed; otherwise it is plain ``changes``.
 """
 
 from __future__ import annotations
@@ -41,7 +48,7 @@ import logging
 from collections.abc import Mapping
 from typing import Any, TypeGuard
 
-from bigfix_relevance_analyzer.lsp.linter import SOURCE, DocumentLinter
+from bigfix_relevance_analyzer.lsp.linter import FIX_ALL_KIND, QUICKFIX_KIND, SOURCE, DocumentLinter
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +89,8 @@ class Server:
 
         self._initialized = False
         self._shutdown = False
+        self._code_action_literals = False
+        self._document_changes = False
         self._documents: dict[str, _Document] = {}
 
     def handle(self, message: Mapping[str, Any]) -> list[Message]:
@@ -140,6 +149,8 @@ class Server:
             return [_result(id_, None)]
         if method == "textDocument/hover":
             return [self._hover(id_, params)]
+        if method == "textDocument/codeAction":
+            return [self._code_action(id_, params)]
         return [error_response(id_, ErrorCode.METHOD_NOT_FOUND, f"method not found: {method}")]
 
     def _initialize(self, params: Mapping[str, Any]) -> Message:
@@ -147,15 +158,23 @@ class Server:
 
         self.linter.apply_options(params.get("initializationOptions"))
         self._initialized = True
-        return {
-            "capabilities": {
-                "textDocumentSync": {
-                    "openClose": True,
-                    "change": int(_SyncKind.FULL),
-                    "save": {"includeText": False},
-                },
-                "hoverProvider": True,
+        client = params.get("capabilities")
+        self._code_action_literals = _has(
+            client, "textDocument", "codeAction", "codeActionLiteralSupport"
+        )
+        self._document_changes = _has(client, "workspace", "workspaceEdit", "documentChanges")
+        capabilities: Message = {
+            "textDocumentSync": {
+                "openClose": True,
+                "change": int(_SyncKind.FULL),
+                "save": {"includeText": False},
             },
+            "hoverProvider": True,
+        }
+        if self._code_action_literals:
+            capabilities["codeActionProvider"] = {"codeActionKinds": [QUICKFIX_KIND, FIX_ALL_KIND]}
+        return {
+            "capabilities": capabilities,
             "serverInfo": {"name": SOURCE, "version": __version__},
         }
 
@@ -174,6 +193,52 @@ class Server:
             return _result(id_, None)
         found = self.linter.hover(uri, document.text, (line, character), document.language_id)
         return _result(id_, found)
+
+    def _code_action(self, id_: Any, params: Mapping[str, Any]) -> Message:
+        identifier = params.get("textDocument")
+        uri = identifier.get("uri") if isinstance(identifier, Mapping) else None
+        found = _range(params.get("range"))
+        if not isinstance(uri, str) or found is None:
+            return error_response(
+                id_, ErrorCode.INVALID_PARAMS, "codeAction needs a textDocument uri and a range"
+            )
+        document = self._documents.get(uri)
+        if document is None:
+            return _result(id_, [])
+        context = params.get("context")
+        only = context.get("only") if isinstance(context, Mapping) else None
+        kinds = [kind for kind in only if isinstance(kind, str)] if isinstance(only, list) else None
+        fixes = self.linter.fixes(uri, document.text, document.language_id, range=found, only=kinds)
+        actions = []
+        for fix in fixes:
+            edits = [
+                {
+                    "range": {
+                        "start": {"line": start[0], "character": start[1]},
+                        "end": {"line": end[0], "character": end[1]},
+                    },
+                    "newText": new_text,
+                }
+                for (start, end), new_text in fix.edits
+            ]
+            if self._document_changes:
+                edit: Message = {
+                    "documentChanges": [
+                        {"textDocument": {"uri": uri, "version": document.version}, "edits": edits}
+                    ]
+                }
+            else:
+                edit = {"changes": {uri: edits}}
+            action: Message = {
+                "title": fix.title,
+                "kind": fix.kind,
+                "diagnostics": list(fix.diagnostics),
+                "edit": edit,
+            }
+            if fix.is_preferred:
+                action["isPreferred"] = True
+            actions.append(action)
+        return _result(id_, actions)
 
     # -- notifications --------------------------------------------------------
 
@@ -237,6 +302,31 @@ class Server:
             "diagnostics": self.linter.diagnostics(uri, document.text, document.language_id),
         }
         return _notify("textDocument/publishDiagnostics", params)
+
+
+def _has(value: object, *keys: str) -> bool:
+    """Whether ``value[keys[0]][keys[1]]...`` is there and truthy: a client
+    capability, which an absent object at any level leaves off."""
+    for key in keys:
+        if not isinstance(value, Mapping):
+            return False
+        value = value.get(key)
+    return bool(value)
+
+
+def _range(value: object) -> tuple[tuple[int, int], tuple[int, int]] | None:
+    """An LSP ``Range`` as ``((line, character), (line, character))``, if it is one."""
+    if not isinstance(value, Mapping):
+        return None
+    points = []
+    for name in ("start", "end"):
+        point = value.get(name)
+        line = point.get("line") if isinstance(point, Mapping) else None
+        character = point.get("character") if isinstance(point, Mapping) else None
+        if not _is_index(line) or not _is_index(character):
+            return None
+        points.append((line, character))
+    return points[0], points[1]
 
 
 def _is_index(value: object) -> TypeGuard[int]:

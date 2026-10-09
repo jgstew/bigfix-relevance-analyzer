@@ -1077,6 +1077,19 @@ def test_the_readme_covers_every_file_type_setting_and_command() -> None:
         assert associations.get(f"*{extension}") == "xml", extension
 
 
+def test_the_readme_documents_quick_fixes_and_fix_on_save() -> None:
+    """The kind is the server's (FIX_ALL_KIND), and fix on save is opt-in (#113)."""
+    from bigfix_relevance_analyzer.lsp.linter import FIX_ALL_KIND
+
+    text = (PRIMARY / "README.md").read_text("utf-8")
+    assert "### Quick fixes" in text
+    assert f'"{FIX_ALL_KIND}": "explicit"' in text
+    assert "editor.codeActionsOnSave" in text
+    (example,) = re.findall(r'"editor\.codeActionsOnSave": (\{[^}]*\})', text)
+    assert json.loads(example) == {FIX_ALL_KIND: "explicit"}
+    assert "does not offer fixes" not in text
+
+
 def test_the_user_facing_text_leaves_out_how_the_extension_is_built() -> None:
     manifest = _manifest(PRIMARY)
     for text in (manifest["description"], (PRIMARY / "README.md").read_text("utf-8")):

@@ -48,6 +48,8 @@ function waitFor(uri, ready) {
   });
 }
 
+const codeOf = (d) => (typeof d.code === "object" ? d.code.value : d.code);
+
 const summary = (found) =>
   found.map((d) => ({
     code: typeof d.code === "object" ? d.code.value : d.code,
@@ -88,6 +90,26 @@ async function lint() {
   const besEditor = await vscode.window.showTextDocument(bes);
   const besFound = await waitFor(bes, (found) => found.length > 0);
 
+  // Quick fixes (issue #113): the lightbulb's fix, applied the way VS Code
+  // applies it, clears the diagnostic it was for.
+  const fixable = vscode.Uri.file(path.join(folder, "fixable.rel"));
+  await vscode.window.showTextDocument(fixable);
+  await waitFor(fixable, (found) => found.some((d) => codeOf(d) === "plural-preferred"));
+  const actions = await vscode.commands.executeCommand(
+    "vscode.executeCodeActionProvider",
+    fixable,
+    new vscode.Range(0, 20, 0, 20)
+  );
+  const titles = actions.map((action) => action.title);
+  const quick = actions.find((action) => action.title === "Change `setting` to `settings`");
+  const applied = quick ? await vscode.workspace.applyEdit(quick.edit) : false;
+  const fixedFound = applied
+    ? await waitFor(fixable, (found) => !found.some((d) => codeOf(d) === "plural-preferred"))
+    : [];
+  const fixedText = vscode.workspace.textDocuments
+    .find((document) => document.uri.toString() === fixable.toString())
+    ?.getText();
+
   // An unsaved buffer has no file name, so only its language says it is
   // relevance (see LANGUAGE_ID in src/bigfix_relevance_analyzer/lsp/linter.py).
   let untitledFound;
@@ -113,11 +135,13 @@ async function lint() {
     ],
     "task.bes": summary(besFound),
     "task.bes languageId": besEditor.document.languageId,
+    "fixable.rel actions": titles,
+    "fixable.rel after the fix": summary(fixedFound),
+    "fixable.rel text after the fix": fixedText,
     ...(untitledFound ? { [`untitled (${language})`]: summary(untitledFound) } : {}),
   };
   fs.writeFileSync(process.env.SMOKE_RESULT, JSON.stringify(result, null, 2));
 
-  const codeOf = (d) => (typeof d.code === "object" ? d.code.value : d.code);
   const codes = new Set(brokenFound.map(codeOf));
   if (!codes.has("error-token")) {
     throw new Error(`broken.rel: expected an error-token diagnostic, got ${[...codes]}`);
@@ -151,6 +175,12 @@ async function lint() {
   // over exactly the name (characters 7 to 38), mapped back through the fence.
   if (!hoverText.includes("`totally bogus made up inspector`") || !hoverText.includes("not defined")) {
     throw new Error(`fenced.md: expected a hover on the unknown name, got ${JSON.stringify(hoverText)}`);
+  }
+  if (!quick || !applied) {
+    throw new Error(`fixable.rel: expected the quick fix to be offered and applied, got ${JSON.stringify(titles)}`);
+  }
+  if (fixedText !== 'exists values of settings "x" of client\n') {
+    throw new Error(`fixable.rel: unexpected text after the fix: ${JSON.stringify(fixedText)}`);
   }
   const expectedRange = [[3, 7], [3, 38]];
   if (JSON.stringify(result["fenced.md hover range"]) !== JSON.stringify(expectedRange)) {

@@ -65,6 +65,19 @@ the site analysed as linting analyses it, and the answer is
 diagnostics would not look either: past the size guard, or in a document no
 extractor reads.
 
+Quick fixes
+-----------
+:meth:`DocumentLinter.fixes` offers each fixable statement's safe fix as an
+editor action, and one more that fixes the whole file. Nothing about whether a
+fix is safe is decided here: :func:`~bigfix_relevance_analyzer.fixfile._plan`
+plans it against the buffer's own bytes, exactly as ``--fix`` and the
+pre-commit hook plan a file, and its byte edits become ranges through
+:meth:`~bigfix_relevance_analyzer.lsp.positions.DocumentIndex.byte_range`. A
+plan it refuses is no action, with the reason logged at debug level. An editor
+asks on every cursor move, so nothing is planned unless a fixable diagnostic
+is in the requested range, and plans are kept with the document's extraction
+until its text changes.
+
 Runs in WASM
 ------------
 This is the code an editor extension runs inside a componentize-py component,
@@ -79,11 +92,13 @@ import dataclasses
 import enum
 import logging
 from collections import OrderedDict
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any, Final, NamedTuple
 from urllib.parse import unquote, urlparse
 from urllib.request import url2pathname
+
+from bigfix_relevance_analyzer.autofix import AutofixResult, _kept
 
 # Underscore-private on purpose: this package's modules share extract's
 # helpers this way (lint.py imports _extract_file and _is_recognized too).
@@ -94,6 +109,7 @@ from bigfix_relevance_analyzer.extract import (
     _ExtractionProblem,
     _is_recognized,
 )
+from bigfix_relevance_analyzer.fixfile import SiteAnchor, _plan, _site_anchor, site_fixes
 from bigfix_relevance_analyzer.lint import (
     Finding,
     LintConfig,
@@ -130,6 +146,15 @@ relevance statement, when the client says it is this language: an unsaved
 ``untitled:`` buffer, or a file switched to it by hand. The extension
 contributes the language under this id; a test keeps the two equal."""
 
+QUICKFIX_KIND: Final = "quickfix"
+"""The code action kind of a fix for one statement."""
+
+FIX_ALL_KIND: Final = "source.fixAll.bigfix-relevance"
+"""The code action kind of the fix for the whole file: what
+``editor.codeActionsOnSave`` names to fix on save."""
+
+FIX_ALL_TITLE: Final = "Fix all safe issues in this file"
+
 DEFAULT_CACHE_SIZE: Final = 2048
 """Sites whose findings the linter keeps -- as many as lint keeps analyses."""
 
@@ -156,6 +181,12 @@ class _Extraction:
     sites: list[RelevanceSite]
     problems: list[_ExtractionProblem]
     _index: DocumentIndex | None = None
+    fixes: dict[SiteAnchor | None, tuple[tuple[Range, str], ...] | None] = dataclasses.field(
+        default_factory=dict
+    )
+    """Planned quick-fix edits for this text, by site anchor (``None`` for the
+    whole file); ``None`` for one that may not be offered. The edits, not the
+    plans: a plan holds two copies of the document."""
 
     @property
     def index(self) -> DocumentIndex:
@@ -175,6 +206,26 @@ _SEVERITIES: Final = {
     Severity.ERROR: _DiagnosticSeverity.ERROR,
     Severity.WARNING: _DiagnosticSeverity.WARNING,
 }
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class DocumentFix:
+    """One code action, as plain data: what the protocol layer turns into a
+    ``CodeAction`` with a ``WorkspaceEdit``."""
+
+    title: str
+    kind: str
+    """:data:`QUICKFIX_KIND` or :data:`FIX_ALL_KIND`."""
+
+    diagnostics: tuple[Diagnostic, ...]
+    """The diagnostics it fixes, exactly as :meth:`DocumentLinter.diagnostics` publishes them."""
+
+    edits: tuple[tuple[Range, str], ...]
+    """Ranges in the buffer and the text that replaces each; an insertion's
+    range is empty. Disjoint, in document order."""
+
+    is_preferred: bool = False
+    """Whether it is the one fix for its diagnostics: what "Auto Fix" applies."""
 
 
 class CacheStats(NamedTuple):
@@ -310,6 +361,114 @@ class DocumentLinter:
             }
         return result
 
+    def fixes(
+        self,
+        uri: str,
+        text: str,
+        language_id: str | None = None,
+        *,
+        range: Range | None = None,
+        only: Sequence[str] | None = None,
+    ) -> list[DocumentFix]:
+        """The code actions for ``range`` of the document at ``uri`` holding ``text``.
+
+        One :data:`QUICKFIX_KIND` action per statement with a fixable
+        diagnostic in ``range`` (all of them when ``range`` is ``None``), each
+        applying that statement's whole fix; then, when the file has two or
+        more, a second-choice quick fix for all of them; then the
+        :data:`FIX_ALL_KIND` action. ``only`` keeps just the kinds it names or
+        is a prefix of, as LSP's ``context.only`` does, and asking for the
+        fix-all kind by name gets it wherever ``range`` is: fix on save. The
+        file type is chosen exactly as :meth:`diagnostics` chooses it.
+        """
+
+        def wanted(kind: str) -> bool:
+            return only is None or any(kind == want or kind.startswith(f"{want}.") for want in only)
+
+        data = text.encode("utf-8", errors="surrogatepass")
+        if len(data) > self.max_document_bytes:
+            return []
+        extracted = self._extract(uri, text, data, language_id)
+        if extracted is None:
+            return []
+        findings = _lint_extracted(
+            extracted.path, extracted.sites, extracted.problems, self.config, self._judge
+        )
+        fixable = site_fixes(findings)
+        if not fixable:
+            return []
+        index = extracted.index
+        published = {
+            id(fix.site): tuple(
+                diagnostic
+                for finding in findings
+                if finding.site is fix.site and finding.autofix is not None
+                for diagnostic in _diagnostics(index, finding)
+            )
+            for fix in fixable
+        }
+        in_range = [
+            fix
+            for fix in fixable
+            if range is None or any(_overlaps(d, range) for d in published[id(fix.site)])
+        ]
+        asked_for_all = only is not None and wanted(FIX_ALL_KIND)
+        if not in_range and not asked_for_all:
+            return []
+
+        actions: list[DocumentFix] = []
+        if wanted(QUICKFIX_KIND):
+            for fix in in_range:
+                edits = self._planned(extracted, _site_anchor(fix.site))
+                if edits is not None:
+                    actions.append(
+                        DocumentFix(
+                            _title(fix.autofix),
+                            QUICKFIX_KIND,
+                            published[id(fix.site)],
+                            edits,
+                            is_preferred=True,
+                        )
+                    )
+        lightbulb = len(fixable) > 1 and bool(in_range) and wanted(QUICKFIX_KIND)
+        if lightbulb or wanted(FIX_ALL_KIND):
+            edits = self._planned(extracted, None)
+            if edits is not None:
+                fixed = tuple(d for fix in fixable for d in published[id(fix.site)])
+                if lightbulb:
+                    actions.append(DocumentFix(FIX_ALL_TITLE, QUICKFIX_KIND, fixed, edits))
+                if wanted(FIX_ALL_KIND) and (in_range or asked_for_all):
+                    actions.append(DocumentFix(FIX_ALL_TITLE, FIX_ALL_KIND, fixed, edits))
+        return actions
+
+    def _planned(
+        self, extracted: _Extraction, anchor: SiteAnchor | None
+    ) -> tuple[tuple[Range, str], ...] | None:
+        """The edits fixing one site (``anchor``) or the whole file (``None``),
+        as ranges in the buffer; ``None`` when no fix may be offered."""
+        if anchor not in extracted.fixes:
+            extracted.fixes[anchor] = self._edits(extracted, anchor)
+        return extracted.fixes[anchor]
+
+    def _edits(
+        self, extracted: _Extraction, anchor: SiteAnchor | None
+    ) -> tuple[tuple[Range, str], ...] | None:
+        """:meth:`_planned`, uncached."""
+        only = None if anchor is None else {anchor}
+        plan = _plan(extracted.path, extracted.data, self.config, judge=self._judge, only=only)
+        for refused in plan.unapplied:
+            logger.debug("no quick fix at line %d: %s", refused.line, refused.reason)
+        if not plan.applied:
+            return None
+        edits: list[tuple[Range, str]] = []
+        for edit in plan.edits:
+            found = extracted.index.byte_range(edit.start, edit.end)
+            if found is None:
+                logger.debug("no quick fix: bytes %d-%d do not map", edit.start, edit.end)
+                return None
+            edits.append((found, edit.replacement.decode("utf-8")))
+        return tuple(edits)
+
     def forget(self, uri: str) -> None:
         """Drop what is kept for ``uri``: the client closed it, or its text is
         no longer known. Nothing happens for a URI never seen."""
@@ -395,6 +554,28 @@ def _document_path(uri: str, language_id: str | None) -> Path:
         # single element: a second untyped suffix must not break this.
         return path.with_name(f"{path.name}{min(_UNTYPED_TEXT_SUFFIXES)}")
     return path
+
+
+def _title(autofix: AutofixResult) -> str:
+    """A quick fix's title: the one change it makes, or how many it makes.
+
+    Worded as lint words what a fix did (``lint._with_fix``)."""
+    count = sum(autofix.applied.values())
+    if count == 1 and len(autofix.edits) == 1:
+        (edit,) = autofix.edits
+        if _kept(edit, autofix.original) is not None:
+            return "Wrap in `unique value of`"
+        return f"Change `{autofix.original[edit.start : edit.end]}` to `{edit.replacement}`"
+    return f"Apply {count} safe fixes to this statement"
+
+
+def _overlaps(diagnostic: Diagnostic, wanted: Range) -> bool:
+    """Whether ``diagnostic``'s range meets ``wanted``, touching included: a
+    cursor at either end of a squiggle is on it."""
+    found = diagnostic["range"]
+    start = (found["start"]["line"], found["start"]["character"])
+    end = (found["end"]["line"], found["end"]["character"])
+    return start <= wanted[1] and wanted[0] <= end
 
 
 def _diagnostics(index: DocumentIndex, finding: Finding) -> list[Diagnostic]:

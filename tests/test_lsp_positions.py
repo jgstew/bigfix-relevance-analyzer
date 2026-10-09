@@ -478,3 +478,38 @@ def test_site_offset_on_a_text_site_builds_no_byte_index(name: str, doc: str) ->
     assert index.site_offset(site, (line, 7)) == 7
     assert index.locate(sites, (line, 7)) == (site, 7)
     assert index._byte_starts is None
+
+
+# -- byte offsets to ranges: where a quick fix's bytes go (#113) ----------------------
+
+
+def test_byte_range_is_zero_width_for_an_insertion() -> None:
+    text = 'exists values of setting "x" of client\n'
+    index = DocumentIndex(text, text.encode())
+    assert index.byte_range(24, 24) == ((0, 24), (0, 24))
+    assert index.byte_range(0, 6) == ((0, 0), (0, 6))
+
+
+def test_byte_range_counts_utf16_after_an_astral_character() -> None:
+    text = '/* \U0001f600 */ exists values of setting "x" of client\r\n'
+    data = text.encode()
+    index = DocumentIndex(text, data)
+    byte = data.index(b"setting ") + len(b"setting")
+    # The emoji is 4 bytes and 1 code point, but 2 UTF-16 units.
+    assert index.byte_range(byte, byte) == ((0, text.index("setting ") + 7 + 1),) * 2
+
+
+def test_byte_range_on_a_later_crlf_line() -> None:
+    text = 'true and\r\nexists values of setting "x" of client\r\n'
+    data = text.encode()
+    index = DocumentIndex(text, data)
+    byte = data.index(b"setting ") + len(b"setting")
+    assert index.byte_range(byte, byte) == ((1, 24), (1, 24))
+
+
+@pytest.mark.parametrize("offset", [1, 2, 3, 100])
+def test_byte_range_is_none_inside_a_character_or_past_the_end(offset: int) -> None:
+    text = "\U0001f600x"
+    index = DocumentIndex(text, text.encode())
+    assert index.byte_range(offset, offset) is None
+    assert index.byte_range(0, offset) is None

@@ -77,6 +77,8 @@ const scenarios = {
     // The name starts at character 7, so a range that starts there is not a
     // whole-line one that happens to.
     "fenced.md": "# Example\n\n```relevance\nexists totally bogus made up inspector\n```\n",
+    // A quick fix (issue #113): `setting` -> `settings`, by inserting `s`.
+    "fixable.rel": 'exists values of setting "x" of client\n',
     "task.bes":
       '<?xml version="1.0" encoding="UTF-8"?>\n<BES><Task><Title>t</Title>\n' +
       '<Relevance>exists file "unterminated</Relevance>\n</Task></BES>\n',

@@ -745,3 +745,218 @@ def test_a_closed_or_dropped_document_is_forgotten_by_the_linter(
             notification("textDocument/didClose", {"textDocument": {"uri": uri("a.rel")}})
         )
     assert forgotten == [uri("a.rel")]
+
+
+# ---------------------------------------------------------------------------
+# Quick fixes: textDocument/codeAction (#113)
+# ---------------------------------------------------------------------------
+
+FIX_ALL = "source.fixAll.bigfix-relevance"
+SETTING_TEXT = 'exists values of setting "x" of client\n'
+
+
+def client_capabilities(*, literals: bool = True, document_changes: bool = True) -> Message:
+    """What vscode-languageclient 10.1.2 advertises, or less of it."""
+    capabilities: Message = {
+        "workspace": {"workspaceEdit": {"documentChanges": document_changes}},
+        "textDocument": {"codeAction": {}},
+    }
+    if literals:
+        capabilities["textDocument"]["codeAction"]["codeActionLiteralSupport"] = {
+            "codeActionKind": {"valueSet": ["", "quickfix", "refactor", "source"]}
+        }
+    return capabilities
+
+
+def started_for_fixes(**kwargs: bool) -> Server:
+    server = Server()
+    params = {"processId": None, "rootUri": ROOT_URI, "capabilities": client_capabilities(**kwargs)}
+    server.handle(request("initialize", params))
+    server.handle(notification("initialized", {}))
+    return server
+
+
+def code_actions(
+    server: Server,
+    name: str,
+    start: tuple[int, int] = (0, 0),
+    end: tuple[int, int] = (0, 0),
+    only: list[str] | None = None,
+    id_: int = 2,
+) -> Message:
+    context: Message = {"diagnostics": [], "triggerKind": 2}
+    if only is not None:
+        context["only"] = only
+    params = {
+        "textDocument": {"uri": uri(name)},
+        "range": {
+            "start": {"line": start[0], "character": start[1]},
+            "end": {"line": end[0], "character": end[1]},
+        },
+        "context": context,
+    }
+    (response,) = server.handle(request("textDocument/codeAction", params, id_=id_))
+    return response
+
+
+def apply_workspace_edit(text: str, edit: Message, name: str) -> str:
+    """``text`` with a ``WorkspaceEdit``'s edits for ``name`` applied (single-line ranges)."""
+    if "documentChanges" in edit:
+        (change,) = edit["documentChanges"]
+        assert change["textDocument"]["uri"] == uri(name)
+        edits = change["edits"]
+    else:
+        edits = edit["changes"][uri(name)]
+    lines = text.splitlines(keepends=True)
+    for item in sorted(
+        edits,
+        key=lambda e: (e["range"]["start"]["line"], e["range"]["start"]["character"]),
+        reverse=True,
+    ):
+        start, end = item["range"]["start"], item["range"]["end"]
+        assert start["line"] == end["line"]
+        line = lines[start["line"]]
+        lines[start["line"]] = (
+            line[: start["character"]] + item["newText"] + line[end["character"] :]
+        )
+    return "".join(lines)
+
+
+def test_code_actions_are_advertised_only_with_literal_support() -> None:
+    server = Server()
+    params = {"processId": None, "capabilities": client_capabilities()}
+    (response,) = server.handle(request("initialize", params))
+    assert response["result"]["capabilities"] == {
+        "textDocumentSync": {"openClose": True, "change": 1, "save": {"includeText": False}},
+        "hoverProvider": True,
+        "codeActionProvider": {"codeActionKinds": ["quickfix", FIX_ALL]},
+    }
+    plain = initialize(Server())  # capabilities: {}
+    assert "codeActionProvider" not in plain["result"]["capabilities"]
+
+
+def test_a_code_action_over_a_fixable_diagnostic() -> None:
+    server = started_for_fixes()
+    published_diagnostics = diagnostics(did_open(server, "t.rel", SETTING_TEXT, version=7), "t.rel")
+    response = code_actions(server, "t.rel", (0, 18), (0, 18))
+    quick, fix_all = response["result"]
+    assert quick["kind"] == "quickfix" and quick["isPreferred"] is True
+    assert quick["title"] == "Change `setting` to `settings`"
+    assert quick["diagnostics"] == [
+        d for d in published_diagnostics if d["code"] == "plural-preferred"
+    ]
+    (change,) = quick["edit"]["documentChanges"]
+    assert change["textDocument"] == {"uri": uri("t.rel"), "version": 7}
+    assert change["edits"] == [
+        {
+            "range": {"start": {"line": 0, "character": 24}, "end": {"line": 0, "character": 24}},
+            "newText": "s",
+        }
+    ]
+    assert fix_all["kind"] == FIX_ALL
+
+
+def test_a_range_with_no_fixable_diagnostic_gets_nothing() -> None:
+    server = started_for_fixes()
+    did_open(server, "t.rel", "true and\n" + SETTING_TEXT)
+    assert code_actions(server, "t.rel", (0, 1), (0, 1))["result"] == []
+
+
+def test_only_picks_the_kinds() -> None:
+    server = started_for_fixes()
+    did_open(server, "t.rel", SETTING_TEXT)
+    (only_all,) = code_actions(server, "t.rel", only=["source.fixAll"])["result"]
+    assert only_all["kind"] == FIX_ALL
+    assert [
+        a["kind"]
+        for a in code_actions(server, "t.rel", (0, 18), (0, 18), only=["quickfix"])["result"]
+    ] == ["quickfix"]
+
+
+def test_a_client_without_document_changes_gets_changes() -> None:
+    server = started_for_fixes(document_changes=False)
+    did_open(server, "t.rel", SETTING_TEXT)
+    quick, _ = code_actions(server, "t.rel", (0, 18), (0, 18))["result"]
+    assert apply_workspace_edit(SETTING_TEXT, quick["edit"], "t.rel") == SETTING_TEXT.replace(
+        "setting ", "settings "
+    )
+    assert "documentChanges" not in quick["edit"]
+
+
+def test_an_unknown_or_closed_document_gets_nothing() -> None:
+    server = started_for_fixes()
+    assert code_actions(server, "nope.rel")["result"] == []
+    did_open(server, "t.rel", SETTING_TEXT)
+    server.handle(notification("textDocument/didClose", {"textDocument": {"uri": uri("t.rel")}}))
+    assert code_actions(server, "t.rel", (0, 18), (0, 18))["result"] == []
+
+
+def test_a_code_action_before_initialize_is_refused() -> None:
+    (response,) = Server().handle(request("textDocument/codeAction", {}))
+    assert response["error"]["code"] == -32002
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {},
+        {"textDocument": {"uri": uri("t.rel")}},
+        {"textDocument": {"uri": uri("t.rel")}, "range": {"start": {"line": 0}, "end": {}}},
+        {"textDocument": {"uri": 3}, "range": {}},
+    ],
+)
+def test_malformed_code_action_params_are_invalid(params: Message) -> None:
+    server = started_for_fixes()
+    (response,) = server.handle(request("textDocument/codeAction", params))
+    assert response["error"]["code"] == -32602
+
+
+def test_taking_the_action_round_trips() -> None:
+    """Apply it, send the result as didChange: the fixed code is gone, and a
+    second request offers nothing."""
+    server = started_for_fixes()
+    did_open(server, "t.rel", SETTING_TEXT)
+    quick, _ = code_actions(server, "t.rel", (0, 18), (0, 18))["result"]
+    fixed = apply_workspace_edit(SETTING_TEXT, quick["edit"], "t.rel")
+    after = diagnostics(did_change(server, "t.rel", fixed, version=2), "t.rel")
+    assert not any(d["code"] == "plural-preferred" for d in after)
+    assert code_actions(server, "t.rel", (0, 0), (5, 0), id_=3)["result"] == []
+
+
+def test_a_stale_action_is_not_served_after_a_change() -> None:
+    server = started_for_fixes()
+    did_open(server, "t.rel", SETTING_TEXT)
+    code_actions(server, "t.rel", (0, 18), (0, 18))
+    did_change(server, "t.rel", "true and " + SETTING_TEXT, version=2)
+    quick, _ = code_actions(server, "t.rel", (0, 27), (0, 27), id_=3)["result"]
+    (change,) = quick["edit"]["documentChanges"]
+    assert change["textDocument"]["version"] == 2
+    assert change["edits"][0]["range"]["start"]["character"] == 24 + len("true and ")
+
+
+def test_code_actions_need_no_codec_beyond_utf8() -> None:
+    """The component's snapshot has no UTF-16 codec: see the diagnostics twin above."""
+    run_fresh_python(
+        """
+import sys
+for name in ("encodings.utf_16", "encodings.utf_16_le", "encodings.utf_16_be"):
+    sys.modules[name] = None
+from bigfix_relevance_analyzer.lsp.server import Server
+server = Server()
+literals = {"codeActionKind": {"valueSet": []}}
+caps = {"textDocument": {"codeAction": {"codeActionLiteralSupport": literals}}}
+server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"capabilities": caps}})
+text = '/* \\U0001f600 */ exists values of setting "x" of client'
+server.handle({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {
+    "textDocument": {"uri": "file:///w/a.rel", "languageId": "x", "version": 1, "text": text}}})
+point = {"line": 0, "character": 28}  # on `setting`, UTF-16 counted
+params = {"textDocument": {"uri": "file:///w/a.rel"}, "range": {"start": point, "end": point},
+    "context": {"diagnostics": []}}
+(reply,) = server.handle(
+    {"jsonrpc": "2.0", "id": 2, "method": "textDocument/codeAction", "params": params})
+quick = reply["result"][0]
+(edit,) = quick["edit"]["changes"]["file:///w/a.rel"]
+assert edit["range"]["start"]["character"] == text.index("setting ") + 7 + 1, edit
+print("ok")
+"""
+    )

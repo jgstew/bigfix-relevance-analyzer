@@ -153,6 +153,53 @@ test("hover describes the inspector under the cursor", async (t) => {
   });
 });
 
+test("a quick fix is answered through the component", async (t) => {
+  // The fixer's modules -- difflib among them -- must be in the component's
+  // build snapshot: a module first imported at runtime does not exist there.
+  const server = startServer();
+  t.after(() => server.child.kill());
+  const literals = { codeActionKind: { valueSet: ["quickfix", "source"] } };
+  server.send({
+    id: 1,
+    method: "initialize",
+    params: {
+      processId: null,
+      rootUri: null,
+      capabilities: { textDocument: { codeAction: { codeActionLiteralSupport: literals } } },
+    },
+  });
+  const response = await server.next((m) => m.id === 1);
+  assert.deepEqual(response.result.capabilities.codeActionProvider, {
+    codeActionKinds: ["quickfix", "source.fixAll.bigfix-relevance"],
+  });
+  server.send({ method: "initialized", params: {} });
+  const uri = "file:///workspace/fixable.rel";
+  // An astral character before the fix: 4 UTF-8 bytes, 2 UTF-16 units.
+  const text = '/* \u{1F600} */ exists values of setting "x" of client\n';
+  server.send({
+    method: "textDocument/didOpen",
+    params: { textDocument: { uri, languageId: "plaintext", version: 1, text } },
+  });
+  await server.next((m) => m.method === "textDocument/publishDiagnostics");
+  const character = text.indexOf("setting") + "setting".length; // UTF-16, as JS counts
+  server.send({
+    id: 2,
+    method: "textDocument/codeAction",
+    params: {
+      textDocument: { uri },
+      range: { start: { line: 0, character }, end: { line: 0, character } },
+      context: { diagnostics: [] },
+    },
+  });
+  const actions = (await server.next((m) => m.id === 2)).result;
+  const [quick] = actions;
+  assert.equal(quick.title, "Change `setting` to `settings`");
+  assert.equal(quick.isPreferred, true);
+  assert.deepEqual(quick.edit.changes[uri], [
+    { range: { start: { line: 0, character }, end: { line: 0, character } }, newText: "s" },
+  ]);
+});
+
 test("shutdown then exit ends the process with 0", async () => {
   const server = startServer();
   await initialized(server);
