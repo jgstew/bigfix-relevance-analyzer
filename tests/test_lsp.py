@@ -197,7 +197,7 @@ def test_a_failing_handler_is_logged_and_does_not_escape(
         raise RuntimeError("boom")
 
     server = started()
-    monkeypatch.setattr(linter_module, "_lint_data", explode)
+    monkeypatch.setattr(linter_module, "_lint_extracted", explode)
     with caplog.at_level(logging.ERROR, logger="bigfix_relevance_analyzer"):
         assert did_open(server, "a.rel", BROKEN) == []
     assert "boom" in caplog.text
