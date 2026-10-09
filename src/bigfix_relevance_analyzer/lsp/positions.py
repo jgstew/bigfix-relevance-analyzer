@@ -124,7 +124,8 @@ class DocumentIndex:
         point = self._point(position)
         if point is None:
             return None
-        return self._offset_at(site, position, point, self._byte_at(*point))
+        # No byte offset yet: only a BES site needs one, and works it out itself.
+        return self._offset_at(site, position, point, None)
 
     def locate(
         self, sites: Iterable[RelevanceSite], position: Position
