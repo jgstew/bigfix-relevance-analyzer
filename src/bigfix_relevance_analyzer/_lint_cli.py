@@ -53,9 +53,11 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import re
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Final
 
 from bigfix_relevance_analyzer._cli_common import (
     add_ceiling_args,
@@ -71,10 +73,10 @@ from bigfix_relevance_analyzer.fixfile import (
     FileFix,
     FixPlan,
     FixResult,
-    _plan_path,
+    _plan_directory,
+    _plan_paths,
     fix_directory,
     fix_paths,
-    plan_fix,
 )
 from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
@@ -84,7 +86,6 @@ from bigfix_relevance_analyzer.lint import (
     LintConfig,
     Severity,
     _findings_dict,
-    _walk_files,
     counts,
     lint_text,
 )
@@ -220,8 +221,10 @@ def main(argv: list[str] | None = None, *, prog: str = "bigfix-relevance-lint") 
         parser.error("--fix rewrites files in place; it cannot fix relevance given as text")
     if args.diff and not args.fix:
         parser.error("--diff shows what --fix would change; give both")
+    if args.diff and output != "text":
+        parser.error("--diff prints a unified diff; it cannot be combined with --json/--markdown")
     if args.diff:
-        return _diff(_plans(paths, config, args.max_depth), quiet=args.quiet)
+        return _diff(paths, config, args)
 
     scope = _scope(paths, texts)
     fixes: FixResult | None = None
@@ -274,30 +277,62 @@ def main(argv: list[str] | None = None, *, prog: str = "bigfix-relevance-lint") 
     return 0
 
 
-def _plans(paths: list[str], config: LintConfig, max_depth: int) -> list[FixPlan]:
-    """What ``--fix`` would do to each path, or to each walked file: nothing written."""
+_LINE: Final = re.compile(r"[^\r\n]*(?:\r\n|\r|\n)|[^\r\n]+\Z")
+"""One line with its ending, split only where the extractors split lines --
+unlike :meth:`str.splitlines`, which also breaks at form feeds and Unicode
+line separators."""
+
+
+def _diff(paths: list[str], config: LintConfig, args: argparse.Namespace) -> int:
+    """``--fix --diff``: what ``--fix`` would do, with nothing written.
+
+    The unified diff goes to stdout, so it can be piped to ``patch`` or ``git
+    apply``; everything ``--fix`` would print -- fixes not applied, the
+    findings that would be left, the summary -- goes to stderr. The exit status
+    is ``--fix``'s, with "would change" for "changed".
+    """
+    plans: Iterator[FixPlan]
+    findings: tuple[Finding, ...] = ()
     if paths:
-        return [plan_fix(path, config) for path in paths]
-    files, _ = _walk_files(Path("."), max_depth)
-    return [_plan_path(file_path, config, explicit=False) for file_path in files]
-
-
-def _diff(plans: Sequence[FixPlan], *, quiet: bool) -> int:
-    """Print each plan's change as a unified diff; 1 if any file would change."""
-    changed = [plan for plan in plans if plan.changed]
-    if not quiet:
-        for plan in changed:
-            name = str(plan.path)
-            before = plan.original.decode("utf-8", errors="replace").splitlines(keepends=True)
-            after = plan.fixed.decode("utf-8", errors="replace").splitlines(keepends=True)
-            print("".join(difflib.unified_diff(before, after, name, name)), end="")
-    applied = sum(len(plan.applied) for plan in plans)
-    unapplied = sum(len(plan.unapplied) for plan in plans)
+        plans = _plan_paths(paths, config)
+    else:
+        plans, findings = _plan_directory(Path("."), config, max_depth=args.max_depth)
+    unapplied: list[FileFix] = []
+    applied = changed = 0
+    for plan in plans:  # one at a time: a walk never holds every file's bytes
+        findings += plan.findings
+        unapplied += plan.unapplied
+        applied += len(plan.applied)
+        if plan.changed:
+            changed += 1
+            if not args.quiet:
+                print(_unified_diff(plan), end="")
+    tallies = counts(findings)
+    errors = tallies[Severity.ERROR.value]
+    warnings = tallies[Severity.WARNING.value]
+    if not args.quiet:
+        for fix in unapplied:
+            print(_fix_line(fix), file=sys.stderr)
+        for finding in findings:
+            print(finding, file=sys.stderr)
     print(
-        f"{applied} fix(es) would be applied in {len(changed)} file(s), {unapplied} not applied",
+        f"{applied} fix(es) would be applied in {changed} file(s), "
+        f"{len(unapplied)} not applied; {_summary(errors, warnings, _scope(paths, []))}",
         file=sys.stderr,
     )
-    return 1 if changed else 0
+    return 1 if errors or (args.fail_on_warning and warnings) or changed else 0
+
+
+def _unified_diff(plan: FixPlan) -> str:
+    """``plan``'s change as a unified diff, with ``\\ No newline at end of file``
+    after a last line that has none, as GNU diff and git write it."""
+    name = str(plan.path)
+    before = _LINE.findall(plan.original.decode("utf-8", errors="replace"))
+    after = _LINE.findall(plan.fixed.decode("utf-8", errors="replace"))
+    return "".join(
+        line if line.endswith(("\n", "\r")) else f"{line}\n\\ No newline at end of file\n"
+        for line in difflib.unified_diff(before, after, name, name)
+    )
 
 
 def _markdown_report(findings: tuple[Finding, ...], fixes: FixResult | None, summary: str) -> str:

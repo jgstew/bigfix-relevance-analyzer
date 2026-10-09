@@ -442,6 +442,91 @@ def test_fix_diff_prints_the_change_and_writes_nothing(
     assert capsys.readouterr().out == ""
 
 
+def test_fix_diff_marks_a_last_line_with_no_newline(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The convention `patch` and `git apply` expect, as GNU diff and git write it."""
+    path = write(tmp_path, "t.rel", 'exists values of setting "x" of client')
+    assert main(["--fix", "--diff", str(path)]) == 1
+    assert capsys.readouterr().out.endswith(
+        "@@ -1 +1 @@\n"
+        '-exists values of setting "x" of client\n'
+        "\\ No newline at end of file\n"
+        '+exists values of settings "x" of client\n'
+        "\\ No newline at end of file\n"
+    )
+
+
+def test_fix_diff_splits_lines_only_where_the_linter_does(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A form feed is not a line break to the extractor, so not to the diff either."""
+    path = write(tmp_path, "t.rel", 'true \x0c and exists values of setting "x" of client\n')
+    assert main(["--fix", "--diff", str(path)]) == 1
+    assert "@@ -1 +1 @@\n" in capsys.readouterr().out
+
+
+def test_fix_diff_reports_a_file_error_and_fails(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["--fix", "--diff", str(tmp_path / "missing.rel")]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "[file-error]" in captured.err
+
+
+def test_fix_diff_fails_on_an_error_with_nothing_to_fix(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = write(tmp_path, "broken.rel", BROKEN)
+    assert main(["--fix", "--diff", str(path)]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "[parse-error]" in captured.err
+
+
+def test_fix_diff_honours_fail_on_warning(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = write(tmp_path, "t.rel", "totally bogus made up inspector\n")
+    assert main(["--fix", "--diff", str(path)]) == 0
+    assert main(["--fix", "--diff", "--fail-on-warning", str(path)]) == 1
+
+
+def test_fix_diff_says_which_fix_it_would_not_apply(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """On stderr, so stdout stays a patch."""
+    path = tmp_path / "u.rel"
+    path.write_bytes(b'exists values of setting "\xff" of client\n')
+    assert main(["--fix", "--diff", str(path)]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"{path}:1: not fixed [plural-preferred] undecodable bytes on line 1" in captured.err
+
+
+def test_fix_diff_walks_like_fix_and_reports_depth(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    deep = tmp_path / "a" / "b"
+    deep.mkdir(parents=True)
+    (deep / "t.bes").write_text(SETTING_TASK)
+    (tmp_path / "t.bes").write_text(SETTING_TASK)
+    monkeypatch.chdir(tmp_path)
+    assert main(["--fix", "--diff", "--max-depth", "1"]) == 1
+    captured = capsys.readouterr()
+    assert "+++ t.bes" in captured.out
+    assert "[max-depth-exceeded]" in captured.err
+    assert (deep / "t.bes").read_text() == SETTING_TASK
+
+
+@pytest.mark.parametrize("flag", ["--json", "--markdown"])
+def test_fix_diff_refuses_another_output_format(flag: str) -> None:
+    with pytest.raises(SystemExit) as raised:
+        main(["--fix", "--diff", flag, "t.bes"])
+    assert raised.value.code == 2
+
+
 def test_diff_needs_fix() -> None:
     with pytest.raises(SystemExit) as raised:
         main(["--diff", "t.bes"])

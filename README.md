@@ -624,8 +624,9 @@ It exits `1` whenever it fixed anything, even with nothing left to report:
 pre-commit's convention is that a hook which modifies files fails, so the fix
 is reviewed and staged rather than committed unread. A second run then passes.
 `--json` with `--fix` prints `fix_paths_to_dict()`'s payload. `--fix --diff`
-writes nothing: it prints what `--fix` would change as a unified diff per file,
-and exits `1` if anything would.
+writes nothing: it prints what `--fix` would change as a unified diff per file
+on stdout (ready for `patch` or `git apply`), everything else `--fix` would
+print on stderr, and exits as `--fix` would - `1` if anything would change.
 
 Called with **no path arguments at all**, either entry point walks the current
 directory instead of erroring - `bigfix-relevance-lint` on its own, or
@@ -903,7 +904,9 @@ as they were. What guards a write:
 4. the fixed file is linted again with the same `LintConfig`, and no rule may
    report more findings than before ("the fix would add a complexity
    finding"): adding `unique value of` raises a statement's score, and a fix
-   must not trade a warning for an error over `max_score`;
+   must not trade a warning for an error over `max_score`. Only the fix whose
+   own statement gained the finding is refused; the others in the file still
+   go in;
 5. the file must still hold what was planned from when it is written, and is
    read back after writing and restored if it does not hold what was written.
 
@@ -922,7 +925,8 @@ if plan.changed and my_check(plan.original, plan.fixed):
 ```
 
 `fix_file()` is `write_fix(plan_fix(...))`. `write_fix()` refuses a file that
-changed after it was planned ("file changed since it was planned").
+changed after it was planned ("file changed since it was planned"), reporting
+its fixes and findings as the file now is.
 
 `str` documents and lxml trees have no bytes, so a fix in one cannot be
 written back. `source_map` and `column` are left out of a site's equality,
