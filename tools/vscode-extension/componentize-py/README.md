@@ -2,7 +2,8 @@
 
 Catch mistakes in BigFix Relevance while you write it. Problems are underlined
 as you type, in the fixlets, tasks, analyses, dashboards and documents where
-your relevance already lives. Whole-file relevance gets syntax highlighting.
+your relevance already lives. Relevance, ActionScript and the fixlets that hold
+them get syntax highlighting.
 
 ## Features
 
@@ -48,6 +49,31 @@ keywords such as `of`, `whose` and `if ... then ... else`, comparison, logical a
 arithmetic operators (including `is not equal to` and `does not contain`),
 `it`, strings, numbers and comments.
 
+### ActionScript and BES files
+
+`.bes` and `.bes.xml` files are colored as XML, with the code inside colored as
+the language it is:
+
+- **ActionScript** in action scripts: commands, `if`/`elseif`/`else`/`endif`,
+  `//` comments, strings, URLs, and the relevance inside each `{...}`
+  substitution. The text of a `createfile until` or `appendfile` block is
+  shown as file content, not as commands, and the options of an
+  `override run` or `override wait` block are shown as options. Action scripts
+  in other languages (such as `application/x-sh` or PowerShell) stay plain.
+- **Relevance** in relevance elements, success criteria and analysis
+  properties.
+
+ActionScript on its own, for example a template for an action, is colored in
+files ending in `.actionscript`. Those files are highlighted only, not checked.
+
+`.bes` files open as **BigFix BES XML**, which replaces VS Code's own XML
+support for them. To have another XML extension handle them instead, map them
+back to XML in your settings (you lose the ActionScript and relevance colors):
+
+```json
+"files.associations": { "*.bes": "xml" }
+```
+
 ### A language for relevance
 
 **BigFix Relevance** is available as a language for any editor. Use
@@ -92,6 +118,8 @@ exists file "C:\Windows\notepad.exe"
   underline the whole line they are on. Every other problem underlines just
   the text it is about.
 - Highlighting colors keywords and operators, not inspector names.
+- In `.bes` files, relevance in descriptions, and in `<?Relevance ...?>`
+  blocks of dashboards and reports, is checked but not colored.
 - Completion is not available yet. Hover needs a statement that parses; on one
   with a syntax error there is no hover until it is fixed.
 - A file is checked when its name ends in one of the file types above, or when

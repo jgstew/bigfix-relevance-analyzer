@@ -628,10 +628,18 @@ def test_dependabot_never_moves_the_shim_past_jco_on_its_own(package: Path) -> N
 GENERATOR = REPO_ROOT / "tools" / "generate_tmlanguage.py"
 
 
-def _language(extension: Path) -> dict[str, Any]:
-    (language,) = _manifest(extension)["contributes"]["languages"]
+def _language(extension: Path, language_id: str = "bigfix-relevance") -> dict[str, Any]:
+    (language,) = (
+        language
+        for language in _manifest(extension)["contributes"]["languages"]
+        if language["id"] == language_id
+    )
     found: dict[str, Any] = language
     return found
+
+
+ACTIONSCRIPT_ID = "bigfix-actionscript"
+BES_ID = "bigfix-bes"
 
 
 def test_the_primary_extension_contributes_the_relevance_language() -> None:
@@ -646,6 +654,76 @@ def test_the_primary_extension_contributes_the_relevance_language() -> None:
     # VS Code (1.74+) activates on a contributed language by itself; listing
     # `onLanguage:` too is redundant.
     assert f"onLanguage:{LANGUAGE_ID}" not in _manifest(PRIMARY)["activationEvents"]
+
+
+def test_the_relevance_language_is_listed_first() -> None:
+    """extension.js reads `contributes.languages[0]` as the relevance language."""
+    assert "manifest.contributes.languages[0].id" in (PRIMARY / "extension.js").read_text("utf-8")
+    assert _manifest(PRIMARY)["contributes"]["languages"][0]["id"] == "bigfix-relevance"
+
+
+def test_the_primary_extension_contributes_exactly_three_languages() -> None:
+    ids = [language["id"] for language in _manifest(PRIMARY)["contributes"]["languages"]]
+    assert ids == ["bigfix-relevance", ACTIONSCRIPT_ID, BES_ID]
+    for language_id in ids:
+        assert (PRIMARY / _language(PRIMARY, language_id)["configuration"]).is_file()
+
+
+def test_the_bes_language_takes_exactly_the_files_the_extractor_reads_as_bes_xml() -> None:
+    """Highlighting and linting never disagree about which files are BES."""
+    from bigfix_relevance_analyzer.extract import _BES_XML_SUFFIXES, _is_bes_xml
+
+    extensions = _language(PRIMARY, BES_ID)["extensions"]
+    for extension in extensions:
+        assert _is_bes_xml(Path(f"x{extension}")), extension
+    assert set(_BES_XML_SUFFIXES) <= set(extensions)
+    assert ".bes.xml" in extensions
+
+
+def test_raw_actionscript_files_are_highlighted_but_not_linted() -> None:
+    """`.actionscript` (the console's own `parent:file = <*.ActionScript>`;
+    never `.as`, which is Adobe's). Linting raw ActionScript is a separate
+    decision, so the suffix stays out of the analyzer's document patterns."""
+    extensions = _language(PRIMARY, ACTIONSCRIPT_ID)["extensions"]
+    assert extensions == [".actionscript"]
+    patterns: list[str] = json.loads((PRIMARY / "document-patterns.json").read_text("utf-8"))
+    assert not any(fnmatch("dir/x.actionscript", pattern) for pattern in patterns)
+
+
+def test_the_actionscript_configuration_matches_actionscript_syntax() -> None:
+    """Line comments only; `{` closes itself even inside a string, where a
+    substitution is most often written."""
+    config = json.loads(
+        (PRIMARY / _language(PRIMARY, ACTIONSCRIPT_ID)["configuration"]).read_text("utf-8")
+    )
+    assert config["comments"] == {"lineComment": "//"}
+    pairs = {pair["open"]: pair for pair in config["autoClosingPairs"]}
+    assert pairs["{"]["close"] == "}" and "string" not in pairs["{"].get("notIn", [])
+    assert pairs['"']["notIn"] == ["string", "comment"]
+
+
+def test_the_bes_configuration_keeps_the_xml_conveniences() -> None:
+    """Registering `.bes` as its own language drops VS Code's XML language
+    configuration, so the one shipped here carries what XML had."""
+    config = json.loads((PRIMARY / _language(PRIMARY, BES_ID)["configuration"]).read_text("utf-8"))
+    assert config["comments"] == {"blockComment": ["<!--", "-->"]}
+    assert ["<", ">"] in config["brackets"]
+    opens = {pair["open"] for pair in config["autoClosingPairs"]}
+    assert {"<!--", '"', "{", "("} <= opens
+
+
+def test_the_grammars_and_language_files_are_packaged() -> None:
+    ignored = [
+        line.strip()
+        for line in (PRIMARY / ".vscodeignore").read_text("utf-8").splitlines()
+        if line.strip() and not line.startswith("#")
+    ]
+    contributes = _manifest(PRIMARY)["contributes"]
+    paths = [grammar["path"] for grammar in contributes["grammars"]]
+    paths += [language["configuration"] for language in contributes["languages"]]
+    for path in paths:
+        relative = path.removeprefix("./")
+        assert not any(fnmatch(relative, pattern) for pattern in ignored), relative
 
 
 GATE = PRIMARY / "server-gate.json"
@@ -738,6 +816,25 @@ def test_the_smoke_test_checks_the_server_waits_for_relevance() -> None:
     assert "serverRunning" in suite
 
 
+def test_the_smoke_test_opens_a_bes_file_in_the_bes_language() -> None:
+    """Registering `.bes` as its own language must not cost it its diagnostics:
+    the server picks the extractor by file suffix, never by `languageId` (but
+    for whole-file relevance; see `_document_path` in lsp/linter.py)."""
+    run = (COMMON_SMOKE / "run.mjs").read_text("utf-8")
+    suite = (COMMON_SMOKE / "suite.js").read_text("utf-8")
+    assert '"task.bes"' in run
+    assert "SMOKE_BES_LANGUAGE" in run and "SMOKE_BES_LANGUAGE" in suite
+    assert "languageId" in suite
+
+
+def test_the_grammar_test_runs_in_ci() -> None:
+    """The real TextMate engine is the authority on the grammars (issue #116)."""
+    assert (PRIMARY / "test" / "grammar.test.mjs").is_file()
+    assert "test/grammar.test.mjs" in WORKFLOW.read_text("utf-8")
+    dev = _manifest(PRIMARY)["devDependencies"]
+    assert dev["vscode-textmate"][0].isdigit() and dev["vscode-oniguruma"][0].isdigit()
+
+
 def test_only_one_extension_defines_the_language() -> None:
     """Two installed extensions defining the same language would conflict."""
     for extension in EXTENSIONS:
@@ -768,9 +865,22 @@ def test_every_contributed_grammar_exists_and_is_registered_correctly() -> None:
     injection = by_scope["markdown.bigfix-relevance.codeblock"]
     assert injection["injectTo"] == ["text.html.markdown"]
     assert injection["embeddedLanguages"] == {"meta.embedded.block.bigfix-relevance": LANGUAGE_ID}
+    actionscript = by_scope["source.bigfix-actionscript"]
+    assert actionscript["language"] == ACTIONSCRIPT_ID
+    assert actionscript["embeddedLanguages"] == {"meta.embedded.line.bigfix-relevance": LANGUAGE_ID}
+    bes = by_scope["text.xml.bigfix-bes"]
+    assert bes["language"] == BES_ID
+    assert bes["embeddedLanguages"] == {
+        "meta.embedded.block.bigfix-actionscript": ACTIONSCRIPT_ID,
+        "meta.embedded.block.bigfix-relevance": LANGUAGE_ID,
+        "meta.embedded.line.bigfix-relevance": LANGUAGE_ID,
+    }
     for grammar in grammars:
         on_disk = json.loads((PRIMARY / grammar["path"]).read_text("utf-8"))
         assert on_disk["scopeName"] == grammar["scopeName"]
+        # Every embedded scope the grammar uses is mapped to its language.
+        used = set(re.findall(r"meta\.embedded\.[a-z]+\.bigfix-[a-z]+", json.dumps(on_disk)))
+        assert used <= set(grammar.get("embeddedLanguages", {})), grammar["scopeName"]
 
 
 def test_the_committed_grammars_are_what_the_generator_produces() -> None:
@@ -932,6 +1042,11 @@ def test_the_readme_covers_every_file_type_setting_and_command() -> None:
         assert f"`{setting}`" in text, setting
     for command in _manifest(PRIMARY)["contributes"]["commands"]:
         assert command["title"] in text, command["title"]
+    for language in _manifest(PRIMARY)["contributes"]["languages"]:
+        for extension in language["extensions"]:
+            assert f"`{extension}`" in text, extension
+    assert "ActionScript" in text
+    assert "files.associations" in text
 
 
 def test_the_user_facing_text_leaves_out_how_the_extension_is_built() -> None:
@@ -946,3 +1061,5 @@ def test_the_manifest_files_the_extension_where_people_look() -> None:
     manifest = _manifest(PRIMARY)
     assert {"Linters", "Programming Languages"} <= set(manifest["categories"])
     assert "bigfix" in manifest["keywords"]
+    assert "actionscript" in manifest["keywords"]
+    assert "ActionScript" in manifest["description"]

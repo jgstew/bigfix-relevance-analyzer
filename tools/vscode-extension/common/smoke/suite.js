@@ -82,6 +82,12 @@ async function lint() {
     .join("\n");
   const hoverRange = hovers[0]?.range;
 
+  // A .bes in its own language (issue #116) is still linted: the server picks
+  // the extractor by file suffix, not by languageId.
+  const bes = vscode.Uri.file(path.join(folder, "task.bes"));
+  const besEditor = await vscode.window.showTextDocument(bes);
+  const besFound = await waitFor(bes, (found) => found.length > 0);
+
   // An unsaved buffer has no file name, so only its language says it is
   // relevance (see LANGUAGE_ID in src/bigfix_relevance_analyzer/lsp/linter.py).
   let untitledFound;
@@ -105,6 +111,8 @@ async function lint() {
       [hoverRange.start.line, hoverRange.start.character],
       [hoverRange.end.line, hoverRange.end.character],
     ],
+    "task.bes": summary(besFound),
+    "task.bes languageId": besEditor.document.languageId,
     ...(untitledFound ? { [`untitled (${language})`]: summary(untitledFound) } : {}),
   };
   fs.writeFileSync(process.env.SMOKE_RESULT, JSON.stringify(result, null, 2));
@@ -121,6 +129,13 @@ async function lint() {
     if (!token || token.range.start.character !== 12) {
       throw new Error(`${name}: expected error-token from character 12, got ${JSON.stringify(summary(found))}`);
     }
+  }
+  if (!besFound.some((d) => codeOf(d) === "error-token" && d.range.start.line === 2)) {
+    throw new Error(`task.bes: expected error-token on line 3, got ${JSON.stringify(summary(besFound))}`);
+  }
+  const besLanguage = process.env.SMOKE_BES_LANGUAGE;
+  if (besLanguage && besEditor.document.languageId !== besLanguage) {
+    throw new Error(`task.bes: expected languageId ${besLanguage}, got ${besEditor.document.languageId}`);
   }
   // The fence opens on line 3, so its statement is on line 4: proves line
   // mapping from an extracted site back to the document.

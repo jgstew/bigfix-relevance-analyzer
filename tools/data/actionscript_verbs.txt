@@ -1,0 +1,330 @@
+# Every BigFix ActionScript command verb, lowercased and single-spaced.
+# Do not edit by hand: regenerate with tools/generate_actionscript_keywords.py
+# from a jgstew/pre-commit-bigfix checkout (pre_commit_bigfix/schclass_data/):
+# ExpandedActionScript.schclass sha256 0a339983b90158111e4ca4d9a5dae56e96669762de4b5c03ab14cbe7cc29ba24
+# bigfix_overrides.schclass sha256 2160d72215590a8892e568f5bdc52c274faa22e887e210401b7b3ba3bd45b8b1
+# 324 verbs
+action launch preference low-priority
+action launch preference normal-priority
+action lock indefinite
+action lock until
+action log all
+action log command
+action may require restart
+action parameter query
+action requires login
+action requires restart
+action unlock
+action uses file encoding
+action uses wow64 redirection
+activate lpar
+add disk to lpar
+add new group
+add nohash prefetch item
+add policy
+add prefetch item
+add to enabled blacklist
+add to install blacklist
+add to uninstall blacklist
+administrative rights disable
+administrative rights enable
+administrator add
+administrator delete
+agent interface
+allow email access
+append apps
+append apps without notification
+appendfile
+approve in messaging system
+archive now
+assign exchange policy
+associate app vpn
+audit lpar netboot
+begin prefetch block
+binary name copy
+binary name delete
+binary name folder create
+binary name folder delete
+binary name move
+block in messaging system
+browse to
+bulk app upload
+bulk enroll
+cancel selective wipe
+cancel wipe
+change policy
+change vlan
+check osd context
+check profile
+check scripting task
+chmod
+clear credentials store
+clear enabled blacklist
+clear install blacklist
+clear passcode
+clear policy
+clear restrictions password
+clear uninstall blacklist
+clear wifi ssid
+client certificate refresh
+client restart
+clone vm to template
+collect prefetch items
+configure extender
+configure nim client
+continue if
+convert vm to template
+copy
+create configs
+create exchange policy
+create linux vm from template
+create lpar
+create lpar profile
+create mksysb image
+create snapshot
+create vm from iso
+create windows vm from template
+createfile until
+custom site subscribe
+custom site unsubscribe
+deactivate lpar
+deallocate instance
+decrypt file
+delete
+delete device
+delete enterprise app
+delete group
+delete lpar
+delete policy
+delete profile
+delete tag
+delete vm
+deny email access
+deploy profile
+deprovision redemption codes
+disable external storage encryption
+disable internal storage encryption
+disable lost mode
+disassociate app vpn
+dos
+download
+download as
+download now as
+else
+elseif
+enable external storage encryption
+enable gathering
+enable internal storage encryption
+enable lost mode
+end prefetch block
+endif
+enter maintenance mode
+erase device
+execute prefetch plug-in
+exit
+exit maintenance mode
+extract
+fixlet close
+fixlet delete
+fixlet restore
+folder create
+folder delete
+force password change
+force sync
+force user change password
+go to snapshot
+if
+import certificate
+import enrollment questions
+import redemption codes
+initialize patch action
+install agent
+install app
+install application
+install appstore application
+install certificate
+install encrypted profile
+install enterprise application
+install profile
+install provisioning profile
+ios setting
+iso refresh
+launch intent activity
+launch intent service
+list exchange policy
+locate device
+lock container
+lock device
+lock screen
+maas360 refresh
+modify group
+modify lpar profile
+modify policy
+modify vm
+module add
+module commit
+module delete
+mount tools
+move
+move user to group
+netboot lpar
+notify client
+offer apps
+offer apps without notification
+open
+osd command
+override run
+override wait
+parameter
+pause while
+play lost mode sound
+plugin store
+power off hard
+power off soft
+power on
+prefetch
+provision redemption codes
+push enterprise app
+push link
+push message
+quarantine
+rad command
+reboot host
+reenroll
+refresh
+refresh device
+regdelete
+regdelete64
+regkeydelete
+regkeydelete64
+regset
+regset64
+relay select
+remove
+remove access point name
+remove all snapshots
+remove app
+remove app built in configuration
+remove application
+remove appstore application
+remove certificate
+remove enterprise vpn profile
+remove exchange account
+remove exchange policy
+remove from email server
+remove from enabled blacklist
+remove from install blacklist
+remove from mailbox server
+remove from uninstall blacklist
+remove nim client
+remove organization info
+remove patch window
+remove profile
+remove provisioning profile
+remove redemption codes
+remove snapshot
+remove vpn profile
+remove wifi profile
+rename snapshot
+report device location
+request authentication
+reset
+reset a2a agent
+reset passcode
+reset password
+restart
+restart device
+restart instance
+revert snapshot
+run
+rundetached
+runhidden
+schedule os update
+schedule os update scan
+script
+script64
+selective wipe
+selectively wipe
+selectively wipe nitrodesk touchdown
+send email message
+send log file
+send message
+send pin message
+set
+set access point name
+set app built in configuration
+set bluetooth policy
+set browser policy
+set bulk
+set clock
+set custom attribute
+set default access
+set default access point name
+set device restrictions
+set enabled blacklist
+set enterprise vpn profile
+set exchange account
+set install blacklist
+set kiosk policy
+set max devices
+set organization info
+set policy
+set refresh interval
+set roaming policy
+set security policy
+set tag
+set target
+set touchdown configuration
+set touchdown policies
+set uninstall blacklist
+set vpn profile
+set web clip
+set wifi profile
+set wifi ssid
+setting
+setting delete
+setup nim client
+shut down device
+shutdown
+shutdown host
+silently install
+silently uninstall
+silently upgrade
+site force evaluation
+site gather schedule disable
+site gather schedule manual
+site gather schedule publisher
+site gather schedule seconds
+start beacon
+start instance
+start scripting task
+stop beacon
+stop force instance
+stop instance
+subscribe
+surrender device id
+suspend hard
+suspend soft
+test connection
+transfer schedule
+unenroll
+unoffer apps
+unsubscribe
+update enrollment profile
+update sms address
+upgrade tools
+upload enterprise app
+utility
+vlan power on
+wait
+waitdetached
+waithidden
+wipe
+wipe agent data
+wipe blackberry data
+wipe container
+wipe device
+wipe disk
+wipe internal storage
+wipe sd card
+wipe traveler data
