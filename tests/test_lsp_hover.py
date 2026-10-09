@@ -17,7 +17,6 @@ from typing import Any
 import pytest
 from _helpers import REPO_ROOT, lsp_text
 
-from bigfix_relevance_analyzer import __version__
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.extract import _extract_data
 from bigfix_relevance_analyzer.lint import LintConfig, _analyze_cached
@@ -346,6 +345,9 @@ LINKED = [
     ("a.rel", FILES, needle) for needle in ("files", "of", "whose", "it", '"x"', "=", "folder")
 ] + [
     ("a.rel", 'exists file "x" | false', "|"),
+    ("a.rel", 'exists file "x"', "exists"),
+    ("a.rel", 'number of files of folder "x"', "number"),
+    ("a.rel", 'if exists file "x" then 1 else 2', "then"),
     ("a.rel", '("1" as integer) > 0', "as"),
     ("a.rel", '("a", "b")', ","),
     ("a.bsr", "names of bes computers", "bes computers"),
@@ -370,13 +372,14 @@ def test_the_keywords_link_to_the_syntax_reference() -> None:
         assert f"{DOCS_URL}syntax.md#" in markdown, needle
 
 
-def test_links_point_at_this_versions_release_tag() -> None:
-    """Not ``main``: a heading renamed there later must not break the links in
-    an extension already installed. A release tags exactly this checkout, which
-    is what the anchor test above reads."""
+def test_links_point_at_main() -> None:
+    """Not a release tag: an unreleased build (or one whose version falls back
+    to ``0.0.0``) would link to a tag that does not exist, a 404. On ``main``
+    the worst a later heading rename can do is land on the top of the right
+    page, and the anchor test above keeps a rename from going unnoticed."""
     assert (
-        f"https://github.com/jgstew/bigfix-relevance-analyzer/blob/v{__version__}/docs/reference/"
-    ) == DOCS_URL
+        DOCS_URL == "https://github.com/jgstew/bigfix-relevance-analyzer/blob/main/docs/reference/"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -519,3 +522,54 @@ def test_closing_a_document_forgets_its_extraction(extractions: list[str]) -> No
     linter.hover(uri, FILES, (0, 8))
     assert len(extractions) == 2
     linter.forget("file:///workspace/never-seen.rel")  # no error
+
+
+ABSORB = "universal_relevance.md#errors-are-values-and-some-constructs-absorb-them"
+GUARD = "client_relevance.md#only-if-guards-a-platform-specific-inspector"
+
+
+@pytest.mark.parametrize(
+    ("text", "needle", "page"),
+    [
+        ('exists file "x"', "exists", ABSORB),
+        ('not exists file "x"', "not", ABSORB),
+        ('number of files of folder "x"', "number", ABSORB),
+        ('if exists file "x" then 1 else 2', "if", GUARD),
+    ],
+)
+def test_exists_number_of_and_if_link_to_what_they_do_with_errors(
+    text: str, needle: str, page: str
+) -> None:
+    """Every construct's hover links to the reference; for these three the
+    section is what they do with an error, which is their surprising part."""
+    markdown, _ = shown("a.rel", text, needle)
+    assert f"]({DOCS_URL}{page})" in markdown
+
+
+def test_the_extraction_cache_is_bounded_by_bytes(
+    extractions: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A large BES document's extraction holds several MiB (8.7 MiB measured
+    for 995 KiB), so the cache keeps documents up to a byte budget, not a count."""
+    monkeypatch.setattr(linter_module, "EXTRACTION_CACHE_BYTES", 2 * len(FILES))
+    linter = DocumentLinter()
+    uris = [f"file:///workspace/{n}.rel" for n in range(3)]
+    for uri in uris:
+        linter.diagnostics(uri, FILES)
+    linter.hover(uris[2], FILES, (0, 8))
+    linter.hover(uris[1], FILES, (0, 8))
+    assert len(extractions) == 3
+    linter.hover(uris[0], FILES, (0, 8))
+    assert len(extractions) == 4
+
+
+def test_a_document_over_the_byte_budget_is_still_kept_while_it_is_the_latest(
+    extractions: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The one being edited and hovered is the reason the cache exists."""
+    monkeypatch.setattr(linter_module, "EXTRACTION_CACHE_BYTES", 1)
+    linter = DocumentLinter()
+    uri = "file:///workspace/a.rel"
+    linter.diagnostics(uri, FILES)
+    linter.hover(uri, FILES, (0, 8))
+    assert len(extractions) == 1
