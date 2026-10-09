@@ -199,14 +199,15 @@ class RelevanceSite:
     source_map: SourceMap | None = field(default=None, compare=False, hash=False, repr=False)
     """Which bytes of the file each character of :attr:`text` came from.
 
-    What lets a fix be written back into the file
+    What lets a fix be written back into a BES XML file
     (:mod:`~bigfix_relevance_analyzer.fixfile`). Only BES XML read as bytes
     (:func:`extract_relevance_from_bes_xml`, so also
-    :func:`extract_relevance_from_file` on a ``.bes``) has one so far; it is
-    ``None`` everywhere else, and for an element whose bytes are not its text
-    in UTF-8. Left out of equality, hashing and :meth:`to_dict`: it says
-    where a statement is, not what it is, and a site from lxml or from a
-    string must still compare equal to the same site read from bytes.
+    :func:`extract_relevance_from_file` on a ``.bes``) has one; it is ``None``
+    everywhere else, and for an element whose bytes are not its text in
+    UTF-8. Every other file type is placed through :attr:`column` instead.
+    Left out of equality, hashing and :meth:`to_dict`: it says where a
+    statement is, not what it is, and a site from lxml or from a string must
+    still compare equal to the same site read from bytes.
     """
 
     column: int | None = field(default=None, compare=False, hash=False, repr=False)
@@ -217,7 +218,8 @@ class RelevanceSite:
     substitution -- and counted in characters of the text they read, so after
     ``\r\n`` and ``\r`` are folded to ``\n``, which moves no character within
     a line. With :attr:`line`, it is what places a span of :attr:`text` in an
-    editor's buffer (:mod:`bigfix_relevance_analyzer.lsp.positions`).
+    editor's buffer (:mod:`bigfix_relevance_analyzer.lsp.positions`), and a
+    fix in the file's bytes (:mod:`bigfix_relevance_analyzer.fixfile`).
 
     ``None`` for BES XML, whose :attr:`source_map` places every character
     already. Left out of equality, hashing, ``repr`` and :meth:`to_dict` for the

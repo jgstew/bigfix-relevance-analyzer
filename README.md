@@ -610,19 +610,22 @@ uvx --from bigfix-relevance-analyzer bigfix-relevance-lint "(version of client, 
 `--fail-on-warning` for a repo that wants zero tolerance even for an unknown
 inspector name.
 
-`--fix` applies every safe fix in place (see [Writing fixes back into
-files](#writing-fixes-back-into-files)), prints one line per fix, then the
-findings left standing:
+`--fix` applies every safe fix in place, in every file type the linter reads
+(see [Writing fixes back into files](#writing-fixes-back-into-files)), prints
+one line per fix, then the findings left standing:
 
 ```text
 Fixlet.bes:12: fixed [plural-preferred] setting -> settings
-notes.rel:1: not fixed [plural-preferred] no source map for a plain-text site; only BES XML is fixable for now
+Report.ojo:3: fixed [singular-required] names of bes computers -> unique value of names of bes computers
+notes.rel:1: not fixed [plural-preferred] undecodable bytes on line 1
 ```
 
 It exits `1` whenever it fixed anything, even with nothing left to report:
 pre-commit's convention is that a hook which modifies files fails, so the fix
 is reviewed and staged rather than committed unread. A second run then passes.
-`--json` with `--fix` prints `fix_paths_to_dict()`'s payload.
+`--json` with `--fix` prints `fix_paths_to_dict()`'s payload. `--fix --diff`
+writes nothing: it prints what `--fix` would change as a unified diff per file,
+and exits `1` if anything would.
 
 Called with **no path arguments at all**, either entry point walks the current
 directory instead of erroring - `bigfix-relevance-lint` on its own, or
@@ -842,14 +845,15 @@ The same result is on `RelevanceAnalysis.autofix()`, under `"autofix"` in
 `to_dict()` (`null` when nothing fixes), and on every fixable lint `Finding`
 as `Finding.autofix` - the site's whole result, not the finding's own edit,
 because only a rewrite worked out over every fix at once is safe to swap in.
-`AutofixResult.to_dict()` names each code's lint rule:
+`AutofixResult.to_dict()` names each code's lint rule, and so does each edit
+(`TextEdit.rule`):
 
 ```json
 {"original": "...", "fixed": "...", "changed": true, "rounds": 2,
  "applied": [{"code": "singular-spelling-mid-chain", "rule": "plural-preferred", "count": 2}],
  "unapplied": [],
- "edits": [{"start": 28, "end": 34, "replacement": "folders", "code": "singular-spelling-mid-chain"},
-           {"start": 44, "end": 50, "replacement": "folders", "code": "singular-spelling-mid-chain"}]}
+ "edits": [{"start": 28, "end": 34, "replacement": "folders", "code": "singular-spelling-mid-chain", "rule": "plural-preferred"},
+           {"start": 44, "end": 50, "replacement": "folders", "code": "singular-spelling-mid-chain", "rule": "plural-preferred"}]}
 ```
 
 ### Writing fixes back into files
@@ -867,35 +871,68 @@ result.unapplied  # the same, each with a `reason` it was not applied
 result.findings  # lint findings for the files as they now are
 ```
 
+Every file type the linter reads is fixed this way: BES XML (`.bes`,
+`.bes.xml`), whole-file relevance (`.rel`, `.bsr`), markdown fences, and the
+HTML family's `<?Relevance ?>` and `Relevance()` calls (`.ojo`, `.besrpt`,
+`.beswrpt`, `.html`, ...).
+
 A site's text is decoded and stripped, so it cannot be searched for in its
-file. Instead `RelevanceSite.source_map` records which bytes each character
-came from, and `AutofixResult.edits` gives every edit measured against the
+file. Instead `AutofixResult.edits` gives every edit measured against the
 original statement (composed across rounds, so applying them to `original`
-gives `fixed`). Each edit is mapped to the exact bytes it replaces, and only
-those bytes are rewritten: `&lt;` stays `&lt;`, `&quot;` stays `&quot;`, a
-CDATA section stays CDATA (even one that splits the statement, as in
-`of cl<![CDATA[ient]]>`), and a CRLF file stays CRLF. What guards a write:
+gives `fixed`), and each edit is split into the smallest pieces that make it:
+a wrap is an insertion of `unique value of ` (and `(`, `)`), a respelling an
+insertion of `s` or a one-letter change like `y` -> `ies`. Each piece is
+placed at the exact bytes it belongs at - through `RelevanceSite.source_map`
+for BES XML, through the site's line and `column` for every other type - and
+only writes new text, never a copy of the statement. So `&lt;` stays `&lt;`,
+`&quot;` stays `&quot;`, a CDATA section stays CDATA (even one that splits
+the statement, as in `sett<![CDATA[ing]]>`), `\"` in a JavaScript string
+stays `\"`, and CRLF, CR-only, mixed line endings and a byte order mark stay
+as they were. What guards a write:
 
 1. the analyzer's own guard above decided the fix is safe, and no rule it
    applies under is `IGNORE` in the `LintConfig`;
-2. every edit maps to one unbroken run of bytes - never part of an entity,
-   never across markup - and its replacement needs no escaping;
+2. every piece writes only names, spaces and parentheses (`[A-Za-z0-9 ()]`),
+   which need no escaping anywhere relevance is written, and maps to bytes
+   that read back as the text it expects - never part of an entity, never
+   across markup, never next to bytes that are not UTF-8;
 3. the edited bytes are extracted again *before* anything is written, and
    every site must read back as expected - the fixed text where a fix went,
    the original everywhere else - or nothing in that file is written
    ("re-extract mismatch");
-4. the file is read back after writing, and restored if it does not hold what
-   was written.
+4. the fixed file is linted again with the same `LintConfig`, and no rule may
+   report more findings than before ("the fix would add a complexity
+   finding"): adding `unique value of` raises a statement's score, and a fix
+   must not trade a warning for an error over `max_score`;
+5. the file must still hold what was planned from when it is written, and is
+   read back after writing and restored if it does not hold what was written.
 
-Only sites extracted from BES XML bytes (`.bes`, `.bes.xml`) have a source map
-so far; a fix anywhere else (`.rel`, `.bsr`, markdown, HTML, an lxml tree, a
-`str` document) is reported unapplied, with the reason. `source_map` is left
-out of a site's equality, hash and `to_dict()`, so existing outputs do not
-change. The lower-level pieces are public too, in `fixfile`: `site_fixes()`
-(one fix per site, from findings) and `source_edits()` (one fix's edits as
-`ByteEdit`s on the file, or `Unmapped` with the reason).
-`AutofixResult.applied_rules` tallies the applied codes by lint rule, so a
-consumer disabling rules by name need not parse `to_dict()`.
+Planning and writing are separate steps, so a caller can check a fix before it
+is written - against BES.xsd, say:
+
+```python
+from bigfix_relevance_analyzer import LintConfig, plan_fix, write_fix
+
+plan = plan_fix("Fixlet.bes", LintConfig())  # reads the file, writes nothing
+plan.changed  # whether any fix applies
+plan.original, plan.fixed  # the bytes before and after
+plan.findings  # lint findings for `fixed`; `original_findings` for `original`
+if plan.changed and my_check(plan.original, plan.fixed):
+    result = write_fix(plan)  # a FileFixResult, as fix_file() returns
+```
+
+`fix_file()` is `write_fix(plan_fix(...))`. `write_fix()` refuses a file that
+changed after it was planned ("file changed since it was planned").
+
+`str` documents and lxml trees have no bytes, so a fix in one cannot be
+written back. `source_map` and `column` are left out of a site's equality,
+hash and `to_dict()`, so existing outputs do not change. The lower-level
+pieces are public too, in `fixfile`: `site_fixes()` (one fix per site, from
+findings) and `source_edits(site, autofix, data)` (one fix's pieces as
+`ByteEdit`s on the file's bytes `data`, or `Unmapped` with the reason; BES
+sites need no `data`). `AutofixResult.applied_rules` tallies the applied codes
+by lint rule, so a consumer disabling rules by name need not parse
+`to_dict()`.
 
 ### Finding an inspector you cannot name
 

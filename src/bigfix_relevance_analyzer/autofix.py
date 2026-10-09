@@ -38,6 +38,11 @@ Print-free and never raises on bad relevance, like the rest of the package.
 
 from __future__ import annotations
 
+# At the top, never inside `_pieces`: the VS Code extension's componentize-py
+# build keeps only the modules imported while it loads the package, so a lazy
+# import works here and fails there.
+import difflib
+import re
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -83,6 +88,12 @@ class TextEdit:
     replacement: str
     code: str
     """The checker diagnostic this edit resolves."""
+
+    @property
+    def rule(self) -> str:
+        """The lint rule :attr:`code` reports under, so a consumer naming its own
+        code per change need not carry the mapping."""
+        return _rule_for(self.code)
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,6 +169,7 @@ class AutofixResult:
                     "end": edit.end,
                     "replacement": edit.replacement,
                     "code": edit.code,
+                    "rule": edit.rule,
                 }
                 for edit in self.edits
             ],
@@ -235,6 +247,48 @@ def _kept(edit: TextEdit, before: str) -> int | None:
     if edit.replacement == f"{_UNIQUE_VALUE}({old})":
         return len(_UNIQUE_VALUE) + 1
     return None
+
+
+_SAFE_TEXT: Final = re.compile(r"[A-Za-z0-9 ()]*")
+"""What a piece (see :func:`_pieces`) may write into a file, matched whole.
+
+Every fix today writes only inspector-name letters, ``unique value of`` and
+parentheses, and those mean the same in every place relevance is written: XML
+text, CDATA, an attribute, a JavaScript string, a ``<?Relevance ?>``, an
+ActionScript ``{...}``, a markdown fence. Anything else -- a quote, ``&``,
+``<``, ``}``, a line break -- would need escaping for one of them, and is
+refused rather than guessed at.
+"""
+
+
+def _pieces(result: AutofixResult) -> tuple[TextEdit, ...]:
+    """:attr:`AutofixResult.edits`, split into the smallest changes that make them.
+
+    A wrap's edit replaces its whole operand with a copy of it behind
+    ``unique value of`` (see :class:`~bigfix_relevance_analyzer.typecheck.TypeFix`),
+    and a cascade can merge a wrap and a respelling into one edit. The copy is
+    the *decoded* statement: written back into a file whole, it would un-escape
+    what the author escaped (``&lt;`` in BES XML, ``\"`` in a JavaScript
+    string). Split by :class:`difflib.SequenceMatcher`, a wrap is an insertion
+    of ``unique value of `` (and ``(``, ``)``), a respelling is ``+s`` or ``y``
+    -> ``ies``, and what a piece writes is only ever new text.
+
+    Each piece keeps its edit's :attr:`TextEdit.code`. Sorted and disjoint;
+    applying them to :attr:`AutofixResult.original` gives
+    :attr:`AutofixResult.fixed`, as the edits do.
+    """
+    return tuple(piece for edit in result.edits for piece in _edit_pieces(result.original, edit))
+
+
+def _edit_pieces(original: str, edit: TextEdit) -> tuple[TextEdit, ...]:
+    """One of :func:`_pieces`' edits, split; ``edit`` is against ``original``."""
+    old = original[edit.start : edit.end]
+    matcher = difflib.SequenceMatcher(None, old, edit.replacement, autojunk=False)
+    return tuple(
+        TextEdit(edit.start + i1, edit.start + i2, edit.replacement[j1:j2], edit.code)
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes()
+        if tag != "equal"
+    )
 
 
 def _map_back(

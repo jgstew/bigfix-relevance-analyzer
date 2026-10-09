@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import itertools
 import json
+from typing import cast
 
 import pytest
 from _helpers import MID_CHAIN, SETTING
@@ -339,7 +340,13 @@ def test_to_dict_shape() -> None:
         "applied": [{"code": MID_CHAIN, "rule": "plural-preferred", "count": 2}],
         "unapplied": [],
         "edits": [
-            {"start": edit.start, "end": edit.end, "replacement": "folders", "code": MID_CHAIN}
+            {
+                "start": edit.start,
+                "end": edit.end,
+                "replacement": "folders",
+                "code": MID_CHAIN,
+                "rule": "plural-preferred",
+            }
             for edit in result.edits
         ],
     }
@@ -405,88 +412,89 @@ right side is plural too, though it holds at most one value: the grouped
 ...` with `A singular expression is required.`"""
 
 
-@pytest.mark.parametrize(
-    ("text", "dialect", "fixed", "applied"),
-    [
-        pytest.param(
-            'pathnames of files "x" | pathnames of files "y"',
-            Dialect.CLIENT,
-            'unique value of pathnames of files "x" | unique value of pathnames of files "y"',
-            {LEFT: 1, RIGHT: 1},
-            id="both-operands-one-round",
-        ),
-        pytest.param(
-            'pathnames of files "x" | "y"',
-            Dialect.CLIENT,
-            'unique value of pathnames of files "x" | "y"',
-            {LEFT: 1},
-            id="left-only",
-        ),
-        pytest.param(
-            '"y" | pathnames of files "x"',
-            Dialect.CLIENT,
-            '"y" | unique value of pathnames of files "x"',
-            {RIGHT: 1},
-            id="right-only",
-        ),
-        pytest.param(
-            '"x" & pathnames of files "y"',
-            Dialect.CLIENT,
-            '"x" & unique value of pathnames of files "y"',
-            {RIGHT: 1},
-            id="ampersand",
-        ),
-        pytest.param(
-            '(sizes of files "x") + 1',
-            Dialect.CLIENT,
-            'unique value of (sizes of files "x") + 1',
-            {LEFT: 1},
-            id="plus",
-        ),
-        pytest.param(
-            '- sizes of files "x"',
-            Dialect.CLIENT,
-            '- unique value of sizes of files "x"',
-            {ARGUMENT: 1},
-            id="unary-minus",
-        ),
-        pytest.param(
-            '(concatenations ", " of pathnames of files "x") | "y"',
-            Dialect.CLIENT,
-            '(concatenation ", " of pathnames of files "x") | "y"',
-            {LEFT: 1},
-            id="aggregate-respelled",
-        ),
-        pytest.param(
-            'pathnames /* keep me */ of files "x" | "y"',
-            Dialect.CLIENT,
-            'unique value of pathnames /* keep me */ of files "x" | "y"',
-            {LEFT: 1},
-            id="comment-kept",
-        ),
-        pytest.param(
-            'pathnames of files "x" as lowercase = "y"',
-            Dialect.CLIENT,
-            'unique value of (pathnames of files "x" as lowercase) = "y"',
-            {LEFT: 1},
-            id="cast-parenthesized",
-        ),
-        pytest.param(
-            "(bes computers) | (unique value of bes computers)",
-            Dialect.SESSION,
-            "unique value of (bes computers) | (unique value of bes computers)",
-            {LEFT: 1},
-            id="session-bes-computers-accepted",
-        ),
-        pytest.param(
-            NIRCMD,
-            Dialect.CLIENT,
-            "unique value of " + NIRCMD.replace(" != ", " != unique value of ", 1),
-            {LEFT: 1, RIGHT: 1},
-            id="corpus-nircmd",
-        ),
-    ],
-)
+SINGULAR_REQUIRED_CASES = [
+    pytest.param(
+        'pathnames of files "x" | pathnames of files "y"',
+        Dialect.CLIENT,
+        'unique value of pathnames of files "x" | unique value of pathnames of files "y"',
+        {LEFT: 1, RIGHT: 1},
+        id="both-operands-one-round",
+    ),
+    pytest.param(
+        'pathnames of files "x" | "y"',
+        Dialect.CLIENT,
+        'unique value of pathnames of files "x" | "y"',
+        {LEFT: 1},
+        id="left-only",
+    ),
+    pytest.param(
+        '"y" | pathnames of files "x"',
+        Dialect.CLIENT,
+        '"y" | unique value of pathnames of files "x"',
+        {RIGHT: 1},
+        id="right-only",
+    ),
+    pytest.param(
+        '"x" & pathnames of files "y"',
+        Dialect.CLIENT,
+        '"x" & unique value of pathnames of files "y"',
+        {RIGHT: 1},
+        id="ampersand",
+    ),
+    pytest.param(
+        '(sizes of files "x") + 1',
+        Dialect.CLIENT,
+        'unique value of (sizes of files "x") + 1',
+        {LEFT: 1},
+        id="plus",
+    ),
+    pytest.param(
+        '- sizes of files "x"',
+        Dialect.CLIENT,
+        '- unique value of sizes of files "x"',
+        {ARGUMENT: 1},
+        id="unary-minus",
+    ),
+    pytest.param(
+        '(concatenations ", " of pathnames of files "x") | "y"',
+        Dialect.CLIENT,
+        '(concatenation ", " of pathnames of files "x") | "y"',
+        {LEFT: 1},
+        id="aggregate-respelled",
+    ),
+    pytest.param(
+        'pathnames /* keep me */ of files "x" | "y"',
+        Dialect.CLIENT,
+        'unique value of pathnames /* keep me */ of files "x" | "y"',
+        {LEFT: 1},
+        id="comment-kept",
+    ),
+    pytest.param(
+        'pathnames of files "x" as lowercase = "y"',
+        Dialect.CLIENT,
+        'unique value of (pathnames of files "x" as lowercase) = "y"',
+        {LEFT: 1},
+        id="cast-parenthesized",
+    ),
+    pytest.param(
+        "(bes computers) | (unique value of bes computers)",
+        Dialect.SESSION,
+        "unique value of (bes computers) | (unique value of bes computers)",
+        {LEFT: 1},
+        id="session-bes-computers-accepted",
+    ),
+    pytest.param(
+        NIRCMD,
+        Dialect.CLIENT,
+        "unique value of " + NIRCMD.replace(" != ", " != unique value of ", 1),
+        {LEFT: 1, RIGHT: 1},
+        id="corpus-nircmd",
+    ),
+]
+"""One statement per shape the singular-required fix takes, with what it gives."""
+
+
+@pytest.mark.parametrize(("text", "dialect", "fixed", "applied"), SINGULAR_REQUIRED_CASES)
 def test_a_plural_in_a_singular_position_is_fixed(
     text: str, dialect: Dialect, fixed: str, applied: dict[str, int]
 ) -> None:
@@ -666,3 +674,154 @@ def test_autofix_is_exported_from_the_package() -> None:
 
     assert package.autofix_relevance is autofix
     assert package.AutofixResult is AutofixResult
+
+
+# -- minimal pieces: what a fix writes into a file (#115) -------------------------
+#
+# A wrap's edit replaces the whole operand with a copy of itself behind
+# `unique value of`, and that copy is the *decoded* statement: written back
+# into a file whole, it would un-escape whatever the author escaped (`&lt;` in
+# BES XML, `\"` in a JavaScript string). `_pieces` splits every edit into the
+# smallest changes that turn the original into the fixed text, so what a fix
+# writes is only ever new text, never anything copied from the statement.
+
+
+def _hand_built(original: str, *edits: TextEdit) -> AutofixResult:
+    return AutofixResult(
+        original=original, fixed=autofix_module._apply(original, edits), edits=edits
+    )
+
+
+def _assert_pieces_rebuild_fixed(result: AutofixResult) -> tuple[TextEdit, ...]:
+    """The invariants the byte mapping relies on; returns the pieces."""
+    pieces = autofix_module._pieces(result)
+    assert autofix_module._apply(result.original, pieces) == result.fixed, result
+    for left, right in itertools.pairwise(pieces):
+        assert left.end <= right.start and left.start < right.start, pieces
+    by_edit = {edit.code for edit in result.edits}
+    for piece in pieces:
+        assert piece.code in by_edit
+        assert any(edit.start <= piece.start <= piece.end <= edit.end for edit in result.edits)
+        assert autofix_module._SAFE_TEXT.fullmatch(piece.replacement), piece
+    return pieces
+
+
+def test_a_respelling_is_one_insertion() -> None:
+    pieces = _assert_pieces_rebuild_fixed(autofix(SETTING, Dialect.CLIENT))
+    assert pieces == (TextEdit(24, 24, "s", MID_CHAIN),)
+    assert SETTING[:24].endswith("setting")
+
+
+@pytest.mark.parametrize(
+    ("word", "fixed", "piece"),
+    [
+        pytest.param("property", "properties", (7, 8, "ies"), id="y-to-ies"),
+        pytest.param("analysis", "analyses", (6, 7, "e"), id="i-to-e"),
+        pytest.param("concatenations", "concatenation", (13, 14, ""), id="aggregate-singular"),
+    ],
+)
+def test_a_respelling_inside_the_word_is_one_short_replacement(
+    word: str, fixed: str, piece: tuple[int, int, str]
+) -> None:
+    """The real-content shapes that are not pure insertions (#115 S1)."""
+    original = f'names of bes {word} "x"'
+    start = original.index(word)
+    result = _hand_built(original, TextEdit(start, start + len(word), fixed, MID_CHAIN))
+    (only,) = _assert_pieces_rebuild_fixed(result)
+    assert (only.start - start, only.end - start, only.replacement) == piece
+
+
+def test_a_wrap_is_only_the_inserted_prefix() -> None:
+    text = 'pathnames of files "x" | "y"'
+    pieces = _assert_pieces_rebuild_fixed(autofix(text, Dialect.CLIENT))
+    assert pieces == (TextEdit(0, 0, "unique value of ", "left-operand-not-singular"),)
+
+
+def test_a_parenthesized_wrap_is_two_insertions() -> None:
+    text = 'pathnames of files "x" as lowercase = "y"'
+    pieces = _assert_pieces_rebuild_fixed(autofix(text, Dialect.CLIENT))
+    end = text.index(" = ")
+    assert [(p.start, p.end, p.replacement) for p in pieces] == [
+        (0, 0, "unique value of ("),
+        (end, end, ")"),
+    ]
+
+
+def test_a_merged_wrap_and_respelling_is_two_insertions_and_copies_no_quote() -> None:
+    """A cascade merges these into one edit that is neither (#113 S2)."""
+    text = 'names of files of folder "a" of folder "b" = "y"'
+    result = autofix(text, Dialect.CLIENT)
+    (edit,) = result.edits
+    assert '"' in edit.replacement
+    pieces = _assert_pieces_rebuild_fixed(result)
+    folder = text.index('folder "a"') + len("folder")
+    assert [(p.start, p.end, p.replacement) for p in pieces] == [
+        (0, 0, "unique value of "),
+        (folder, folder, "s"),
+    ]
+    assert not any('"' in piece.replacement for piece in pieces)
+
+
+def test_nothing_fixed_has_no_pieces() -> None:
+    assert autofix_module._pieces(autofix(SETTINGS_FIXED, Dialect.CLIENT)) == ()
+
+
+SETTINGS_FIXED = 'exists values of settings "x" of client'
+
+
+def _every_fixable_statement() -> list[tuple[str, Dialect | None]]:
+    from _corpus import corpus_cases, extracted_sites
+
+    statements: list[tuple[str, Dialect | None]] = [
+        (SETTING, Dialect.CLIENT),
+        (CASCADE, Dialect.CLIENT),
+        *((str(case.values[0]), cast(Dialect, case.values[1])) for case in SINGULAR_REQUIRED_CASES),
+        *((case.source, None) for case in corpus_cases()),
+        *((site.text, site.dialect) for _, site in extracted_sites()),
+    ]
+    return statements
+
+
+def test_every_fixable_statement_splits_into_safe_pieces() -> None:
+    """Over this file's cases, the parse corpus and the examples: applying the
+    pieces gives the fixed text, they are sorted and disjoint, keep their
+    edit's code, and only ever write ``[A-Za-z0-9 ()]``."""
+    fixed = 0
+    for text, dialect in _every_fixable_statement():
+        result = autofix(text, dialect)
+        if result.edits:
+            fixed += 1
+            _assert_pieces_rebuild_fixed(result)
+    assert fixed >= 15, "too few fixable statements for this to mean much"
+
+
+def test_safe_text_is_names_spaces_and_parentheses_only() -> None:
+    safe = autofix_module._SAFE_TEXT
+    for text in ("", "s", "ies", "unique value of ", "unique value of (", ")", "Abc 123"):
+        assert safe.fullmatch(text), text
+    for text in ('"', "'", "&", "<", ">", "\\", "]]>", "?>", "}", "{", "\r", "\n", "\t", "\u00e9"):
+        assert not safe.fullmatch(text), text
+
+
+def test_difflib_is_imported_when_the_module_loads() -> None:
+    """componentize-py snapshots only what is imported at build time, so a
+    lazy ``import difflib`` inside ``_pieces`` would work here and fail in the
+    VS Code extension. A module attribute is what only a top-level import sets."""
+    import difflib
+
+    assert getattr(autofix_module, "difflib", None) is difflib
+
+
+# -- the rule an edit reports under (#115 A3) -------------------------------------
+
+
+def test_an_edit_names_its_lint_rule() -> None:
+    from bigfix_relevance_analyzer.lint import _rule_for
+
+    for text, dialect in [(SETTING, Dialect.CLIENT), ('pathnames of files "x" | "y"', None)]:
+        result = autofix(text, dialect)
+        assert result.edits
+        for edit, payload in zip(result.edits, result.to_dict()["edits"], strict=True):
+            assert edit.rule == _rule_for(edit.code)
+            assert payload["rule"] == edit.rule
+    assert autofix(SETTING, Dialect.CLIENT).edits[0].rule == "plural-preferred"

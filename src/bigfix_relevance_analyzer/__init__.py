@@ -43,11 +43,14 @@ from bigfix_relevance_analyzer.extract import (
 from bigfix_relevance_analyzer.fixfile import (
     FileFix,
     FileFixResult,
+    FixPlan,
     FixResult,
     fix_directory,
     fix_file,
     fix_paths,
     fix_paths_to_dict,
+    plan_fix,
+    write_fix,
 )
 from bigfix_relevance_analyzer.inspectors import (
     Inspector,
@@ -127,6 +130,7 @@ __all__ = [
     "FileFix",
     "FileFixResult",
     "Finding",
+    "FixPlan",
     "FixResult",
     "HtmlContext",
     "Inspector",
@@ -193,6 +197,7 @@ __all__ = [
     "node_at",
     "nodes_at",
     "parse_relevance",
+    "plan_fix",
     "relevance_types",
     "resolve_it_bindings",
     "rules",
@@ -203,4 +208,5 @@ __all__ = [
     "to_sexpr",
     "tokenize",
     "try_parse_relevance",
+    "write_fix",
 ]
