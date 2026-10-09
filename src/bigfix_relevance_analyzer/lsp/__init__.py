@@ -1,10 +1,11 @@
-"""A language server for BigFix Relevance: lint diagnostics in any LSP editor.
+"""A language server for BigFix Relevance: lint diagnostics and hover in any LSP editor.
 
 Two layers, kept apart so the protocol one can be swapped (for pygls, say)
 without touching the other:
 
 - :mod:`~bigfix_relevance_analyzer.lsp.linter` -- :class:`DocumentLinter`,
-  everything the editor is told, with no protocol in it.
+  everything the editor is told, with no protocol in it; what a hover says
+  is :mod:`~bigfix_relevance_analyzer.lsp.hover`'s.
 - :mod:`~bigfix_relevance_analyzer.lsp.server` -- :class:`Server`, the
   hand-rolled JSON-RPC adapter over it, with no I/O;
   :mod:`~bigfix_relevance_analyzer.lsp.stdio` is the standard transport around

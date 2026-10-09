@@ -32,6 +32,15 @@ up. Checks include:
 - **Complexity:** statements whose structure or evaluation cost is far above
   what ordinary content needs.
 
+### Hover
+
+Point at part of a statement to see what it is. On an inspector, the hover
+shows the definitions it matches there: the signature, what it returns, whether
+it is singular or plural as written, and the platforms (client) or contexts
+(session) that have it. It also explains literals, what `it` refers to, and
+keywords and operators such as `whose`, `of`, `|` and `as`, with links to the
+reference documentation.
+
 ### Syntax highlighting
 
 `.rel` and `.bsr` files, and relevance in Markdown code fences, are colored:
@@ -83,7 +92,8 @@ exists file "C:\Windows\notepad.exe"
   underline the whole line they are on. Every other problem underlines just
   the text it is about.
 - Highlighting colors keywords and operators, not inspector names.
-- Hover information and completion are not available yet.
+- Completion is not available yet. Hover needs a statement that parses; on one
+  with a syntax error there is no hover until it is fixed.
 - A file is checked when its name ends in one of the file types above, or when
   its language is set to BigFix Relevance. Other files are left alone.
 - The checker starts the first time you open a file with relevance to check,

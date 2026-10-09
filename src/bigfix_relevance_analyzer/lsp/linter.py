@@ -55,6 +55,16 @@ document over :data:`DEFAULT_MAX_DOCUMENT_BYTES` (UTF-8) gets one informational
 integration's, not a lint rule: it says the document was not judged, never that
 it is wrong.
 
+Hover
+-----
+:meth:`DocumentLinter.hover` answers what the cursor is on, through the same
+extractors and the same analysis cache as the diagnostics: the position is
+mapped back into a site (:meth:`~bigfix_relevance_analyzer.lsp.positions.DocumentIndex.locate`),
+the site analysed as linting analyses it, and the answer is
+:mod:`~bigfix_relevance_analyzer.lsp.hover`'s. No hover anywhere the
+diagnostics would not look either: past the size guard, or in a document no
+extractor reads.
+
 Runs in WASM
 ------------
 This is the code an editor extension runs inside a componentize-py component,
@@ -80,21 +90,27 @@ from urllib.request import url2pathname
 from bigfix_relevance_analyzer.extract import (
     _UNTYPED_TEXT_SUFFIXES,
     RelevanceSite,
+    _extract_data,
     _is_recognized,
 )
 from bigfix_relevance_analyzer.lint import (
     Finding,
     LintConfig,
     Severity,
+    _analyze_site,
     _judge_site,
     _lint_data,
 )
-from bigfix_relevance_analyzer.lsp.positions import DocumentIndex, Range, utf16_length
+from bigfix_relevance_analyzer.lsp.hover import describe
+from bigfix_relevance_analyzer.lsp.positions import DocumentIndex, Position, Range, utf16_length
 
 logger = logging.getLogger(__name__)
 
 Diagnostic = dict[str, Any]
 """An LSP ``Diagnostic`` as plain JSON-serializable data."""
+
+HoverResult = dict[str, Any]
+"""An LSP ``Hover`` as plain JSON-serializable data."""
 
 SOURCE: Final = "bigfix-relevance-analyzer"
 """The ``source`` on every diagnostic, and the server's name in ``serverInfo``."""
@@ -218,6 +234,41 @@ class DocumentLinter:
             return []
         index = DocumentIndex(text, data)
         return [diagnostic for finding in findings for diagnostic in _diagnostics(index, finding)]
+
+    def hover(
+        self, uri: str, text: str, position: Position, language_id: str | None = None
+    ) -> HoverResult | None:
+        """What to show for ``position`` in the document at ``uri`` holding ``text``.
+
+        ``position`` is LSP's: a 0-based line and a UTF-16 character. ``None``
+        when there is nothing to say there -- see :mod:`~bigfix_relevance_analyzer.lsp.hover`
+        -- or the document is one :meth:`diagnostics` would not lint. The file
+        type is chosen exactly as :meth:`diagnostics` chooses it.
+        """
+        data = text.encode("utf-8", errors="surrogatepass")
+        if len(data) > self.max_document_bytes:
+            return None
+        path = _document_path(uri, language_id)
+        if not _is_recognized(path):
+            return None
+        sites, _ = _extract_data(path, data)
+        index = DocumentIndex(text, data)
+        located = index.locate(sites, position)
+        if located is None:
+            return None
+        site, offset = located
+        found = describe(_analyze_site(site, self.config), offset)
+        if found is None:
+            return None
+        result: HoverResult = {"contents": {"kind": "markdown", "value": found.markdown}}
+        mapped = index.site_range(site, found.span)
+        if mapped is not None:
+            (start_line, start), (end_line, end) = mapped
+            result["range"] = {
+                "start": {"line": start_line, "character": start},
+                "end": {"line": end_line, "character": end},
+            }
+        return result
 
     def _judge(
         self, file_path: Path | None, site: RelevanceSite, config: LintConfig

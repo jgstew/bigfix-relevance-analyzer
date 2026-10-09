@@ -70,6 +70,17 @@ async function lint() {
   await vscode.window.showTextDocument(fenced);
   const fencedFound = await waitFor(fenced, (found) => found.length > 0);
 
+  // Hover (issue #96, item 2), on the unknown name the diagnostic is about.
+  const hovers = await vscode.commands.executeCommand(
+    "vscode.executeHoverProvider",
+    fenced,
+    new vscode.Position(3, 9)
+  );
+  const hoverText = hovers
+    .flatMap((hover) => hover.contents)
+    .map((content) => (typeof content === "string" ? content : content.value))
+    .join("\n");
+
   // An unsaved buffer has no file name, so only its language says it is
   // relevance (see LANGUAGE_ID in src/bigfix_relevance_analyzer/lsp/linter.py).
   let untitledFound;
@@ -88,6 +99,7 @@ async function lint() {
     firstDiagnosticsMs: firstMs,
     "broken.rel": summary(brokenFound),
     "fenced.md": summary(fencedFound),
+    "fenced.md hover": hoverText,
     ...(untitledFound ? { [`untitled (${language})`]: summary(untitledFound) } : {}),
   };
   fs.writeFileSync(process.env.SMOKE_RESULT, JSON.stringify(result, null, 2));
@@ -111,6 +123,9 @@ async function lint() {
     throw new Error(`fenced.md: expected a diagnostic on line 4, got ${JSON.stringify(summary(fencedFound))}`);
   }
   // ...and the column: the unknown name, after `exists `, within the fence.
+  if (!hoverText.includes("`totally bogus made up inspector`") || !hoverText.includes("not defined")) {
+    throw new Error(`fenced.md: expected a hover on the unknown name, got ${JSON.stringify(hoverText)}`);
+  }
   const unknown = fencedFound.find((d) => codeOf(d) === "unknown-inspector");
   if (!unknown || unknown.range.start.line !== 3 || unknown.range.start.character !== 7) {
     throw new Error(`fenced.md: expected unknown-inspector at line 4, character 7, got ${JSON.stringify(summary(fencedFound))}`);

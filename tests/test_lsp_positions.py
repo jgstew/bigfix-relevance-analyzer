@@ -14,7 +14,7 @@ import dataclasses
 from pathlib import Path
 
 import pytest
-from _helpers import lsp_text
+from _helpers import lsp_lines, lsp_text
 
 from bigfix_relevance_analyzer.extract import (
     RelevanceSite,
@@ -298,3 +298,124 @@ def test_line_length_counts_utf16_units() -> None:
     assert index.line_length(0) == 4
     assert index.line_length(1) == 0
     assert index.line_length(5) == 0
+
+
+# ---------------------------------------------------------------------------
+# The way back: a buffer position to an offset in a site, for hover
+# ---------------------------------------------------------------------------
+
+ROUND_TRIP_DOCUMENTS = [
+    ("a.md", "# T\n\n```relevance\nexists totally bogus\n```\n"),
+    ("a.md", "- item\n\n    ```relevance\n    exists totally bogus\n    ```\n"),
+    ("a.md", '# T\r\n```relevance\r\nexists file "x"\r\n  whose (size of it = "big")\r\n```\r\n'),
+    ("a.rel", '\n\n   exists file "x"\n     whose (size of it = "big")\n'),
+    ("a.rel", 'exists file "x"\r  whose (size of it = "big")'),
+    ("a.rel", 'exists file "\U0001f600\U0001f600" whose (size of it = "big")'),
+    ("a.bsr", "  names of bes computers whose (bogus thing)"),
+    ("a.ojo", "<p><?Relevance bogus one ?> and <?Relevance bogus two ?></p>"),
+    ("a.ojo", '<script>\n  var x = Relevance("exists \\"a\\" whose (bogus thing)");\n</script>\n'),
+    ("a.bes", bes('\t<Relevance>exists file "x" whose (size of it &gt; "big")</Relevance>')),
+    ("a.bes", bes("\t<Relevance>exists totally <![CDATA[bogus]]></Relevance>")),
+    ("a.bes", bes('\t<Relevance>exists file "\U0001f600" whose (bogus thing)</Relevance>')),
+    (
+        "a.bes",
+        bes(
+            '\t<Relevance>exists file "x"\n\twhose (size of it = "big")\n'
+            "\tand exists bogus thing</Relevance>",
+            "\r\n",
+        ),
+    ),
+    ("a.bes", bes("\t<Relevance>\n\t\texists totally bogus\n\t</Relevance>")),
+]
+
+
+def positions(text: str) -> list[tuple[int, int]]:
+    """Every LSP position in ``text`` that is on a character, in UTF-16 units."""
+    found = []
+    for line, content in enumerate(lsp_lines(text)[0]):
+        character = 0
+        for char in content:
+            found.append((line, character))
+            character += 2 if ord(char) > 0xFFFF else 1
+    return found
+
+
+@pytest.mark.parametrize(("name", "doc"), ROUND_TRIP_DOCUMENTS)
+def test_every_mappable_character_maps_back_to_its_offset(name: str, doc: str) -> None:
+    """The inverse agrees with the forward mapping wherever that one is sure."""
+    sites, index = sites_of(name, doc)
+    checked = 0
+    for site in sites:
+        for offset in range(len(site.text)):
+            if site.text[offset] == "\n":
+                continue
+            found = index.site_range(site, TextSpan(offset, offset + 1))
+            if found is None:
+                continue
+            assert index.site_offset(site, found[0]) == offset, (site.text, offset)
+            checked += 1
+    assert checked
+
+
+@pytest.mark.parametrize(("name", "doc"), ROUND_TRIP_DOCUMENTS)
+def test_every_position_maps_back_only_onto_its_own_character(name: str, doc: str) -> None:
+    """From the buffer's side: an offset, when there is one, is the character
+    whose range covers the position -- never a neighbour, never in markup."""
+    sites, index = sites_of(name, doc)
+    hits = 0
+    for position in positions(doc):
+        for site in sites:
+            offset = index.site_offset(site, position)
+            if offset is None:
+                continue
+            found = index.site_range(site, TextSpan(offset, offset + 1))
+            assert found is not None
+            assert found[0] <= position < found[1], (position, offset, found)
+            hits += 1
+    assert hits
+
+
+def test_a_position_in_the_markup_around_a_site_is_in_no_site() -> None:
+    doc = bes("\t<Relevance>exists totally bogus</Relevance>")
+    sites, index = sites_of("a.bes", doc)
+    (site,) = sites
+    assert index.site_offset(site, (4, 3)) is None  # inside `<Relevance>`
+    assert index.site_offset(site, (4, 12)) == 0  # the `e` of `exists`
+    assert index.site_offset(site, (3, 3)) is None  # the line above
+    assert index.site_offset(site, (99, 0)) is None
+
+
+def test_every_character_of_an_entity_is_the_one_character_it_stands_for() -> None:
+    doc = bes('\t<Relevance>size of file "x" &gt; 3</Relevance>')
+    sites, index = sites_of("a.bes", doc)
+    (site,) = sites
+    column = doc.split("\n")[4].index("&gt;")
+    gt = site.text.index(">")
+    assert [index.site_offset(site, (4, column + i)) for i in range(4)] == [gt] * 4
+
+
+def test_the_low_surrogate_of_an_astral_character_is_that_character() -> None:
+    doc = 'exists file "\U0001f600" whose (size of it = "big")'
+    sites, index = sites_of("a.rel", doc)
+    (site,) = sites
+    emoji = site.text.index("\U0001f600")
+    assert index.site_offset(site, (0, emoji)) == emoji
+    assert index.site_offset(site, (0, emoji + 1)) == emoji
+    assert index.site_offset(site, (0, emoji + 2)) == emoji + 1
+
+
+def test_a_position_past_the_end_of_a_line_or_a_site_is_in_no_site() -> None:
+    sites, index = sites_of("a.md", "# T\n```relevance\nexists bogus\n```\n")
+    (site,) = sites
+    assert index.site_offset(site, (2, 11)) == 11
+    assert index.site_offset(site, (2, 12)) is None
+    assert index.site_offset(site, (2, 99)) is None
+    assert index.site_offset(site, (3, 0)) is None
+
+
+def test_locate_finds_the_site_holding_a_position() -> None:
+    doc = "<p><?Relevance bogus one ?> and <?Relevance bogus two ?></p>"
+    sites, index = sites_of("a.ojo", doc)
+    assert index.locate(sites, (0, doc.index("one"))) == (sites[0], sites[0].text.index("one"))
+    assert index.locate(sites, (0, doc.index("two"))) == (sites[1], sites[1].text.index("two"))
+    assert index.locate(sites, (0, doc.index(" and "))) is None

@@ -1,7 +1,7 @@
 {
   "name": "bigfix-relevance-developer",
   "displayName": "BigFix Relevance Developer",
-  "description": "Live diagnostics and syntax highlighting for BigFix Relevance in fixlets, tasks, analyses, dashboards, .rel files and Markdown.",
+  "description": "Live diagnostics, hover and syntax highlighting for BigFix Relevance in fixlets, tasks, analyses, dashboards, .rel files and Markdown.",
   "version": "0.0.1",
   "private": true,
   "publisher": "jgstew",

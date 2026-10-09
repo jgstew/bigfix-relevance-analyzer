@@ -19,6 +19,12 @@ of two routes:
   document, because the text was read with ``\\r\\n`` folded to ``\\n``:
   offsets drift in a CRLF file, lines and columns do not.
 
+Hover needs the opposite move, from a position in the buffer to an offset in
+a site's text: :meth:`DocumentIndex.site_offset`, by the same two routes run
+backwards. Whatever offset it finds is mapped forward again and kept only if
+that range covers the position, so the way back can never disagree with the
+way there.
+
 On the second route the buffer is read back at the range found and compared
 with the span's text; any difference means the range is ``None``. That catches
 a replacement character where the buffer's bytes did not decode, and any
@@ -33,6 +39,7 @@ from __future__ import annotations
 
 import bisect
 import re
+from collections.abc import Iterable
 from typing import Final
 
 from bigfix_relevance_analyzer.extract import RelevanceSite
@@ -105,6 +112,45 @@ class DocumentIndex:
             return self._text_range(site, start, end)
         return None
 
+    def site_offset(self, site: RelevanceSite, position: Position) -> int | None:
+        """The offset in ``site.text`` of the character at ``position``, or ``None``.
+
+        ``None`` when the position is not on a character of the site -- in the
+        markup around it, past a line's end, on another line -- or when the
+        character there cannot be placed for certain. Every character of an
+        entity such as ``&gt;`` is the one character it stands for, and either
+        half of a surrogate pair is the astral character it encodes.
+        """
+        line, character = position
+        if not 0 <= line < len(self.lines):
+            return None
+        index = _code_point_at(self.lines[line], character)
+        if index is None:
+            return None
+        if site.source_map is not None:
+            offset = self._mapped_offset(site, line, index)
+        elif site.column is not None:
+            offset = self._text_offset(site, line, index)
+        else:
+            return None
+        if offset is None:
+            return None
+        # The guard: the forward mapping of what was found must cover `position`.
+        found = self.site_range(site, TextSpan(offset, offset + 1))
+        if found is None or not found[0] <= position < found[1]:
+            return None
+        return offset
+
+    def locate(
+        self, sites: Iterable[RelevanceSite], position: Position
+    ) -> tuple[RelevanceSite, int] | None:
+        """The first of ``sites`` with a character at ``position``, and its offset."""
+        for site in sites:
+            offset = self.site_offset(site, position)
+            if offset is not None:
+                return site, offset
+        return None
+
     # -- BES XML: through the source map's bytes ---------------------------
 
     def _mapped_range(self, site: RelevanceSite, start: int, end: int) -> Range | None:
@@ -118,23 +164,47 @@ class DocumentIndex:
             return None
         return first, last
 
-    def _byte_position(self, offset: int) -> Position | None:
+    def _line_byte_starts(self) -> list[int]:
         if self._byte_starts is None:
             self._byte_starts = [
                 0,
                 *(match.end() for match in _BYTE_LINE_BREAK.finditer(self.data)),
             ]
+        return self._byte_starts
+
+    def _byte_position(self, offset: int) -> Position | None:
+        starts = self._line_byte_starts()
         if not 0 <= offset <= len(self.data):
             return None
-        line = bisect.bisect_right(self._byte_starts, offset) - 1
+        line = bisect.bisect_right(starts, offset) - 1
         try:
-            prefix = self.data[self._byte_starts[line] : offset].decode("utf-8")
+            prefix = self.data[starts[line] : offset].decode("utf-8")
         except UnicodeDecodeError:
             # Mid-character, or bytes that are not the buffer's text.
             return None
         if line >= len(self.lines) or not self.lines[line].startswith(prefix):
             return None
         return line, utf16_length(prefix)
+
+    def _mapped_offset(self, site: RelevanceSite, line: int, index: int) -> int | None:
+        """The offset in ``site.text`` whose bytes hold code point ``index`` of ``line``."""
+        assert site.source_map is not None
+        starts = self._line_byte_starts()
+        if line >= len(starts):
+            return None
+        prefix = self.lines[line][:index].encode("utf-8", errors="surrogatepass")
+        byte = starts[line] + len(prefix)
+        for span in site.source_map.spans:
+            if not span.raw_start <= byte < span.raw_end:
+                continue
+            if span.atomic:
+                return span.start
+            position = span.raw_start
+            for offset in range(span.start, span.end):
+                position += _utf8_length(site.text[offset])
+                if byte < position:
+                    return offset
+        return None
 
     # -- Text extractors: through the site's line and column ----------------
 
@@ -152,6 +222,24 @@ class DocumentIndex:
             (last[0], utf16_length(self.lines[last[0]][: last[1]])),
         )
 
+    def _text_offset(self, site: RelevanceSite, line: int, index: int) -> int | None:
+        """The offset in ``site.text`` written at code point ``index`` of ``line``:
+        :meth:`_text_point` backwards."""
+        assert site.column is not None
+        relative = line - (site.line - 1)
+        if relative < 0:
+            return None
+        start = 0
+        for _ in range(relative):
+            start = site.text.find("\n", start) + 1
+            if start == 0:
+                return None
+        end = site.text.find("\n", start)
+        if end == -1:
+            end = len(site.text)
+        offset = start + index - (site.column - 1 if relative == 0 else 0)
+        return offset if start <= offset < end else None
+
     def _text_point(self, site: RelevanceSite, offset: int) -> tuple[int, int] | None:
         """``(line, code point index in it)`` of ``site.text[offset]`` in the buffer."""
         assert site.column is not None
@@ -162,6 +250,23 @@ class DocumentIndex:
         if not 0 <= line < len(self.lines) or index > len(self.lines[line]):
             return None
         return line, index
+
+
+def _code_point_at(line: str, character: int) -> int | None:
+    """The index in ``line`` of the code point UTF-16 unit ``character`` is in,
+    or ``None`` past its end. Either half of a surrogate pair is its character."""
+    units = 0
+    for index, char in enumerate(line):
+        units += 2 if ord(char) > 0xFFFF else 1
+        if character < units:
+            return index if character >= 0 else None
+    return None
+
+
+def _utf8_length(char: str) -> int:
+    """How many bytes UTF-8 spends on ``char``, counted rather than encoded."""
+    code = ord(char)
+    return 1 if code < 0x80 else 2 if code < 0x800 else 3 if code < 0x10000 else 4
 
 
 def _widen(text: str, span: TextSpan) -> tuple[int, int] | None:
