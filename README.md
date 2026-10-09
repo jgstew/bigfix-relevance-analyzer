@@ -576,14 +576,27 @@ package asserts an opinion about.
 language server over stdio, still with no dependencies. It publishes the
 linter's findings as diagnostics on open, change and save, using the same
 extractors and rules as `bigfix-relevance-lint`, but over the editor's unsaved
-buffer. The file type comes from the document URI's suffix. Diagnostics only,
-for now. Each one covers the text its finding is about - the unterminated
+buffer. The file type comes from the document URI's suffix. Each diagnostic
+covers the text its finding is about - the unterminated
 string, the `it` with nothing to bind to, the comparison a type error is in,
 each use of an unknown name - counted in UTF-16 code units, with entities,
 CDATA and CRLF line endings as the buffer has them. A statement-level finding
 (`complexity`, `mixed-dialect`, a substitution's type, ...) and a problem in
 the file around the relevance (an unclosed fence) still cover their whole
 line, as does any span that cannot be placed for certain.
+
+It also answers hover (`textDocument/hover`) with a few lines of Markdown about
+what is under the cursor, inside any statement the linter reads, BES entities
+and CDATA included:
+
+- an inspector: the table rows it resolved to here (signature, return type,
+  plurality as written, and the client platforms and session contexts that
+  define it), or that no table defines it;
+- a literal, what an `it` is bound to and by which `of` or `whose`, and the
+  construct an operator or keyword belongs to, linked to `docs/reference/`.
+
+Whitespace, comments, articles, parentheses and a statement that does not parse
+get no hover.
 
 The protocol logic does no I/O, so it can also run without stdio. A host such
 as a WASM runtime inside an editor extension passes each parsed JSON-RPC
@@ -607,8 +620,8 @@ the `maxDocumentBytes` initialization option.
 
 The protocol layer is a thin adapter. Everything the editor is told (the
 diagnostics, the cache, the size guard and their options) comes from
-`DocumentLinter`, which has no JSON-RPC in it: `diagnostics(uri, text)` returns
-plain dicts in LSP's field names. Moving to a library such as pygls would mean
+`DocumentLinter`, which has no JSON-RPC in it: `diagnostics(uri, text)` and
+`hover(uri, text, (line, character))` return plain dicts in LSP's field names. Moving to a library such as pygls would mean
 writing another adapter over it, not porting it.
 
 **[BigFix Relevance Developer](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer)**,
