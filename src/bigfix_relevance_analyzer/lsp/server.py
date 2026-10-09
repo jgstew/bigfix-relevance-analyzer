@@ -20,13 +20,17 @@ linter, not porting any of it.
 
 What is served
 --------------
-Diagnostics, and nothing else yet. A document is linted on open, change and
+Diagnostics and hover. A document is linted on open, change and
 save, and its diagnostics are published as ``textDocument/publishDiagnostics``;
 closing it publishes an empty list. Sync is full-document only: relevance
 statements are short, and incrementality pays off per *site* (the linter's
 cache), not per keystroke within one. A document whose suffix no extractor
 reads gets an empty list rather than silence, so nothing stale is left behind
 if it was renamed.
+
+``textDocument/hover`` answers from the stored text of an open document, with
+a null result for a document that is not open or a position with nothing to
+say. Hover params that are not a URI and two integers are invalid params.
 """
 
 from __future__ import annotations
@@ -35,7 +39,7 @@ import dataclasses
 import enum
 import logging
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, TypeGuard
 
 from bigfix_relevance_analyzer.lsp.linter import SOURCE, DocumentLinter
 
@@ -134,6 +138,8 @@ class Server:
         if method == "shutdown":
             self._shutdown = True
             return [_result(id_, None)]
+        if method == "textDocument/hover":
+            return [self._hover(id_, params)]
         return [error_response(id_, ErrorCode.METHOD_NOT_FOUND, f"method not found: {method}")]
 
     def _initialize(self, params: Mapping[str, Any]) -> Message:
@@ -148,9 +154,26 @@ class Server:
                     "change": int(_SyncKind.FULL),
                     "save": {"includeText": False},
                 },
+                "hoverProvider": True,
             },
             "serverInfo": {"name": SOURCE, "version": __version__},
         }
+
+    def _hover(self, id_: Any, params: Mapping[str, Any]) -> Message:
+        identifier = params.get("textDocument")
+        position = params.get("position")
+        uri = identifier.get("uri") if isinstance(identifier, Mapping) else None
+        line = position.get("line") if isinstance(position, Mapping) else None
+        character = position.get("character") if isinstance(position, Mapping) else None
+        if not isinstance(uri, str) or not _is_index(line) or not _is_index(character):
+            return error_response(
+                id_, ErrorCode.INVALID_PARAMS, "hover needs a textDocument uri and a position"
+            )
+        document = self._documents.get(uri)
+        if document is None:
+            return _result(id_, None)
+        found = self.linter.hover(uri, document.text, (line, character), document.language_id)
+        return _result(id_, found)
 
     # -- notifications --------------------------------------------------------
 
@@ -212,6 +235,11 @@ class Server:
             "diagnostics": self.linter.diagnostics(uri, document.text, document.language_id),
         }
         return _notify("textDocument/publishDiagnostics", params)
+
+
+def _is_index(value: object) -> TypeGuard[int]:
+    """Whether ``value`` is a JSON integer, as a line or character must be."""
+    return isinstance(value, int) and not isinstance(value, bool)
 
 
 def _result(id_: Any, result: Any) -> Message:

@@ -129,11 +129,12 @@ def lint_expected(path: Path) -> list[tuple[str, str, int]]:
 # ---------------------------------------------------------------------------
 
 
-def test_initialize_advertises_full_sync_and_names_the_server() -> None:
+def test_initialize_advertises_full_sync_and_hover_and_names_the_server() -> None:
     response = initialize(Server())
     assert response["id"] == 1
     assert response["result"]["capabilities"] == {
         "textDocumentSync": {"openClose": True, "change": 1, "save": {"includeText": False}},
+        "hoverProvider": True,
     }
     assert response["result"]["serverInfo"] == {"name": SOURCE, "version": __version__}
 
@@ -637,3 +638,76 @@ def test_an_untitled_relevance_buffer_gets_diagnostics() -> None:
     (published,) = server.handle(notification("textDocument/didOpen", {"textDocument": document}))
     assert published["params"]["uri"] == "untitled:Untitled-1"
     assert published["params"]["diagnostics"]
+
+
+# ---------------------------------------------------------------------------
+# Hover
+# ---------------------------------------------------------------------------
+
+
+def hover(server: Server, name: str, line: int, character: int, id_: int = 7) -> Message:
+    params = {
+        "textDocument": {"uri": uri(name)},
+        "position": {"line": line, "character": character},
+    }
+    (response,) = server.handle(request("textDocument/hover", params, id_))
+    assert response["id"] == id_
+    return response
+
+
+def test_hover_on_an_open_document_describes_what_is_under_the_cursor() -> None:
+    server = started()
+    did_open(server, "a.rel", CLIENT)
+    result = hover(server, "a.rel", 0, CLIENT.index("size"))["result"]
+    assert result["contents"]["kind"] == "markdown"
+    assert "`size of <file>`" in result["contents"]["value"]
+    start = CLIENT.index("size")
+    assert result["range"] == {
+        "start": {"line": 0, "character": start},
+        "end": {"line": 0, "character": start + len("size")},
+    }
+
+
+def test_hover_reads_the_latest_text_not_the_opened_one() -> None:
+    server = started()
+    did_open(server, "a.rel", 'exists folder "x"')
+    did_change(server, "a.rel", CLIENT, 2)
+    assert (
+        "`size of <file>`"
+        in hover(server, "a.rel", 0, CLIENT.index("size"))["result"]["contents"]["value"]
+    )
+
+
+def test_hover_on_nothing_is_a_null_result() -> None:
+    server = started()
+    did_open(server, "a.rel", CLIENT)
+    assert hover(server, "a.rel", 0, CLIENT.index(" whose"))["result"] is None
+
+
+def test_hover_on_a_document_that_is_not_open_is_a_null_result() -> None:
+    assert hover(started(), "never-opened.rel", 0, 0)["result"] is None
+
+
+def test_hover_on_an_untitled_relevance_buffer_uses_its_language() -> None:
+    server = started()
+    document = {
+        "uri": "untitled:Untitled-1",
+        "languageId": linter_module.LANGUAGE_ID,
+        "version": 1,
+        "text": CLIENT,
+    }
+    server.handle(notification("textDocument/didOpen", {"textDocument": document}))
+    params = {
+        "textDocument": {"uri": "untitled:Untitled-1"},
+        "position": {"line": 0, "character": CLIENT.index("size")},
+    }
+    (response,) = server.handle(request("textDocument/hover", params))
+    assert response["result"] is not None
+
+
+def test_hover_with_a_malformed_position_is_invalid_params() -> None:
+    server = started()
+    did_open(server, "a.rel", CLIENT)
+    params = {"textDocument": {"uri": uri("a.rel")}, "position": {"line": "0"}}
+    (response,) = server.handle(request("textDocument/hover", params))
+    assert response["error"]["code"] == -32602

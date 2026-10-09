@@ -126,6 +126,33 @@ test("an opened document gets its diagnostics published", async (t) => {
   }
 });
 
+test("hover describes the inspector under the cursor", async (t) => {
+  const server = startServer();
+  t.after(() => server.child.kill());
+  const response = await initialized(server);
+  assert.equal(response.result.capabilities.hoverProvider, true);
+  const uri = "file:///workspace/hover.rel";
+  const text = 'exists file "x" whose (size of it > 100)';
+  server.send({
+    method: "textDocument/didOpen",
+    params: { textDocument: { uri, languageId: "plaintext", version: 1, text } },
+  });
+  await server.next((m) => m.method === "textDocument/publishDiagnostics");
+  const character = text.indexOf("size");
+  server.send({
+    id: 2,
+    method: "textDocument/hover",
+    params: { textDocument: { uri }, position: { line: 0, character } },
+  });
+  const hover = await server.next((m) => m.id === 2);
+  assert.equal(hover.result.contents.kind, "markdown");
+  assert.match(hover.result.contents.value, /`size of <file>`/);
+  assert.deepEqual(hover.result.range, {
+    start: { line: 0, character },
+    end: { line: 0, character: character + "size".length },
+  });
+});
+
 test("shutdown then exit ends the process with 0", async () => {
   const server = startServer();
   await initialized(server);
