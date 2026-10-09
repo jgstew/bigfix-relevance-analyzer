@@ -29,7 +29,9 @@ each release.
 Install
 [BigFix Relevance Developer](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer)
 from the Marketplace. It runs this package's [language server](#language-server)
-as WebAssembly, so it needs nothing else installed.
+as WebAssembly, so it needs nothing else installed. It also colors relevance and
+BigFix ActionScript, including the action scripts and relevance inside `.bes`
+files.
 
 ### Command line, via `uvx`
 
