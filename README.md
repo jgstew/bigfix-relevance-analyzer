@@ -1,8 +1,87 @@
 # bigfix-relevance-analyzer
 A python module for working with BigFix Relevance generically. Extract, Analyze, etc.
 
-This is a library first: it is meant to be depended on by other projects
-(pre-commit hooks, `besapi`, MCP servers) rather than run directly.
+It parses client and session relevance, type-checks it, resolves every
+inspector against the inspector tables, binds each `it`, scores complexity and
+evaluation cost, lints BigFix content (`.bes` files and more), and suggests
+safe fixes.
+
+## Ways to use it
+
+| Where | What you get |
+| --- | --- |
+| [Command line, via `uvx`](#command-line-via-uvx) | Analyse one statement, or lint files, with nothing installed |
+| [pre-commit hook](#pre-commit-hook) | Lint the relevance in a BigFix content repo on every commit |
+| [Python library](#python-library) | `import` it from PyPI into your own tool |
+| [Browser playground](#browser-playground) | Paste relevance into a self-contained web page; nothing to install, nothing sent anywhere |
+| [VS Code extension](#vs-code-extension) | Diagnostics, hover and fixes as you type |
+
+### Command line, via `uvx`
+
+Analyse a statement (or every relevance site in a file) and print a report:
+
+```bash
+uvx bigfix-relevance-analyzer "(version of client, name of it, version of it) of operating system"
+```
+
+Lint files or a directory (the current one by default), exiting non-zero on
+errors:
+
+```bash
+uvx --from bigfix-relevance-analyzer bigfix-relevance-lint path/to/content
+```
+
+See [From the command line](#from-the-command-line) and
+[Linting content](#linting-content) for the flags.
+
+### pre-commit hook
+
+The `bes-relevance-lint` hook in
+[pre-commit-bigfix](https://github.com/jgstew/pre-commit-bigfix) runs this
+package's linter over the `.bes` files in a commit:
+
+```yaml
+- repo: https://github.com/jgstew/pre-commit-bigfix
+  rev: <tag>
+  hooks:
+    - id: bes-relevance-lint
+```
+
+### Python library
+
+```bash
+pip install bigfix-relevance-analyzer
+```
+
+```python
+from bigfix_relevance_analyzer import analyze_relevance
+
+report = analyze_relevance('exists file "C:\\foo.txt"')
+report.parsed, report.check.value.types  # (True, frozenset({'boolean'}))
+```
+
+See [Analysing one statement](#analysing-one-statement) and the sections after
+it for the API.
+
+### Browser playground
+
+[www.jgstew.com/files/bigfix-relevance-analyzer-playground.html](https://www.jgstew.com/files/bigfix-relevance-analyzer-playground.html)
+runs this package in the browser as WebAssembly, so nothing needs installing.
+The page is a single self-contained file (the only thing it fetches is its
+icon), so the relevance you paste never leaves your browser. It is updated on
+each release.
+
+### VS Code extension
+
+Install
+[BigFix Relevance Developer](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer)
+from the Marketplace. It runs this package's [language server](#language-server)
+as WebAssembly, so it needs nothing else installed.
+
+## Design notes
+
+As a library it is meant to be depended on by other projects (pre-commit
+hooks, `besapi`, MCP servers, the editor and the playground), so:
 
 - **No dependencies outside the standard library.** (Not "pure Python" - the
   stdlib XML modules are backed by `pyexpat`, which is C - but it ships with
@@ -12,11 +91,6 @@ This is a library first: it is meant to be depended on by other projects
   `basicConfig` or touches your handlers or levels. Nothing is written to stdout,
   so it is safe to import inside a stdio MCP server, where stray output would
   corrupt the JSON-RPC stream.
-
-To use it in an editor, install the
-[BigFix Relevance Developer](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer)
-extension for VS Code. It runs this package's [language server](#language-server)
-as WebAssembly, so it needs nothing else installed.
 
 ## Origin
 
@@ -497,13 +571,12 @@ file1.bes file2.bes`.
 
 ```yaml
 - repo: https://github.com/jgstew/pre-commit-bigfix
-  rev: <sha>
+  rev: <tag>
   hooks:
-    - id: bigfix-relevance-lint
+    - id: bes-relevance-lint
 ```
 
-Until that pre-commit hook is published, the least-friction way to lint a
-content repo is to let `uvx` fetch and run the console script without
+Without pre-commit, `uvx` fetches and runs the console script without
 installing anything:
 
 ```bash
