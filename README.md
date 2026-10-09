@@ -11,7 +11,7 @@ safe fixes.
 | Where | What you get |
 | --- | --- |
 | [Browser playground](#browser-playground) | Paste relevance into a self-contained [web page](https://www.jgstew.com/files/bigfix-relevance-analyzer-playground.html); nothing to install, nothing sent anywhere |
-| [VS Code extension](#vs-code-extension) | Diagnostics, hover and fixes [as you type](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer) |
+| [VS Code extension](#vs-code-extension) | Diagnostics and hover [as you type](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer) |
 | [Command Line `uvx`](#command-line-via-uvx) | Analyse one statement, or lint files, with nothing installed |
 | [pre-commit hook](#pre-commit-hook) | Lint the relevance in a BigFix content repo on every commit |
 | [Python library](#python-library) | `import` it from PyPI into your own tool |
