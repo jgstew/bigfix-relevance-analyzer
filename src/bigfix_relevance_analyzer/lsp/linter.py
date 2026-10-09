@@ -136,6 +136,15 @@ DEFAULT_CACHE_SIZE: Final = 2048
 EXTRACTION_CACHE_SIZE: Final = 8
 """Documents whose last extraction the linter keeps, for hover to reuse."""
 
+EXTRACTION_CACHE_BYTES: Final = 2 * 1024 * 1024
+"""How much document, in UTF-8 bytes, the extractions kept may add up to.
+
+An extraction holds far more than its text: its sites, their source maps and
+the line index. A 995 KiB BES task's held 8.7 MiB, so eight of them would
+approach 70 MiB, much of a WebAssembly component's memory. The document most
+recently extracted is always kept, whatever its size: it is the one being
+edited and hovered, which is what the cache is for."""
+
 
 @dataclasses.dataclass(slots=True)
 class _Extraction:
@@ -329,8 +338,12 @@ class DocumentLinter:
         extracted = _Extraction(path, text, data, sites, problems)
         self._extractions[uri] = extracted
         self._extractions.move_to_end(uri)
-        if len(self._extractions) > EXTRACTION_CACHE_SIZE:
-            self._extractions.popitem(last=False)
+        held = sum(len(kept.data) for kept in self._extractions.values())
+        while len(self._extractions) > 1 and (
+            len(self._extractions) > EXTRACTION_CACHE_SIZE or held > EXTRACTION_CACHE_BYTES
+        ):
+            _, dropped = self._extractions.popitem(last=False)
+            held -= len(dropped.data)
         return extracted
 
     def _judge(

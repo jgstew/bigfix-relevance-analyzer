@@ -25,7 +25,7 @@ from __future__ import annotations
 import itertools
 from typing import Final, NamedTuple
 
-from bigfix_relevance_analyzer import __version__, inspectors
+from bigfix_relevance_analyzer import inspectors
 from bigfix_relevance_analyzer.analyzer import ReferenceReport, RelevanceAnalysis
 from bigfix_relevance_analyzer.binding import Binder
 from bigfix_relevance_analyzer.dialect import Dialect
@@ -54,16 +54,14 @@ from bigfix_relevance_analyzer.nodes import (
 )
 from bigfix_relevance_analyzer.tokenizer import Token, TokenKind
 
-DOCS_URL: Final = (
-    f"https://github.com/jgstew/bigfix-relevance-analyzer/blob/v{__version__}/docs/reference/"
-)
-"""Where hover links point: the reference pages at this version's release tag.
+DOCS_URL: Final = "https://github.com/jgstew/bigfix-relevance-analyzer/blob/main/docs/reference/"
+"""Where hover links point: the reference pages, on the default branch.
 
-A tag rather than ``main``, so a heading renamed later cannot break the links
-in an extension already installed. A test holds every linked anchor to a
-heading in this checkout's ``docs/reference/``, which is what the release tags.
-The price: a build of a version not yet released links to a tag that does not
-exist until it is."""
+Not a release tag. An unreleased build -- or one whose version falls back to
+``0.0.0`` -- would link to a tag that does not exist, which is a 404. On
+``main`` the worst a later heading rename can do is open the right page at its
+top, and a test holds every linked anchor to a heading in this checkout's
+``docs/reference/``, so a rename cannot go unnoticed."""
 
 MAX_ROWS: Final = 8
 """Inspector rows listed before the rest are summarized as a count."""
@@ -79,6 +77,14 @@ _BAR_LINK: Final = f"[Error fallback]({_SYNTAX}#-is-error-fallback-not-or)"
 _STRING_LINK: Final = f"[String literals]({_SYNTAX}#string-literals)"
 _TUPLE_LINK: Final = f"[Tuples and collections]({_SYNTAX}#tuples-and-collections)"
 _OPERATOR_LINK: Final = f"[Operator spellings]({_SYNTAX}#operator-spellings-collapse)"
+_ABSORB_LINK: Final = (
+    f"[Errors are values]({DOCS_URL}universal_relevance.md"
+    "#errors-are-values-and-some-constructs-absorb-them)"
+)
+_GUARD_LINK: Final = (
+    f"[Only `if` guards]({DOCS_URL}client_relevance.md"
+    "#only-if-guards-a-platform-specific-inspector)"
+)
 _DIALECT_LINKS: Final = {
     Dialect.CLIENT: f"[Client relevance]({DOCS_URL}client_relevance.md)",
     Dialect.SESSION: f"[Session relevance]({DOCS_URL}session_relevance.md)",
@@ -229,9 +235,9 @@ def _markdown(analysis: RelevanceAnalysis, node: Node, spelled: str) -> str | No
         case Exists(negated=negated):
             written = _code(spelled)
             meaning = "no value" if negated else "at least one value"
-            return f"**{written}** - true when its operand has {meaning}"
+            return _lines(f"**{written}** - true when its operand has {meaning}", _ABSORB_LINK)
         case NumberOf():
-            return f"**{_code(spelled)}** - how many values its operand has"
+            return _lines(f"**{_code(spelled)}** - how many values its operand has", _ABSORB_LINK)
         case ItemOf(index=index):
             return _lines(
                 f"**{_code(spelled)}** - tuple element {index.text}, counting from 0", _TUPLE_LINK
@@ -251,9 +257,10 @@ def _markdown(analysis: RelevanceAnalysis, node: Node, spelled: str) -> str | No
                 words[0].text if words else default
                 for words, default in zip(keywords, ("if", "then", "else"), strict=True)
             )
-            return (
+            return _lines(
                 f"**{_code(spelled_if)} ... {_code(spelled_then)} ... {_code(spelled_else)}** "
-                "- conditional expression"
+                "- conditional expression",
+                _GUARD_LINK,
             )
         case TupleExpr(items=items):
             return _lines(f"**{_code(spelled)}** - tuple of {len(items)} items", _TUPLE_LINK)
