@@ -365,11 +365,87 @@ def test_fix_rewrites_the_file_reports_it_and_exits_one(
 def test_fix_reports_a_fix_it_could_not_apply(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    path = write(tmp_path, "t.rel", 'exists values of setting "x" of client\n')
+    """A byte that is not UTF-8 on the fix's line: no offset next to it can be trusted."""
+    data = b'exists values of setting "\xff" of client\n'
+    path = tmp_path / "t.rel"
+    path.write_bytes(data)
     assert main(["--fix", str(path)]) == 0
+    assert path.read_bytes() == data
     out = capsys.readouterr().out
-    assert f"{path}:1: not fixed [plural-preferred] no source map" in out
+    assert f"{path}:1: not fixed [plural-preferred] undecodable bytes on line 1" in out
     assert f"{path}:1: warning [plural-preferred]" in out
+
+
+@pytest.mark.parametrize(
+    ("name", "text", "fixed", "reported"),
+    [
+        (
+            "t.rel",
+            'exists values of setting "x" of client\n',
+            'exists values of settings "x" of client\n',
+            "1: fixed [plural-preferred] setting -> settings",
+        ),
+        (
+            "t.md",
+            '# T\n\n```relevance\nexists values of setting "x" of client\n```\n',
+            '# T\n\n```relevance\nexists values of settings "x" of client\n```\n',
+            "4: fixed [plural-preferred] setting -> settings",
+        ),
+        (
+            "t.ojo",
+            '<p><?Relevance names of bes computers | "y" ?></p>\n',
+            '<p><?Relevance unique value of names of bes computers | "y" ?></p>\n',
+            (
+                "1: fixed [singular-required] names of bes computers -> "
+                "unique value of names of bes computers"
+            ),
+        ),
+    ],
+)
+def test_fix_rewrites_every_file_type_and_reports_the_whole_edit(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    name: str,
+    text: str,
+    fixed: str,
+    reported: str,
+) -> None:
+    """Reported per edit as the analyzer made it, never per inserted piece."""
+    path = write(tmp_path, name, text)
+    assert main(["--fix", str(path)]) == 1
+    assert path.read_text() == fixed
+    assert capsys.readouterr().out.startswith(f"{path}:{reported}\n")
+    assert main(["--fix", str(path)]) == 0
+
+
+def test_fix_diff_prints_the_change_and_writes_nothing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = write(tmp_path, "t.bes", SETTING_TASK)
+    assert main(["--fix", "--diff", str(path)]) == 1
+    assert path.read_text() == SETTING_TASK
+    captured = capsys.readouterr()
+    assert captured.out == (
+        f"--- {path}\n"
+        f"+++ {path}\n"
+        "@@ -1,4 +1,4 @@\n"
+        ' <?xml version="1.0" encoding="UTF-8"?>\n'
+        " <BES><Task>\n"
+        '-<Relevance>exists values of setting "x" of client</Relevance>\n'
+        '+<Relevance>exists values of settings "x" of client</Relevance>\n'
+        " </Task></BES>\n"
+    )
+    assert "1 fix(es) would be applied in 1 file(s)" in captured.err
+
+    clean = write(tmp_path, "c.bes", SETTING_TASK.replace("setting ", "settings "))
+    assert main(["--fix", "--diff", str(clean)]) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_diff_needs_fix() -> None:
+    with pytest.raises(SystemExit) as raised:
+        main(["--diff", "t.bes"])
+    assert raised.value.code == 2
 
 
 def test_fix_honours_ignore(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

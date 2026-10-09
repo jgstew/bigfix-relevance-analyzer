@@ -28,7 +28,8 @@ the reason -- and then the findings left standing. It exits ``1`` whenever it
 fixed anything, even if nothing is left to report: a rewritten file is a change
 the author has not seen yet, and pre-commit's convention is that a hook which
 modifies files fails, so the fix is reviewed and staged rather than committed
-unread.
+unread. ``--fix --diff`` writes nothing: it prints what ``--fix`` would change,
+as a unified diff per file, and exits ``1`` if anything would.
 
 A positional argument that names nothing on disk *and* contains whitespace is
 linted as relevance text rather than reported as a missing file -- a filename
@@ -51,7 +52,9 @@ still prints nothing on its own.
 from __future__ import annotations
 
 import argparse
+import difflib
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 from bigfix_relevance_analyzer._cli_common import (
@@ -64,14 +67,24 @@ from bigfix_relevance_analyzer._cli_common import (
     output_format,
     print_rules,
 )
-from bigfix_relevance_analyzer.fixfile import FileFix, FixResult, fix_directory, fix_paths
+from bigfix_relevance_analyzer.fixfile import (
+    FileFix,
+    FixPlan,
+    FixResult,
+    _plan_path,
+    fix_directory,
+    fix_paths,
+    plan_fix,
+)
 from bigfix_relevance_analyzer.lint import (
     DEFAULT_MAX_DEPTH,
     DEFAULT_MAX_EVALUATION_COST,
     DEFAULT_MAX_SCORE,
     Finding,
+    LintConfig,
     Severity,
     _findings_dict,
+    _walk_files,
     counts,
     lint_text,
 )
@@ -176,6 +189,14 @@ def main(argv: list[str] | None = None, *, prog: str = "bigfix-relevance-lint") 
         ),
     )
     parser.add_argument(
+        "--diff",
+        action="store_true",
+        help=(
+            "with --fix: write nothing, print what would change as a unified diff instead; "
+            "exits non-zero if anything would"
+        ),
+    )
+    parser.add_argument(
         "--list-rules",
         action="store_true",
         help="print every rule, its default severity and what it means, then exit",
@@ -197,6 +218,10 @@ def main(argv: list[str] | None = None, *, prog: str = "bigfix-relevance-lint") 
     paths = [arg for arg in args.paths if arg not in texts]
     if texts and args.fix:
         parser.error("--fix rewrites files in place; it cannot fix relevance given as text")
+    if args.diff and not args.fix:
+        parser.error("--diff shows what --fix would change; give both")
+    if args.diff:
+        return _diff(_plans(paths, config, args.max_depth), quiet=args.quiet)
 
     scope = _scope(paths, texts)
     fixes: FixResult | None = None
@@ -247,6 +272,32 @@ def main(argv: list[str] | None = None, *, prog: str = "bigfix-relevance-lint") 
     if errors or (args.fail_on_warning and warnings) or (fixes is not None and fixes.changed):
         return 1
     return 0
+
+
+def _plans(paths: list[str], config: LintConfig, max_depth: int) -> list[FixPlan]:
+    """What ``--fix`` would do to each path, or to each walked file: nothing written."""
+    if paths:
+        return [plan_fix(path, config) for path in paths]
+    files, _ = _walk_files(Path("."), max_depth)
+    return [_plan_path(file_path, config, explicit=False) for file_path in files]
+
+
+def _diff(plans: Sequence[FixPlan], *, quiet: bool) -> int:
+    """Print each plan's change as a unified diff; 1 if any file would change."""
+    changed = [plan for plan in plans if plan.changed]
+    if not quiet:
+        for plan in changed:
+            name = str(plan.path)
+            before = plan.original.decode("utf-8", errors="replace").splitlines(keepends=True)
+            after = plan.fixed.decode("utf-8", errors="replace").splitlines(keepends=True)
+            print("".join(difflib.unified_diff(before, after, name, name)), end="")
+    applied = sum(len(plan.applied) for plan in plans)
+    unapplied = sum(len(plan.unapplied) for plan in plans)
+    print(
+        f"{applied} fix(es) would be applied in {len(changed)} file(s), {unapplied} not applied",
+        file=sys.stderr,
+    )
+    return 1 if changed else 0
 
 
 def _markdown_report(findings: tuple[Finding, ...], fixes: FixResult | None, summary: str) -> str:

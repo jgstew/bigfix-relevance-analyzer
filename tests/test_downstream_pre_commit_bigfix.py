@@ -1,8 +1,8 @@
 """What pre-commit-bigfix's ``bes-relevance-lint`` hook relies on, pinned here.
 
 pre-commit-bigfix (github.com/jgstew/pre-commit-bigfix) depends on this package
-with no upper bound (``bigfix-relevance-analyzer >= 1.19.0``), so every release
-of this one reaches its users at once. Its hook,
+within one major version (``bigfix-relevance-analyzer >= 1.23.1, < 2``), so every
+minor and patch release of this one reaches its users at once. Its hook,
 ``pre_commit_bigfix/bes_relevance_lint.py`` (read at its commit 53063b1):
 
 * imports ``LintConfig``, ``Severity``, ``lint_directory`` and ``lint_paths``
@@ -34,6 +34,11 @@ release notes, and change pre-commit-bigfix to match if it needs to.
 Precise diagnostic ranges (issue #96, item 1) are planned to leave all of it
 alone: ``Finding.line`` keeps its meaning, and anything new is additive.
 
+The hook's opt-in auto-fix (#115, Part B) will also call ``plan_fix`` and
+``write_fix``, check a ``FixPlan`` against BES.xsd between the two, and name
+its own code per change from ``TextEdit.rule``. That surface is pinned here
+before the hook ships it.
+
 A deliberate change to the output (a reworded message, say) regenerates the
 golden, and its diff is exactly what the hook's users will see::
 
@@ -60,9 +65,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from _helpers import golden_text
+from _helpers import golden_text, run_fresh_python
 
 from bigfix_relevance_analyzer import LintConfig, Severity, lint_directory, lint_paths
+from bigfix_relevance_analyzer.autofix import AutofixResult, TextEdit
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.extract import _is_recognized
 from bigfix_relevance_analyzer.lint import RULES, Finding
@@ -226,6 +232,59 @@ def _findings_with_autofix() -> list[Finding]:
     return with_fix
 
 
+def test_the_fix_entry_points_the_auto_fix_will_call() -> None:
+    """``plan = plan_fix(path, config)``; its BES.xsd guard compares
+    ``plan.original`` with ``plan.fixed`` when ``plan.changed``; then
+    ``write_fix(plan)``, or the original findings when it may not write."""
+    package = importlib.import_module("bigfix_relevance_analyzer")
+    for name in ("FixPlan", "plan_fix", "write_fix", "FileFixResult", "FileFix"):
+        assert hasattr(package, name), name
+    assert list(inspect.signature(package.plan_fix).parameters)[:2] == ["path", "config"]
+    assert list(inspect.signature(package.write_fix).parameters) == ["plan"]
+    plan_fields = {field.name for field in dataclasses.fields(package.FixPlan)}
+    assert {
+        "path",
+        "original",
+        "fixed",
+        "applied",
+        "unapplied",
+        "findings",
+        "original_findings",
+    } <= plan_fields
+    assert isinstance(inspect.getattr_static(package.FixPlan, "changed"), property)
+    result_fields = {field.name for field in dataclasses.fields(package.FileFixResult)}
+    assert {"path", "applied", "unapplied", "findings", "changed"} <= result_fields
+    fix_fields = {field.name for field in dataclasses.fields(package.FileFix)}
+    assert {"path", "line", "site", "autofix", "reason"} <= fix_fields
+
+
+def test_an_edit_names_the_rule_the_hook_reports_it_under() -> None:
+    """One ``auto-fixed`` line per edit, coded from ``CODES[edit.rule]``."""
+    assert "edits" in {field.name for field in dataclasses.fields(AutofixResult)}
+    assert {"start", "end", "replacement", "code"} <= {
+        field.name for field in dataclasses.fields(TextEdit)
+    }
+    assert isinstance(inspect.getattr_static(TextEdit, "rule"), property)
+    edits = [edit for finding in _findings_with_autofix() for edit in finding.autofix.edits]  # type: ignore[union-attr]
+    assert edits
+    assert {edit.rule for edit in edits} <= HOOK_RULES
+
+
+def test_the_editor_component_snapshots_difflib_with_the_fixer() -> None:
+    """componentize-py keeps only modules imported at build time. The build
+    imports the language server, so the fixer's ``difflib`` must come in as a
+    top-level import of ``autofix``: a lazy one works on CPython and fails only
+    inside the VS Code extension. (``inspectors`` importing difflib too is why
+    ``"difflib" in sys.modules`` alone would prove nothing.)"""
+    run_fresh_python(
+        "import sys\n"
+        "import bigfix_relevance_analyzer.lsp.server\n"
+        "from bigfix_relevance_analyzer import autofix\n"
+        "assert autofix.difflib is sys.modules['difflib']\n"
+        "print('ok')\n"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Behaviour the hook depends on
 # ---------------------------------------------------------------------------
@@ -335,11 +394,17 @@ def test_the_real_hook_prints_the_golden_report() -> None:
 
     Its E/W-codes become rule names for the comparison, the one difference the
     copy makes on purpose; and its closing count lines are left out.
+
+    ``--enable W601`` is a no-op on today's hook, which disables W601 in its
+    hook declaration rather than its code; once the auto-fix release moves that
+    into its code (#115 Part B), this keeps the golden the same across both.
+    No ``--auto-fix`` is passed, so this also pins that the default never
+    writes.
     """
     hook = _hook_module()
     output = io.StringIO()
     with _in_repo_root(), contextlib.redirect_stdout(output):
-        status = hook.main(_example_files())
+        status = hook.main(["--enable", "W601", *_example_files()])
     assert status in (0, 1)
     rules_by_code = {code: rule for rule, code in hook.CODES.items()}
     lines = []

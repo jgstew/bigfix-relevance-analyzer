@@ -219,6 +219,7 @@
           "code": "singular-spelling-mid-chain",
           "end": 24,
           "replacement": "settings",
+          "rule": "plural-preferred",
           "start": 17
         }
       ],
