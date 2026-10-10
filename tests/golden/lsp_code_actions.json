@@ -1,0 +1,1192 @@
+{
+ "client_relevance/tasks/task_power_management_sleep_when_idle.bes": [
+  {
+   "title": "Apply 2 safe fixes to this statement",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      11,
+      535
+     ],
+     [
+      11,
+      535
+     ],
+     "s"
+    ],
+    [
+     [
+      11,
+      631
+     ],
+     [
+      11,
+      631
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      11,
+      535
+     ],
+     [
+      11,
+      535
+     ],
+     "s"
+    ],
+    [
+     [
+      11,
+      631
+     ],
+     [
+      11,
+      631
+     ],
+     "s"
+    ]
+   ]
+  }
+ ],
+ "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes": [
+  {
+   "title": "Apply 2 safe fixes to this statement",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      14,
+      137
+     ],
+     [
+      14,
+      137
+     ],
+     "s"
+    ],
+    [
+     [
+      14,
+      222
+     ],
+     [
+      14,
+      222
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Apply 2 safe fixes to this statement",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      32,
+      193
+     ],
+     [
+      32,
+      193
+     ],
+     "s"
+    ],
+    [
+     [
+      32,
+      236
+     ],
+     [
+      32,
+      236
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Apply 2 safe fixes to this statement",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      111,
+      109
+     ],
+     [
+      111,
+      109
+     ],
+     "s"
+    ],
+    [
+     [
+      111,
+      139
+     ],
+     [
+      111,
+      139
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Apply 2 safe fixes to this statement",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      118,
+      176
+     ],
+     [
+      118,
+      176
+     ],
+     "s"
+    ],
+    [
+     [
+      118,
+      219
+     ],
+     [
+      118,
+      219
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "quickfix",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      14,
+      137
+     ],
+     [
+      14,
+      137
+     ],
+     "s"
+    ],
+    [
+     [
+      14,
+      222
+     ],
+     [
+      14,
+      222
+     ],
+     "s"
+    ],
+    [
+     [
+      32,
+      193
+     ],
+     [
+      32,
+      193
+     ],
+     "s"
+    ],
+    [
+     [
+      32,
+      236
+     ],
+     [
+      32,
+      236
+     ],
+     "s"
+    ],
+    [
+     [
+      111,
+      109
+     ],
+     [
+      111,
+      109
+     ],
+     "s"
+    ],
+    [
+     [
+      111,
+      139
+     ],
+     [
+      111,
+      139
+     ],
+     "s"
+    ],
+    [
+     [
+      118,
+      176
+     ],
+     [
+      118,
+      176
+     ],
+     "s"
+    ],
+    [
+     [
+      118,
+      219
+     ],
+     [
+      118,
+      219
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      14,
+      137
+     ],
+     [
+      14,
+      137
+     ],
+     "s"
+    ],
+    [
+     [
+      14,
+      222
+     ],
+     [
+      14,
+      222
+     ],
+     "s"
+    ],
+    [
+     [
+      32,
+      193
+     ],
+     [
+      32,
+      193
+     ],
+     "s"
+    ],
+    [
+     [
+      32,
+      236
+     ],
+     [
+      32,
+      236
+     ],
+     "s"
+    ],
+    [
+     [
+      111,
+      109
+     ],
+     [
+      111,
+      109
+     ],
+     "s"
+    ],
+    [
+     [
+      111,
+      139
+     ],
+     [
+      111,
+      139
+     ],
+     "s"
+    ],
+    [
+     [
+      118,
+      176
+     ],
+     [
+      118,
+      176
+     ],
+     "s"
+    ],
+    [
+     [
+      118,
+      219
+     ],
+     [
+      118,
+      219
+     ],
+     "s"
+    ]
+   ]
+  }
+ ],
+ "bes-wrap-over-lt/t.bes": [
+  {
+   "title": "Wrap in `unique value of`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      4,
+      13
+     ],
+     [
+      4,
+      13
+     ],
+     "unique value of "
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      4,
+      13
+     ],
+     [
+      4,
+      13
+     ],
+     "unique value of "
+    ]
+   ]
+  }
+ ],
+ "bes-wrap-over-quot/t.bes": [
+  {
+   "title": "Wrap in `unique value of`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      4,
+      13
+     ],
+     [
+      4,
+      13
+     ],
+     "unique value of "
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      4,
+      13
+     ],
+     [
+      4,
+      13
+     ],
+     "unique value of "
+    ]
+   ]
+  }
+ ],
+ "bes-name-split-by-cdata/t.bes": [
+  {
+   "title": "Change `setting` to `settings`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      4,
+      49
+     ],
+     [
+      4,
+      49
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      4,
+      49
+     ],
+     [
+      4,
+      49
+     ],
+     "s"
+    ]
+   ]
+  }
+ ],
+ "bes-substitution-wrap-over-lt/t.bes": [
+  {
+   "title": "Wrap in `unique value of`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      5,
+      78
+     ],
+     [
+      5,
+      78
+     ],
+     "unique value of "
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      5,
+      78
+     ],
+     [
+      5,
+      78
+     ],
+     "unique value of "
+    ]
+   ]
+  }
+ ],
+ "bes-merged-wrap-and-respelling/t.bes": [
+  {
+   "title": "Apply 2 safe fixes to this statement",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      4,
+      13
+     ],
+     [
+      4,
+      13
+     ],
+     "unique value of "
+    ],
+    [
+     [
+      4,
+      37
+     ],
+     [
+      4,
+      37
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      4,
+      13
+     ],
+     [
+      4,
+      13
+     ],
+     "unique value of "
+    ],
+    [
+     [
+      4,
+      37
+     ],
+     [
+      4,
+      37
+     ],
+     "s"
+    ]
+   ]
+  }
+ ],
+ "bes-crlf/t.bes": [
+  {
+   "title": "Change `setting` to `settings`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      6,
+      24
+     ],
+     [
+      6,
+      24
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      6,
+      24
+     ],
+     [
+      6,
+      24
+     ],
+     "s"
+    ]
+   ]
+  }
+ ],
+ "rel/t.rel": [
+  {
+   "title": "Change `setting` to `settings`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      0,
+      24
+     ],
+     [
+      0,
+      24
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      0,
+      24
+     ],
+     [
+      0,
+      24
+     ],
+     "s"
+    ]
+   ]
+  }
+ ],
+ "bsr-wrap/t.bsr": [
+  {
+   "title": "Wrap in `unique value of`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      0
+     ],
+     "unique value of "
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      0
+     ],
+     "unique value of "
+    ]
+   ]
+  }
+ ],
+ "rel-crlf/t.rel": [
+  {
+   "title": "Change `setting` to `settings`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      1,
+      24
+     ],
+     [
+      1,
+      24
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      1,
+      24
+     ],
+     [
+      1,
+      24
+     ],
+     "s"
+    ]
+   ]
+  }
+ ],
+ "rel-cr-only/t.rel": [
+  {
+   "title": "Change `setting` to `settings`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      1,
+      24
+     ],
+     [
+      1,
+      24
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      1,
+      24
+     ],
+     [
+      1,
+      24
+     ],
+     "s"
+    ]
+   ]
+  }
+ ],
+ "rel-astral-before-the-fix-crlf/t.rel": [
+  {
+   "title": "Change `setting` to `settings`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      0,
+      33
+     ],
+     [
+      0,
+      33
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      0,
+      33
+     ],
+     [
+      0,
+      33
+     ],
+     "s"
+    ]
+   ]
+  }
+ ],
+ "rel-bom-line-1/t.rel": [
+  {
+   "title": "Change `setting` to `settings`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      0,
+      25
+     ],
+     [
+      0,
+      25
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      0,
+      25
+     ],
+     [
+      0,
+      25
+     ],
+     "s"
+    ]
+   ]
+  }
+ ],
+ "md-two-fences-from-line-3/t.md": [
+  {
+   "title": "Change `setting` to `settings`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      3,
+      24
+     ],
+     [
+      3,
+      24
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Change `setting` to `settings`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      7,
+      24
+     ],
+     [
+      7,
+      24
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "quickfix",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      3,
+      24
+     ],
+     [
+      3,
+      24
+     ],
+     "s"
+    ],
+    [
+     [
+      7,
+      24
+     ],
+     [
+      7,
+      24
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      3,
+      24
+     ],
+     [
+      3,
+      24
+     ],
+     "s"
+    ],
+    [
+     [
+      7,
+      24
+     ],
+     [
+      7,
+      24
+     ],
+     "s"
+    ]
+   ]
+  }
+ ],
+ "md-crlf/t.md": [
+  {
+   "title": "Change `setting` to `settings`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      3,
+      24
+     ],
+     [
+      3,
+      24
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      3,
+      24
+     ],
+     [
+      3,
+      24
+     ],
+     "s"
+    ]
+   ]
+  }
+ ],
+ "md-mixed-line-endings/t.md": [
+  {
+   "title": "Change `setting` to `settings`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      3,
+      24
+     ],
+     [
+      3,
+      24
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      3,
+      24
+     ],
+     [
+      3,
+      24
+     ],
+     "s"
+    ]
+   ]
+  }
+ ],
+ "ojo-two-identical-pis-on-one-line/t.ojo": [
+  {
+   "title": "Wrap in `unique value of`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      0,
+      15
+     ],
+     [
+      0,
+      15
+     ],
+     "unique value of "
+    ]
+   ]
+  },
+  {
+   "title": "Wrap in `unique value of`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      0,
+      63
+     ],
+     [
+      0,
+      63
+     ],
+     "unique value of "
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "quickfix",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      0,
+      15
+     ],
+     [
+      0,
+      15
+     ],
+     "unique value of "
+    ],
+    [
+     [
+      0,
+      63
+     ],
+     [
+      0,
+      63
+     ],
+     "unique value of "
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      0,
+      15
+     ],
+     [
+      0,
+      15
+     ],
+     "unique value of "
+    ],
+    [
+     [
+      0,
+      63
+     ],
+     [
+      0,
+      63
+     ],
+     "unique value of "
+    ]
+   ]
+  }
+ ],
+ "html-js-call-single-quotes/t.html": [
+  {
+   "title": "Wrap in `unique value of`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      0,
+      19
+     ],
+     [
+      0,
+      19
+     ],
+     "unique value of "
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      0,
+      19
+     ],
+     [
+      0,
+      19
+     ],
+     "unique value of "
+    ]
+   ]
+  }
+ ],
+ "html-js-call-escaped-quotes/t.html": [
+  {
+   "title": "Wrap in `unique value of`",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      0,
+      19
+     ],
+     [
+      0,
+      19
+     ],
+     "unique value of "
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      0,
+      19
+     ],
+     [
+      0,
+      19
+     ],
+     "unique value of "
+    ]
+   ]
+  }
+ ]
+}

@@ -11,7 +11,7 @@ safe fixes.
 | Where | What you get |
 | --- | --- |
 | [Browser playground](#browser-playground) | Paste relevance into a self-contained [web page](https://www.jgstew.com/files/bigfix-relevance-analyzer-playground.html); nothing to install, nothing sent anywhere |
-| [VS Code extension](#vs-code-extension) | Diagnostics and hover [as you type](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer) |
+| [VS Code extension](#vs-code-extension) | Diagnostics, hover and quick fixes [as you type](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer) |
 | [Command Line `uvx`](#command-line-via-uvx) | Analyse one statement, or lint files, with nothing installed |
 | [pre-commit hook](#pre-commit-hook) | Lint the relevance in a BigFix content repo on every commit |
 | [Python library](#python-library) | `import` it from PyPI into your own tool |
@@ -685,6 +685,18 @@ and CDATA included:
 Whitespace, comments, articles, parentheses and a statement that does not parse
 get no hover.
 
+And it offers each safe fix as a quick fix (`textDocument/codeAction`): one
+`quickfix` action per statement with a fixable diagnostic in the requested
+range, and a `source.fixAll.bigfix-relevance` action that fixes the whole file,
+which an editor can run on save (and runs, in VS Code, for anyone whose
+`editor.codeActionsOnSave` turns on the generic `source.fixAll`). Nothing
+about whether a fix is safe is decided in the editor layer: the buffer's bytes are planned exactly as `--fix` plans a
+file (see [Writing fixes back into files](#writing-fixes-back-into-files)), and
+each byte edit becomes a range, so a fix inserts only the text it adds and an
+action is offered only for a fix `--fix` would write. Code actions are
+advertised to a client that accepts `CodeAction` literals, and their edits
+carry the document's version when the client supports `documentChanges`.
+
 The protocol logic does no I/O, so it can also run without stdio. A host such
 as a WASM runtime inside an editor extension passes each parsed JSON-RPC
 message to `Server.handle()` and sends back whatever list it returns:
@@ -708,7 +720,10 @@ the `maxDocumentBytes` initialization option.
 The protocol layer is a thin adapter. Everything the editor is told (the
 diagnostics, the cache, the size guard and their options) comes from
 `DocumentLinter`, which has no JSON-RPC in it: `diagnostics(uri, text)` and
-`hover(uri, text, (line, character))` return plain dicts in LSP's field names. Moving to a library such as pygls would mean
+`hover(uri, text, (line, character))` return plain dicts in LSP's field names,
+and `fixes(uri, text, range=...)` returns `DocumentFix` objects (a title, a
+kind, the diagnostics fixed, and edits as ranges with their new text) that
+the server turns into `CodeAction`s. Moving to a library such as pygls would mean
 writing another adapter over it, not porting it.
 
 **[BigFix Relevance Developer](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer)**,

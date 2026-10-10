@@ -112,6 +112,20 @@ class DocumentIndex:
             return self._text_range(site, start, end)
         return None
 
+    def byte_range(self, start: int, end: int) -> Range | None:
+        """The range bytes ``[start, end)`` of :attr:`data` cover; zero-width for
+        an insertion (``start == end``). ``None`` for an offset inside a
+        character, past the end, or on bytes that are not the buffer's text.
+
+        How a quick fix reaches the buffer: :mod:`~bigfix_relevance_analyzer.fixfile`
+        plans it as byte edits of exactly these bytes.
+        """
+        first = self._byte_position(start)
+        last = self._byte_position(end)
+        if first is None or last is None:
+            return None
+        return first, last
+
     def site_offset(self, site: RelevanceSite, position: Position) -> int | None:
         """The offset in ``site.text`` of the character at ``position``, or ``None``.
 

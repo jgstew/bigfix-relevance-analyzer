@@ -42,6 +42,36 @@ it is singular or plural as written, and the platforms (client) or contexts
 keywords and operators such as `whose`, `of`, `|` and `as`, with links to the
 reference documentation.
 
+### Quick fixes
+
+Some problems come with a fix the checker has worked out and checked is safe:
+a name spelled in the singular where the plural is safer (`setting` becomes
+`settings`), and a list of values where a single value is required (wrapped in
+`unique value of`). A light bulb appears on the underlined text; click it, or
+press `Ctrl+.` (`Cmd+.` on macOS), to apply the fix. **Fix all safe issues in
+this file** applies every one at once.
+
+A fix only adds the words it needs. Everything else in the file stays exactly
+as you wrote it, including escaped characters such as `&lt;` and `&quot;` in
+`.bes` files. A fix is not offered if it would cause a new problem anywhere in
+the file, such as a statement becoming too complex.
+
+To apply every safe fix each time you save, add this to your settings:
+
+```json
+"editor.codeActionsOnSave": { "source.fixAll.bigfix-relevance": "explicit" }
+```
+
+If your settings already fix everything on save for every language, as
+ESLint, Ruff and other tools suggest:
+
+```json
+"editor.codeActionsOnSave": { "source.fixAll": "explicit" }
+```
+
+then these fixes run on save too. To keep the others but not these, add
+`"source.fixAll.bigfix-relevance": "never"` beside it.
+
 ### Syntax highlighting
 
 `.rel` and `.bsr` files, and relevance in Markdown code fences, are colored:
