@@ -739,6 +739,40 @@ for reply in server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "
     ...  # hand each reply back to the client
 ```
 
+To force the dialect of an embedded server, give it a linter that forces it:
+`Server(linter=DocumentLinter(config=LintConfig(suggest=True, dialect=Dialect.SESSION)))`.
+
+**Without a language client.** A web page, a notebook or a WASM playground
+usually holds the text itself and has no LSP client to keep the server's copy
+current. `StatementSession` is that client for one statement, in-process:
+
+```python
+from bigfix_relevance_analyzer import Dialect
+from bigfix_relevance_analyzer.lsp import LspError, StatementSession
+
+session = StatementSession()  # or StatementSession(dialect=Dialect.SESSION)
+diagnostics = session.sync(text)  # the diagnostics if the text changed, else None
+session.diagnostics  # always the latest, however the text got there
+hover = session.request("textDocument/hover", {"position": {"line": 0, "character": 9}}, text)
+completion = session.request("textDocument/completion", {"position": position}, text)
+actions = session.request(
+    "textDocument/codeAction",
+    {"range": lsp_range, "context": {"diagnostics": [], "only": ["quickfix"]}},
+    text,
+)
+session.close()  # safe to call twice
+```
+
+The caller passes the text to every call; the session opens the document on
+first use and sends a full-text change only when the text differs, so a request
+is always answered against the text it was asked about. `request()` adds
+`textDocument` itself, an error response raises `LspError` (with `code` and
+`message`), and answers are the server's own LSP JSON. The document is one
+plain statement (`untitled:statement`, language `bigfix-relevance`). Positions
+are LSP's (0-based line, UTF-16 character), which is also what CodeMirror 6
+counts in. The session advertises no snippet support and takes plain
+`changes` edits.
+
 On a keystroke the server re-judges only the sites that changed. Unchanged
 statements keep their cached findings, moved to their current line, so typing
 in a 59-site task costs about 2 ms instead of about 50 ms. "Did you mean" leads
