@@ -1201,6 +1201,176 @@ def test_a_manifest_without_the_bes_language_costs_only_bes() -> None:
 
 
 # ---------------------------------------------------------------------------
+# A fixlet pasted into an unsaved tab becomes BigFix BES XML (issue #132)
+# ---------------------------------------------------------------------------
+
+SNIFF = PRIMARY / "sniff.js"
+SNIFF_SETTING = "bigfixRelevance.detectBesXml"
+
+
+def test_detecting_bes_xml_is_a_setting_on_by_default() -> None:
+    setting = _settings(PRIMARY)[SNIFF_SETTING]
+    assert setting["type"] == "boolean"
+    assert setting["default"] is True
+    assert "once" in setting["description"]
+
+
+def test_the_extension_switches_only_unsaved_tabs_from_what_vs_code_guessed() -> None:
+    """Never a saved file or another scheme: only the languages VS Code itself
+    gives a pasted or typed fixlet (php and markdown from its language
+    detection, measured in review 4/9 of #136)."""
+    text = (PRIMARY / "extension.js").read_text("utf-8")
+    assert 'require("./sniff")' in text
+    assert 'const SWITCH_FROM = new Set(["plaintext", "xml", "php", "markdown"]);' in text
+    assert 'document.uri.scheme === "untitled"' in text
+    assert "setTextDocumentLanguage(document, BES_LANGUAGE_ID)" in text
+    assert f'"{SNIFF_SETTING.removeprefix("bigfixRelevance.")}"' in text
+    # At most once per tab: a URI is remembered, and forgotten only when the tab
+    # has really closed (a language change is a close and an open of one URI).
+    assert "decided.add(" in text and "decided.delete(" in text
+    assert "onDidCloseTextDocument" in text
+
+
+def _function_body(source: str, name: str) -> str:
+    start = source.index(f"function {name}(")
+    return source[start : source.index("\n}\n", start)]
+
+
+def test_only_a_paste_or_typing_switches_a_tab() -> None:
+    """Review of #136 (2/9, 3/9): a document that opens with BES XML already in
+    it was restored by a window reload or created by another extension, so its
+    language is somebody's choice. Switching happens on change events only, and
+    such a document is decided as it opens."""
+    text = (PRIMARY / "extension.js").read_text("utf-8")
+    activate = _function_body(text, "activate")
+    opened = activate[
+        activate.index("onDidOpenTextDocument") : activate.index("onDidChangeTextDocument")
+    ]
+    assert "maybeSwitch" not in opened
+    assert "settle(document)" in opened
+    changed = activate[
+        activate.index("onDidChangeTextDocument") : activate.index("onDidCloseTextDocument")
+    ]
+    assert "maybeSwitch(event)" in changed
+    loop = activate[activate.index("for (const document of vscode.workspace.textDocuments)") :]
+    assert "maybeSwitch" not in loop.split("}")[0]
+    assert "settle(document)" in loop.split("}")[0]
+
+
+def test_the_sniff_reads_only_what_the_sniffer_looks_at() -> None:
+    """Review of #136 (5/9): one bound, sniff.js's, in characters, and only when
+    a change reaches it."""
+    text = (PRIMARY / "extension.js").read_text("utf-8")
+    assert 'const { isBesXml, HEAD_CHARS } = require("./sniff");' in text
+    assert "positionAt(HEAD_CHARS)" in text
+    assert "rangeOffset < HEAD_CHARS" in text
+    assert "SNIFF_LINES" not in text
+    assert "module.exports = { isBesXml, HEAD_CHARS };" in SNIFF.read_text("utf-8")
+
+
+def test_a_closed_tab_is_told_from_a_language_change_by_its_tab() -> None:
+    """Review of #136 (7/9): a language change keeps the tab; a real close
+    removes it. No timing assumption."""
+    text = (PRIMARY / "extension.js").read_text("utf-8")
+    forget = _function_body(text, "forget")
+    assert "isTabOpen(key)" in forget
+    # A tab being closed is still listed as its document closes (measured in
+    # VS Code 1.140.0), so the tab's own close event ends its decision.
+    assert "tabGroups.onDidChangeTabs(forgetTabs)" in text
+    assert "decided.delete(key)" in _function_body(text, "forgetTabs")
+    assert "setTimeout" not in text
+    tab_open = text[text.index("const isTabOpen") :]
+    assert "vscode.window.tabGroups" in tab_open[: tab_open.index(";\n")]
+
+
+def test_a_failed_switch_is_retried_and_logged() -> None:
+    """Review of #136 (9/9): not switched means not decided."""
+    switch = _function_body((PRIMARY / "extension.js").read_text("utf-8"), "maybeSwitch")
+    rejected = switch[switch.index(".then(undefined,") :]
+    assert "decided.delete(key)" in rejected
+    # Logged to the extension host's log, with the reason.
+    assert "could not switch" in rejected and "error?.message" in rejected
+
+
+def test_the_sniffer_ships_and_is_tested_in_ci() -> None:
+    assert SNIFF.is_file()
+    assert "vscode" not in re.findall(r'require\("([^"]+)"\)', SNIFF.read_text("utf-8"))
+    assert "test/sniff.test.mjs" in WORKFLOW.read_text("utf-8")
+    assert '"sniff.js"' in SERVER_TEST.read_text("utf-8")
+
+
+SNIFF_CHECK = """
+const { isBesXml } = require(process.argv[1]);
+const fs = require("node:fs");
+const paths = JSON.parse(fs.readFileSync(0, "utf8"));
+console.log(JSON.stringify(paths.map((p) => isBesXml(fs.readFileSync(p, "utf8")))));
+"""
+
+
+def test_the_sniffer_tells_every_tracked_bes_file_from_everything_else() -> None:
+    """Every tracked `.bes` is detected, and no tracked relevance, ActionScript,
+    Markdown, Python or JSON file is."""
+    node, git = shutil.which("node"), shutil.which("git")
+    if node is None or git is None or not (REPO_ROOT / ".git").exists():
+        pytest.skip("needs node and a git checkout")
+
+    def tracked(*patterns: str) -> list[str]:
+        listed = subprocess.run(
+            [git, "ls-files", *patterns], cwd=REPO_ROOT, capture_output=True, text=True, check=True
+        ).stdout.split("\n")
+        return [str(REPO_ROOT / name) for name in listed if name]
+
+    bes = tracked("*.bes")
+    others = tracked("*.rel", "*.bsr", "*.actionscript", "*.md", "*.py", "*.json")
+    assert bes and others
+    result = subprocess.run(
+        [node, "-e", SNIFF_CHECK, str(SNIFF)],
+        input=json.dumps(bes + others),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    detected = dict(zip(bes + others, json.loads(result.stdout), strict=True))
+    assert [path for path in bes if not detected[path]] == []
+    assert [path for path in others if detected[path]] == []
+
+
+def test_the_smoke_test_pastes_a_fixlet_into_an_unsaved_tab() -> None:
+    """The prototype's scenarios: a paste, typing, a choice that sticks, a
+    reused tab name, other content left alone, and the setting off."""
+    suite = (COMMON_SMOKE / "suite.js").read_text("utf-8")
+    assert "editor.action.clipboardPasteAction" in suite
+    assert '"type"' in suite
+    assert "detectBesXml" in suite
+    for scenario in (
+        "pasted",
+        "typed",
+        "kept xml",
+        "reused tab",
+        "no declaration",
+        "pasted under text",
+        "python",
+        "other xml",
+        "setting off",
+        "reused tab name",
+        "typed slowly",
+        "opened by code",
+        "edited by code",
+    ):
+        assert f'"{scenario}"' in suite or f"expectedPastes.{scenario} =" in suite, scenario
+    # Expectations are structured, never matched as strings (review of #136, 1/9).
+    assert 'startsWith("not ")' not in suite
+    assert "languages.has(found)" in suite
+
+
+def test_the_readme_says_a_pasted_fixlet_is_checked() -> None:
+    text = " ".join((PRIMARY / "README.md").read_text("utf-8").split())
+    assert "pick **BigFix BES XML** from the" not in text
+    assert "switched to **BigFix BES XML**" in text
+    assert "once" in text
+
+
+# ---------------------------------------------------------------------------
 # What VS Code shows for the extension: README and manifest text
 # ---------------------------------------------------------------------------
 

@@ -149,5 +149,10 @@ get diagnostics. `test/gate.test.mjs` unit-tests the gate, and a test in
 `tests/` checks it passes every tracked Markdown and HTML file the extractor
 finds relevance in.
 
+The first instance also pastes and types fixlets into new, unsaved tabs, which
+`sniff.js` must switch to BigFix BES XML once and only once (issue #132), and
+leaves other pastes alone. `test/sniff.test.mjs` unit-tests the sniffer, and a
+test in `tests/` checks it detects every tracked `.bes` file and nothing else.
+
 Either extension's `trace.server` setting set to `"verbose"` logs every LSP
 message to its output channel.

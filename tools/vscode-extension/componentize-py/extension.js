@@ -24,6 +24,7 @@ const path = require("node:path");
 const vscode = require("vscode");
 
 const { needsServer } = require("./gate");
+const { isBesXml, HEAD_CHARS } = require("./sniff");
 const manifest = require("./package.json");
 // Kept in step with the analyzer's recognized suffixes by
 // tests/test_vscode_extension_layout.py.
@@ -123,6 +124,83 @@ function consider(document) {
   restart();
 }
 
+// Languages VS Code itself gives a fixlet in a new tab (issue #132, measured in
+// VS Code 1.140.0): plaintext before anything; xml from the built-in XML
+// language's `firstLine` on a paste; php or markdown from its language
+// detection, which guesses from the first lines while a fixlet is typed.
+const SWITCH_FROM = new Set(["plaintext", "xml", "php", "markdown"]);
+// Unsaved tabs whose language is settled, by URI: switched once already, or
+// opened with BES XML already in them (restored by a window reload, or created
+// by another extension), so a language somebody picked sticks. VS Code never
+// re-detects after an extension sets a language, and neither does this.
+const decided = new Set();
+// Unsaved documents closed while their tab stayed open: a language change,
+// which VS Code reports as a close and an open of the same URI.
+const relabelled = new Set();
+
+const isTabOpen = (key) =>
+  vscode.window.tabGroups.all.some((group) =>
+    group.tabs.some((tab) => tab.input instanceof vscode.TabInputText && tab.input.uri.toString() === key)
+  );
+
+/** Whether `document` is an unsaved tab that may still be switched. */
+function undecided(document) {
+  return (
+    Boolean(BES_LANGUAGE_ID) &&
+    document.uri.scheme === "untitled" &&
+    SWITCH_FROM.has(document.languageId) &&
+    !decided.has(document.uri.toString())
+  );
+}
+
+/** The text sniff.js looks at, and no more. */
+function head(document) {
+  return document.getText(new vscode.Range(new vscode.Position(0, 0), document.positionAt(HEAD_CHARS)));
+}
+
+/** As a document opens: one with BES XML already in it keeps its language. */
+function settle(document) {
+  const key = document.uri.toString();
+  if (relabelled.delete(key)) return; // the same tab, in its new language
+  if (undecided(document) && isBesXml(head(document))) decided.add(key);
+}
+
+/** Switch an unsaved tab a fixlet is pasted or typed into, at most once. */
+function maybeSwitch({ document, contentChanges }) {
+  if (!undecided(document)) return;
+  if (!contentChanges.some((change) => change.rangeOffset < HEAD_CHARS)) return;
+  if (!vscode.workspace.getConfiguration(PREFIX).get("detectBesXml")) return;
+  if (!isBesXml(head(document))) return;
+  const key = document.uri.toString();
+  decided.add(key);
+  // Arrives as a close and an open in the new language, which `consider` sees.
+  vscode.languages.setTextDocumentLanguage(document, BES_LANGUAGE_ID).then(undefined, (error) => {
+    // Not switched, so not decided: the next edit tries again.
+    decided.delete(key);
+    console.warn(`${NAME}: could not switch ${key} to ${BES_LANGUAGE_ID}: ${error?.message ?? error}`);
+  });
+}
+
+/** Tell a language change, which keeps the tab, from a close without one. */
+function forget(document) {
+  if (document.uri.scheme !== "untitled") return;
+  const key = document.uri.toString();
+  // A tab being closed is still listed here; forgetTabs ends its decision.
+  if (isTabOpen(key)) relabelled.add(key);
+  else decided.delete(key);
+}
+
+/** A closed tab ends its decision: its `Untitled-N` name is reused, and detected afresh. */
+function forgetTabs({ closed }) {
+  for (const tab of closed) {
+    if (!(tab.input instanceof vscode.TabInputText) || tab.input.uri.scheme !== "untitled") continue;
+    const key = tab.input.uri.toString();
+    if (isTabOpen(key)) continue; // still shown in another group
+    decided.delete(key);
+    relabelled.delete(key);
+  }
+}
+
 async function activate(context) {
   context.subscriptions.push(
     // Explicit, so it starts the server even where nothing has passed the gate.
@@ -135,11 +213,23 @@ async function activate(context) {
     vscode.workspace.onDidChangeConfiguration((event) =>
       wanted && event.affectsConfiguration(`${PREFIX}.maxDocumentBytes`) ? restart() : undefined
     ),
-    vscode.workspace.onDidOpenTextDocument(consider),
-    // Markdown or HTML can gain relevance as it is edited.
-    vscode.workspace.onDidChangeTextDocument((event) => consider(event.document))
+    vscode.workspace.onDidOpenTextDocument((document) => {
+      settle(document);
+      consider(document);
+    }),
+    // Markdown or HTML can gain relevance as it is edited, and an unsaved tab
+    // can gain a fixlet: only a paste or typing switches one.
+    vscode.workspace.onDidChangeTextDocument((event) => {
+      maybeSwitch(event);
+      consider(event.document);
+    }),
+    vscode.workspace.onDidCloseTextDocument(forget),
+    vscode.window.tabGroups.onDidChangeTabs(forgetTabs)
   );
-  for (const document of vscode.workspace.textDocuments) consider(document);
+  for (const document of vscode.workspace.textDocuments) {
+    settle(document);
+    consider(document);
+  }
   // For tests (common/smoke/suite.js): whether the server has been started.
   return { serverRunning: () => client?.isRunning() ?? false };
 }

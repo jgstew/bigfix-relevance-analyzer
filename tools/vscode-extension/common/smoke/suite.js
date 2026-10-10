@@ -33,6 +33,15 @@ const BES_BROKEN =
   '\t<Relevance>exists values of setting "x" of client</Relevance>\n' +
   "</Task>\n</BES>\n";
 const BES_BROKEN_ERROR = { line: 3, character: 24 };
+// The same fixlet without its XML declaration, and two pastes that are not BES.
+const BES_NO_DECLARATION = BES_BROKEN.slice(BES_BROKEN.indexOf("\n") + 1);
+const PYTHON = "import os\n\nprint(os.getcwd())\n";
+const OTHER_XML = '<?xml version="1.0" encoding="UTF-8"?>\n<project>\n  <name>x</name>\n</project>\n';
+// How long a tab is given to be switched, and how long one that must not be
+// is given to be (wrongly) switched. The switch happens in the extension's
+// change listener, so both are generous.
+const SWITCH_MS = 10_000;
+const SETTLE_MS = 1_500;
 
 function ours(uri) {
   return vscode.languages.getDiagnostics(uri).filter((d) => d.source === SOURCE);
@@ -56,6 +65,36 @@ function waitFor(uri, ready) {
     const subscription = vscode.languages.onDidChangeDiagnostics(check);
     check();
   });
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** The language of the open document at `uri`: a switch replaces the document. */
+const languageOf = (uri) =>
+  vscode.workspace.textDocuments.find((document) => document.uri.toString() === uri.toString())?.languageId;
+
+/** The language of `uri` once it is `expected`, or after SETTLE_MS with none expected. */
+async function languageAfter(uri, expected) {
+  const until = Date.now() + (expected ? SWITCH_MS : SETTLE_MS);
+  while (Date.now() < until && !(expected && languageOf(uri) === expected)) await sleep(50);
+  return languageOf(uri);
+}
+
+/** A new, unsaved tab, as File > New Text File opens it; returns its URI. */
+async function newTab() {
+  await vscode.commands.executeCommand("workbench.action.files.newUntitledFile");
+  return vscode.window.activeTextEditor.document.uri;
+}
+
+/** Paste `text` into the active editor the way a person does. */
+async function paste(text) {
+  await vscode.env.clipboard.writeText(text);
+  await vscode.commands.executeCommand("editor.action.clipboardPasteAction");
+}
+
+/** Type `text` into the active editor, a line at a time. */
+async function type(text) {
+  for (const line of text.split(/(?<=\n)/)) await vscode.commands.executeCommand("type", { text: line });
 }
 
 const codeOf = (d) => (typeof d.code === "object" ? d.code.value : d.code);
@@ -149,23 +188,119 @@ async function lint() {
   }
 
   // Unsaved BES XML (issue #120): a buffer created in the language, and the
-  // demo path, a fixlet pasted into a plain tab and then switched to it.
-  // Neither has a `.bes` name, so again only the language says what it is.
+  // demo path, a fixlet pasted into a new tab, which the extension switches to
+  // it (issue #132). Neither has a `.bes` name, so again only the language
+  // says what it is.
   const besLanguage = process.env.SMOKE_BES_LANGUAGE;
   const hasTheError = (found) =>
     found.some((d) => codeOf(d) === "error-token" && d.range.start.line === BES_BROKEN_ERROR.line);
   let untitledBesFound;
   let switchedBesFound;
   let otherSchemeBesFound;
+  // Issue #132: what each new tab ended up as, and what it should have: a
+  // language id it must be ({ is }) or must not be ({ not }).
+  const pastes = {};
+  const expectedPastes = {};
   if (besLanguage) {
     const created = await vscode.workspace.openTextDocument({ language: besLanguage, content: BES_BROKEN });
     await vscode.window.showTextDocument(created);
     untitledBesFound = await waitFor(created.uri, hasTheError);
 
-    const pasted = await vscode.workspace.openTextDocument({ language: "plaintext", content: BES_BROKEN });
-    await vscode.window.showTextDocument(pasted);
-    const switched = await vscode.languages.setTextDocumentLanguage(pasted, besLanguage);
-    switchedBesFound = await waitFor(switched.uri, hasTheError);
+    const pasted = await newTab();
+    await paste(BES_BROKEN);
+    expectedPastes.pasted = { is: besLanguage };
+    pastes.pasted = await languageAfter(pasted, besLanguage);
+    switchedBesFound = pastes.pasted === besLanguage ? await waitFor(pasted, hasTheError) : [];
+
+    // A language picked after the switch sticks, however much more is pasted.
+    await vscode.languages.setTextDocumentLanguage(vscode.window.activeTextEditor.document, "xml");
+    await paste(BES_BROKEN);
+    expectedPastes["kept xml"] = { is: "xml" };
+    pastes["kept xml"] = await languageAfter(pasted, undefined);
+
+    // Closed without saving, the tab's name is reused, and the new tab is
+    // detected afresh.
+    await vscode.commands.executeCommand("workbench.action.revertAndCloseActiveEditor");
+    const reused = await newTab();
+    await paste(BES_BROKEN);
+    expectedPastes["reused tab"] = { is: besLanguage };
+    pastes["reused tab"] = await languageAfter(reused, besLanguage);
+    // Only a reused name proves a closed tab is forgotten (review 6/9).
+    expectedPastes["reused tab name"] = { is: "reused" };
+    pastes["reused tab name"] = reused.toString() === pasted.toString() ? "reused" : `new name ${reused}`;
+
+    // Typed rather than pasted: VS Code's own detection would make it Markdown.
+    const typed = await newTab();
+    await type(BES_BROKEN);
+    expectedPastes.typed = { is: besLanguage };
+    pastes.typed = await languageAfter(typed, besLanguage);
+
+    // Typed at a person's pace: VS Code guesses a language after line 1, before
+    // the <BES line is typed (review 4/9).
+    const slow = await newTab();
+    const [declaration, ...rest] = BES_BROKEN.split(/(?<=\n)/);
+    await type(declaration);
+    await sleep(3_000);
+    pastes["typed slowly, after line 1"] = languageOf(slow);
+    await type(rest.join(""));
+    expectedPastes["typed slowly"] = { is: besLanguage };
+    pastes["typed slowly"] = await languageAfter(slow, besLanguage);
+
+    const bare = await newTab();
+    await paste(BES_NO_DECLARATION);
+    expectedPastes["no declaration"] = { is: besLanguage };
+    pastes["no declaration"] = await languageAfter(bare, besLanguage);
+
+    // Pasted at the top of a tab that already has text.
+    const under = await newTab();
+    await type("notes to self\n");
+    await vscode.commands.executeCommand("cursorTop");
+    await paste(BES_BROKEN);
+    expectedPastes["pasted under text"] = { is: besLanguage };
+    pastes["pasted under text"] = await languageAfter(under, besLanguage);
+
+    // Other content is left to VS Code: whatever it decides, never BES.
+    for (const [name, text] of [["python", PYTHON], ["other xml", OTHER_XML]]) {
+      const other = await newTab();
+      await paste(text);
+      expectedPastes[name] = { not: besLanguage };
+      pastes[name] = await languageAfter(other, undefined);
+    }
+
+    // Another extension's unsaved XML document, created with its content and
+    // then edited by code, is never switched: only a paste or typing into a
+    // tab is (review 3/9). Reloading a window restores unsaved tabs the same
+    // way, with their content, so a language picked by hand survives it (2/9).
+    const made = await vscode.workspace.openTextDocument({ language: "xml", content: BES_BROKEN });
+    expectedPastes["opened by code"] = { is: "xml" };
+    pastes["opened by code"] = await languageAfter(made.uri, undefined);
+    const edit = new vscode.WorkspaceEdit();
+    edit.insert(made.uri, new vscode.Position(0, 0), "<!-- edited -->\n");
+    await vscode.workspace.applyEdit(edit);
+    expectedPastes["edited by code"] = { is: "xml" };
+    pastes["edited by code"] = await languageAfter(made.uri, undefined);
+
+    // And the setting turns it off.
+    const config = vscode.workspace.getConfiguration(process.env.SMOKE_SETTINGS_PREFIX);
+    expectedPastes["setting off"] = { not: besLanguage };
+    let turnedOff = true;
+    try {
+      // Rejects when the extension declares no such setting.
+      await config.update("detectBesXml", false, vscode.ConfigurationTarget.Workspace);
+    } catch (error) {
+      turnedOff = false;
+      // Not a language id, so it can never pass for one (review 1/9).
+      pastes["setting off"] = `the setting could not be turned off: ${error.message ?? error}`;
+    }
+    if (turnedOff) {
+      try {
+        const off = await newTab();
+        await paste(BES_BROKEN);
+        pastes["setting off"] = await languageAfter(off, undefined);
+      } finally {
+        await config.update("detectBesXml", undefined, vscode.ConfigurationTarget.Workspace);
+      }
+    }
 
     // ...but not in any other scheme: a `git:` diff view of a `.bes` stands
     // in here as a made-up scheme. Not a timer: a buffer that must be linted
@@ -208,7 +343,8 @@ async function lint() {
     ...(untitledBesFound
       ? {
           [`untitled (${besLanguage})`]: summary(untitledBesFound),
-          [`untitled (plaintext, then ${besLanguage})`]: summary(switchedBesFound),
+          [`untitled, a fixlet pasted (then ${besLanguage})`]: summary(switchedBesFound),
+          "untitled tabs pasted or typed into": pastes,
           [`smoke-vfs:/task.bes (${besLanguage})`]: summary(otherSchemeBesFound),
         }
       : {}),
@@ -241,6 +377,15 @@ async function lint() {
       const where = `line ${BES_BROKEN_ERROR.line + 1}, character ${BES_BROKEN_ERROR.character}`;
       throw new Error(`${name}: expected error-token at ${where}, got ${JSON.stringify(summary(found))}`);
     }
+  }
+  // A result is a language id only if it is one VS Code knows, so an error
+  // recorded in its place fails a { not } expectation too.
+  const languages = new Set(await vscode.languages.getLanguages());
+  for (const [name, expected] of Object.entries(expectedPastes)) {
+    const found = pastes[name];
+    const ok =
+      "is" in expected ? found === expected.is : languages.has(found) && found !== expected.not;
+    if (!ok) throw new Error(`untitled tab, ${name}: expected ${JSON.stringify(expected)}, got ${found}`);
   }
   if (otherSchemeBesFound?.length) {
     throw new Error(`smoke-vfs:/task.bes: expected no diagnostics, got ${JSON.stringify(summary(otherSchemeBesFound))}`);

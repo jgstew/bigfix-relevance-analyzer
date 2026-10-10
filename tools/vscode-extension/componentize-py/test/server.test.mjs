@@ -83,6 +83,7 @@ test("the packaged extension holds the server, the component and its runtime", (
   for (const path of [
     "extension.js",
     "gate.js",
+    "sniff.js",
     "server-gate.json",
     "server.js",
     "document-patterns.json",
