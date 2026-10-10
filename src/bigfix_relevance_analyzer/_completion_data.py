@@ -14,15 +14,17 @@ from __future__ import annotations
 
 SCHEMA_VERSION: int = 1
 
-SOURCES: tuple[tuple[str, str], ...] = (
-    ("bigfix-content", "d524c7381bd53fb7f9ddb826d1ced9223c721d82"),
-    ("_BigFix-ExtendedContent", "unknown"),
-    ("updates-for-win-apps", "c3ba68d7aea6ac7db53be72828d417a724a686bf"),
-    ("_BigFix-SaaS_GitHub01", "unknown"),
-    ("sofy-catalog-content", "12545704ac63f71ed6b7608181a9bdf665171ced"),
-    ("besapi", "4a5c20f25af4ebb8e399f891cdbed741e0a22dd3"),
+SOURCES: tuple[str, ...] = (
+    "d524c7381bd53fb7f9ddb826d1ced9223c721d82",
+    "unknown",
+    "c3ba68d7aea6ac7db53be72828d417a724a686bf",
+    "unknown",
+    "12545704ac63f71ed6b7608181a9bdf665171ced",
+    "4a5c20f25af4ebb8e399f891cdbed741e0a22dd3",
 )
-"""The content repos mined, as ``(directory name, commit)``."""
+"""One entry per content repo mined: its commit, or ``unknown`` for one
+that is not a git checkout. Never its name: a private repo contributes
+counts only."""
 
 # 1038 rows
 ROWS: str = """\

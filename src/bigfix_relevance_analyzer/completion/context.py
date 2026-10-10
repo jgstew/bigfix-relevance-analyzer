@@ -15,14 +15,15 @@ statement, so a half-written one costs nothing to recover from. It knows three
 places, measured on real content in #127:
 
 ``after-of``
-    ``files of |``. The words before ``of`` are the *consumer*, and what fits is
-    a producer of what it takes. Read back over an index (``key "x" of``), any
-    ``whose (...)`` filters (``files whose (...) of``), and to the start of the
-    name phrase, which ends where the parser's would: at a structural word, or
-    at a word operator the trie matches in full (``substrings separated by``
-    stays whole, ``x contains y of`` is cut after ``contains``). A
-    parenthesized consumer (``(preceding text of it) of``) is the head of the
-    group, parsed on its own: a complete expression, so no recovery.
+    ``files of |``, or ``files of (|``. The words before ``of`` are the
+    *consumer*, and what fits is a producer of what it takes. Read back over an
+    index (``key "x" of``), any ``whose (...)`` filters (``files whose (...)
+    of``), and to the start of the name phrase, which ends where the parser's
+    would: at a structural word, or at a word operator the trie matches in full
+    (``substrings separated by`` stays whole, ``x contains y of`` is cut after
+    ``contains``). A parenthesized consumer (``(preceding text of it) of``) is
+    the head of the group, parsed on its own: a complete expression, so no
+    recovery.
 
 ``whose-it``
     Wherever a new expression starts inside ``whose (`` (see below): what
@@ -270,8 +271,12 @@ class _Scan:
         make = functools.partial(
             CompletionContext, replace=replace, partial=partial, dialect=dialect
         )
-        if code and _is_word(code[-1], "of"):
-            consumer = self.consumer_before(len(code) - 2)
+        # `X of |`, or `X of (|`: a group opened as the object is still X's.
+        of = len(code) - 1
+        while of >= 0 and _is_punct(code[of], "("):
+            of -= 1
+        if of >= 0 and _is_word(code[of], "of"):
+            consumer = self.consumer_before(of - 1)
             if consumer is None:
                 return make(kind="after-of")
             outer = None

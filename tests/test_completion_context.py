@@ -490,3 +490,40 @@ def test_singular_is_shared() -> None:
     assert singular(row) == "file"
     assert written_plural("files") and not written_plural("file")
     assert not written_plural("windows")  # `window`'s plural, and its own row's singular
+
+
+@pytest.mark.parametrize(
+    "prefix",
+    [
+        "names of files of (",
+        "names of files of ((",
+        "names of files of ( ",
+        "names of files of (fold",
+    ],
+)
+def test_an_object_opened_in_parentheses_keeps_its_consumer(prefix: str) -> None:
+    """`X of (Y ...)`: the group is still X's object (second review, finding 1)."""
+    found = at_end(prefix)
+    assert found is not None
+    assert (found.kind, found.consumer, found.outer) == ("after-of", "file", "name")
+
+
+def test_after_of_parenthesized_inside_whose_is_still_after_of() -> None:
+    found = at_end("files whose (name of (")
+    assert found is not None
+    assert (found.kind, found.consumer) == ("after-of", "name")
+
+
+def test_an_index_group_is_not_an_object() -> None:
+    """`key (` opens an index, not an object: no consumer reaches inside it."""
+    found = at_end("key (")
+    assert found is not None
+    assert found.kind == "statement-start"
+
+
+def test_a_written_plural_keeps_every_reading() -> None:
+    """`attributes` is the plural of `attribute` (on an xml dom node) and the
+    singular of a dmi row; both readings resolve, so both types fit."""
+    assert {"xml dom node", "dmi memory_device"} <= (
+        expected_types("attributes", indexed=False) or set()
+    )

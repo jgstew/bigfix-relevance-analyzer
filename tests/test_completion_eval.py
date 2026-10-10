@@ -19,6 +19,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from _corpus import parsed_corpus_sites
+from _helpers import REPO_ROOT, load_tool
 
 from bigfix_relevance_analyzer.completion.context import (
     _opens_expression,
@@ -30,14 +31,9 @@ from bigfix_relevance_analyzer.completion.rank import rank
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.lint import _site_dialect
 from bigfix_relevance_analyzer.nodes import (
-    Exists,
-    It,
     Node,
-    NumberOf,
     Of,
-    Unary,
     Whose,
-    children,
     walk,
 )
 from bigfix_relevance_analyzer.tokenizer import code_tokens
@@ -47,42 +43,35 @@ TOP = 3
 """The cut the floors are for: VS Code shows about this many above the fold
 when nothing typed decides the order."""
 
-FLOORS = {"after-of": 0.75, "whose-it": 0.76, "statement-start": 0.14}
-"""Top-3 accuracy per kind, measured 2026-10-10 less a margin of about two
-misses: after-of 77.9% of 272, whose-it 80.9% of 47, statement-start 18.4% of
-49. (Whose-it was 92.6% of 27 before the scan also claimed the seats after
-``exists``, ``if``, ``then``, ``else``, ``,`` and ``;`` inside ``whose (``;
-those 27 still score 92.6%.) Statement starts rank low because the table's counts are not split by
-dialect and most of its starts are client (`value`, `key`), while many of these
-examples are session relevance."""
+FLOORS = {"after-of": 0.75, "whose-it": 0.74, "statement-start": 0.11}
+"""Top-3 accuracy per kind, measured 2026-10-10 on the miner's own positions,
+less a margin of about two misses: after-of 77.9% of 272, whose-it 78.7% of 47,
+statement-start 14.3% of 63 (every start the miner counts: each side of
+``and``/``or``, each ``if`` part, each tuple or collection item).
+
+Whose-it has moved twice: 92.6% of 27 when only ``(``, ``and``, ``or`` and
+``not`` opened a seat (those 27 still score 92.6%), then one seat fewer hit when
+``X of (`` began reading as after-of -- correctly: that ``X of it`` is also the
+object of an outer ``of``. Statement starts rank low because the table's
+counts are not split by dialect and most of its starts are client (``value``,
+``key``), while many of these examples are session relevance."""
+
+TOOL = load_tool(REPO_ROOT / "tools" / "generate_completion_data.py", "_completion_eval_tool")
+"""The table's generator: the evaluation scores the positions it mines."""
+
+_whose_it = TOOL._it_properties
+"""``X of it`` in a predicate, not inside a nested ``whose`` (which rebinds ``it``)."""
+
+_starts = TOOL._starts
+"""The expressions in a starting position: after ``(``, ``,``, ``;``, ``and``,
+``or``, ``if``, ``then``, ``else``, with ``exists``, ``not`` and ``number of``
+stripped."""
 
 ENVIRONMENTS = {
     Dialect.CLIENT: (TypeEnvironment.create(Dialect.CLIENT),),
     Dialect.SESSION: (TypeEnvironment.create(Dialect.SESSION),),
 }
 EITHER = (*ENVIRONMENTS[Dialect.CLIENT], *ENVIRONMENTS[Dialect.SESSION])
-
-
-def _whose_it(predicate: Node) -> Iterator[Of]:
-    """``X of it`` in a predicate, not inside a nested ``whose`` (which rebinds ``it``)."""
-    stack = [predicate]
-    while stack:
-        node = stack.pop()
-        if isinstance(node, Of) and isinstance(node.obj, It):
-            yield node
-        if isinstance(node, Whose):
-            stack.append(node.collection)
-            continue
-        stack.extend(children(node))
-
-
-def _first(node: Node) -> Node:
-    """The statement's first expression after ``exists``, ``not`` and ``number of``."""
-    while isinstance(node, Exists | NumberOf | Unary) and not (
-        isinstance(node, Unary) and node.op != "not"
-    ):
-        node = node.operand
-    return node
 
 
 def _opens_a_condition(text: str, offset: int) -> bool:
@@ -103,7 +92,8 @@ def _positions(text: str, root: Node) -> Iterator[tuple[str, int, Node]]:
             for of in _whose_it(node.predicate):
                 if _opens_a_condition(text, of.span.start):
                     yield "whose-it", of.span.start, of.prop
-    yield "statement-start", _first(root).span.start, _first(root)
+    for start in _starts(root):
+        yield "statement-start", start.span.start, start
 
 
 def measure() -> dict[str, list[int | None]]:
@@ -133,6 +123,13 @@ def measure() -> dict[str, list[int | None]]:
 
 def share(ranks: list[int | None], top: int) -> float:
     return sum(1 for r in ranks if r is not None and r < top) / len(ranks)
+
+
+def test_the_positions_are_the_miners() -> None:
+    """The evaluation scores the seats the table is mined at (second review,
+    finding 5): the same `X of it` and start positions, from the same code."""
+    assert _whose_it is TOOL._it_properties
+    assert _starts is TOOL._starts
 
 
 def test_the_ranking_holds_its_floor() -> None:

@@ -5,7 +5,9 @@ Completion ranks what fits after ``X of``, inside ``whose (`` and at the start o
 a statement by how real content uses it (#127). This mines those counts from
 local checkouts of content repositories into a small table the package ships.
 The table holds inspector names and counts only, never content, so counts from
-private repositories may ship in the public package (decided on #127).
+private repositories may ship in the public package (decided on #127). The
+provenance it records is one commit per repo -- ``unknown`` for a directory
+that is not a git checkout -- and never a repo's name (decided on PR #129).
 
 Usage, from the analyzer checkout with the content repos as siblings::
 
@@ -134,9 +136,10 @@ def statements(repo: Path) -> dict[str, Dialect | None]:
     return found
 
 
-def source_of(repo: Path) -> tuple[str, str]:
-    """``(name, commit)`` for the provenance line: the repo's directory name and
-    its ``HEAD``, or ``unknown`` when it is not the top of a git checkout."""
+def source_of(repo: Path) -> str:
+    """The provenance of ``repo``: its ``HEAD`` commit, or ``unknown`` when it
+    is not the top of a git checkout. Never its name: a private repo may
+    contribute counts, but its name does not ship (decided on PR #129)."""
     resolved = repo.resolve()
     try:
         top = subprocess.run(
@@ -146,10 +149,10 @@ def source_of(repo: Path) -> tuple[str, str]:
             text=True,
         ).stdout.split()
     except (OSError, subprocess.CalledProcessError):
-        return resolved.name, "unknown"
+        return "unknown"
     if len(top) != 2 or Path(top[0]).resolve() != resolved:
-        return resolved.name, "unknown"
-    return resolved.name, top[1]
+        return "unknown"
+    return top[1]
 
 
 # ---------------------------------------------------------------------------
@@ -292,14 +295,12 @@ def table(texts: Iterable[str]) -> dict[Key, tuple[int, int, int]]:
     return {key: (counts[key], indexed[key], plural[key]) for key in counts}
 
 
-def render(rows: dict[Key, tuple[int, int, int]], sources: Sequence[tuple[str, str]]) -> str:
+def render(rows: dict[Key, tuple[int, int, int]], sources: Sequence[str]) -> str:
     """The generated module's text."""
     lines = sorted("\t".join((*key, *(str(n) for n in rows[key]))) for key in rows)
     # Double-quoted, as `ruff format` would leave them: a regeneration must not
     # be rewritten by the commit hooks.
-    provenance = "".join(
-        f"    ({json.dumps(name)}, {json.dumps(commit)}),\n" for name, commit in sources
-    )
+    provenance = "".join(f"    {json.dumps(commit)},\n" for commit in sources)
     body = "".join(f"{line}\n" for line in lines)
     return (
         '"""Completion ranking counts, mined from content. Do not edit by hand.\n'
@@ -318,10 +319,12 @@ def render(rows: dict[Key, tuple[int, int, int]], sources: Sequence[tuple[str, s
         "\n"
         f"SCHEMA_VERSION: int = {SCHEMA_VERSION}\n"
         "\n"
-        "SOURCES: tuple[tuple[str, str], ...] = (\n"
+        "SOURCES: tuple[str, ...] = (\n"
         f"{provenance}"
         ")\n"
-        '"""The content repos mined, as ``(directory name, commit)``."""\n'
+        '"""One entry per content repo mined: its commit, or ``unknown`` for one\n'
+        "that is not a git checkout. Never its name: a private repo contributes\n"
+        'counts only."""\n'
         "\n"
         f"# {len(lines)} rows\n"
         f'ROWS: str = """\\\n{body}"""\n'

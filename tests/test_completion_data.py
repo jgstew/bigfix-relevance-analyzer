@@ -47,11 +47,13 @@ def test_the_schema_version() -> None:
     assert _completion_data.SCHEMA_VERSION == 1
 
 
-def test_the_sources_name_each_repo_and_commit() -> None:
+def test_the_sources_are_commits_only_never_names() -> None:
+    """Private repos may contribute counts, never their names: the provenance
+    is one commit per repo, or ``unknown`` for one that is not a checkout."""
     assert _completion_data.SOURCES
-    for name, commit in _completion_data.SOURCES:
-        assert name and "/" not in name
-        assert commit
+    for commit in _completion_data.SOURCES:
+        assert isinstance(commit, str)
+        assert commit == "unknown" or (len(commit) == 40 and int(commit, 16) >= 0), commit
 
 
 def test_every_row_parses() -> None:
@@ -204,7 +206,8 @@ def test_the_generator_writes_a_module(tool: ModuleType, tmp_path: Path) -> None
     assert tool.main([str(one), str(two), "--output", str(target)]) == 0
     module = _load(target)
     assert module.SCHEMA_VERSION == 1
-    assert module.SOURCES == (("one", "unknown"), ("two", "unknown"))
+    assert module.SOURCES == ("unknown", "unknown")
+    assert '"one"' not in target.read_text() and '"two"' not in target.read_text()
     rows = {tuple(row[:5]): tuple(int(n) for n in row[5:]) for row in _rows(module.ROWS)}
     # The same statement in three files and two repos counts once; the file
     # over 1 MiB is not read.
@@ -228,7 +231,8 @@ def test_the_generator_records_a_git_commit(tool: ModuleType, tmp_path: Path) ->
     head = subprocess.run(  # type: ignore[call-overload]
         ["git", "rev-parse", "HEAD"], **run, text=True
     ).stdout.strip()
-    assert tool.source_of(repo) == ("repo", head)
+    assert tool.source_of(repo) == head
+    assert tool.source_of(tmp_path) == "unknown"
 
 
 def test_the_generator_refuses_a_missing_repo(tool: ModuleType, tmp_path: Path) -> None:
