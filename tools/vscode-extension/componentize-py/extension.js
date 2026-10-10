@@ -36,10 +36,11 @@ const PREFIX = manifest.settingsPrefix;
 const LANGUAGE_ID = manifest.contributes.languages[0].id;
 // The BES XML language, found by the suffix it takes rather than by position.
 // The server reads a buffer in it as BES XML even with no `.bes` name: see
-// BES_LANGUAGE_ID in lsp/linter.py.
+// BES_LANGUAGE_ID in lsp/linter.py. Missing, it costs BES buffers only: this
+// runs as the file loads, where a throw would stop relevance checking too.
 const BES_LANGUAGE_ID = manifest.contributes.languages.find((language) =>
   language.extensions?.includes(".bes")
-).id;
+)?.id;
 const NAME = manifest.displayName;
 const SERVER = path.join(__dirname, "server.js");
 const COMPONENT = path.join(__dirname, "dist", "component", "lsp.js");
@@ -52,8 +53,12 @@ const COMPONENT = path.join(__dirname, "dist", "component", "lsp.js");
 const DOCUMENT_SELECTOR = [
   ...documentPatterns.map((pattern) => ({ scheme: "file", pattern })),
   { language: LANGUAGE_ID },
-  { language: BES_LANGUAGE_ID, scheme: "file" },
-  { language: BES_LANGUAGE_ID, scheme: "untitled" },
+  ...(BES_LANGUAGE_ID
+    ? [
+        { language: BES_LANGUAGE_ID, scheme: "file" },
+        { language: BES_LANGUAGE_ID, scheme: "untitled" },
+      ]
+    : []),
 ];
 
 /** @type {import("vscode-languageclient/node").LanguageClient | undefined} */

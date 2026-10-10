@@ -23,9 +23,6 @@ const SOURCE = "bigfix-relevance-analyzer";
 const TIMEOUT_MS = 60_000;
 // How long the idle scenario gives the server to (wrongly) start.
 const IDLE_MS = 3_000;
-// How long a document the server must not be sent is given to (wrongly) get
-// diagnostics, once the server is known to be answering.
-const UNSENT_MS = 2_000;
 
 // The same task as BES_BROKEN in tests/_helpers.py: the unterminated string is
 // on line 3 (0-based), so a whole-document range would not pass for it.
@@ -168,7 +165,10 @@ async function lint() {
     switchedBesFound = await waitFor(switched.uri, errorOnLine3);
 
     // ...but not in any other scheme: a `git:` diff view of a `.bes` stands
-    // in here as a made-up scheme. The server is known to be answering by now.
+    // in here as a made-up scheme. Not a timer: a buffer that must be linted
+    // is opened after it, and the client sends and the server answers in
+    // order, so once that one has its diagnostics, this one would have had
+    // them too had it been sent, however slow the machine.
     const provider = vscode.workspace.registerTextDocumentContentProvider("smoke-vfs", {
       provideTextDocumentContent: () => BES_BROKEN,
     });
@@ -176,7 +176,9 @@ async function lint() {
       const other = await vscode.workspace.openTextDocument(vscode.Uri.parse("smoke-vfs:/task.bes"));
       await vscode.languages.setTextDocumentLanguage(other, besLanguage);
       await vscode.window.showTextDocument(other);
-      await new Promise((resolve) => setTimeout(resolve, UNSENT_MS));
+      const control = await vscode.workspace.openTextDocument({ language: besLanguage, content: BES_BROKEN });
+      await vscode.window.showTextDocument(control);
+      await waitFor(control.uri, errorOnLine3);
       otherSchemeBesFound = ours(other.uri);
     } finally {
       provider.dispose();

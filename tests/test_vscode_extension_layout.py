@@ -1088,11 +1088,11 @@ def test_the_server_falls_back_on_the_bes_language_the_extension_contributes() -
     server reads as BES XML."""
     from bigfix_relevance_analyzer.lsp.linter import BES_LANGUAGE_ID
 
-    (bes,) = [
+    (bes,) = (
         language
         for language in _manifest(PRIMARY)["contributes"]["languages"]
         if ".bes" in language.get("extensions", [])
-    ]
+    )
     assert BES_LANGUAGE_ID == bes["id"] == BES_ID
 
 
@@ -1106,6 +1106,14 @@ def test_the_extension_sends_bes_buffers_only_as_files_or_unsaved() -> None:
     # Found by its `.bes` extension, not by a second positional contract.
     assert '.includes(".bes")' in text
     assert "languages[2]" not in text
+
+
+def test_a_manifest_without_the_bes_language_costs_only_bes() -> None:
+    """Review of #133: the lookup runs when VS Code loads extension.js, so a
+    `.id` of nothing would stop relevance linting too, not just BES."""
+    text = (PRIMARY / "extension.js").read_text("utf-8")
+    assert ")?.id;" in text
+    assert "...(BES_LANGUAGE_ID" in text
 
 
 # ---------------------------------------------------------------------------
@@ -1143,12 +1151,12 @@ def test_the_readme_covers_every_file_type_setting_and_command() -> None:
         json.loads(example) for example in re.findall(r'"files\.associations": (\{[^}]*\})', text)
     ]
     # The way back to XML covers every suffix the BES language takes.
-    (to_xml,) = [found for found in examples if "xml" in found.values()]
+    (to_xml,) = (found for found in examples if "xml" in found.values())
     for extension in _language(PRIMARY, BES_ID)["extensions"]:
         assert to_xml.get(f"*{extension}") == "xml", extension
     # ...and the way in, for BES saved under another name (#120), names the
     # language by the id it really has.
-    (to_bes,) = [found for found in examples if "xml" not in found.values()]
+    (to_bes,) = (found for found in examples if "xml" not in found.values())
     assert set(to_bes.values()) == {BES_ID}
 
 

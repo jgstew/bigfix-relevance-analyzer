@@ -127,9 +127,10 @@ back to XML in your settings (you lose the ActionScript and relevance colors):
 
 A new, unsaved file set to BigFix BES XML is checked as you type, before it has
 a name: paste a fixlet into a new tab and pick **BigFix BES XML** from the
-language list. So is a saved file with another name switched to it, such as a
-fixlet saved as `.xml`. To have such files open as BigFix BES XML every time,
-map them in your settings:
+language list. So is a saved file switched to it whose name is not one of the
+file types below, such as a fixlet saved as `.xml`. A file that is one of them,
+such as `.md` or `.html`, is still read as that type. To have such files open
+as BigFix BES XML every time, map them in your settings:
 
 ```json
 "files.associations": { "**/Fixlets/**/*.xml": "bigfix-bes" }
@@ -187,9 +188,9 @@ exists file "C:\Windows\notepad.exe"
   start of a statement. Elsewhere, such as after a comparison or `as`, it
   suggests nothing yet. Hover needs a statement that parses; on one with a
   syntax error there is no hover until it is fixed.
-- A file is checked when its name ends in one of the file types above, or when
-  its language is set to BigFix Relevance or BigFix BES XML. Other files are
-  left alone.
+- A file is checked when its name ends in one of the file types above, or,
+  when it ends in none of them, its language is set to BigFix Relevance or
+  BigFix BES XML. Other files are left alone.
 - The checker starts the first time you open a file with relevance to check,
   so it uses no memory in windows without any. Markdown and HTML files count
   only once they contain relevance, as described above.
