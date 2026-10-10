@@ -472,6 +472,39 @@ def test_the_workflow_runs_only_when_an_input_of_the_extension_changes() -> None
 RELEASE = REPO_ROOT / ".github" / "workflows" / "tag_and_release.yaml"
 
 
+PUBLISH = REPO_ROOT / ".github" / "workflows" / "publish-vscode-extension.yaml"
+
+
+def _job(workflow: str, name: str) -> str:
+    """The text of the top-level job ``name`` in ``workflow``: up to the next job."""
+    match = re.search(
+        rf"^  {name}:\n(.*?)(?=^  [A-Za-z0-9_-]+:\n|\Z)", workflow, re.MULTILINE | re.DOTALL
+    )
+    assert match, name
+    return match.group(1)
+
+
+def test_the_release_passes_the_open_vsx_token_to_the_publish_workflow() -> None:
+    """A called workflow gets an environment secret only when its caller passes
+    it, by name or with `secrets: inherit`; otherwise it is an empty string
+    with no error. The v1.29.0 release's Open VSX job failed exactly so."""
+    marketplace = _job(RELEASE.read_text("utf-8"), "marketplace")
+    assert "uses: ./.github/workflows/publish-vscode-extension.yaml" in marketplace
+    assert re.search(
+        r"^    secrets:\n      OVSX_PAT: \$\{\{ secrets\.OVSX_PAT \}\}$", marketplace, re.MULTILINE
+    )
+    # By name, not every secret the repository has.
+    assert not re.search(r"^    secrets: inherit", marketplace, re.MULTILINE)
+    # ...and a caller that forgets it fails to start rather than running blind.
+    publish = PUBLISH.read_text("utf-8")
+    call = publish.split("  workflow_call:\n", 1)[1].split("  workflow_dispatch:\n", 1)[0]
+    assert re.search(
+        r"^    secrets:\n      OVSX_PAT:\n(?:        #.*\n)*        required: true$",
+        call,
+        re.MULTILINE,
+    )
+
+
 def test_the_build_can_take_a_given_wheel(tmp_path: Path) -> None:
     """A release builds from the wheel it publishes, not from a rebuild of the tree."""
     build = load_tool(PRIMARY / "build-component" / "build_component.py", "_build_component")

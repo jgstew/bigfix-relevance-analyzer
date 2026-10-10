@@ -24,7 +24,9 @@ name: Publish VS Code Extension
 #     publishing a version the Marketplace already has a no-op.
 #
 # Open VSX authenticates with a personal access token for now: the secret
-# OVSX_PAT of the `openvsx-publisher` environment. Open VSX trusted publishing
+# OVSX_PAT of the `openvsx-publisher` environment. A caller must pass it by
+# name (`secrets: OVSX_PAT: ...`): a called workflow gets an environment
+# secret only when its caller passes it. Open VSX trusted publishing
 # (OIDC, `ovsx publish --trusted-publishing`) will replace it later; it needs
 # the extension to already have one version on Open VSX, and OVSX_PAT must be
 # removed then, because a PAT always takes precedence over the OIDC token.
@@ -42,6 +44,13 @@ on:
       version:
         description: "Release version to publish, without the leading v"
         type: string
+        required: true
+    secrets:
+      OVSX_PAT:
+        # The caller passes it by name; the value is the `openvsx-publisher`
+        # environment's, which the publish-openvsx job sets. Required only
+        # checks that the caller passes it, not that it has a value: an empty
+        # one still fails "Verify publish rights".
         required: true
   workflow_dispatch:
     inputs:
@@ -214,7 +223,7 @@ jobs:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
           if [ -z "$OVSX_PAT" ]; then
-            echo "::error::the openvsx-publisher environment has no OVSX_PAT secret"
+            echo "::error::OVSX_PAT is empty: the openvsx-publisher environment has no such secret, or the calling workflow did not pass it (secrets: OVSX_PAT)"
             exit 1
           fi
           npx --yes "ovsx@${OVSX_VERSION}" verify-pat "$PUBLISHER"

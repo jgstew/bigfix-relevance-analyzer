@@ -389,6 +389,13 @@ jobs:
     uses: ./.github/workflows/publish-vscode-extension.yaml # zizmor: ignore[self-repository]
     with:
       version: ${{ needs.version.outputs.version }}
+    # An environment secret reaches a called workflow only when the caller
+    # passes it; otherwise it is an empty string, with no error. Passed by
+    # name, though it exists only in the `openvsx-publisher` environment: the
+    # called job that sets that environment gets its value. By name rather
+    # than `secrets: inherit`, so the publish workflow sees nothing else.
+    secrets:
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
 
   # Asks jgstew/jgstew.github.io to pick up the playground from the release
   # that just went public. That repo's own workflow does the work: it downloads
