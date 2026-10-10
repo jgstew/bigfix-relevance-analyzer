@@ -24,6 +24,7 @@ const path = require("node:path");
 const vscode = require("vscode");
 
 const { needsServer } = require("./gate");
+const { isBesXml } = require("./sniff");
 const manifest = require("./package.json");
 // Kept in step with the analyzer's recognized suffixes by
 // tests/test_vscode_extension_layout.py.
@@ -123,6 +124,39 @@ function consider(document) {
   restart();
 }
 
+// Languages VS Code itself gives a pasted fixlet: plaintext before anything,
+// xml from the built-in XML language's `firstLine` (issue #132).
+const SWITCH_FROM = new Set(["plaintext", "xml"]);
+// Lines read to sniff: enough for any preamble sniff.js accepts before <BES.
+const SNIFF_LINES = 200;
+// Unsaved tabs already switched once, by URI, so a language picked afterwards
+// sticks: VS Code never re-detects after an extension sets a language, and
+// neither does this.
+const decided = new Set();
+
+/** Switch an unsaved tab holding BES XML to the BES language, at most once. */
+function maybeSwitch(document) {
+  if (!BES_LANGUAGE_ID || document.uri.scheme !== "untitled") return;
+  const key = document.uri.toString();
+  if (decided.has(key) || !SWITCH_FROM.has(document.languageId)) return;
+  if (!vscode.workspace.getConfiguration(PREFIX).get("detectBesXml")) return;
+  if (!isBesXml(document.getText(new vscode.Range(0, 0, SNIFF_LINES, 0)))) return;
+  decided.add(key);
+  // Arrives as a close and an open in the new language, which `consider` sees.
+  vscode.languages.setTextDocumentLanguage(document, BES_LANGUAGE_ID).then(undefined, () => undefined);
+}
+
+/** Forget a tab once it has really closed: VS Code reuses `Untitled-N` names. */
+function forget(document) {
+  const key = document.uri.toString();
+  if (!decided.has(key)) return;
+  // A language change is a close and an open of the same URI in the same
+  // tick, so only a URI still closed one tick later was really closed.
+  setTimeout(() => {
+    if (!vscode.workspace.textDocuments.some((open) => open.uri.toString() === key)) decided.delete(key);
+  }, 0);
+}
+
 async function activate(context) {
   context.subscriptions.push(
     // Explicit, so it starts the server even where nothing has passed the gate.
@@ -135,11 +169,22 @@ async function activate(context) {
     vscode.workspace.onDidChangeConfiguration((event) =>
       wanted && event.affectsConfiguration(`${PREFIX}.maxDocumentBytes`) ? restart() : undefined
     ),
-    vscode.workspace.onDidOpenTextDocument(consider),
-    // Markdown or HTML can gain relevance as it is edited.
-    vscode.workspace.onDidChangeTextDocument((event) => consider(event.document))
+    vscode.workspace.onDidOpenTextDocument((document) => {
+      maybeSwitch(document);
+      consider(document);
+    }),
+    // Markdown or HTML can gain relevance as it is edited, and an unsaved tab
+    // can gain a fixlet.
+    vscode.workspace.onDidChangeTextDocument(({ document }) => {
+      maybeSwitch(document);
+      consider(document);
+    }),
+    vscode.workspace.onDidCloseTextDocument(forget)
   );
-  for (const document of vscode.workspace.textDocuments) consider(document);
+  for (const document of vscode.workspace.textDocuments) {
+    maybeSwitch(document);
+    consider(document);
+  }
   // For tests (common/smoke/suite.js): whether the server has been started.
   return { serverRunning: () => client?.isRunning() ?? false };
 }

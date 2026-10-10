@@ -125,9 +125,13 @@ back to XML in your settings (you lose the ActionScript and relevance colors):
 "files.associations": { "*.bes": "xml", "*.bes.xml": "xml" }
 ```
 
-A new, unsaved file set to BigFix BES XML is checked as you type, before it has
-a name: paste a fixlet into a new tab and pick **BigFix BES XML** from the
-language list. So is a saved file switched to it whose name is not one of the
+Paste a fixlet into a new, unsaved tab, or type one, and the tab is switched to
+**BigFix BES XML** and checked as you type, before it has a name. Each tab is
+switched only once, so if you change its language back, your choice sticks; turn
+`bigfixRelevance.detectBesXml` off to switch tabs yourself. A tab you set to XML
+by hand before pasting a fixlet into it is still switched, once. Saved files are
+never switched. A new file you set to BigFix BES XML yourself is checked the same
+way. So is a saved file switched to it whose name is not one of the
 file types below, such as a fixlet saved as `.xml`. A file that is one of them,
 such as `.md` or `.html`, is still read as that type. To have such files open
 as BigFix BES XML every time, map them in your settings:
@@ -165,6 +169,7 @@ exists file "C:\Windows\notepad.exe"
 
 | Setting | Default | |
 |---|---|---|
+| `bigfixRelevance.detectBesXml` | `true` | Switch a new, unsaved tab to BigFix BES XML when a fixlet is pasted or typed into it. Each tab is switched only once. |
 | `bigfixRelevance.maxDocumentBytes` | `1048576` (1 MiB) | Files larger than this are not checked; they get one information message instead, so a very large generated file can't slow the editor down. |
 | `bigfixRelevance.trace.server` | `off` | Set to `messages` or `verbose` to log the extension's activity to its **Output** channel, for troubleshooting. |
 

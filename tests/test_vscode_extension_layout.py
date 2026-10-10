@@ -1201,6 +1201,107 @@ def test_a_manifest_without_the_bes_language_costs_only_bes() -> None:
 
 
 # ---------------------------------------------------------------------------
+# A fixlet pasted into an unsaved tab becomes BigFix BES XML (issue #132)
+# ---------------------------------------------------------------------------
+
+SNIFF = PRIMARY / "sniff.js"
+SNIFF_SETTING = "bigfixRelevance.detectBesXml"
+
+
+def test_detecting_bes_xml_is_a_setting_on_by_default() -> None:
+    setting = _settings(PRIMARY)[SNIFF_SETTING]
+    assert setting["type"] == "boolean"
+    assert setting["default"] is True
+    assert "once" in setting["description"]
+
+
+def test_the_extension_switches_only_unsaved_tabs_from_plain_text_or_xml() -> None:
+    """Never a saved file or another scheme, and never a language a person or
+    another extension chose: only what VS Code gives a pasted fixlet."""
+    text = (PRIMARY / "extension.js").read_text("utf-8")
+    assert 'require("./sniff")' in text
+    assert 'const SWITCH_FROM = new Set(["plaintext", "xml"]);' in text
+    assert 'document.uri.scheme !== "untitled"' in text
+    assert "setTextDocumentLanguage(document, BES_LANGUAGE_ID)" in text
+    assert f'"{SNIFF_SETTING.removeprefix("bigfixRelevance.")}"' in text
+    # At most once per tab: a URI is remembered, and forgotten only when the tab
+    # has really closed (a language change is a close and an open of one URI).
+    assert "decided.add(" in text and "decided.delete(" in text
+    assert "onDidCloseTextDocument" in text
+
+
+def test_the_sniffer_ships_and_is_tested_in_ci() -> None:
+    assert SNIFF.is_file()
+    assert "vscode" not in re.findall(r'require\("([^"]+)"\)', SNIFF.read_text("utf-8"))
+    assert "test/sniff.test.mjs" in WORKFLOW.read_text("utf-8")
+    assert '"sniff.js"' in SERVER_TEST.read_text("utf-8")
+
+
+SNIFF_CHECK = """
+const { isBesXml } = require(process.argv[1]);
+const fs = require("node:fs");
+const paths = JSON.parse(fs.readFileSync(0, "utf8"));
+console.log(JSON.stringify(paths.map((p) => isBesXml(fs.readFileSync(p, "utf8")))));
+"""
+
+
+def test_the_sniffer_tells_every_tracked_bes_file_from_everything_else() -> None:
+    """Every tracked `.bes` is detected, and no tracked relevance, ActionScript,
+    Markdown, Python or JSON file is."""
+    node, git = shutil.which("node"), shutil.which("git")
+    if node is None or git is None or not (REPO_ROOT / ".git").exists():
+        pytest.skip("needs node and a git checkout")
+
+    def tracked(*patterns: str) -> list[str]:
+        listed = subprocess.run(
+            [git, "ls-files", *patterns], cwd=REPO_ROOT, capture_output=True, text=True, check=True
+        ).stdout.split("\n")
+        return [str(REPO_ROOT / name) for name in listed if name]
+
+    bes = tracked("*.bes")
+    others = tracked("*.rel", "*.bsr", "*.actionscript", "*.md", "*.py", "*.json")
+    assert bes and others
+    result = subprocess.run(
+        [node, "-e", SNIFF_CHECK, str(SNIFF)],
+        input=json.dumps(bes + others),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    detected = dict(zip(bes + others, json.loads(result.stdout), strict=True))
+    assert [path for path in bes if not detected[path]] == []
+    assert [path for path in others if detected[path]] == []
+
+
+def test_the_smoke_test_pastes_a_fixlet_into_an_unsaved_tab() -> None:
+    """The prototype's scenarios: a paste, typing, a choice that sticks, a
+    reused tab name, other content left alone, and the setting off."""
+    suite = (COMMON_SMOKE / "suite.js").read_text("utf-8")
+    assert "editor.action.clipboardPasteAction" in suite
+    assert '"type"' in suite
+    assert "detectBesXml" in suite
+    for scenario in (
+        "pasted",
+        "typed",
+        "kept xml",
+        "reused tab",
+        "no declaration",
+        "pasted under text",
+        "python",
+        "other xml",
+        "setting off",
+    ):
+        assert f'"{scenario}"' in suite or f"expectedPastes.{scenario} =" in suite, scenario
+
+
+def test_the_readme_says_a_pasted_fixlet_is_checked() -> None:
+    text = " ".join((PRIMARY / "README.md").read_text("utf-8").split())
+    assert "pick **BigFix BES XML** from the" not in text
+    assert "switched to **BigFix BES XML**" in text
+    assert "once" in text
+
+
+# ---------------------------------------------------------------------------
 # What VS Code shows for the extension: README and manifest text
 # ---------------------------------------------------------------------------
 

@@ -130,6 +130,7 @@ async function launch(scenario, files) {
           SMOKE_RESULT: result,
           SMOKE_UNTITLED_LANGUAGE: UNTITLED_LANGUAGE,
           SMOKE_BES_LANGUAGE: BES_LANGUAGE,
+          SMOKE_SETTINGS_PREFIX: PREFIX,
           SMOKE_EXTENSION_ID: `${manifest.publisher}.${manifest.name}`,
         },
         // A throwaway profile per run, rather than test-electron's default of
