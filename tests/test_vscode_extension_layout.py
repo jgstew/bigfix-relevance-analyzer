@@ -19,10 +19,12 @@ Pure and cheap, like ``test_playground_layout.py``: paths and text, never a buil
 
 from __future__ import annotations
 
+import codecs
 import inspect
 import json
 import re
 import shutil
+import struct
 import subprocess
 import tomllib
 import zipfile
@@ -31,7 +33,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from _helpers import load_tool
+from _helpers import BES_BROKEN, BROKEN, load_tool
 
 from bigfix_relevance_analyzer.extract import _RECOGNIZED_SUFFIXES, _is_recognized
 
@@ -350,7 +352,9 @@ def test_the_extension_names_an_icon_and_a_relevance_file_icon() -> None:
     (relevance,) = (
         lang for lang in manifest["contributes"]["languages"] if lang["id"] == "bigfix-relevance"
     )
+    # VS Code takes a file icon per theme kind; both are the light logo.
     assert set(relevance["icon"]) == {"light", "dark"}
+    assert relevance["icon"]["light"] == relevance["icon"]["dark"]
 
 
 def test_the_build_copies_every_icon_the_manifest_names_from_the_logo(tmp_path: Path) -> None:
@@ -358,10 +362,20 @@ def test_the_build_copies_every_icon_the_manifest_names_from_the_logo(tmp_path: 
     package.json for vsce, as it does the LICENSE."""
     build = load_tool(PRIMARY / "build-component" / "build_component.py", "_build_component")
     copied = build.copy_icons(tmp_path)
-    logos = {path.read_bytes() for path in (REPO_ROOT / "docs" / "images").glob("logo*")}
+    logos = {path.read_bytes(): path.name for path in (REPO_ROOT / "docs" / "images").glob("logo*")}
     for icon in _manifest_icons(PRIMARY):
         assert tmp_path / icon in copied, icon
-        assert (tmp_path / icon).read_bytes() in logos, icon
+        logo = logos.get((tmp_path / icon).read_bytes())
+        assert logo is not None, icon
+        # The light logo everywhere (the dark one is kept but not used), and
+        # each icon in its own format.
+        assert "dark" not in logo, (icon, logo)
+        assert Path(icon).suffix == Path(logo).suffix, (icon, logo)
+    # vsce and Open VSX take only a PNG of at least 128x128.
+    icon = (tmp_path / _manifest(PRIMARY)["icon"]).read_bytes()
+    assert icon.startswith(b"\x89PNG\r\n\x1a\n")
+    width, height = struct.unpack(">II", icon[16:24])
+    assert width >= 128 and height >= 128, (width, height)
 
 
 def test_the_copied_icons_are_never_committed() -> None:
@@ -892,6 +906,28 @@ def test_the_smoke_test_opens_a_bes_file_in_the_bes_language() -> None:
     assert "SMOKE_BES_LANGUAGE" in run and "SMOKE_BES_LANGUAGE" in suite
     assert "languageId" in suite
     assert "setTextDocumentLanguage" in suite
+
+
+def _js_string_constant(source: str, name: str) -> str:
+    """The value of ``const <name> = '...' + "..." ...;`` in ``source``: plain
+    ASCII literals with backslash escapes, concatenated."""
+    match = re.search(rf"^const {name} =(.*?);$", source, re.MULTILINE | re.DOTALL)
+    assert match, name
+    literals = re.findall(r"'((?:[^'\\]|\\.)*)'|\"((?:[^\"\\]|\\.)*)\"", match.group(1))
+    return "".join(codecs.decode(single or double, "unicode_escape") for single, double in literals)
+
+
+def test_the_smoke_bes_fixture_is_the_unit_tests_fixture() -> None:
+    """Review of #133: the smoke test checks the same document the unit tests
+    do, and expects the unterminated string where that document has it."""
+    suite = (COMMON_SMOKE / "suite.js").read_text("utf-8")
+    assert _js_string_constant(suite, "BES_BROKEN") == BES_BROKEN
+    line = next(i for i, text in enumerate(BES_BROKEN.splitlines()) if BROKEN in text)
+    character = BES_BROKEN.splitlines()[line].index(BROKEN) + BROKEN.index('"')
+    assert f"const BES_BROKEN_ERROR = {{ line: {line}, character: {character} }};" in suite
+    # ...and the checks use it, not numbers of their own.
+    assert "character !== 24" not in suite
+    assert suite.count("BES_BROKEN_ERROR.") >= 3
 
 
 def test_the_grammar_test_runs_in_ci() -> None:

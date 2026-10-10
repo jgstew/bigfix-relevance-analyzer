@@ -47,9 +47,10 @@ const COMPONENT = path.join(__dirname, "dist", "component", "lsp.js");
 
 // Files by suffix, plus buffers by language, which is what brings an unsaved
 // `untitled:` buffer to the server; it then lints it by its languageId.
-// Relevance buffers are sent whatever their scheme. BES XML buffers only as
-// files or unsaved buffers: content repos are mostly `.bes`, and any other
-// scheme would also lint the `git:` side of every `.bes` diff view.
+// BES XML buffers are sent only as files or unsaved buffers: any other scheme
+// would also lint the `git:` side of every `.bes` diff view. Relevance buffers
+// are still sent whatever their scheme, which has the same cost for `.rel` and
+// `.bsr` diffs; whether to scope them too, and to which schemes, is #134.
 const DOCUMENT_SELECTOR = [
   ...documentPatterns.map((pattern) => ({ scheme: "file", pattern })),
   { language: LANGUAGE_ID },

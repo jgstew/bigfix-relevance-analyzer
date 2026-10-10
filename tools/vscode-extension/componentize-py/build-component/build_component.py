@@ -51,12 +51,13 @@ COMPONENTIZE = REPO / "tools/playground-wasm/componentize-py/build-playground/co
 WORLD = "lsp"
 
 # The icons package.json names, each copied at build time from the project logo
-# in docs/images/, the only copy in the repository.
+# in docs/images/, the only copy in the repository. The light logo only: the
+# Relevance file icon is it for light and dark themes alike, and the dark logo
+# files there are kept but not used.
 LOGO_DIR = REPO / "docs/images"
 ICONS = {
     "images/icon.png": "logo-256.png",
-    "images/relevance-light.svg": "logo.svg",
-    "images/relevance-dark.svg": "logo-dark.svg",
+    "images/relevance.svg": "logo.svg",
 }
 
 
@@ -86,8 +87,8 @@ def copy_license(target_dir: Path = EXTENSION) -> Path:
 def copy_icons(target_dir: Path = EXTENSION) -> list[Path]:
     """Copy the logo into ``target_dir`` as every icon in ``ICONS``; return the copies.
 
-    The extension's Marketplace icon and the Relevance language's light and dark
-    file icons. Copied at build time, gitignored, like the LICENSE.
+    The extension's Marketplace icon and the Relevance language's file icon.
+    Copied at build time, gitignored, like the LICENSE.
     """
     copies = []
     for icon, logo in ICONS.items():

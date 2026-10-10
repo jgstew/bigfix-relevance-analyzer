@@ -51,8 +51,8 @@
         ],
         "configuration": "./language-configuration.json",
         "icon": {
-          "light": "./images/relevance-light.svg",
-          "dark": "./images/relevance-dark.svg"
+          "light": "./images/relevance.svg",
+          "dark": "./images/relevance.svg"
         }
       },
       {

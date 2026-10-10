@@ -24,13 +24,15 @@ const TIMEOUT_MS = 60_000;
 // How long the idle scenario gives the server to (wrongly) start.
 const IDLE_MS = 3_000;
 
-// The same task as BES_BROKEN in tests/_helpers.py: the unterminated string is
-// on line 3 (0-based), so a whole-document range would not pass for it.
+// The same task as BES_BROKEN in tests/_helpers.py, and where its unterminated
+// string starts (0-based): not line 0, so a whole-document range would not pass
+// for it. tests/test_vscode_extension_layout.py keeps both in step.
 const BES_BROKEN =
   '<?xml version="1.0" encoding="UTF-8"?>\n<BES>\n<Task>\n' +
   '\t<Relevance>exists file "unterminated</Relevance>\n' +
   '\t<Relevance>exists values of setting "x" of client</Relevance>\n' +
   "</Task>\n</BES>\n";
+const BES_BROKEN_ERROR = { line: 3, character: 24 };
 
 function ours(uri) {
   return vscode.languages.getDiagnostics(uri).filter((d) => d.source === SOURCE);
@@ -150,19 +152,20 @@ async function lint() {
   // demo path, a fixlet pasted into a plain tab and then switched to it.
   // Neither has a `.bes` name, so again only the language says what it is.
   const besLanguage = process.env.SMOKE_BES_LANGUAGE;
-  const errorOnLine3 = (found) => found.some((d) => codeOf(d) === "error-token" && d.range.start.line === 3);
+  const hasTheError = (found) =>
+    found.some((d) => codeOf(d) === "error-token" && d.range.start.line === BES_BROKEN_ERROR.line);
   let untitledBesFound;
   let switchedBesFound;
   let otherSchemeBesFound;
   if (besLanguage) {
     const created = await vscode.workspace.openTextDocument({ language: besLanguage, content: BES_BROKEN });
     await vscode.window.showTextDocument(created);
-    untitledBesFound = await waitFor(created.uri, errorOnLine3);
+    untitledBesFound = await waitFor(created.uri, hasTheError);
 
     const pasted = await vscode.workspace.openTextDocument({ language: "plaintext", content: BES_BROKEN });
     await vscode.window.showTextDocument(pasted);
     const switched = await vscode.languages.setTextDocumentLanguage(pasted, besLanguage);
-    switchedBesFound = await waitFor(switched.uri, errorOnLine3);
+    switchedBesFound = await waitFor(switched.uri, hasTheError);
 
     // ...but not in any other scheme: a `git:` diff view of a `.bes` stands
     // in here as a made-up scheme. Not a timer: a buffer that must be linted
@@ -178,7 +181,7 @@ async function lint() {
       await vscode.window.showTextDocument(other);
       const control = await vscode.workspace.openTextDocument({ language: besLanguage, content: BES_BROKEN });
       await vscode.window.showTextDocument(control);
-      await waitFor(control.uri, errorOnLine3);
+      await waitFor(control.uri, hasTheError);
       otherSchemeBesFound = ours(other.uri);
     } finally {
       provider.dispose();
@@ -233,9 +236,10 @@ async function lint() {
   // The untitled BES buffers: the unterminated string precisely, as in task.bes.
   for (const [name, found] of [["untitled BES", untitledBesFound], ["switched BES", switchedBesFound]]) {
     if (!found) continue;
-    const token = found.find((d) => codeOf(d) === "error-token" && d.range.start.line === 3);
-    if (!token || token.range.start.character !== 24) {
-      throw new Error(`${name}: expected error-token at line 4, character 24, got ${JSON.stringify(summary(found))}`);
+    const token = found.find((d) => codeOf(d) === "error-token" && d.range.start.line === BES_BROKEN_ERROR.line);
+    if (!token || token.range.start.character !== BES_BROKEN_ERROR.character) {
+      const where = `line ${BES_BROKEN_ERROR.line + 1}, character ${BES_BROKEN_ERROR.character}`;
+      throw new Error(`${name}: expected error-token at ${where}, got ${JSON.stringify(summary(found))}`);
     }
   }
   if (otherSchemeBesFound?.length) {

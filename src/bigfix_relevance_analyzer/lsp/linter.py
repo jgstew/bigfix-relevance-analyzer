@@ -688,16 +688,18 @@ def _path_of(uri: str) -> Path:
 def _document_path(uri: str, language_id: str | None) -> Path:
     """The path whose suffix picks the extractor for this document."""
     path = _path_of(uri)
-    if language_id == LANGUAGE_ID and not _is_recognized(path):
-        # Plain relevance, the same as a `.rel` file: dialect from the content.
-        # The suffix only picks the extractor, and every untyped suffix picks
-        # the same one, so any member will do. `min` rather than unpacking a
-        # single element: a second untyped suffix must not break this.
-        return path.with_name(f"{path.name}{min(_UNTYPED_TEXT_SUFFIXES)}")
-    if language_id == BES_LANGUAGE_ID and not _is_recognized(path):
-        # Likewise: every BES XML suffix picks the same extractor.
-        return path.with_name(f"{path.name}{min(_BES_XML_SUFFIXES)}")
-    return path
+    # The languages read without a recognized suffix, each with the suffixes of
+    # the extractor it gets: plain relevance (dialect from the content, as a
+    # `.rel` file) and BES XML. Built per call, so it always holds the module's
+    # current sets.
+    fallbacks = {LANGUAGE_ID: _UNTYPED_TEXT_SUFFIXES, BES_LANGUAGE_ID: _BES_XML_SUFFIXES}
+    suffixes = fallbacks.get(language_id or "")
+    if suffixes is None or _is_recognized(path):
+        return path
+    # The suffix only picks the extractor, and every member of a set picks the
+    # same one, so any will do. `min` rather than unpacking a single element:
+    # a second suffix in a set must not break this.
+    return path.with_name(f"{path.name}{min(suffixes)}")
 
 
 def _title(autofix: AutofixResult) -> str:

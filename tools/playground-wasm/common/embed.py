@@ -37,11 +37,11 @@ SHARED_PARTIALS = {
 
 # The project logo, in docs/images/ (its only copy), base64-embedded wherever a
 # partial names one of these placeholders: shared_style.html's favicon. Filled
-# for every page, so a build script never passes them.
+# for every page, so a build script never passes them. The light logo only,
+# whatever the color scheme: logo-dark.svg is kept there but not used.
 LOGO_DIR = COMMON_DIR.parents[2] / "docs" / "images"
 LOGO_ASSETS = {
-    "%%LOGO_LIGHT_SVG%%": "logo.svg",
-    "%%LOGO_DARK_SVG%%": "logo-dark.svg",
+    "%%LOGO_SVG%%": "logo.svg",
 }
 
 # Anything of the form %%NAME%%. Used to catch leftovers, including placeholders
