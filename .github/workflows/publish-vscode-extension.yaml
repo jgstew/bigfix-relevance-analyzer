@@ -1,7 +1,8 @@
 ---
 name: Publish VS Code Extension
 
-# Publishes "BigFix Relevance Developer" to the Visual Studio Marketplace.
+# Publishes "BigFix Relevance Developer" to the Visual Studio Marketplace
+# (job `publish`) and to Open VSX (job `publish-openvsx`).
 #
 # Publishes the .vsix attached to a PUBLISHED GitHub release, checked against
 # that release's SHA256SUMS.txt, rather than packaging a new one: the
@@ -22,10 +23,18 @@ name: Publish VS Code Extension
 #     example if the release's own run failed here. --skip-duplicate makes
 #     publishing a version the Marketplace already has a no-op.
 #
+# Open VSX authenticates with a personal access token for now: the secret
+# OVSX_PAT of the `openvsx-publisher` environment. Open VSX trusted publishing
+# (OIDC, `ovsx publish --trusted-publishing`) will replace it later; it needs
+# the extension to already have one version on Open VSX, and OVSX_PAT must be
+# removed then, because a PAT always takes precedence over the OIDC token.
+#
 # Every step runs on every call except the last: the actual `vsce publish` is
 # inert until the repository variable VSCE_PUBLISH is set to `true`. Until
 # then a run is a dry run that still proves the release download, the Entra ID
-# login, and the publisher membership (`vsce verify-pat`).
+# login, and the publisher membership (`vsce verify-pat`). Open VSX has the
+# same gate in the repository variable OVSX_PUBLISH (`ovsx verify-pat` in the
+# dry run).
 
 on:
   workflow_call:
@@ -137,3 +146,86 @@ jobs:
         if: vars.VSCE_PUBLISH != 'true'
         run: |
           echo "::notice::VSCE_PUBLISH is not 'true': verified $PUBLISHER can publish v$VERSION, but did not publish it"
+
+  publish-openvsx:
+    name: Publish to Open VSX
+    runs-on: ubuntu-latest
+    # Holds the secret OVSX_PAT. Any protection rules on it (required
+    # reviewer, branch restriction) gate this job.
+    environment: openvsx-publisher
+    permissions:
+      # contents: read - download the release's assets
+      contents: read
+    env:
+      VERSION: ${{ inputs.version }}
+      OVSX_VERSION: "1.2.0"
+      # The repo's 7-day release-age cooldown for everything `npx` resolves
+      # (ovsx's own dependencies are not locked). Needs npm >= 11.10.0; older
+      # npm warns about an unknown config and applies no cooldown.
+      npm_config_min_release_age: "7"
+    steps:
+      - name: Check the version input
+        run: |
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-]?[0-9A-Za-z.]+)?$'; then
+            echo "::error::unexpected version: '$VERSION' (expected e.g. 1.2.3, no leading v)"
+            exit 1
+          fi
+
+      # No checkout and no npm ci: ovsx is run straight from the registry by
+      # `npx`, pinned only by OVSX_VERSION. Its own dependencies are resolved
+      # fresh on each run, with no lockfile and no release-age cooldown.
+      # Node 24 for a newer npm (min-release-age). No `cache:` on purpose, as
+      # in `publish`.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      - name: Download the release's .vsix and checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/release"
+          gh release download "v${VERSION}" --repo "$GITHUB_REPOSITORY" \
+            --dir "${RUNNER_TEMP}/release" \
+            --pattern bigfix-relevance-developer.vsix \
+            --pattern SHA256SUMS.txt
+          cd "${RUNNER_TEMP}/release"
+          sha256sum -c --ignore-missing --strict SHA256SUMS.txt
+          echo "VSIX=${RUNNER_TEMP}/release/bigfix-relevance-developer.vsix" >> "$GITHUB_ENV"
+
+      # The publisher in the .vsix is the Open VSX namespace; it must match
+      # the namespace's case exactly.
+      - name: Read the .vsix manifest
+        run: |
+          unzip -p "$VSIX" extension/package.json > "${RUNNER_TEMP}/manifest.json"
+          vsix_version="$(jq -er .version "${RUNNER_TEMP}/manifest.json")"
+          publisher="$(jq -er .publisher "${RUNNER_TEMP}/manifest.json")"
+          if [ "$vsix_version" != "$VERSION" ]; then
+            echo "::error::the .vsix is version $vsix_version, the release is $VERSION"
+            exit 1
+          fi
+          echo "PUBLISHER=$publisher" >> "$GITHUB_ENV"
+          echo "publisher: $publisher, version: $vsix_version"
+
+      # Fails fast when the secret is missing, expired, or lacks rights to
+      # the namespace.
+      - name: Verify publish rights
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [ -z "$OVSX_PAT" ]; then
+            echo "::error::the openvsx-publisher environment has no OVSX_PAT secret"
+            exit 1
+          fi
+          npx --yes "ovsx@${OVSX_VERSION}" verify-pat "$PUBLISHER"
+
+      - name: Publish
+        if: vars.OVSX_PUBLISH == 'true'
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: npx --yes "ovsx@${OVSX_VERSION}" publish --skip-duplicate --packagePath "$VSIX"
+
+      - name: Note the skipped publish
+        if: vars.OVSX_PUBLISH != 'true'
+        run: |
+          echo "::notice::OVSX_PUBLISH is not 'true': verified $PUBLISHER can publish v$VERSION to Open VSX, but did not publish it"
