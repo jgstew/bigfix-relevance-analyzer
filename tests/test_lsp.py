@@ -28,6 +28,7 @@ from bigfix_relevance_analyzer.lint import LintConfig, lint_file
 from bigfix_relevance_analyzer.lsp import linter as linter_module
 from bigfix_relevance_analyzer.lsp import stdio
 from bigfix_relevance_analyzer.lsp.linter import (
+    COMPLETION_LIMIT,
     DEFAULT_MAX_DOCUMENT_BYTES,
     DOCUMENT_TOO_LARGE,
     SOURCE,
@@ -129,12 +130,15 @@ def lint_expected(path: Path) -> list[tuple[str, str, int]]:
 # ---------------------------------------------------------------------------
 
 
-def test_initialize_advertises_full_sync_and_hover_and_names_the_server() -> None:
+def test_initialize_advertises_full_sync_hover_and_completion_and_names_the_server() -> None:
     response = initialize(Server())
     assert response["id"] == 1
     assert response["result"]["capabilities"] == {
         "textDocumentSync": {"openClose": True, "change": 1, "save": {"includeText": False}},
         "hoverProvider": True,
+        # No trigger characters: a space would fire on every word, and clients
+        # already ask as letters are typed and on an explicit request.
+        "completionProvider": {"resolveProvider": False},
     }
     assert response["result"]["serverInfo"] == {"name": SOURCE, "version": __version__}
 
@@ -829,6 +833,7 @@ def test_code_actions_are_advertised_only_with_literal_support() -> None:
     assert response["result"]["capabilities"] == {
         "textDocumentSync": {"openClose": True, "change": 1, "save": {"includeText": False}},
         "hoverProvider": True,
+        "completionProvider": {"resolveProvider": False},
         "codeActionProvider": {"codeActionKinds": ["quickfix", FIX_ALL]},
     }
     plain = initialize(Server())  # capabilities: {}
@@ -967,3 +972,170 @@ def test_an_inverted_range_is_invalid() -> None:
     did_open(server, "t.rel", SETTING_TEXT)
     response = code_actions(server, "t.rel", (0, 30), (0, 10))
     assert response["error"]["code"] == -32602
+
+
+# ---------------------------------------------------------------------------
+# Completion (#127)
+# ---------------------------------------------------------------------------
+
+
+def started_with(capabilities: Message) -> Server:
+    server = Server()
+    params = {"processId": None, "rootUri": ROOT_URI, "capabilities": capabilities}
+    server.handle(request("initialize", params))
+    server.handle(notification("initialized", {}))
+    return server
+
+
+SNIPPETS: Message = {"textDocument": {"completion": {"completionItem": {"snippetSupport": True}}}}
+
+
+def completion(server: Server, name: str, line: int, character: int, id_: int = 2) -> Message:
+    params = {
+        "textDocument": {"uri": uri(name)},
+        "position": {"line": line, "character": character},
+    }
+    (response,) = server.handle(request("textDocument/completion", params, id_=id_))
+    return response
+
+
+def test_completion_after_of_on_an_open_document() -> None:
+    server = started()
+    text = "exists files of "
+    did_open(server, "c.rel", text)
+    response = completion(server, "c.rel", 0, len(text))
+    result = response["result"]
+    assert set(result) == {"isIncomplete", "items"}
+    first = result["items"][0]
+    assert first == {
+        "label": "folders",
+        "kind": 10,
+        "detail": first["detail"],
+        "sortText": "0000",
+        "filterText": "folders",
+        "textEdit": {
+            "range": {
+                "start": {"line": 0, "character": len(text)},
+                "end": {"line": 0, "character": len(text)},
+            },
+            "newText": "folders",
+        },
+    }
+    assert first["detail"].endswith(": folder")
+
+
+def test_a_full_list_says_it_is_incomplete() -> None:
+    server = started()
+    did_open(server, "c.rel", "exists files of ")
+    result = completion(server, "c.rel", 0, 16)["result"]
+    assert len(result["items"]) == COMPLETION_LIMIT
+    assert result["isIncomplete"] is True
+    did_change(server, "c.rel", "exists files of csidl", version=2)
+    result = completion(server, "c.rel", 0, 21)["result"]
+    assert result["items"]
+    assert len(result["items"]) < COMPLETION_LIMIT
+    assert result["isIncomplete"] is False
+
+
+def test_completion_replaces_the_partial_word() -> None:
+    server = started()
+    did_open(server, "c.rel", "exists files of fold")
+    (first, *_) = completion(server, "c.rel", 0, 20)["result"]["items"]
+    assert first["textEdit"]["range"]["start"] == {"line": 0, "character": 16}
+    assert first["textEdit"]["range"]["end"] == {"line": 0, "character": 20}
+
+
+def test_snippets_only_for_a_client_that_takes_them() -> None:
+    server = started_with(SNIPPETS)
+    did_open(server, "c.rel", "exists files of ")
+    (first, *_) = completion(server, "c.rel", 0, 16)["result"]["items"]
+    assert first["textEdit"]["newText"] == 'folders "$1"'
+    assert first["insertTextFormat"] == 2
+    plain = started()
+    did_open(plain, "c.rel", "exists files of ")
+    (first, *_) = completion(plain, "c.rel", 0, 16)["result"]["items"]
+    assert "insertTextFormat" not in first
+
+
+def test_completion_where_nothing_fits_is_an_empty_list() -> None:
+    server = started()
+    did_open(server, "c.rel", 'exists files of "fold')
+    assert completion(server, "c.rel", 0, 21)["result"] == {"isIncomplete": False, "items": []}
+
+
+def test_completion_on_a_document_that_is_not_open_is_an_empty_list() -> None:
+    response = completion(started(), "nope.rel", 0, 0)
+    assert response["result"] == {"isIncomplete": False, "items": []}
+
+
+def test_completion_reads_the_latest_text() -> None:
+    server = started()
+    did_open(server, "c.rel", "exists ")
+    did_change(server, "c.rel", "exists files of ", version=2)
+    (first, *_) = completion(server, "c.rel", 0, 16)["result"]["items"]
+    assert first["label"] == "folders"
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {},
+        {"textDocument": {"uri": uri("c.rel")}},
+        {"textDocument": {"uri": 1}, "position": {"line": 0, "character": 0}},
+        {"textDocument": {"uri": uri("c.rel")}, "position": {"line": True, "character": 0}},
+    ],
+)
+def test_malformed_completion_params_are_invalid(params: Message) -> None:
+    server = started()
+    did_open(server, "c.rel", "exists files of ")
+    (response,) = server.handle(request("textDocument/completion", params))
+    assert response["error"]["code"] == -32602
+
+
+def test_a_completion_before_initialize_is_refused() -> None:
+    params = {"textDocument": {"uri": uri("c.rel")}, "position": {"line": 0, "character": 0}}
+    (response,) = Server().handle(request("textDocument/completion", params))
+    assert response["error"]["code"] == -32002
+
+
+def test_completion_needs_no_codec_beyond_utf8() -> None:
+    """The component's snapshot has no UTF-16 codec: see the diagnostics twin above."""
+    run_fresh_python(
+        """
+import sys
+for name in ("encodings.utf_16", "encodings.utf_16_le", "encodings.utf_16_be"):
+    sys.modules[name] = None
+from bigfix_relevance_analyzer.lsp.server import Server
+server = Server()
+server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
+text = '/* \U0001f600 */ exists files of fold'
+server.handle({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {
+    "textDocument": {"uri": "file:///w/a.rel", "languageId": "x", "version": 1, "text": text}}})
+end = len(text) + 1  # UTF-16 counted
+params = {"textDocument": {"uri": "file:///w/a.rel"}, "position": {"line": 0, "character": end}}
+(reply,) = server.handle(
+    {"jsonrpc": "2.0", "id": 2, "method": "textDocument/completion", "params": params})
+first = reply["result"]["items"][0]
+assert first["label"] == "folders", first
+assert first["textEdit"]["range"]["start"]["character"] == end - len("fold"), first
+print("ok")
+"""
+    )
+
+
+def test_the_editor_component_snapshots_completion() -> None:
+    """componentize-py keeps only the modules imported at build time, and the
+    build imports the language server: completion, its table and the scan's
+    parser must all come in with it, or completion fails only in the editor."""
+    run_fresh_python(
+        "import sys\n"
+        "import bigfix_relevance_analyzer.lsp.server\n"
+        "for name in (\n"
+        "    'bigfix_relevance_analyzer._completion_data',\n"
+        "    'bigfix_relevance_analyzer.completion.context',\n"
+        "    'bigfix_relevance_analyzer.completion.rank',\n"
+        "    'bigfix_relevance_analyzer.parser',\n"
+        "):\n"
+        "    assert name in sys.modules, name\n"
+        "print('ok')\n"
+    )

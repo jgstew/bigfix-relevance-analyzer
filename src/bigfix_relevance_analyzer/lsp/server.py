@@ -20,7 +20,7 @@ linter, not porting any of it.
 
 What is served
 --------------
-Diagnostics, hover and quick fixes. A document is linted on open, change and
+Diagnostics, hover, completion and quick fixes. A document is linted on open, change and
 save, and its diagnostics are published as ``textDocument/publishDiagnostics``;
 closing it publishes an empty list. Sync is full-document only: relevance
 statements are short, and incrementality pays off per *site* (the linter's
@@ -31,6 +31,15 @@ if it was renamed.
 ``textDocument/hover`` answers from the stored text of an open document, with
 a null result for a document that is not open or a position with nothing to
 say. Hover params that are not a URI and two integers are invalid params.
+
+``textDocument/completion`` answers from the stored text the same way, with a
+``CompletionList`` of the linter's completions, best first: each a property
+item with a ``sortText`` from its rank and a ``textEdit`` over what is being
+typed. Its insert text is a snippet (``folders "$1"``) only for a client that
+says it takes them (``completionItem.snippetSupport``). The list says it is
+incomplete when it was cut short, so the client asks again as more is typed.
+It is advertised with no trigger characters: a space would fire on every
+word, and clients already ask as letters are typed and on an explicit request.
 
 ``textDocument/codeAction`` answers with the linter's quick fixes for the
 requested range, as ``CodeAction`` literals carrying a ``WorkspaceEdit``. It is
@@ -49,6 +58,7 @@ from collections.abc import Mapping
 from typing import Any, TypeGuard
 
 from bigfix_relevance_analyzer.lsp.linter import (
+    COMPLETION_LIMIT,
     FIX_ALL_KIND,
     QUICKFIX_KIND,
     SOURCE,
@@ -76,6 +86,14 @@ class _SyncKind(enum.IntEnum):
     FULL = 1
 
 
+class _CompletionItemKind(enum.IntEnum):
+    PROPERTY = 10
+
+
+class _InsertTextFormat(enum.IntEnum):
+    SNIPPET = 2
+
+
 @dataclasses.dataclass(slots=True)
 class _Document:
     text: str
@@ -97,6 +115,7 @@ class Server:
         self._shutdown = False
         self._code_action_literals = False
         self._document_changes = False
+        self._snippets = False
         self._documents: dict[str, _Document] = {}
 
     def handle(self, message: Mapping[str, Any]) -> list[Message]:
@@ -155,6 +174,8 @@ class Server:
             return [_result(id_, None)]
         if method == "textDocument/hover":
             return [self._hover(id_, params)]
+        if method == "textDocument/completion":
+            return [self._completion(id_, params)]
         if method == "textDocument/codeAction":
             return [self._code_action(id_, params)]
         return [error_response(id_, ErrorCode.METHOD_NOT_FOUND, f"method not found: {method}")]
@@ -169,6 +190,9 @@ class Server:
             client, "textDocument", "codeAction", "codeActionLiteralSupport"
         )
         self._document_changes = _has(client, "workspace", "workspaceEdit", "documentChanges")
+        self._snippets = _has(
+            client, "textDocument", "completion", "completionItem", "snippetSupport"
+        )
         capabilities: Message = {
             "textDocumentSync": {
                 "openClose": True,
@@ -176,6 +200,7 @@ class Server:
                 "save": {"includeText": False},
             },
             "hoverProvider": True,
+            "completionProvider": {"resolveProvider": False},
         }
         if self._code_action_literals:
             capabilities["codeActionProvider"] = {"codeActionKinds": [QUICKFIX_KIND, FIX_ALL_KIND]}
@@ -197,6 +222,41 @@ class Server:
             return _result(id_, None)
         found = self.linter.hover(uri, document.text, position, document.language_id)
         return _result(id_, found)
+
+    def _completion(self, id_: Any, params: Mapping[str, Any]) -> Message:
+        identifier = params.get("textDocument")
+        uri = identifier.get("uri") if isinstance(identifier, Mapping) else None
+        position = _position(params.get("position"))
+        if not isinstance(uri, str) or position is None:
+            return error_response(
+                id_, ErrorCode.INVALID_PARAMS, "completion needs a textDocument uri and a position"
+            )
+        document = self._documents.get(uri)
+        if document is None:
+            return _result(id_, {"isIncomplete": False, "items": []})
+        found = self.linter.completions(
+            uri, document.text, position, document.language_id, snippets=self._snippets
+        )
+        items = []
+        for completion in found:
+            item: Message = {
+                "label": completion.label,
+                "kind": int(_CompletionItemKind.PROPERTY),
+                "detail": completion.detail,
+                "sortText": completion.sort_text,
+                "filterText": completion.label,
+            }
+            if completion.range is not None:
+                item["textEdit"] = {
+                    "range": lsp_range(completion.range),
+                    "newText": completion.insert_text,
+                }
+            else:
+                item["insertText"] = completion.insert_text
+            if completion.is_snippet:
+                item["insertTextFormat"] = int(_InsertTextFormat.SNIPPET)
+            items.append(item)
+        return _result(id_, {"isIncomplete": len(found) >= COMPLETION_LIMIT, "items": items})
 
     def _code_action(self, id_: Any, params: Mapping[str, Any]) -> Message:
         identifier = params.get("textDocument")

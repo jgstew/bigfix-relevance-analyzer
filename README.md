@@ -11,7 +11,7 @@ safe fixes.
 | Where | What you get |
 | --- | --- |
 | [Browser playground](#browser-playground) | Paste relevance into a self-contained [web page](https://www.jgstew.com/files/bigfix-relevance-analyzer-playground.html); nothing to install, nothing sent anywhere |
-| [VS Code extension](#vs-code-extension) | Diagnostics, hover and quick fixes [as you type](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer) |
+| [VS Code extension](#vs-code-extension) | Diagnostics, hover, completion and quick fixes [as you type](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer) |
 | [Command Line `uvx`](#command-line-via-uvx) | Analyse one statement, or lint files, with nothing installed |
 | [pre-commit hook](#pre-commit-hook) | Lint the relevance in a BigFix content repo on every commit |
 | [Python library](#python-library) | `import` it from PyPI into your own tool |
@@ -685,6 +685,21 @@ and CDATA included:
 Whitespace, comments, articles, parentheses and a statement that does not parse
 get no hover.
 
+It completes inspector names (`textDocument/completion`) after `X of`, inside
+`whose (` and at the start of a statement. After `X of` the text to the left is
+the *consumer*, and what fits is a *producer* of what it takes: after `files of`,
+anything returning a `<folder>`. Candidates are ranked by a table of how real
+content uses each pair (`_completion_data.py`, mined by
+`tools/generate_completion_data.py` from content repositories; names and counts
+only), then by the types the inspector tables allow, filtered by the site's
+dialect and the configured platform. Measured leave-one-repo-out over six
+content repositories, the producer actually written is in the top 3 for 78% of
+real `X of` pairs. The context comes from the tokens before the cursor, never a
+parse of the half-written statement, so a statement that does not parse yet is
+no obstacle. A plural is inserted where content usually writes one, and a
+snippet with an index placeholder (`folders "$1"`) for a client that takes
+snippets.
+
 And it offers each safe fix as a quick fix (`textDocument/codeAction`): one
 `quickfix` action per statement with a fixable diagnostic in the requested
 range, and a `source.fixAll.bigfix-relevance` action that fixes the whole file,
@@ -721,7 +736,9 @@ The protocol layer is a thin adapter. Everything the editor is told (the
 diagnostics, the cache, the size guard and their options) comes from
 `DocumentLinter`, which has no JSON-RPC in it: `diagnostics(uri, text)` and
 `hover(uri, text, (line, character))` return plain dicts in LSP's field names,
-and `fixes(uri, text, range=...)` returns `DocumentFix` objects (a title, a
+`completions(uri, text, (line, character))` returns `DocumentCompletion`
+objects (a label, a detail, the text to insert, a sort key and the range it
+replaces), and `fixes(uri, text, range=...)` returns `DocumentFix` objects (a title, a
 kind, the diagnostics fixed, and edits as ranges with their new text) that
 the server turns into `CodeAction`s. Moving to a library such as pygls would mean
 writing another adapter over it, not porting it.

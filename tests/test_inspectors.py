@@ -23,13 +23,17 @@ from bigfix_relevance_analyzer.inspectors import (
     MatchKind,
     WrittenForm,
     _parse_property,
+    _producers_index,
     all_inspectors,
     ancestors,
+    applicable_to,
     binary_operators,
     casts,
     inspector_names,
     known_types,
     lookup,
+    object_types,
+    producers_of,
     properties,
     relevance_types,
     search,
@@ -39,6 +43,7 @@ from bigfix_relevance_analyzer.inspectors import (
     written_form_of,
 )
 from bigfix_relevance_analyzer.nodes import Reference, walk
+from bigfix_relevance_analyzer.typecheck import TypeEnvironment
 
 
 def only(name: str, signature: str) -> Inspector:
@@ -873,3 +878,105 @@ def test_the_lookup_cache_is_bounded() -> None:
     """
     assert lookup.cache_info().maxsize == _LOOKUP_CACHE_SIZE
     assert _LOOKUP_CACHE_SIZE is not None
+
+
+# ---------------------------------------------------------------------------
+# The type side of completion (#127)
+# ---------------------------------------------------------------------------
+#
+# Completion after `X of` is a reverse lookup: what returns the type `X` takes.
+# Inside `whose (` it is the forward one: what applies to the filtered type.
+
+
+def _client() -> TypeEnvironment:
+    return TypeEnvironment.create(Dialect.CLIENT)
+
+
+def _names_of(rows: Sequence[Inspector]) -> set[str]:
+    return {row.name for row in rows}
+
+
+def test_object_types_are_the_last_operand_of_every_row() -> None:
+    # `files of <folder>`, `file <string> of <folder>`, `file of <service>`,
+    # `file <string> of <encoding>`: every row the written form names.
+    assert object_types("files") == {"folder", "service", "encoding"}
+    # Written singular or plural, the same rows.
+    assert object_types("file") == object_types("files")
+    # The index narrows it: `files of` has no index, `file "x" of` has one.
+    assert object_types("files", indexed=False) == {"folder", "service"}
+    assert object_types("file", indexed=True) == {"folder", "encoding"}
+
+
+def test_object_types_of_a_global_or_unknown_name_is_empty() -> None:
+    assert object_types("bes computers") == frozenset()
+    assert object_types("totally bogus") == frozenset()
+
+
+def test_producers_of_a_folder_include_the_usual_ones() -> None:
+    names = _names_of(producers_of({"folder"}, _client()))
+    assert {"folder", "windows folder", "parent folder", "data folder", "csidl folder"} <= names
+    # Every one returns a folder, or a type that inherits from one.
+    for row in producers_of({"folder"}, _client()):
+        assert "folder" in ancestors(row.return_type), row.signature
+
+
+def test_producers_include_rows_returning_a_subtype() -> None:
+    # `application` inherits from `file`; asking for a file must offer it.
+    assert "file" in ancestors("application")
+    returned = {row.return_type for row in producers_of({"file"}, _client())}
+    assert "application" in returned
+
+
+def test_producers_are_filtered_by_dialect() -> None:
+    session = TypeEnvironment.create(Dialect.SESSION)
+    rows = producers_of({"folder"}, session)
+    assert all(Dialect.SESSION in row.dialects for row in rows)
+    assert "windows folder" not in _names_of(rows)
+
+
+def test_producers_are_filtered_by_platform() -> None:
+    assert "apple extras folder" in _names_of(producers_of({"folder"}, _client()))
+    windows = TypeEnvironment.create(Dialect.CLIENT, "windows")
+    names = _names_of(producers_of({"folder"}, windows))
+    assert "apple extras folder" not in names
+    assert "windows folder" in names
+
+
+def test_producers_are_properties_only_and_in_table_order() -> None:
+    rows = producers_of({"string"}, _client())
+    assert rows
+    assert {row.kind for row in rows} == {InspectorKind.PROPERTY}
+    order = {row: position for position, row in enumerate(properties())}
+    assert [order[row] for row in rows] == sorted(order[row] for row in rows)
+
+
+def test_producers_of_an_unknown_type_is_empty() -> None:
+    assert producers_of({"no such type"}, _client()) == ()
+
+
+def test_applicable_to_a_file_includes_what_its_ancestors_declare() -> None:
+    names = _names_of(applicable_to({"file"}, _client()))
+    # `name` is declared on `filesystem object`, which `file` inherits from.
+    assert {"name", "size", "modification time"} <= names
+    for row in applicable_to({"file"}, _client()):
+        assert row.operands and row.operands[-1] in ancestors("file"), row.signature
+
+
+def test_applicable_to_is_filtered_by_dialect() -> None:
+    session = TypeEnvironment.create(Dialect.SESSION)
+    rows = applicable_to({"bes computer"}, session)
+    assert "name" in _names_of(rows)
+    assert all(Dialect.SESSION in row.dialects for row in rows)
+
+
+def test_the_producers_index_is_built_lazily() -> None:
+    run_fresh_python(
+        "from bigfix_relevance_analyzer import inspectors\n"
+        "assert inspectors._producers_index.cache_info().currsize == 0\n"
+        "from bigfix_relevance_analyzer.typecheck import TypeEnvironment\n"
+        "from bigfix_relevance_analyzer.dialect import Dialect\n"
+        "inspectors.producers_of({'folder'}, TypeEnvironment.create(Dialect.CLIENT))\n"
+        "assert inspectors._producers_index.cache_info().currsize == 1\n"
+        "print('ok')\n"
+    )
+    assert _producers_index() is _producers_index()

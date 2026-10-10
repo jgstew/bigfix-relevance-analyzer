@@ -17,7 +17,8 @@
 // Scenarios, one VS Code launch each (suite.js reads SMOKE_SCENARIO):
 //
 //   lint  a workspace with a .rel, a fenced .md and a .bes: the extension
-//         activates, and the language server's diagnostics reach all three
+//         activates, the language server's diagnostics reach all three, and
+//         hover, a quick fix and completion answer
 //         (and an unsaved buffer, for an extension contributing the relevance
 //         language). The .bes opens in the BES language when the extension
 //         contributes one.
@@ -79,6 +80,8 @@ const scenarios = {
     "fenced.md": "# Example\n\n```relevance\nexists totally bogus made up inspector\n```\n",
     // A quick fix (issue #113): `setting` -> `settings`, by inserting `s`.
     "fixable.rel": 'exists values of setting "x" of client\n',
+    // Completion (issue #127): after `files of`, `folders` is offered.
+    "complete.rel": "exists files of ",
     "task.bes":
       '<?xml version="1.0" encoding="UTF-8"?>\n<BES><Task><Title>t</Title>\n' +
       '<Relevance>exists file "unterminated</Relevance>\n</Task></BES>\n',

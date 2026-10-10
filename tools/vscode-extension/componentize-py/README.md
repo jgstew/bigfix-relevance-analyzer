@@ -42,6 +42,26 @@ it is singular or plural as written, and the platforms (client) or contexts
 keywords and operators such as `whose`, `of`, `|` and `as`, with links to the
 reference documentation.
 
+### Completion
+
+Inspector names are suggested as you type, in three places:
+
+- **After `of`:** what can go there, most likely first. After `files of`,
+  `folders` comes first, then `csidl folders`, `windows folders` and the
+  other things that hold files.
+- **Inside `whose (`:** properties of what is being filtered. After
+  `files whose (`, `name` comes first.
+- **At the start of a statement**, and after `exists`, `not`, `and`, `or` or an
+  opening parenthesis.
+
+Suggestions are ordered by how often real BigFix content uses them in that
+place, and only names that fit are offered: client inspectors in client
+relevance, session inspectors in session relevance. A name usually written in
+the plural is suggested in the plural, and one that usually takes an argument
+is inserted with a placeholder for it (`folders "..."`). Suggestions appear as
+you type a word; press `Ctrl+Space` to see them anywhere else, for example
+right after `of `.
+
 ### Quick fixes
 
 Some problems come with a fix the checker has worked out and checked is safe:
@@ -154,8 +174,10 @@ exists file "C:\Windows\notepad.exe"
   may be).
 - A new, unsaved file set to BigFix BES XML is colored, but not checked until
   it is saved as a `.bes` file.
-- Completion is not available yet. Hover needs a statement that parses; on one
-  with a syntax error there is no hover until it is fixed.
+- Completion suggests inspector names after `of`, inside `whose (` and at the
+  start of a statement. Elsewhere, such as after a comparison or `as`, it
+  suggests nothing yet. Hover needs a statement that parses; on one with a
+  syntax error there is no hover until it is fixed.
 - A file is checked when its name ends in one of the file types above, or when
   its language is set to BigFix Relevance. Other files are left alone.
 - The checker starts the first time you open a file with relevance to check,

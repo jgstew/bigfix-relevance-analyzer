@@ -153,6 +153,34 @@ test("hover describes the inspector under the cursor", async (t) => {
   });
 });
 
+test("completion after `of` is answered through the component", async (t) => {
+  // The completion table and modules must be in the component's build
+  // snapshot: a module first imported at runtime does not exist there.
+  const server = startServer();
+  t.after(() => server.child.kill());
+  const response = await initialized(server);
+  assert.deepEqual(response.result.capabilities.completionProvider, { resolveProvider: false });
+  const uri = "file:///workspace/complete.rel";
+  const text = "exists files of ";
+  server.send({
+    method: "textDocument/didOpen",
+    params: { textDocument: { uri, languageId: "plaintext", version: 1, text } },
+  });
+  await server.next((m) => m.method === "textDocument/publishDiagnostics");
+  server.send({
+    id: 2,
+    method: "textDocument/completion",
+    params: { textDocument: { uri }, position: { line: 0, character: text.length } },
+  });
+  const completion = await server.next((m) => m.id === 2);
+  const labels = completion.result.items.map((item) => item.label);
+  assert.equal(labels[0], "folders", `got ${labels.slice(0, 5)}`);
+  assert.deepEqual(completion.result.items[0].textEdit.range, {
+    start: { line: 0, character: text.length },
+    end: { line: 0, character: text.length },
+  });
+});
+
 test("a quick fix is answered through the component", async (t) => {
   // The fixer's modules -- difflib among them -- must be in the component's
   // build snapshot: a module first imported at runtime does not exist there.
