@@ -378,6 +378,21 @@ def test_the_build_copies_every_icon_the_manifest_names_from_the_logo(tmp_path: 
     assert width >= 128 and height >= 128, (width, height)
 
 
+def test_the_root_readme_shows_the_logo_left_of_its_title() -> None:
+    """As the playground page does. An absolute URL to the logo on `main`: the
+    README is also the PyPI description, where a repository path is broken.
+    Empty alt: the heading's text already names it."""
+    first = (REPO_ROOT / "README.md").read_text("utf-8").splitlines()[0]
+    raw = "https://raw.githubusercontent.com/jgstew/bigfix-relevance-analyzer/main/"
+    match = re.fullmatch(
+        rf'# <img src="{re.escape(raw)}(docs/images/logo\.svg)" alt="" height="32"> '
+        r"bigfix-relevance-analyzer",
+        first,
+    )
+    assert match, first
+    assert (REPO_ROOT / match.group(1)).is_file()
+
+
 def test_the_copied_icons_are_never_committed() -> None:
     git = shutil.which("git")
     if git is None or not (REPO_ROOT / ".git").exists():

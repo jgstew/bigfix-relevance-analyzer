@@ -1,4 +1,4 @@
-# bigfix-relevance-analyzer
+# <img src="https://raw.githubusercontent.com/jgstew/bigfix-relevance-analyzer/main/docs/images/logo.svg" alt="" height="32"> bigfix-relevance-analyzer
 A python module for working with BigFix Relevance generically. Extract, Analyze, etc.
 
 It parses client and session relevance, type-checks it, resolves every
