@@ -121,6 +121,7 @@ from bigfix_relevance_analyzer.dialect import Dialect
 # Underscore-private on purpose: this package's modules share extract's
 # helpers this way (lint.py imports _extract_file and _is_recognized too).
 from bigfix_relevance_analyzer.extract import (
+    _BES_XML_SUFFIXES,
     _UNTYPED_TEXT_SUFFIXES,
     RelevanceSite,
     _extract_data,
@@ -166,6 +167,14 @@ A buffer whose URI names no recognized file type is still linted, as a single
 relevance statement, when the client says it is this language: an unsaved
 ``untitled:`` buffer, or a file switched to it by hand. The extension
 contributes the language under this id; a test keeps the two equal."""
+
+BES_LANGUAGE_ID: Final = "bigfix-bes"
+"""The VS Code language id for BES XML (``.bes``, ``.bes.xml``).
+
+The same fallback as :data:`LANGUAGE_ID`, read as BES XML: a fixlet pasted into
+an unsaved ``untitled:`` buffer, or a file with another name (a fixlet saved as
+``.xml``) switched to it. The extension contributes the language under this id;
+a test keeps the two equal."""
 
 QUICKFIX_KIND: Final = "quickfix"
 """The code action kind of a fix for one statement."""
@@ -347,8 +356,9 @@ class DocumentLinter:
 
         The file type comes from the URI's suffix. Only when that names nothing
         the extractor reads does ``language_id`` (the client's ``languageId``)
-        decide: :data:`LANGUAGE_ID` means whole-file relevance. A ``.md`` stays
-        markdown whatever the client calls it.
+        decide: :data:`LANGUAGE_ID` means whole-file relevance, and
+        :data:`BES_LANGUAGE_ID` BES XML. A ``.md`` stays markdown whatever the
+        client calls it.
         """
         data = text.encode("utf-8", errors="surrogatepass")
         if len(data) > self.max_document_bytes:
@@ -678,13 +688,18 @@ def _path_of(uri: str) -> Path:
 def _document_path(uri: str, language_id: str | None) -> Path:
     """The path whose suffix picks the extractor for this document."""
     path = _path_of(uri)
-    if language_id == LANGUAGE_ID and not _is_recognized(path):
-        # Plain relevance, the same as a `.rel` file: dialect from the content.
-        # The suffix only picks the extractor, and every untyped suffix picks
-        # the same one, so any member will do. `min` rather than unpacking a
-        # single element: a second untyped suffix must not break this.
-        return path.with_name(f"{path.name}{min(_UNTYPED_TEXT_SUFFIXES)}")
-    return path
+    # The languages read without a recognized suffix, each with the suffixes of
+    # the extractor it gets: plain relevance (dialect from the content, as a
+    # `.rel` file) and BES XML. Built per call, so it always holds the module's
+    # current sets.
+    fallbacks = {LANGUAGE_ID: _UNTYPED_TEXT_SUFFIXES, BES_LANGUAGE_ID: _BES_XML_SUFFIXES}
+    suffixes = fallbacks.get(language_id or "")
+    if suffixes is None or _is_recognized(path):
+        return path
+    # The suffix only picks the extractor, and every member of a set picks the
+    # same one, so any will do. `min` rather than unpacking a single element:
+    # a second suffix in a set must not break this.
+    return path.with_name(f"{path.name}{min(suffixes)}")
 
 
 def _title(autofix: AutofixResult) -> str:

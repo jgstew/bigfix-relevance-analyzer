@@ -39,6 +39,15 @@ SETTING = 'exists values of setting "x" of client'
 MID_CHAIN = "singular-spelling-mid-chain"
 """The checker code :data:`SETTING` raises."""
 
+BES_BROKEN = (
+    '<?xml version="1.0" encoding="UTF-8"?>\n<BES>\n<Task>\n'
+    f"\t<Relevance>{BROKEN}</Relevance>\n"
+    f"\t<Relevance>{SETTING}</Relevance>\n"
+    "</Task>\n</BES>\n"
+)
+"""A task with :data:`BROKEN` on line 3 and the fixable :data:`SETTING` on line 4
+(LSP lines, 0-based): what a fixlet pasted into an unsaved tab looks like."""
+
 BES_EXAMPLE = REPO_ROOT / "tests/examples/mixed_context/task_with_client_and_session_relevance.bes"
 """A real document with both a client and a session site. Anchored on this file
 rather than the working directory, so the suite also runs from inside ``tests/``."""

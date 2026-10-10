@@ -34,16 +34,32 @@ const PREFIX = manifest.settingsPrefix;
 // The server lints a buffer in it even with no file name: see LANGUAGE_ID in
 // src/bigfix_relevance_analyzer/lsp/linter.py.
 const LANGUAGE_ID = manifest.contributes.languages[0].id;
+// The BES XML language, found by the suffix it takes rather than by position.
+// The server reads a buffer in it as BES XML even with no `.bes` name: see
+// BES_LANGUAGE_ID in lsp/linter.py. Missing, it costs BES buffers only: this
+// runs as the file loads, where a throw would stop relevance checking too.
+const BES_LANGUAGE_ID = manifest.contributes.languages.find((language) =>
+  language.extensions?.includes(".bes")
+)?.id;
 const NAME = manifest.displayName;
 const SERVER = path.join(__dirname, "server.js");
 const COMPONENT = path.join(__dirname, "dist", "component", "lsp.js");
 
-// Files by suffix, plus any buffer in the relevance language whatever its
-// scheme: that is what brings an unsaved `untitled:` buffer to the server,
-// which then lints it by its languageId.
+// Files by suffix, plus buffers by language, which is what brings an unsaved
+// `untitled:` buffer to the server; it then lints it by its languageId.
+// BES XML buffers are sent only as files or unsaved buffers: any other scheme
+// would also lint the `git:` side of every `.bes` diff view. Relevance buffers
+// are still sent whatever their scheme, which has the same cost for `.rel` and
+// `.bsr` diffs; whether to scope them too, and to which schemes, is #134.
 const DOCUMENT_SELECTOR = [
   ...documentPatterns.map((pattern) => ({ scheme: "file", pattern })),
   { language: LANGUAGE_ID },
+  ...(BES_LANGUAGE_ID
+    ? [
+        { language: BES_LANGUAGE_ID, scheme: "file" },
+        { language: BES_LANGUAGE_ID, scheme: "untitled" },
+      ]
+    : []),
 ];
 
 /** @type {import("vscode-languageclient/node").LanguageClient | undefined} */

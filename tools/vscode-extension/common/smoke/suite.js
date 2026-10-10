@@ -24,6 +24,16 @@ const TIMEOUT_MS = 60_000;
 // How long the idle scenario gives the server to (wrongly) start.
 const IDLE_MS = 3_000;
 
+// The same task as BES_BROKEN in tests/_helpers.py, and where its unterminated
+// string starts (0-based): not line 0, so a whole-document range would not pass
+// for it. tests/test_vscode_extension_layout.py keeps both in step.
+const BES_BROKEN =
+  '<?xml version="1.0" encoding="UTF-8"?>\n<BES>\n<Task>\n' +
+  '\t<Relevance>exists file "unterminated</Relevance>\n' +
+  '\t<Relevance>exists values of setting "x" of client</Relevance>\n' +
+  "</Task>\n</BES>\n";
+const BES_BROKEN_ERROR = { line: 3, character: 24 };
+
 function ours(uri) {
   return vscode.languages.getDiagnostics(uri).filter((d) => d.source === SOURCE);
 }
@@ -138,6 +148,46 @@ async function lint() {
     untitledFound = await waitFor(untitled.uri, (found) => found.length > 0);
   }
 
+  // Unsaved BES XML (issue #120): a buffer created in the language, and the
+  // demo path, a fixlet pasted into a plain tab and then switched to it.
+  // Neither has a `.bes` name, so again only the language says what it is.
+  const besLanguage = process.env.SMOKE_BES_LANGUAGE;
+  const hasTheError = (found) =>
+    found.some((d) => codeOf(d) === "error-token" && d.range.start.line === BES_BROKEN_ERROR.line);
+  let untitledBesFound;
+  let switchedBesFound;
+  let otherSchemeBesFound;
+  if (besLanguage) {
+    const created = await vscode.workspace.openTextDocument({ language: besLanguage, content: BES_BROKEN });
+    await vscode.window.showTextDocument(created);
+    untitledBesFound = await waitFor(created.uri, hasTheError);
+
+    const pasted = await vscode.workspace.openTextDocument({ language: "plaintext", content: BES_BROKEN });
+    await vscode.window.showTextDocument(pasted);
+    const switched = await vscode.languages.setTextDocumentLanguage(pasted, besLanguage);
+    switchedBesFound = await waitFor(switched.uri, hasTheError);
+
+    // ...but not in any other scheme: a `git:` diff view of a `.bes` stands
+    // in here as a made-up scheme. Not a timer: a buffer that must be linted
+    // is opened after it, and the client sends and the server answers in
+    // order, so once that one has its diagnostics, this one would have had
+    // them too had it been sent, however slow the machine.
+    const provider = vscode.workspace.registerTextDocumentContentProvider("smoke-vfs", {
+      provideTextDocumentContent: () => BES_BROKEN,
+    });
+    try {
+      const other = await vscode.workspace.openTextDocument(vscode.Uri.parse("smoke-vfs:/task.bes"));
+      await vscode.languages.setTextDocumentLanguage(other, besLanguage);
+      await vscode.window.showTextDocument(other);
+      const control = await vscode.workspace.openTextDocument({ language: besLanguage, content: BES_BROKEN });
+      await vscode.window.showTextDocument(control);
+      await waitFor(control.uri, hasTheError);
+      otherSchemeBesFound = ours(other.uri);
+    } finally {
+      provider.dispose();
+    }
+  }
+
   const result = {
     vscode: vscode.version,
     firstDiagnosticsMs: firstMs,
@@ -155,6 +205,13 @@ async function lint() {
     "fixable.rel text after the fix": fixedText,
     "complete.rel completions": completionLabels.slice(0, 5),
     ...(untitledFound ? { [`untitled (${language})`]: summary(untitledFound) } : {}),
+    ...(untitledBesFound
+      ? {
+          [`untitled (${besLanguage})`]: summary(untitledBesFound),
+          [`untitled (plaintext, then ${besLanguage})`]: summary(switchedBesFound),
+          [`smoke-vfs:/task.bes (${besLanguage})`]: summary(otherSchemeBesFound),
+        }
+      : {}),
   };
   fs.writeFileSync(process.env.SMOKE_RESULT, JSON.stringify(result, null, 2));
 
@@ -173,9 +230,20 @@ async function lint() {
   if (!besFound.some((d) => codeOf(d) === "error-token" && d.range.start.line === 2)) {
     throw new Error(`task.bes: expected error-token on line 3, got ${JSON.stringify(summary(besFound))}`);
   }
-  const besLanguage = process.env.SMOKE_BES_LANGUAGE;
   if (besLanguage && besEditor.document.languageId !== besLanguage) {
     throw new Error(`task.bes: expected languageId ${besLanguage}, got ${besEditor.document.languageId}`);
+  }
+  // The untitled BES buffers: the unterminated string precisely, as in task.bes.
+  for (const [name, found] of [["untitled BES", untitledBesFound], ["switched BES", switchedBesFound]]) {
+    if (!found) continue;
+    const token = found.find((d) => codeOf(d) === "error-token" && d.range.start.line === BES_BROKEN_ERROR.line);
+    if (!token || token.range.start.character !== BES_BROKEN_ERROR.character) {
+      const where = `line ${BES_BROKEN_ERROR.line + 1}, character ${BES_BROKEN_ERROR.character}`;
+      throw new Error(`${name}: expected error-token at ${where}, got ${JSON.stringify(summary(found))}`);
+    }
+  }
+  if (otherSchemeBesFound?.length) {
+    throw new Error(`smoke-vfs:/task.bes: expected no diagnostics, got ${JSON.stringify(summary(otherSchemeBesFound))}`);
   }
   // The fence opens on line 3, so its statement is on line 4: proves line
   // mapping from an extracted site back to the document.

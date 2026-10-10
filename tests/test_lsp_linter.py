@@ -18,6 +18,7 @@ from typing import Any
 
 import pytest
 from _helpers import (
+    BES_BROKEN,
     BES_EXAMPLE,
     BROKEN,
     CLIENT,
@@ -285,6 +286,75 @@ def test_untitled_linting_survives_a_second_untyped_suffix(
     monkeypatch.setattr(linter_module, "_UNTYPED_TEXT_SUFFIXES", frozenset({".rel", ".relevance"}))
     found = DocumentLinter().diagnostics("untitled:Untitled-1", BROKEN, language_id=LANGUAGE_ID)
     assert "error-token" in {d["code"] for d in found}
+
+
+# The same for BES XML (issue #120): a fixlet pasted into an unsaved tab, or a
+# fixlet saved as `.xml`, in the BigFix BES XML language.
+
+
+def test_an_untitled_bes_buffer_is_linted_as_a_saved_bes_file() -> None:
+    from bigfix_relevance_analyzer.lsp.linter import BES_LANGUAGE_ID
+
+    found = DocumentLinter().diagnostics(
+        "untitled:Untitled-1", BES_BROKEN, language_id=BES_LANGUAGE_ID
+    )
+    assert {d["code"] for d in found} >= {"error-token", "plural-preferred"}
+    assert found == DocumentLinter().diagnostics("file:///w/task.bes", BES_BROKEN)
+
+
+def test_a_file_switched_to_the_bes_language_is_linted(tmp_path: Path) -> None:
+    from bigfix_relevance_analyzer.lsp.linter import BES_LANGUAGE_ID
+
+    found = DocumentLinter().diagnostics(
+        "file:///w/task.xml", BES_BROKEN, language_id=BES_LANGUAGE_ID
+    )
+    assert found
+    assert found == DocumentLinter().diagnostics("file:///w/task.bes", BES_BROKEN)
+    assert as_lint(found) == lint_expected(write(tmp_path, "task.bes", BES_BROKEN))
+
+
+def test_a_recognized_suffix_wins_over_the_bes_language() -> None:
+    """A guard, passing before #120 too: a .md stays markdown (no fence, so
+    nothing), and a .rel stays whole-file relevance, not BES."""
+    from bigfix_relevance_analyzer.lsp.linter import BES_LANGUAGE_ID
+
+    linter = DocumentLinter()
+    assert linter.diagnostics("file:///w/notes.md", BES_BROKEN, language_id=BES_LANGUAGE_ID) == []
+    assert linter.diagnostics(
+        "file:///w/q.rel", BES_BROKEN, language_id=BES_LANGUAGE_ID
+    ) == linter.diagnostics("file:///w/q.rel", BES_BROKEN)
+
+
+def test_an_untitled_buffer_in_the_xml_language_is_not_linted() -> None:
+    """A guard: `xml` is what VS Code calls a pasted fixlet by default; only
+    our own language is acted on."""
+    assert DocumentLinter().diagnostics("untitled:Untitled-1", BES_BROKEN, language_id="xml") == []
+
+
+def test_untitled_bes_linting_survives_a_second_bes_suffix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import bigfix_relevance_analyzer.lsp.linter as linter_module
+    from bigfix_relevance_analyzer.lsp.linter import BES_LANGUAGE_ID
+
+    monkeypatch.setattr(linter_module, "_BES_XML_SUFFIXES", frozenset({".bes", ".fixlet"}))
+    found = DocumentLinter().diagnostics(
+        "untitled:Untitled-1", BES_BROKEN, language_id=BES_LANGUAGE_ID
+    )
+    assert "error-token" in {d["code"] for d in found}
+
+
+def test_switching_an_untitled_buffer_to_the_bes_language_re_extracts_it() -> None:
+    """VS Code's language picker keeps the URI and the text; the extraction
+    kept for the first, unrecognized type must not answer for the second."""
+    from bigfix_relevance_analyzer.lsp.linter import BES_LANGUAGE_ID
+
+    linter = DocumentLinter()
+    uri = "untitled:Untitled-1"
+    assert linter.diagnostics(uri, BES_BROKEN, language_id="plaintext") == []
+    assert "error-token" in {
+        d["code"] for d in linter.diagnostics(uri, BES_BROKEN, language_id=BES_LANGUAGE_ID)
+    }
 
 
 # ---------------------------------------------------------------------------

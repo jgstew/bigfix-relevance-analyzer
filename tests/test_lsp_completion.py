@@ -10,7 +10,7 @@ text the editor replaces rather than which numbers it was given.
 from __future__ import annotations
 
 import pytest
-from _helpers import lsp_lines, lsp_text
+from _helpers import BES_BROKEN, lsp_lines, lsp_text
 
 from bigfix_relevance_analyzer import lint
 from bigfix_relevance_analyzer.lint import LintConfig, TextSpan
@@ -161,6 +161,15 @@ def test_an_untitled_relevance_buffer_uses_its_language() -> None:
         "untitled:Untitled-1", "exists files of ", (0, 16), "bigfix-relevance"
     )
     assert found and found[0].label == "folders"
+
+
+def test_an_untitled_bes_buffer_uses_its_language() -> None:
+    """Issue #120: the same completions as a saved .bes with the same text."""
+    linter = DocumentLinter()
+    position = (4, len("\t<Relevance>exists "))
+    found = linter.completions("untitled:Untitled-1", BES_BROKEN, position, "bigfix-bes")
+    assert found
+    assert found == linter.completions("file:///w/task.bes", BES_BROKEN, position)
 
 
 def test_nothing_past_the_size_guard() -> None:

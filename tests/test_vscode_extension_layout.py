@@ -19,10 +19,12 @@ Pure and cheap, like ``test_playground_layout.py``: paths and text, never a buil
 
 from __future__ import annotations
 
+import codecs
 import inspect
 import json
 import re
 import shutil
+import struct
 import subprocess
 import tomllib
 import zipfile
@@ -31,7 +33,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from _helpers import load_tool
+from _helpers import BES_BROKEN, BROKEN, load_tool
 
 from bigfix_relevance_analyzer.extract import _RECOGNIZED_SUFFIXES, _is_recognized
 
@@ -335,6 +337,58 @@ def test_the_copied_license_is_never_committed() -> None:
     assert result.returncode == 0, "the build's copy of LICENSE is not gitignored"
 
 
+def _manifest_icons(extension: Path) -> list[str]:
+    """Every icon path package.json names: the extension's own, and each language's."""
+    manifest = _manifest(extension)
+    icons = [manifest["icon"]] if "icon" in manifest else []
+    for language in manifest["contributes"].get("languages", []):
+        icons.extend(language.get("icon", {}).values())
+    return [icon.removeprefix("./") for icon in icons]
+
+
+def test_the_extension_names_an_icon_and_a_relevance_file_icon() -> None:
+    manifest = _manifest(PRIMARY)
+    assert manifest["icon"].endswith(".png"), "Marketplace and Open VSX need a PNG icon"
+    (relevance,) = (
+        lang for lang in manifest["contributes"]["languages"] if lang["id"] == "bigfix-relevance"
+    )
+    # VS Code takes a file icon per theme kind; both are the light logo.
+    assert set(relevance["icon"]) == {"light", "dark"}
+    assert relevance["icon"]["light"] == relevance["icon"]["dark"]
+
+
+def test_the_build_copies_every_icon_the_manifest_names_from_the_logo(tmp_path: Path) -> None:
+    """The logo lives once, in docs/images/; the build copies it beside
+    package.json for vsce, as it does the LICENSE."""
+    build = load_tool(PRIMARY / "build-component" / "build_component.py", "_build_component")
+    copied = build.copy_icons(tmp_path)
+    logos = {path.read_bytes(): path.name for path in (REPO_ROOT / "docs" / "images").glob("logo*")}
+    for icon in _manifest_icons(PRIMARY):
+        assert tmp_path / icon in copied, icon
+        logo = logos.get((tmp_path / icon).read_bytes())
+        assert logo is not None, icon
+        # The light logo everywhere (the dark one is kept but not used), and
+        # each icon in its own format.
+        assert "dark" not in logo, (icon, logo)
+        assert Path(icon).suffix == Path(logo).suffix, (icon, logo)
+    # vsce and Open VSX take only a PNG of at least 128x128.
+    icon = (tmp_path / _manifest(PRIMARY)["icon"]).read_bytes()
+    assert icon.startswith(b"\x89PNG\r\n\x1a\n")
+    width, height = struct.unpack(">II", icon[16:24])
+    assert width >= 128 and height >= 128, (width, height)
+
+
+def test_the_copied_icons_are_never_committed() -> None:
+    git = shutil.which("git")
+    if git is None or not (REPO_ROOT / ".git").exists():
+        pytest.skip("not a git checkout")
+    for icon in _manifest_icons(PRIMARY):
+        result = subprocess.run(
+            [git, "check-ignore", "-q", str(PRIMARY / icon)], cwd=REPO_ROOT, capture_output=True
+        )
+        assert result.returncode == 0, f"the build's copy of {icon} is not gitignored"
+
+
 def test_the_server_has_a_node_test_of_its_own() -> None:
     assert SERVER_TEST.is_file()
 
@@ -402,6 +456,7 @@ def test_the_workflow_runs_only_when_an_input_of_the_extension_changes() -> None
         '"uv.lock"',
         '"tools/vscode-extension/**"',
         '"tools/playground-wasm/componentize-py/build-playground/**"',
+        '"docs/images/**"',
         '".pre-commit-config.yaml"',
         '".github/workflows/vscode-extension.yaml"',
     ):
@@ -841,13 +896,38 @@ def test_the_smoke_test_checks_the_server_waits_for_relevance() -> None:
 
 def test_the_smoke_test_opens_a_bes_file_in_the_bes_language() -> None:
     """Registering `.bes` as its own language must not cost it its diagnostics:
-    the server picks the extractor by file suffix, never by `languageId` (but
-    for whole-file relevance; see `_document_path` in lsp/linter.py)."""
+    the server picks the extractor by file suffix, and by `languageId` only for
+    a name no extractor reads (see `_document_path` in lsp/linter.py). The
+    unsaved buffers of issue #120 are that case: one is switched to the BES
+    language the way a pasted fixlet would be."""
     run = (COMMON_SMOKE / "run.mjs").read_text("utf-8")
     suite = (COMMON_SMOKE / "suite.js").read_text("utf-8")
     assert '"task.bes"' in run
     assert "SMOKE_BES_LANGUAGE" in run and "SMOKE_BES_LANGUAGE" in suite
     assert "languageId" in suite
+    assert "setTextDocumentLanguage" in suite
+
+
+def _js_string_constant(source: str, name: str) -> str:
+    """The value of ``const <name> = '...' + "..." ...;`` in ``source``: plain
+    ASCII literals with backslash escapes, concatenated."""
+    match = re.search(rf"^const {name} =(.*?);$", source, re.MULTILINE | re.DOTALL)
+    assert match, name
+    literals = re.findall(r"'((?:[^'\\]|\\.)*)'|\"((?:[^\"\\]|\\.)*)\"", match.group(1))
+    return "".join(codecs.decode(single or double, "unicode_escape") for single, double in literals)
+
+
+def test_the_smoke_bes_fixture_is_the_unit_tests_fixture() -> None:
+    """Review of #133: the smoke test checks the same document the unit tests
+    do, and expects the unterminated string where that document has it."""
+    suite = (COMMON_SMOKE / "suite.js").read_text("utf-8")
+    assert _js_string_constant(suite, "BES_BROKEN") == BES_BROKEN
+    line = next(i for i, text in enumerate(BES_BROKEN.splitlines()) if BROKEN in text)
+    character = BES_BROKEN.splitlines()[line].index(BROKEN) + BROKEN.index('"')
+    assert f"const BES_BROKEN_ERROR = {{ line: {line}, character: {character} }};" in suite
+    # ...and the checks use it, not numbers of their own.
+    assert "character !== 24" not in suite
+    assert suite.count("BES_BROKEN_ERROR.") >= 3
 
 
 def test_the_grammar_test_runs_in_ci() -> None:
@@ -1039,6 +1119,39 @@ def test_the_extension_sends_relevance_buffers_whatever_their_scheme() -> None:
     assert "{ language: LANGUAGE_ID }" in text
 
 
+def test_the_server_falls_back_on_the_bes_language_the_extension_contributes() -> None:
+    """Issue #120: the id an unsaved BES XML buffer arrives with is the one the
+    server reads as BES XML."""
+    from bigfix_relevance_analyzer.lsp.linter import BES_LANGUAGE_ID
+
+    (bes,) = (
+        language
+        for language in _manifest(PRIMARY)["contributes"]["languages"]
+        if ".bes" in language.get("extensions", [])
+    )
+    assert BES_LANGUAGE_ID == bes["id"] == BES_ID
+
+
+def test_the_extension_sends_bes_buffers_only_as_files_or_unsaved() -> None:
+    """Issue #120. Unsaved BES XML buffers are sent, but not every scheme: a
+    bare language selector would also lint a `git:` diff view of every `.bes`."""
+    text = (PRIMARY / "extension.js").read_text("utf-8")
+    assert '{ language: BES_LANGUAGE_ID, scheme: "file" }' in text
+    assert '{ language: BES_LANGUAGE_ID, scheme: "untitled" }' in text
+    assert "{ language: BES_LANGUAGE_ID }" not in text
+    # Found by its `.bes` extension, not by a second positional contract.
+    assert '.includes(".bes")' in text
+    assert "languages[2]" not in text
+
+
+def test_a_manifest_without_the_bes_language_costs_only_bes() -> None:
+    """Review of #133: the lookup runs when VS Code loads extension.js, so a
+    `.id` of nothing would stop relevance linting too, not just BES."""
+    text = (PRIMARY / "extension.js").read_text("utf-8")
+    assert ")?.id;" in text
+    assert "...(BES_LANGUAGE_ID" in text
+
+
 # ---------------------------------------------------------------------------
 # What VS Code shows for the extension: README and manifest text
 # ---------------------------------------------------------------------------
@@ -1070,11 +1183,17 @@ def test_the_readme_covers_every_file_type_setting_and_command() -> None:
             assert f"`{extension}`" in text, extension
     assert "ActionScript" in text
     assert "files.associations" in text
+    examples = [
+        json.loads(example) for example in re.findall(r'"files\.associations": (\{[^}]*\})', text)
+    ]
     # The way back to XML covers every suffix the BES language takes.
-    (example,) = re.findall(r'"files\.associations": (\{[^}]*\})', text)
-    associations = json.loads(example)
+    (to_xml,) = (found for found in examples if "xml" in found.values())
     for extension in _language(PRIMARY, BES_ID)["extensions"]:
-        assert associations.get(f"*{extension}") == "xml", extension
+        assert to_xml.get(f"*{extension}") == "xml", extension
+    # ...and the way in, for BES saved under another name (#120), names the
+    # language by the id it really has.
+    (to_bes,) = (found for found in examples if "xml" not in found.values())
+    assert set(to_bes.values()) == {BES_ID}
 
 
 def test_the_readme_documents_quick_fixes_and_fix_on_save() -> None:

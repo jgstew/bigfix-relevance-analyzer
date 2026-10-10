@@ -21,7 +21,9 @@
 //         hover, a quick fix and completion answer
 //         (and an unsaved buffer, for an extension contributing the relevance
 //         language). The .bes opens in the BES language when the extension
-//         contributes one.
+//         contributes one, and then unsaved BES buffers are checked too:
+//         one created in the language, one switched to it, and one in
+//         another scheme that must get nothing.
 //   idle  only for an extension contributing that language (the primary
 //         one): Markdown and HTML with no relevance in them must leave its
 //         language server unstarted, and then a relevance-fenced Markdown file

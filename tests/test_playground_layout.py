@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -276,6 +277,7 @@ def test_the_workflow_runs_only_when_an_input_of_the_pages_changes() -> None:
         '"uv.lock"',
         '"tools/playground-wasm/**"',
         '"tests/corpus/**"',
+        '"docs/images/**"',
         '".pre-commit-config.yaml"',
         '".github/workflows/wasm-html.yaml"',
     ):
@@ -364,3 +366,18 @@ def test_a_release_skips_the_browser_test_but_keeps_the_node_smoke_check() -> No
     ):
         assert not_in_release in step(name), name
     assert "if:" not in step("run the analyzer as a component in Node")
+
+
+def test_the_favicon_is_the_project_logo_embedded_in_the_page(tmp_path: Path) -> None:
+    """The logo lives once, in docs/images/; the build embeds it as a data URI,
+    so the page fetches nothing at all, its icon included. The light logo
+    only, whatever the color scheme: the dark one is kept but not used."""
+    embed = load_tool(PLAYGROUND_WASM / "common" / "embed.py", "_playground_embed")
+    template = tmp_path / "template.html"
+    template.write_text("%%SHARED_STYLE%%", encoding="utf-8")
+    page = embed.render(template, {})
+    images = REPO_ROOT / "docs" / "images"
+    (link,) = re.findall(r'<link rel="icon"[^>]*>', page)
+    assert f'href="data:image/svg+xml;base64,{embed.b64_file(images / "logo.svg")}"' in link
+    assert "media=" not in link
+    assert embed.b64_file(images / "logo-dark.svg") not in page
