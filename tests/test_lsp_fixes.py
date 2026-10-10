@@ -105,7 +105,7 @@ def test_every_hazard_gives_the_bytes_fix_file_writes(case: FixCase) -> None:
         (first, *_) = quick_fixes(case.name, result)
         result = apply(result, first)
     assert result == expected
-    (fix_all,) = [fix for fix in fixes(case.name, text) if fix.kind == FIX_ALL_KIND]
+    (fix_all,) = (fix for fix in fixes(case.name, text) if fix.kind == FIX_ALL_KIND)
     assert apply(text, fix_all) == expected
 
 
@@ -189,11 +189,11 @@ def test_the_buffer_is_fixed_not_the_file_on_disk(tmp_path: Path) -> None:
     path = tmp_path / "t.rel"
     path.write_text("true\n")
     buffer = f"true and\n{SETTING}\n"
-    (fix,) = [
+    (fix,) = (
         fix
         for fix in DocumentLinter().fixes(path.as_uri(), buffer, range=WHOLE)
         if fix.kind == QUICKFIX_KIND
-    ]
+    )
     assert apply(buffer, fix) == f"true and\n{SETTINGS}\n"
     assert path.read_text() == "true\n"
 
@@ -374,7 +374,7 @@ def test_every_action_is_pinned_and_round_trips() -> None:
         for fix in per_site:
             after = apply(text, fix)
             assert len(quick_fixes(name.rsplit("/", 1)[-1], after)) == len(per_site) - 1, name
-        (fix_all,) = [fix for fix in found if fix.kind == FIX_ALL_KIND]
+        (fix_all,) = (fix for fix in found if fix.kind == FIX_ALL_KIND)
         assert fixes(name.rsplit("/", 1)[-1], apply(text, fix_all)) == [], name
     assert sites >= 5 + sum(case.sites for case in CASES)
     actual = json.dumps(pinned, indent=1, ensure_ascii=True) + "\n"
