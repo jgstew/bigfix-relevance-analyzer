@@ -110,6 +110,21 @@ async function lint() {
     .find((document) => document.uri.toString() === fixable.toString())
     ?.getText();
 
+  // Completion (issue #127), at the end of a half-typed statement: the server
+  // has the document once its diagnostics (a parse error) are published.
+  const complete = vscode.Uri.file(path.join(folder, "complete.rel"));
+  await vscode.window.showTextDocument(complete);
+  await waitFor(complete, (found) => found.length > 0);
+  const completions = await vscode.commands.executeCommand(
+    "vscode.executeCompletionItemProvider",
+    complete,
+    new vscode.Position(0, "exists files of ".length)
+  );
+  const completionLabels = completions.items
+    .slice()
+    .sort((a, b) => (a.sortText ?? "").localeCompare(b.sortText ?? ""))
+    .map((item) => (typeof item.label === "string" ? item.label : item.label.label));
+
   // An unsaved buffer has no file name, so only its language says it is
   // relevance (see LANGUAGE_ID in src/bigfix_relevance_analyzer/lsp/linter.py).
   let untitledFound;
@@ -138,6 +153,7 @@ async function lint() {
     "fixable.rel actions": titles,
     "fixable.rel after the fix": summary(fixedFound),
     "fixable.rel text after the fix": fixedText,
+    "complete.rel completions": completionLabels.slice(0, 5),
     ...(untitledFound ? { [`untitled (${language})`]: summary(untitledFound) } : {}),
   };
   fs.writeFileSync(process.env.SMOKE_RESULT, JSON.stringify(result, null, 2));
@@ -181,6 +197,9 @@ async function lint() {
   }
   if (fixedText !== 'exists values of settings "x" of client\n') {
     throw new Error(`fixable.rel: unexpected text after the fix: ${JSON.stringify(fixedText)}`);
+  }
+  if (completionLabels[0] !== "folders") {
+    throw new Error(`complete.rel: expected folders first, got ${JSON.stringify(completionLabels.slice(0, 5))}`);
   }
   const expectedRange = [[3, 7], [3, 38]];
   if (JSON.stringify(result["fenced.md hover range"]) !== JSON.stringify(expectedRange)) {

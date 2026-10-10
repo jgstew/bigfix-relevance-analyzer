@@ -22,7 +22,7 @@ from bigfix_relevance_analyzer.extract import (
     extract_relevance_from_bes_xml,
 )
 from bigfix_relevance_analyzer.lint import TextSpan
-from bigfix_relevance_analyzer.lsp.positions import DocumentIndex, Range
+from bigfix_relevance_analyzer.lsp.positions import DocumentIndex, Range, utf16_length
 
 
 def sites_of(name: str, text: str) -> tuple[list[RelevanceSite], DocumentIndex]:
@@ -513,3 +513,180 @@ def test_byte_range_is_none_inside_a_character_or_past_the_end(offset: int) -> N
     index = DocumentIndex(text, text.encode())
     assert index.byte_range(offset, offset) is None
     assert index.byte_range(0, offset) is None
+
+
+# ---------------------------------------------------------------------------
+# The cursor, for completion: in a site or at its end (#127)
+# ---------------------------------------------------------------------------
+#
+# Hover asks for the character *at* a position; completion asks where a cursor
+# *between* characters is, and the cursor is usually past the last one: site
+# text is stripped, so in `exists files of |` the space and the cursor are
+# outside every site. `site_cursor` answers with the site, the offset in its
+# text (up to its length), and whether only whitespace lies between the text's
+# end and the cursor.
+
+CURSOR = "@"
+"""Where the cursor is in a test document. Not a character relevance writes."""
+
+
+def cursor_in(name: str, marked: str) -> tuple[RelevanceSite, int, bool] | None:
+    """:meth:`DocumentIndex.site_cursor` for ``marked`` with its cursor marker
+    removed, at the marker's position."""
+    assert marked.count(CURSOR) == 1, marked
+    doc = marked.replace(CURSOR, "")
+    before = marked[: marked.index(CURSOR)]
+    lines, _ = lsp_lines(before)
+    position = (len(lines) - 1, utf16_length(lines[-1]))
+    sites, index = sites_of(name, doc)
+    return index.site_cursor(sites, position)
+
+
+def _bes_relevance(body: str) -> str:
+    return bes(f"<Relevance>{body}</Relevance>")
+
+
+# Each container, holding a half-typed statement, as `(name, a document with
+# {} where the statement and cursor go)`.
+CONTAINERS = [
+    ("a.rel", "{}"),
+    ("a.rel", "\n  {}\n"),
+    ("a.bes", _bes_relevance("{}")),
+    ("a.md", "# T\n\n```relevance\n{}\n```\n"),
+    ("a.ojo", "<p><?Relevance {} ?></p>"),
+    ("a.html", '<script>Relevance("{}")</script>'),
+    ("a.bes", bes('<Action ID="a"><ActionScript>wait {{{}}}</ActionScript></Action>')),
+]
+CONTAINER_IDS = ["rel", "rel-indented", "bes", "md", "ojo", "html", "actionscript"]
+
+
+@pytest.mark.parametrize(("name", "template"), CONTAINERS, ids=CONTAINER_IDS)
+def test_the_cursor_just_after_the_end_of_a_site(name: str, template: str) -> None:
+    found = cursor_in(name, template.format("exists files of@"))
+    assert found is not None
+    site, offset, after_space = found
+    assert site.text == "exists files of"
+    assert (offset, after_space) == (len(site.text), False)
+
+
+@pytest.mark.parametrize(("name", "template"), CONTAINERS, ids=CONTAINER_IDS)
+def test_the_cursor_after_a_space_past_the_end_of_a_site(name: str, template: str) -> None:
+    found = cursor_in(name, template.format("exists files of @"))
+    assert found is not None
+    site, offset, after_space = found
+    assert site.text == "exists files of"
+    assert (offset, after_space) == (len(site.text), True)
+
+
+@pytest.mark.parametrize(("name", "template"), CONTAINERS, ids=CONTAINER_IDS)
+def test_the_cursor_inside_a_partial_word(name: str, template: str) -> None:
+    found = cursor_in(name, template.format("exists files of fold@"))
+    assert found is not None
+    site, offset, after_space = found
+    assert site.text == "exists files of fold"
+    assert (offset, after_space) == (len(site.text), False)
+    found = cursor_in(name, template.format("exists files of f@old"))
+    assert found is not None
+    assert found[1:] == (len("exists files of f"), False)
+
+
+@pytest.mark.parametrize(("name", "template"), CONTAINERS, ids=CONTAINER_IDS)
+def test_the_cursor_in_the_middle_of_a_site(name: str, template: str) -> None:
+    found = cursor_in(name, template.format("exists files of@ folders"))
+    assert found is not None
+    site, offset, after_space = found
+    assert site.text == "exists files of folders"
+    assert (offset, after_space) == (len("exists files of"), False)
+
+
+@pytest.mark.parametrize(
+    ("name", "marked"),
+    [
+        ("a.ojo", "<p><?Relevance exists files of ?>@</p>"),
+        ("a.ojo", "<p><?Relevance exists files of ?> @</p>"),
+        ("a.html", '<script>Relevance("exists files of" @)</script>'),
+        ("a.md", "```relevance\nexists files of\n```\n@"),
+        ("a.md", "```relevance\nexists files of\n``` @\n"),
+        ("a.bes", _bes_relevance("exists files of") + "@"),
+        ("a.bes", bes("<Relevance>exists files of </Relevance>@\n")),
+        (
+            "a.bes",
+            bes('<Action ID="a"><ActionScript>wait {exists files of} @</ActionScript></Action>'),
+        ),
+    ],
+)
+def test_the_cursor_past_a_closing_delimiter_is_in_no_site(name: str, marked: str) -> None:
+    assert cursor_in(name, marked) is None
+
+
+def test_the_cursor_on_the_next_line_inside_a_fence() -> None:
+    found = cursor_in("a.md", "```relevance\nexists files of\n@\n```\n")
+    assert found is not None
+    site, offset, after_space = found
+    assert (site.text, offset, after_space) == ("exists files of", len(site.text), True)
+
+
+def test_the_cursor_at_the_end_of_a_line_inside_a_multi_line_site() -> None:
+    found = cursor_in("a.rel", 'exists files of@\n whose (name of it = "a")')
+    assert found is not None
+    _, offset, after_space = found
+    assert (offset, after_space) == (len("exists files of"), False)
+
+
+def test_the_cursor_after_an_entity_in_bes() -> None:
+    found = cursor_in("a.bes", _bes_relevance("x &lt; 3 and exists files of @"))
+    assert found is not None
+    site, offset, after_space = found
+    assert site.text == "x < 3 and exists files of"
+    assert (offset, after_space) == (len(site.text), True)
+    found = cursor_in("a.bes", _bes_relevance("x &lt;@ 3"))
+    assert found is not None
+    assert found[1:] == (len("x <"), False)
+
+
+def test_the_cursor_after_an_astral_character() -> None:
+    found = cursor_in("a.rel", '"\U0001f600" & exists files of @')
+    assert found is not None
+    site, offset, after_space = found
+    assert (offset, after_space) == (len(site.text), True)
+
+
+@pytest.mark.parametrize("break_", ["\r\n", "\r"])
+def test_the_cursor_on_a_later_line_with_other_line_breaks(break_: str) -> None:
+    doc = f"```relevance{break_}true and{break_}exists files of @{break_}```{break_}"
+    found = cursor_in("a.md", doc)
+    assert found is not None
+    site, offset, after_space = found
+    assert site.text == "true and\nexists files of"
+    assert (offset, after_space) == (len(site.text), True)
+
+
+def test_the_cursor_is_never_carried_across_another_site() -> None:
+    doc = "<p><?Relevance exists one ?><?Relevance exists two@ ?></p>"
+    found = cursor_in("a.ojo", doc)
+    assert found is not None
+    assert found[0].text == "exists two"
+
+
+def test_the_cursor_at_the_start_of_a_site_is_offset_zero() -> None:
+    found = cursor_in("a.ojo", "<p><?Relevance @exists x ?></p>")
+    assert found is not None
+    assert found[1:] == (0, False)
+
+
+def test_the_cursor_in_an_empty_document_is_in_no_site() -> None:
+    """A known v1 gap: an empty container holds no site, so nothing to complete."""
+    assert cursor_in("a.rel", "@") is None
+    assert cursor_in("a.bes", _bes_relevance("@")) is None
+
+
+def test_the_cursor_off_the_document_is_in_no_site() -> None:
+    sites, index = sites_of("a.rel", "exists files of")
+    assert index.site_cursor(sites, (5, 0)) is None
+    assert index.site_cursor(sites, (0, 99)) is None
+
+
+def test_the_cursor_after_spaces_at_the_end_of_a_line_inside_a_site() -> None:
+    found = cursor_in("a.rel", 'exists files of  @\n whose (name of it = "a")')
+    assert found is not None
+    assert found[1:] == (len("exists files of  "), False)

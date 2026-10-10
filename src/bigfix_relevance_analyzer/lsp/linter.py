@@ -78,6 +78,20 @@ asks on every cursor move, so nothing is planned unless a fixable diagnostic
 is in the requested range, and plans are kept with the document's extraction
 until its text changes.
 
+Completion
+----------
+:meth:`DocumentLinter.completions` offers what fits at the cursor: after ``X
+of``, inside ``whose (`` and at the start of a statement, ranked by how real
+content uses each inspector (:mod:`bigfix_relevance_analyzer.completion`). The
+cursor is placed by
+:meth:`~bigfix_relevance_analyzer.lsp.positions.DocumentIndex.site_cursor`,
+which also finds it just past the end of a half-typed statement; the context
+comes from the tokens before it. Completion shares the extraction cache with
+hover, and nothing else: it never analyses a statement, so it neither pays for
+nor disturbs the findings diagnostics and quick fixes share. The dialect is
+the one lint would use for the site; when that is not definite, both are
+offered.
+
 Runs in WASM
 ------------
 This is the code an editor extension runs inside a componentize-py component,
@@ -98,7 +112,11 @@ from typing import Any, Final, NamedTuple
 from urllib.parse import unquote, urlparse
 from urllib.request import url2pathname
 
+from bigfix_relevance_analyzer import inspectors
 from bigfix_relevance_analyzer.autofix import AutofixResult, _kept
+from bigfix_relevance_analyzer.completion.context import scan_context
+from bigfix_relevance_analyzer.completion.rank import rank
+from bigfix_relevance_analyzer.dialect import Dialect
 
 # Underscore-private on purpose: this package's modules share extract's
 # helpers this way (lint.py imports _extract_file and _is_recognized too).
@@ -114,12 +132,15 @@ from bigfix_relevance_analyzer.lint import (
     Finding,
     LintConfig,
     Severity,
+    TextSpan,
     _analyze_site,
     _judge_site,
     _lint_extracted,
+    _site_dialect,
 )
 from bigfix_relevance_analyzer.lsp.hover import describe
 from bigfix_relevance_analyzer.lsp.positions import DocumentIndex, Position, Range, utf16_length
+from bigfix_relevance_analyzer.typecheck import TypeEnvironment
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +178,10 @@ FIX_ALL_TITLE: Final = "Fix all safe issues in this file"
 
 DEFAULT_CACHE_SIZE: Final = 2048
 """Sites whose findings the linter keeps -- as many as lint keeps analyses."""
+
+COMPLETION_LIMIT: Final = 50
+"""The most completions one request returns. A list that hits it says it is
+incomplete, so the client asks again as more of the word is typed."""
 
 EXTRACTION_CACHE_SIZE: Final = 8
 """Documents whose last extraction the linter keeps, for hover to reuse."""
@@ -233,6 +258,28 @@ class DocumentFix:
 
     is_preferred: bool = False
     """Whether it is the one fix for its diagnostics: what "Auto Fix" applies."""
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class DocumentCompletion:
+    """One completion, as plain data: what the protocol layer turns into a
+    ``CompletionItem``."""
+
+    label: str
+    detail: str
+    """The signature it was ranked as, and its return type."""
+
+    insert_text: str
+    """What to insert: the label, or a snippet when the client takes them."""
+
+    is_snippet: bool
+    sort_text: str
+    """The rank, zero-padded: the order to show while nothing typed decides it."""
+
+    range: Range | None
+    """The buffer range the insertion replaces: the partial word being typed,
+    or the cursor itself when there is none. ``None`` when the partial word
+    cannot be placed for certain; the client then uses its own word range."""
 
 
 class CacheStats(NamedTuple):
@@ -363,6 +410,82 @@ class DocumentLinter:
         if mapped is not None:
             result["range"] = lsp_range(mapped)
         return result
+
+    def completions(
+        self,
+        uri: str,
+        text: str,
+        position: Position,
+        language_id: str | None = None,
+        *,
+        snippets: bool = False,
+    ) -> list[DocumentCompletion]:
+        """What to offer at ``position`` in the document at ``uri`` holding ``text``.
+
+        ``position`` is LSP's, as for :meth:`hover`; ``snippets`` says the
+        client takes snippet insert text. Empty where nothing fits -- see
+        :mod:`bigfix_relevance_analyzer.completion` -- and for a document
+        :meth:`diagnostics` would not lint. Best first, at most
+        :data:`COMPLETION_LIMIT`.
+        """
+        data = text.encode("utf-8", errors="surrogatepass")
+        if len(data) > self.max_document_bytes:
+            return []
+        extracted = self._extract(uri, text, data, language_id)
+        if extracted is None:
+            return []
+        index = extracted.index
+        cursor = index.site_cursor(extracted.sites, position)
+        if cursor is None:
+            return []
+        site, offset, after_space = cursor
+        dialect = _site_dialect(site, self.config.dialect)
+        context = scan_context(site.text, offset, after_space, dialect)
+        if context is None:
+            return []
+        candidates = rank(
+            context,
+            [
+                self._environment(each)
+                for each in (
+                    (dialect,) if dialect is not None else (Dialect.CLIENT, Dialect.SESSION)
+                )
+            ],
+            limit=COMPLETION_LIMIT,
+        )
+        # From the start of what is being typed to the cursor: past the site's
+        # text when a space was typed after a multi-word partial (`bes |`).
+        start, end = context.replace
+        replace: Range | None = (position, position)
+        if start < end:
+            typed = index.site_range(site, TextSpan(start, end))
+            if typed is None and " " in context.partial:
+                # Without a range the client replaces only its own word, the
+                # last: `bes c` would become `bes bes computers`.
+                return []
+            replace = None if typed is None else (typed[0], position)
+        return [
+            DocumentCompletion(
+                label=candidate.label,
+                detail=candidate.detail,
+                insert_text=candidate.snippet
+                if snippets and candidate.snippet
+                else candidate.label,
+                is_snippet=snippets and candidate.snippet is not None,
+                sort_text=f"{candidate.rank:04d}",
+                range=replace,
+            )
+            for candidate in candidates
+        ]
+
+    def _environment(self, dialect: Dialect) -> TypeEnvironment:
+        """The environment to rank in for ``dialect``: the configured platform
+        only when it is one of that dialect's (a client platform would hide
+        every session row)."""
+        platform = self.config.platform
+        if platform is not None and inspectors._dialect_of_context(platform) is not dialect:
+            platform = None
+        return TypeEnvironment.create(dialect, platform)
 
     def fixes(
         self,

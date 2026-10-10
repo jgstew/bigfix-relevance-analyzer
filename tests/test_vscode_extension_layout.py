@@ -1097,6 +1097,24 @@ def test_the_readme_documents_quick_fixes_and_fix_on_save() -> None:
     assert f'"{FIX_ALL_KIND}": "never"' in text
 
 
+def test_the_readme_documents_completion() -> None:
+    """Completion shipped in #127: the README says where it works and how to
+    ask for it, and no longer lists it as missing."""
+    text = (PRIMARY / "README.md").read_text("utf-8")
+    assert "### Completion" in text
+    assert "Completion is not available yet" not in text
+    for place in ("`of`", "`whose (`", "start of a statement"):
+        assert place in text, place
+    assert "Ctrl+Space" in text
+
+
+def test_the_manifest_and_root_readme_mention_completion() -> None:
+    assert "completion" in _manifest(PRIMARY)["description"].lower()
+    root = (REPO_ROOT / "README.md").read_text("utf-8")
+    assert "Diagnostics, hover, completion and quick fixes" in root
+    assert "textDocument/completion" in root
+
+
 def test_the_user_facing_text_leaves_out_how_the_extension_is_built() -> None:
     manifest = _manifest(PRIMARY)
     for text in (manifest["description"], (PRIMARY / "README.md").read_text("utf-8")):

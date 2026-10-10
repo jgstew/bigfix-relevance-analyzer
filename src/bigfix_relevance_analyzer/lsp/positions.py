@@ -25,6 +25,11 @@ backwards. Whatever offset it finds is mapped forward again and kept only if
 that range covers the position, so the way back can never disagree with the
 way there.
 
+Completion needs a third: where a *cursor* is, between characters, and most
+often just past a site's last one, where hover finds nothing because site text
+is stripped. :meth:`DocumentIndex.site_cursor` builds it from hover's mapping
+of the character before the cursor, so it inherits the same guard.
+
 On the second route the buffer is read back at the range found and compared
 with the span's text; any difference means the range is ``None``. That catches
 a replacement character where the buffer's bytes did not decode, and any
@@ -172,6 +177,58 @@ class DocumentIndex:
                 return site, offset
         return None
 
+    def site_cursor(
+        self, sites: Iterable[RelevanceSite], position: Position
+    ) -> tuple[RelevanceSite, int, bool] | None:
+        """The site a cursor at ``position`` is in, or at the end of; the offset
+        of the cursor in its text (``0 <= offset <= len(text)``); and whether
+        only whitespace lies between the text's end and the cursor
+        (``after_space``). ``None`` when no site holds it.
+
+        The cursor is between characters, so it is placed by the character
+        before it when there is one: just after the last character of
+        ``exists files of`` is the end of that site even though what follows
+        is a closing tag. Past the end, only whitespace may lie between the
+        text and the cursor, and that is what keeps a cursor from being
+        carried across a closing delimiter (``?>``, ``}``, a closing fence or
+        quote) or into another site: every container has one, and site text
+        never ends in whitespace.
+
+        An empty container holds no site, so a cursor in one is in none.
+        """
+        sites = list(sites)
+        line, character = position
+        if not 0 <= line < len(self.lines):
+            return None
+        index = _cursor_index(self.lines[line], character)
+        if index is None:
+            return None
+        cursor = self._starts[line] + index
+        # Inside a site, whitespace included: the character before the cursor
+        # is the site's, or the cursor is at the site's start and the character
+        # after it is.
+        if cursor > 0:
+            located = self.locate(sites, self._position_of(cursor - 1))
+            if located is not None:
+                return located[0], located[1] + 1, False
+        located = self.locate(sites, position)
+        if located is not None:
+            return located[0], located[1], False
+        # Past the end of a site, over whitespace only.
+        before = cursor
+        while before > 0 and self.text[before - 1].isspace():
+            before -= 1
+        if 0 < before < cursor:
+            located = self.locate(sites, self._position_of(before - 1))
+            if located is not None and located[1] + 1 == len(located[0].text):
+                return located[0], len(located[0].text), True
+        return None
+
+    def _position_of(self, offset: int) -> Position:
+        """The LSP position of the character at ``offset`` in :attr:`text`."""
+        line = bisect.bisect_right(self._starts, offset) - 1
+        return line, utf16_length(self.lines[line][: offset - self._starts[line]])
+
     def _point(self, position: Position) -> tuple[int, int] | None:
         """``(line, code point index in it)`` of ``position``, if it is on a character."""
         line, character = position
@@ -313,6 +370,22 @@ def _code_point_at(line: str, character: int) -> int | None:
         if character < units:
             return index if character >= 0 else None
     return None
+
+
+def _cursor_index(line: str, character: int) -> int | None:
+    """The index in ``line`` of a cursor ``character`` UTF-16 units in, up to
+    ``len(line)``; ``None`` past the end or between the halves of a
+    surrogate pair, where no cursor can be."""
+    if character < 0:
+        return None
+    units = 0
+    for index, char in enumerate(line):
+        if units == character:
+            return index
+        units += 2 if ord(char) > 0xFFFF else 1
+        if units > character:
+            return None
+    return len(line) if units == character else None
 
 
 def _utf8_length(char: str) -> int:

@@ -47,12 +47,16 @@ import functools
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from bigfix_relevance_analyzer import _inspector_data
 from bigfix_relevance_analyzer._serialize import _enums, _names
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.tokenizer import _normalize_phrase
+
+if TYPE_CHECKING:
+    # `typecheck` imports this module, so only the type checker may import it back.
+    from bigfix_relevance_analyzer.typecheck import TypeEnvironment
 
 __all__ = [
     "SIGNATURE_SAMPLE",
@@ -63,11 +67,15 @@ __all__ = [
     "SearchResult",
     "WrittenForm",
     "ancestors",
+    "applicable_to",
     "binary_operators",
     "casts",
+    "global_properties",
     "inspector_names",
     "known_types",
     "lookup",
+    "object_types",
+    "producers_of",
     "properties",
     "search",
     "sources",
@@ -779,6 +787,115 @@ def written_form_of(entry: Inspector, name: str) -> WrittenForm:
 def sources() -> tuple[str, ...]:
     """The dump labels rows are attributed to, e.g. ``client:windows``."""
     return _inspector_data.SOURCES
+
+
+# ---------------------------------------------------------------------------
+# By type: what completion asks
+# ---------------------------------------------------------------------------
+# `lookup` goes from a name to its rows. Completion goes the other way, from
+# a type to the names that fit it: after `files of`, whatever returns the
+# `<folder>` that `files` takes (a reverse lookup); inside `files whose (`,
+# whatever applies to a `file` (a forward one). Both walk `ancestors`, for the
+# reason that function gives: a row is declared on a base type.
+
+
+def object_types(name: str, *, indexed: bool | None = None) -> frozenset[str]:
+    """The object types the property ``name`` takes, written either way.
+
+    The last operand of each of its rows: ``files`` takes a ``folder``, a
+    ``service`` (``file of <service>``) or, with an index, an ``encoding``.
+    ``indexed`` keeps only the rows with an index (``True``: ``file "x" of``)
+    or only those without (``False``: ``files of``). Empty for a global name
+    or one the tables do not know.
+    """
+    return frozenset(
+        row.operands[-1]
+        for row in lookup(name, kind=InspectorKind.PROPERTY)
+        if row.operands and (indexed is None or (row.index_type is not None) is indexed)
+    )
+
+
+@functools.cache
+def _producers_index() -> dict[str, tuple[Inspector, ...]]:
+    """Property rows by every type their result is, itself and its ancestors.
+
+    Cached, and never built at import, like the other indexes here.
+    """
+    index: dict[str, list[Inspector]] = {}
+    for row in properties():
+        for type_name in ancestors(row.return_type):
+            index.setdefault(type_name, []).append(row)
+    return {type_name: tuple(rows) for type_name, rows in index.items()}
+
+
+@functools.cache
+def _applicable_index() -> dict[str, tuple[Inspector, ...]]:
+    """Property rows by the type of their direct object. Cached, like the rest."""
+    index: dict[str, list[Inspector]] = {}
+    for row in properties():
+        if row.operands:
+            index.setdefault(row.operands[-1], []).append(row)
+    return {type_name: tuple(rows) for type_name, rows in index.items()}
+
+
+def _in_table_order(
+    rows: Iterable[Inspector], environment: TypeEnvironment
+) -> tuple[Inspector, ...]:
+    """``rows`` visible in ``environment``, once each, in :func:`properties` order."""
+    order = _property_order()
+    kept = {row for row in rows if environment.visible(row)}
+    return tuple(sorted(kept, key=order.__getitem__))
+
+
+@functools.cache
+def _property_order() -> dict[Inspector, int]:
+    return {row: position for position, row in enumerate(properties())}
+
+
+def producers_of(types: Iterable[str], environment: TypeEnvironment) -> tuple[Inspector, ...]:
+    """Every property row returning one of ``types`` or a type inheriting from
+    one, visible in ``environment``, in table order.
+
+    The reverse lookup completion after ``X of`` makes: ``producers_of({"folder"},
+    ...)`` is ``folder``, ``windows folder``, ``parent folder`` and the rest.
+    """
+    index = _producers_index()
+    return _in_table_order(
+        (row for type_name in types for row in index.get(type_name, ())), environment
+    )
+
+
+@functools.cache
+def _globals() -> tuple[Inspector, ...]:
+    """Property rows with no object. Cached, like the other indexes here."""
+    return tuple(row for row in properties() if not row.operands)
+
+
+def global_properties(environment: TypeEnvironment) -> tuple[Inspector, ...]:
+    """Every property row with no object (``operating system``, ``bes
+    computers``), visible in ``environment``, in table order: what fits at the
+    start of a statement."""
+    return tuple(row for row in _globals() if environment.visible(row))
+
+
+def applicable_to(types: Iterable[str], environment: TypeEnvironment) -> tuple[Inspector, ...]:
+    """Every property row whose direct object is one of ``types`` or an ancestor
+    of one, visible in ``environment``, in table order.
+
+    The forward lookup for ``X of it`` inside ``whose (``: ``name`` is declared
+    on ``filesystem object``, which ``file`` inherits from, so it applies to a
+    ``file``.
+    """
+    index = _applicable_index()
+    return _in_table_order(
+        (
+            row
+            for type_name in types
+            for ancestor in ancestors(type_name)
+            for row in index.get(ancestor, ())
+        ),
+        environment,
+    )
 
 
 # ---------------------------------------------------------------------------
