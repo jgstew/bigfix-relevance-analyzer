@@ -33,6 +33,8 @@ as WebAssembly, so it needs nothing else installed. It also colors relevance and
 BigFix ActionScript, including the action scripts and relevance inside `.bes`
 files.
 
+The extension is also available for other editors here: https://open-vsx.org/extension/jgstew/bigfix-relevance-developer
+
 ### Command line, via `uvx`
 
 Analyse a statement (or every relevance site in a file) and print a report:
