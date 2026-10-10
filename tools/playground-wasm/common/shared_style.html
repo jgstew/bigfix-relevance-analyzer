@@ -46,7 +46,10 @@
     line-height: 1.5;
   }
   main { max-width: 860px; margin: 0 auto; }
-  h1 { font-size: 1.35rem; margin: 0 0 0.25rem; }
+  h1 { font-size: 1.35rem; margin: 0 0 0.25rem; display: flex; align-items: center; gap: 0.5rem; }
+  /* The project logo, left of the title: the light logo in every color scheme,
+     embedded like the favicon (see embed.py's LOGO_ASSETS). */
+  h1 .logo { width: 2em; height: 2em; flex: none; }
   .subtitle { color: var(--muted); margin: 0 0 1.5rem; font-size: 0.92rem; }
   .subtitle a { color: var(--accent); }
   textarea {

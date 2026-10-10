@@ -381,3 +381,17 @@ def test_the_favicon_is_the_project_logo_embedded_in_the_page(tmp_path: Path) ->
     assert f'href="data:image/svg+xml;base64,{embed.b64_file(images / "logo.svg")}"' in link
     assert "media=" not in link
     assert embed.b64_file(images / "logo-dark.svg") not in page
+
+
+@pytest.mark.parametrize("runtime", ["componentize-py", "pyodide"])
+def test_the_title_shows_the_logo_on_its_left(runtime: str) -> None:
+    """The page's heading starts with the logo, embedded like the favicon (the
+    build fills %%LOGO_SVG%% with it), so the page still fetches nothing.
+    Empty alt: the heading's text already names it."""
+    template = (PLAYGROUND_WASM / runtime / "build-playground" / "template.html").read_text("utf-8")
+    (heading,) = re.findall(r"<h1>.*?</h1>", template, re.DOTALL)
+    assert re.fullmatch(
+        r'<h1><img class="logo" src="data:image/svg\+xml;base64,%%LOGO_SVG%%" alt="" />'
+        r"bigfix-relevance-analyzer</h1>",
+        heading,
+    ), heading
