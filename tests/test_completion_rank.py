@@ -332,13 +332,13 @@ def test_statement_start_falls_back_to_every_visible_global() -> None:
 def test_the_label_follows_the_context_that_ranked_it() -> None:
     """Plural or singular as content writes it *here*, not across every
     context (finding 6)."""
-    (found,) = [
+    (found,) = (
         c for c in rank(context_at('exists key "x" of section "y" of '), CLIENT) if c.name == "file"
-    ]
+    )
     assert found.label == "file"
-    (found,) = [
+    (found,) = (
         c for c in rank(context_at("exists preceding text of "), CLIENT) if c.name == "first"
-    ]
+    )
     assert found.label == "first"
     # Where the context agrees with the rest, nothing changes.
     assert rank(context_at("files of "), CLIENT)[0].label == "folders"

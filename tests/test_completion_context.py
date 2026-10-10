@@ -486,7 +486,7 @@ def test_the_type_helpers_are_the_scans() -> None:
 def test_singular_is_shared() -> None:
     from bigfix_relevance_analyzer import inspectors
 
-    (row,) = [r for r in inspectors.lookup("files") if r.signature == "files of <folder>"]
+    (row,) = (r for r in inspectors.lookup("files") if r.signature == "files of <folder>")
     assert singular(row) == "file"
     assert written_plural("files") and not written_plural("file")
     assert not written_plural("windows")  # `window`'s plural, and its own row's singular

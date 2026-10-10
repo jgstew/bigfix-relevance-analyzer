@@ -273,7 +273,7 @@ def test_the_evaluation_scores_the_editors_context(tool: ModuleType) -> None:
         ('exists action "x" whose (name of it = "a")', 'exists action "x" whose ('),
         ('exists files of folder "x"', "exists files of "),
     ):
-        (seen,) = [o for o in tool.observations(text) if o.kind != "statement-start"]
+        (seen,) = (o for o in tool.observations(text) if o.kind != "statement-start")
         scanned = scan_context(prefix, len(prefix), False, None)
         built = tool._context(seen, None)
         assert scanned is not None
