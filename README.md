@@ -20,8 +20,8 @@ safe fixes.
 
 [bigfix-relevance-analyzer-playground.html](https://www.jgstew.com/files/bigfix-relevance-analyzer-playground.html)
 runs this package in the browser as WebAssembly, so nothing needs installing.
-The page is a single self-contained file (the only thing it fetches is its
-icon), so the relevance you paste never leaves your browser. It is updated on
+The page is a single self-contained file that fetches nothing, so the relevance
+you paste never leaves your browser. It is updated on
 each release.
 
 ### VS Code extension
@@ -665,7 +665,9 @@ package asserts an opinion about.
 language server over stdio, still with no dependencies. It publishes the
 linter's findings as diagnostics on open, change and save, using the same
 extractors and rules as `bigfix-relevance-lint`, but over the editor's unsaved
-buffer. The file type comes from the document URI's suffix. Each diagnostic
+buffer. The file type comes from the document URI's suffix or, for a name no
+extractor reads, from the client's `languageId` (`bigfix-relevance` or
+`bigfix-bes`). Each diagnostic
 covers the text its finding is about - the unterminated
 string, the `it` with nothing to bind to, the comparison a type error is in,
 each use of an unknown name - counted in UTF-16 code units, with entities,

@@ -34,16 +34,26 @@ const PREFIX = manifest.settingsPrefix;
 // The server lints a buffer in it even with no file name: see LANGUAGE_ID in
 // src/bigfix_relevance_analyzer/lsp/linter.py.
 const LANGUAGE_ID = manifest.contributes.languages[0].id;
+// The BES XML language, found by the suffix it takes rather than by position.
+// The server reads a buffer in it as BES XML even with no `.bes` name: see
+// BES_LANGUAGE_ID in lsp/linter.py.
+const BES_LANGUAGE_ID = manifest.contributes.languages.find((language) =>
+  language.extensions?.includes(".bes")
+).id;
 const NAME = manifest.displayName;
 const SERVER = path.join(__dirname, "server.js");
 const COMPONENT = path.join(__dirname, "dist", "component", "lsp.js");
 
-// Files by suffix, plus any buffer in the relevance language whatever its
-// scheme: that is what brings an unsaved `untitled:` buffer to the server,
-// which then lints it by its languageId.
+// Files by suffix, plus buffers by language, which is what brings an unsaved
+// `untitled:` buffer to the server; it then lints it by its languageId.
+// Relevance buffers are sent whatever their scheme. BES XML buffers only as
+// files or unsaved buffers: content repos are mostly `.bes`, and any other
+// scheme would also lint the `git:` side of every `.bes` diff view.
 const DOCUMENT_SELECTOR = [
   ...documentPatterns.map((pattern) => ({ scheme: "file", pattern })),
   { language: LANGUAGE_ID },
+  { language: BES_LANGUAGE_ID, scheme: "file" },
+  { language: BES_LANGUAGE_ID, scheme: "untitled" },
 ];
 
 /** @type {import("vscode-languageclient/node").LanguageClient | undefined} */

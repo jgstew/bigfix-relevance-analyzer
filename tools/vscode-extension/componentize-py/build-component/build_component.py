@@ -8,7 +8,8 @@
         [--package dist/vsix/bigfix-relevance-developer.vsix]
 
 Four steps, everything under ``../dist/`` (gitignored), after copying the
-repository's LICENSE beside package.json for vsce to package (gitignored too):
+repository's LICENSE and the logo's icons beside package.json for vsce to
+package (gitignored too):
 
 1. ``uv build --wheel`` of this checkout -> ``dist/wheel/``, unless ``--wheel``
    names one. A release passes the wheel it publishes, so the extension it
@@ -49,6 +50,15 @@ DIST = EXTENSION / "dist"
 COMPONENTIZE = REPO / "tools/playground-wasm/componentize-py/build-playground/componentize.py"
 WORLD = "lsp"
 
+# The icons package.json names, each copied at build time from the project logo
+# in docs/images/, the only copy in the repository.
+LOGO_DIR = REPO / "docs/images"
+ICONS = {
+    "images/icon.png": "logo-256.png",
+    "images/relevance-light.svg": "logo.svg",
+    "images/relevance-dark.svg": "logo-dark.svg",
+}
+
 
 def _run(argv: list[str], label: str, cwd: Path | None = None) -> None:
     sys.stderr.write(f"  {label}\n")
@@ -73,6 +83,19 @@ def copy_license(target_dir: Path = EXTENSION) -> Path:
     return Path(shutil.copyfile(REPO / "LICENSE", target_dir / "LICENSE"))
 
 
+def copy_icons(target_dir: Path = EXTENSION) -> list[Path]:
+    """Copy the logo into ``target_dir`` as every icon in ``ICONS``; return the copies.
+
+    The extension's Marketplace icon and the Relevance language's light and dark
+    file icons. Copied at build time, gitignored, like the LICENSE.
+    """
+    copies = []
+    for icon, logo in ICONS.items():
+        (target_dir / icon).parent.mkdir(parents=True, exist_ok=True)
+        copies.append(Path(shutil.copyfile(LOGO_DIR / logo, target_dir / icon)))
+    return copies
+
+
 def wheel_version(wheel: Path) -> str:
     """The version in a wheel's file name: ``<name>-<version>-<tags>.whl`` (PEP 427)."""
     return wheel.name.split("-")[1]
@@ -85,6 +108,7 @@ def build(wheel: Path | None = None) -> tuple[Path, str]:
     Returns the glue's path and the version of the wheel it was built from.
     """
     copy_license()
+    copy_icons()
     shutil.rmtree(DIST, ignore_errors=True)
     if wheel is None:
         wheel_dir = DIST / "wheel"

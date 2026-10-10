@@ -35,6 +35,15 @@ SHARED_PARTIALS = {
     "%%SHARED_SCRIPT%%": "shared_script.html",
 }
 
+# The project logo, in docs/images/ (its only copy), base64-embedded wherever a
+# partial names one of these placeholders: shared_style.html's favicon. Filled
+# for every page, so a build script never passes them.
+LOGO_DIR = COMMON_DIR.parents[2] / "docs" / "images"
+LOGO_ASSETS = {
+    "%%LOGO_LIGHT_SVG%%": "logo.svg",
+    "%%LOGO_DARK_SVG%%": "logo-dark.svg",
+}
+
 # Anything of the form %%NAME%%. Used to catch leftovers, including placeholders
 # a caller forgot about entirely rather than only the ones it tried to fill.
 _PLACEHOLDER_RE = re.compile(r"%%[A-Z0-9_]+%%")
@@ -62,7 +71,7 @@ def read_partial(name: str) -> str:
 
 
 def render(template_path: Path, substitutions: dict[str, str]) -> str:
-    """Return ``template_path`` with the shared partials and ``substitutions`` filled in.
+    """Return ``template_path`` with the shared partials, the logo and ``substitutions`` filled in.
 
     Partials are injected first so a partial containing its own placeholder
     still gets filled by ``substitutions`` -- one level of nesting, which is all
@@ -77,6 +86,10 @@ def render(template_path: Path, substitutions: dict[str, str]) -> str:
     for placeholder, filename in SHARED_PARTIALS.items():
         if placeholder in rendered:
             rendered = rendered.replace(placeholder, read_partial(filename))
+
+    for placeholder, filename in LOGO_ASSETS.items():
+        if placeholder in rendered:
+            rendered = rendered.replace(placeholder, b64_file(LOGO_DIR / filename))
 
     for placeholder, value in substitutions.items():
         if placeholder not in rendered:

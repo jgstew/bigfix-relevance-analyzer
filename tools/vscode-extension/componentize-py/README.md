@@ -125,6 +125,16 @@ back to XML in your settings (you lose the ActionScript and relevance colors):
 "files.associations": { "*.bes": "xml", "*.bes.xml": "xml" }
 ```
 
+A new, unsaved file set to BigFix BES XML is checked as you type, before it has
+a name: paste a fixlet into a new tab and pick **BigFix BES XML** from the
+language list. So is a saved file with another name switched to it, such as a
+fixlet saved as `.xml`. To have such files open as BigFix BES XML every time,
+map them in your settings:
+
+```json
+"files.associations": { "**/Fixlets/**/*.xml": "bigfix-bes" }
+```
+
 ### A language for relevance
 
 **BigFix Relevance** is available as a language for any editor. Use
@@ -173,14 +183,13 @@ exists file "C:\Windows\notepad.exe"
   blocks of dashboards and reports, is checked but not colored. Nor is a
   relevance element whose start tag is split across lines (an action script's
   may be).
-- A new, unsaved file set to BigFix BES XML is colored, but not checked until
-  it is saved as a `.bes` file.
 - Completion suggests inspector names after `of`, inside `whose (` and at the
   start of a statement. Elsewhere, such as after a comparison or `as`, it
   suggests nothing yet. Hover needs a statement that parses; on one with a
   syntax error there is no hover until it is fixed.
 - A file is checked when its name ends in one of the file types above, or when
-  its language is set to BigFix Relevance. Other files are left alone.
+  its language is set to BigFix Relevance or BigFix BES XML. Other files are
+  left alone.
 - The checker starts the first time you open a file with relevance to check,
   so it uses no memory in windows without any. Markdown and HTML files count
   only once they contain relevance, as described above.

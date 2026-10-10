@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 from _fix_cases import BOM, CASES, FixCase
+from _helpers import BES_BROKEN
 
 from bigfix_relevance_analyzer import fixfile
 from bigfix_relevance_analyzer.extract import _extract_data
@@ -223,6 +224,17 @@ def test_an_oversized_document_gives_no_actions() -> None:
 
 def test_an_unrecognized_document_gives_no_actions() -> None:
     assert fixes("t.txt", f"{SETTING}\n") == []
+
+
+def test_an_untitled_bes_buffer_gets_the_saved_files_quick_fix() -> None:
+    """Issue #120: fixed from the buffer's bytes, so being unsaved is no matter."""
+    linter = DocumentLinter()
+    line = ((4, 0), (4, 60))
+    found = linter.fixes("untitled:Untitled-1", BES_BROKEN, "bigfix-bes", range=line)
+    assert found == linter.fixes("file:///w/task.bes", BES_BROKEN, range=line)
+    fix = found[0]
+    assert fix.title == "Change `setting` to `settings`"
+    assert apply(BES_BROKEN, fix) == BES_BROKEN.replace(SETTING, SETTINGS)
 
 
 def test_no_fixable_diagnostic_in_range_means_no_planning(monkeypatch: pytest.MonkeyPatch) -> None:

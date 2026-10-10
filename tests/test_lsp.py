@@ -21,7 +21,15 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from _helpers import BES_EXAMPLE, BROKEN, CLIENT, UNKNOWN_INSPECTOR, run_fresh_python, write
+from _helpers import (
+    BES_BROKEN,
+    BES_EXAMPLE,
+    BROKEN,
+    CLIENT,
+    UNKNOWN_INSPECTOR,
+    run_fresh_python,
+    write,
+)
 
 from bigfix_relevance_analyzer import __version__
 from bigfix_relevance_analyzer.lint import LintConfig, lint_file
@@ -642,6 +650,25 @@ def test_an_untitled_relevance_buffer_gets_diagnostics() -> None:
     (published,) = server.handle(notification("textDocument/didOpen", {"textDocument": document}))
     assert published["params"]["uri"] == "untitled:Untitled-1"
     assert published["params"]["diagnostics"]
+
+
+def test_an_untitled_bes_buffer_follows_a_language_switch() -> None:
+    """Issue #120. VS Code reports a change of language mode as a close and an
+    open of the same URI with the new `languageId`."""
+    server = started()
+    document = {
+        "uri": "untitled:Untitled-1",
+        "languageId": "bigfix-bes",
+        "version": 1,
+        "text": BES_BROKEN,
+    }
+    (published,) = server.handle(notification("textDocument/didOpen", {"textDocument": document}))
+    assert "error-token" in {d["code"] for d in published["params"]["diagnostics"]}
+    closed = {"textDocument": {"uri": "untitled:Untitled-1"}}
+    server.handle(notification("textDocument/didClose", closed))
+    document = {**document, "languageId": "plaintext"}
+    (published,) = server.handle(notification("textDocument/didOpen", {"textDocument": document}))
+    assert published["params"]["diagnostics"] == []
 
 
 # ---------------------------------------------------------------------------

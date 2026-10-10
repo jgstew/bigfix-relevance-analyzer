@@ -276,6 +276,7 @@ def test_the_workflow_runs_only_when_an_input_of_the_pages_changes() -> None:
         '"uv.lock"',
         '"tools/playground-wasm/**"',
         '"tests/corpus/**"',
+        '"docs/images/**"',
         '".pre-commit-config.yaml"',
         '".github/workflows/wasm-html.yaml"',
     ):
@@ -364,3 +365,17 @@ def test_a_release_skips_the_browser_test_but_keeps_the_node_smoke_check() -> No
     ):
         assert not_in_release in step(name), name
     assert "if:" not in step("run the analyzer as a component in Node")
+
+
+def test_the_favicon_is_the_project_logo_embedded_in_the_page(tmp_path: Path) -> None:
+    """The logo lives once, in docs/images/; the build embeds it as a data URI,
+    light and dark, so the page fetches nothing at all, its icon included."""
+    embed = load_tool(PLAYGROUND_WASM / "common" / "embed.py", "_playground_embed")
+    template = tmp_path / "template.html"
+    template.write_text("%%SHARED_STYLE%%", encoding="utf-8")
+    page = embed.render(template, {})
+    for logo, scheme in (("logo.svg", "light"), ("logo-dark.svg", "dark")):
+        data = embed.b64_file(REPO_ROOT / "docs" / "images" / logo)
+        assert f"data:image/svg+xml;base64,{data}" in page, logo
+        assert f"(prefers-color-scheme: {scheme})" in page, scheme
+    assert 'rel="icon" href="http' not in page

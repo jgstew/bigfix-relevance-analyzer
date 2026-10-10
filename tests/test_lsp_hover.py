@@ -15,7 +15,7 @@ import re
 from typing import Any
 
 import pytest
-from _helpers import REPO_ROOT, lsp_text
+from _helpers import BES_BROKEN, REPO_ROOT, lsp_text
 
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.extract import _extract_data
@@ -310,6 +310,16 @@ def test_an_untitled_relevance_buffer_has_hover() -> None:
     linter = DocumentLinter()
     assert linter.hover("untitled:Untitled-1", FILES, (0, 8), "bigfix-relevance") is not None
     assert linter.hover("untitled:Untitled-1", FILES, (0, 8), "plaintext") is None
+
+
+def test_an_untitled_bes_buffer_has_hover() -> None:
+    """Issue #120: the same hover as a saved .bes with the same text."""
+    linter = DocumentLinter()
+    position = (4, BES_BROKEN.splitlines()[4].index("setting") + 1)
+    found = linter.hover("untitled:Untitled-1", BES_BROKEN, position, "bigfix-bes")
+    assert found is not None
+    assert found == linter.hover("file:///w/task.bes", BES_BROKEN, position)
+    assert linter.hover("untitled:Untitled-1", BES_BROKEN, position, "xml") is None
 
 
 def test_an_unrecognized_file_type_has_no_hover() -> None:

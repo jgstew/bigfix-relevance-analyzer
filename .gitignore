@@ -231,6 +231,8 @@ node_modules/
 # tools/vscode-extension/componentize-py/build-component/build_component.py, so
 # vsce can package it. A build output: the root LICENSE is the only copy.
 /tools/vscode-extension/componentize-py/LICENSE
+# Likewise the icons, copied from the logo in docs/images/.
+/tools/vscode-extension/componentize-py/images/
 
 # VS Code builds @vscode/test-electron downloads for the smoke test
 # (tools/vscode-extension/common/smoke/run.mjs). Hundreds of MB, re-downloadable.
