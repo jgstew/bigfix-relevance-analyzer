@@ -62,6 +62,16 @@ To apply every safe fix each time you save, add this to your settings:
 "editor.codeActionsOnSave": { "source.fixAll.bigfix-relevance": "explicit" }
 ```
 
+If your settings already fix everything on save for every language, as
+ESLint, Ruff and other tools suggest:
+
+```json
+"editor.codeActionsOnSave": { "source.fixAll": "explicit" }
+```
+
+then these fixes run on save too. To keep the others but not these, add
+`"source.fixAll.bigfix-relevance": "never"` beside it.
+
 ### Syntax highlighting
 
 `.rel` and `.bsr` files, and relevance in Markdown code fences, are colored:

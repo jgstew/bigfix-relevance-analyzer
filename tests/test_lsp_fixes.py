@@ -379,3 +379,35 @@ def test_every_action_is_pinned_and_round_trips() -> None:
     assert sites >= 5 + sum(case.sites for case in CASES)
     actual = json.dumps(pinned, indent=1, ensure_ascii=True) + "\n"
     assert actual == golden_text(GOLDEN, actual)
+
+
+# -- review of #125 -------------------------------------------------------------------
+
+PARTLY_FIXABLE = (
+    '```relevance\npathnames of files "x" | "y"\n```\n\n'  # a wrap: score 12 -> 20
+    f"```relevance\n{SETTING}\n```\n"
+)
+
+
+def test_fix_all_reports_only_the_sites_it_applies() -> None:
+    """With the wrap over the ceiling, fix-all only respells: it must not claim
+    the wrap's diagnostic, and with one site left there is no second-choice
+    "Fix all" beside that site's own fix."""
+    linter = DocumentLinter(config=LintConfig(suggest=True, max_score=15))
+    found = fixes("t.md", PARTLY_FIXABLE, linter)
+    assert [(fix.kind, fix.is_preferred) for fix in found] == [
+        (QUICKFIX_KIND, True),
+        (FIX_ALL_KIND, False),
+    ]
+    quick, fix_all = found
+    assert quick.title == "Change `setting` to `settings`"
+    assert {d["code"] for d in fix_all.diagnostics} == {"plural-preferred"}
+    assert fix_all.diagnostics == quick.diagnostics
+    assert apply(PARTLY_FIXABLE, fix_all) == PARTLY_FIXABLE.replace("setting ", "settings ")
+
+
+def test_no_fix_all_when_the_whole_file_plan_applies_nothing() -> None:
+    linter = DocumentLinter(config=LintConfig(suggest=True, max_score=15))
+    text = '```relevance\npathnames of files "x" | "y"\n```\n'
+    assert fixes("t.md", text, linter) == []
+    assert fixes("t.md", text, linter, only=["source.fixAll"]) == []

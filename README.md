@@ -688,8 +688,9 @@ get no hover.
 And it offers each safe fix as a quick fix (`textDocument/codeAction`): one
 `quickfix` action per statement with a fixable diagnostic in the requested
 range, and a `source.fixAll.bigfix-relevance` action that fixes the whole file,
-which an editor can run on save. Nothing about whether a fix is safe is decided
-in the editor layer: the buffer's bytes are planned exactly as `--fix` plans a
+which an editor can run on save (and runs, in VS Code, for anyone whose
+`editor.codeActionsOnSave` turns on the generic `source.fixAll`). Nothing
+about whether a fix is safe is decided in the editor layer: the buffer's bytes are planned exactly as `--fix` plans a
 file (see [Writing fixes back into files](#writing-fixes-back-into-files)), and
 each byte edit becomes a range, so a fix inserts only the text it adds and an
 action is offered only for a fix `--fix` would write. Code actions are
@@ -718,9 +719,11 @@ the `maxDocumentBytes` initialization option.
 
 The protocol layer is a thin adapter. Everything the editor is told (the
 diagnostics, the cache, the size guard and their options) comes from
-`DocumentLinter`, which has no JSON-RPC in it: `diagnostics(uri, text)`,
-`hover(uri, text, (line, character))` and `fixes(uri, text, range=...)` return
-plain data in LSP's field names. Moving to a library such as pygls would mean
+`DocumentLinter`, which has no JSON-RPC in it: `diagnostics(uri, text)` and
+`hover(uri, text, (line, character))` return plain dicts in LSP's field names,
+and `fixes(uri, text, range=...)` returns `DocumentFix` objects (a title, a
+kind, the diagnostics fixed, and edits as ranges with their new text) that
+the server turns into `CodeAction`s. Moving to a library such as pygls would mean
 writing another adapter over it, not porting it.
 
 **[BigFix Relevance Developer](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer)**,

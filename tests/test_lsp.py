@@ -960,3 +960,10 @@ assert edit["range"]["start"]["character"] == text.index("setting ") + 7 + 1, ed
 print("ok")
 """
     )
+
+
+def test_an_inverted_range_is_invalid() -> None:
+    server = started_for_fixes()
+    did_open(server, "t.rel", SETTING_TEXT)
+    response = code_actions(server, "t.rel", (0, 30), (0, 10))
+    assert response["error"]["code"] == -32602

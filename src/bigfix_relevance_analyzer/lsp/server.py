@@ -48,7 +48,13 @@ import logging
 from collections.abc import Mapping
 from typing import Any, TypeGuard
 
-from bigfix_relevance_analyzer.lsp.linter import FIX_ALL_KIND, QUICKFIX_KIND, SOURCE, DocumentLinter
+from bigfix_relevance_analyzer.lsp.linter import (
+    FIX_ALL_KIND,
+    QUICKFIX_KIND,
+    SOURCE,
+    DocumentLinter,
+    lsp_range,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -180,18 +186,16 @@ class Server:
 
     def _hover(self, id_: Any, params: Mapping[str, Any]) -> Message:
         identifier = params.get("textDocument")
-        position = params.get("position")
         uri = identifier.get("uri") if isinstance(identifier, Mapping) else None
-        line = position.get("line") if isinstance(position, Mapping) else None
-        character = position.get("character") if isinstance(position, Mapping) else None
-        if not isinstance(uri, str) or not _is_index(line) or not _is_index(character):
+        position = _position(params.get("position"))
+        if not isinstance(uri, str) or position is None:
             return error_response(
                 id_, ErrorCode.INVALID_PARAMS, "hover needs a textDocument uri and a position"
             )
         document = self._documents.get(uri)
         if document is None:
             return _result(id_, None)
-        found = self.linter.hover(uri, document.text, (line, character), document.language_id)
+        found = self.linter.hover(uri, document.text, position, document.language_id)
         return _result(id_, found)
 
     def _code_action(self, id_: Any, params: Mapping[str, Any]) -> Message:
@@ -212,14 +216,7 @@ class Server:
         actions = []
         for fix in fixes:
             edits = [
-                {
-                    "range": {
-                        "start": {"line": start[0], "character": start[1]},
-                        "end": {"line": end[0], "character": end[1]},
-                    },
-                    "newText": new_text,
-                }
-                for (start, end), new_text in fix.edits
+                {"range": lsp_range(found), "newText": new_text} for found, new_text in fix.edits
             ]
             if self._document_changes:
                 edit: Message = {
@@ -314,19 +311,23 @@ def _has(value: object, *keys: str) -> bool:
     return bool(value)
 
 
-def _range(value: object) -> tuple[tuple[int, int], tuple[int, int]] | None:
-    """An LSP ``Range`` as ``((line, character), (line, character))``, if it is one."""
+def _position(value: object) -> tuple[int, int] | None:
+    """An LSP ``Position`` as ``(line, character)``, if it is one."""
     if not isinstance(value, Mapping):
         return None
-    points = []
-    for name in ("start", "end"):
-        point = value.get(name)
-        line = point.get("line") if isinstance(point, Mapping) else None
-        character = point.get("character") if isinstance(point, Mapping) else None
-        if not _is_index(line) or not _is_index(character):
-            return None
-        points.append((line, character))
-    return points[0], points[1]
+    line, character = value.get("line"), value.get("character")
+    return (line, character) if _is_index(line) and _is_index(character) else None
+
+
+def _range(value: object) -> tuple[tuple[int, int], tuple[int, int]] | None:
+    """An LSP ``Range`` as ``((line, character), (line, character))``, if it is
+    one: two positions, the start not after the end."""
+    if not isinstance(value, Mapping):
+        return None
+    start, end = _position(value.get("start")), _position(value.get("end"))
+    if start is None or end is None or start > end:
+        return None
+    return start, end
 
 
 def _is_index(value: object) -> TypeGuard[int]:

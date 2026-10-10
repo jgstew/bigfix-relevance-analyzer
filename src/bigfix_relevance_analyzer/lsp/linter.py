@@ -109,7 +109,7 @@ from bigfix_relevance_analyzer.extract import (
     _ExtractionProblem,
     _is_recognized,
 )
-from bigfix_relevance_analyzer.fixfile import SiteAnchor, _plan, _site_anchor, site_fixes
+from bigfix_relevance_analyzer.fixfile import SiteAnchor, SiteFix, _plan, _site_anchor, site_fixes
 from bigfix_relevance_analyzer.lint import (
     Finding,
     LintConfig,
@@ -171,6 +171,15 @@ recently extracted is always kept, whatever its size: it is the one being
 edited and hovered, which is what the cache is for."""
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class _Planned:
+    """One fix plan, kept as what an action needs: its edits as ranges in the
+    buffer, and the sites it applies to (by :func:`_site_anchor`)."""
+
+    edits: tuple[tuple[Range, str], ...]
+    applied: frozenset[SiteAnchor]
+
+
 @dataclasses.dataclass(slots=True)
 class _Extraction:
     """One document's text, as extracted: what diagnostics and hover share."""
@@ -181,9 +190,7 @@ class _Extraction:
     sites: list[RelevanceSite]
     problems: list[_ExtractionProblem]
     _index: DocumentIndex | None = None
-    fixes: dict[SiteAnchor | None, tuple[tuple[Range, str], ...] | None] = dataclasses.field(
-        default_factory=dict
-    )
+    fixes: dict[SiteAnchor | None, _Planned | None] = dataclasses.field(default_factory=dict)
     """Planned quick-fix edits for this text, by site anchor (``None`` for the
     whole file); ``None`` for one that may not be offered. The edits, not the
     plans: a plan holds two copies of the document."""
@@ -354,11 +361,7 @@ class DocumentLinter:
         result: HoverResult = {"contents": {"kind": "markdown", "value": found.markdown}}
         mapped = index.site_range(site, found.span)
         if mapped is not None:
-            (start_line, start), (end_line, end) = mapped
-            result["range"] = {
-                "start": {"line": start_line, "character": start},
-                "end": {"line": end_line, "character": end},
-            }
+            result["range"] = lsp_range(mapped)
         return result
 
     def fixes(
@@ -397,20 +400,22 @@ class DocumentLinter:
         fixable = site_fixes(findings)
         if not fixable:
             return []
+        # One pass over the findings, each fixable diagnostic kept with its
+        # range, so the range test compares tuples rather than reading dicts.
         index = extracted.index
-        published = {
-            id(fix.site): tuple(
-                diagnostic
-                for finding in findings
-                if finding.site is fix.site and finding.autofix is not None
-                for diagnostic in _diagnostics(index, finding)
-            )
-            for fix in fixable
-        }
+        ranged: dict[int, list[tuple[Range, Diagnostic]]] = {}
+        for finding in findings:
+            if finding.site is not None and finding.autofix is not None:
+                ranged.setdefault(id(finding.site), []).extend(_ranged_diagnostics(index, finding))
+
+        def published(fix: SiteFix) -> tuple[Diagnostic, ...]:
+            return tuple(diagnostic for _, diagnostic in ranged.get(id(fix.site), ()))
+
         in_range = [
             fix
             for fix in fixable
-            if range is None or any(_overlaps(d, range) for d in published[id(fix.site)])
+            if range is None
+            or any(_overlaps(found, range) for found, _ in ranged.get(id(fix.site), ()))
         ]
         asked_for_all = only is not None and wanted(FIX_ALL_KIND)
         if not in_range and not asked_for_all:
@@ -419,40 +424,43 @@ class DocumentLinter:
         actions: list[DocumentFix] = []
         if wanted(QUICKFIX_KIND):
             for fix in in_range:
-                edits = self._planned(extracted, _site_anchor(fix.site))
-                if edits is not None:
+                planned = self._planned(extracted, _site_anchor(fix.site))
+                if planned is not None:
                     actions.append(
                         DocumentFix(
                             _title(fix.autofix),
                             QUICKFIX_KIND,
-                            published[id(fix.site)],
-                            edits,
+                            published(fix),
+                            planned.edits,
                             is_preferred=True,
                         )
                     )
-        lightbulb = len(fixable) > 1 and bool(in_range) and wanted(QUICKFIX_KIND)
-        if lightbulb or wanted(FIX_ALL_KIND):
-            edits = self._planned(extracted, None)
-            if edits is not None:
-                fixed = tuple(d for fix in fixable for d in published[id(fix.site)])
-                if lightbulb:
-                    actions.append(DocumentFix(FIX_ALL_TITLE, QUICKFIX_KIND, fixed, edits))
-                if wanted(FIX_ALL_KIND) and (in_range or asked_for_all):
-                    actions.append(DocumentFix(FIX_ALL_TITLE, FIX_ALL_KIND, fixed, edits))
+        if (len(fixable) > 1 and in_range and wanted(QUICKFIX_KIND)) or wanted(FIX_ALL_KIND):
+            whole = self._planned(extracted, None)
+            # Only what the whole-file plan applied: it may refuse a site alone
+            # and fix the rest, and an action must not claim what it leaves.
+            applied = (
+                []
+                if whole is None
+                else [fix for fix in fixable if _site_anchor(fix.site) in whole.applied]
+            )
+            if whole is not None and applied:
+                fixed = tuple(diagnostic for fix in applied for diagnostic in published(fix))
+                reached = any(fix in in_range for fix in applied)
+                if len(applied) > 1 and reached and wanted(QUICKFIX_KIND):
+                    actions.append(DocumentFix(FIX_ALL_TITLE, QUICKFIX_KIND, fixed, whole.edits))
+                if wanted(FIX_ALL_KIND) and (reached or asked_for_all):
+                    actions.append(DocumentFix(FIX_ALL_TITLE, FIX_ALL_KIND, fixed, whole.edits))
         return actions
 
-    def _planned(
-        self, extracted: _Extraction, anchor: SiteAnchor | None
-    ) -> tuple[tuple[Range, str], ...] | None:
-        """The edits fixing one site (``anchor``) or the whole file (``None``),
-        as ranges in the buffer; ``None`` when no fix may be offered."""
+    def _planned(self, extracted: _Extraction, anchor: SiteAnchor | None) -> _Planned | None:
+        """The fix for one site (``anchor``) or the whole file (``None``), as
+        ranges in the buffer; ``None`` when no fix may be offered."""
         if anchor not in extracted.fixes:
-            extracted.fixes[anchor] = self._edits(extracted, anchor)
+            extracted.fixes[anchor] = self._plan_edits(extracted, anchor)
         return extracted.fixes[anchor]
 
-    def _edits(
-        self, extracted: _Extraction, anchor: SiteAnchor | None
-    ) -> tuple[tuple[Range, str], ...] | None:
+    def _plan_edits(self, extracted: _Extraction, anchor: SiteAnchor | None) -> _Planned | None:
         """:meth:`_planned`, uncached."""
         only = None if anchor is None else {anchor}
         plan = _plan(extracted.path, extracted.data, self.config, judge=self._judge, only=only)
@@ -467,7 +475,7 @@ class DocumentLinter:
                 logger.debug("no quick fix: bytes %d-%d do not map", edit.start, edit.end)
                 return None
             edits.append((found, edit.replacement.decode("utf-8")))
-        return tuple(edits)
+        return _Planned(tuple(edits), frozenset(_site_anchor(fix.site) for fix in plan.applied))
 
     def forget(self, uri: str) -> None:
         """Drop what is kept for ``uri``: the client closed it, or its text is
@@ -569,18 +577,20 @@ def _title(autofix: AutofixResult) -> str:
     return f"Apply {count} safe fixes to this statement"
 
 
-def _overlaps(diagnostic: Diagnostic, wanted: Range) -> bool:
-    """Whether ``diagnostic``'s range meets ``wanted``, touching included: a
-    cursor at either end of a squiggle is on it."""
-    found = diagnostic["range"]
-    start = (found["start"]["line"], found["start"]["character"])
-    end = (found["end"]["line"], found["end"]["character"])
-    return start <= wanted[1] and wanted[0] <= end
+def _overlaps(found: Range, wanted: Range) -> bool:
+    """Whether ``found`` meets ``wanted``, touching included: a cursor at
+    either end of a squiggle is on it."""
+    return found[0] <= wanted[1] and wanted[0] <= found[1]
 
 
 def _diagnostics(index: DocumentIndex, finding: Finding) -> list[Diagnostic]:
     """``finding``'s diagnostics: one per span when all of them map, else one
     over its whole line. See the module docstring."""
+    return [diagnostic for _, diagnostic in _ranged_diagnostics(index, finding)]
+
+
+def _ranged_diagnostics(index: DocumentIndex, finding: Finding) -> list[tuple[Range, Diagnostic]]:
+    """:func:`_diagnostics`, each with its range as a tuple."""
     severity = _SEVERITIES[finding.severity]
     site = finding.site
     if site is not None and finding.spans:
@@ -588,24 +598,32 @@ def _diagnostics(index: DocumentIndex, finding: Finding) -> list[Diagnostic]:
         mapped = [found for found in ranges if found is not None]
         if len(mapped) == len(ranges):
             return [
-                _diagnostic(found, severity, finding.code, span.message or finding.message)
+                (found, _diagnostic(found, severity, finding.code, span.message or finding.message))
                 for found, span in zip(mapped, finding.spans, strict=True)
             ]
     line = max(finding.line - 1, 0)
     whole = ((line, 0), (line, index.line_length(line)))
-    return [_diagnostic(whole, severity, finding.code, finding.message)]
+    return [(whole, _diagnostic(whole, severity, finding.code, finding.message))]
 
 
 def _diagnostic(found: Range, severity: _DiagnosticSeverity, code: str, message: str) -> Diagnostic:
     """A diagnostic over ``found``: 0-based lines, UTF-16 code unit characters."""
-    (start_line, start), (end_line, end) = found
     return {
-        "range": {
-            "start": {"line": start_line, "character": start},
-            "end": {"line": end_line, "character": end},
-        },
+        "range": lsp_range(found),
         "severity": int(severity),
         "code": code,
         "source": SOURCE,
         "message": message,
+    }
+
+
+def lsp_range(found: Range) -> dict[str, dict[str, int]]:
+    """``found`` as an LSP ``Range``: 0-based lines, UTF-16 code unit characters.
+
+    The one place a range is written out, for diagnostics, hover and the
+    protocol layer's code action edits alike."""
+    (start_line, start), (end_line, end) = found
+    return {
+        "start": {"line": start_line, "character": start},
+        "end": {"line": end_line, "character": end},
     }

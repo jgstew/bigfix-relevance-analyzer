@@ -1085,9 +1085,16 @@ def test_the_readme_documents_quick_fixes_and_fix_on_save() -> None:
     assert "### Quick fixes" in text
     assert f'"{FIX_ALL_KIND}": "explicit"' in text
     assert "editor.codeActionsOnSave" in text
-    (example,) = re.findall(r'"editor\.codeActionsOnSave": (\{[^}]*\})', text)
-    assert json.loads(example) == {FIX_ALL_KIND: "explicit"}
+    examples = re.findall(r'"editor\.codeActionsOnSave": (\{[^}]*\})', text)
+    assert [json.loads(example) for example in examples] == [
+        {FIX_ALL_KIND: "explicit"},
+        {"source.fixAll": "explicit"},
+    ]
     assert "does not offer fixes" not in text
+    # Kinds are hierarchical: the generic key other fixers suggest runs these too,
+    # so the README says so and gives the way out.
+    assert '"source.fixAll": "explicit"' in text
+    assert f'"{FIX_ALL_KIND}": "never"' in text
 
 
 def test_the_user_facing_text_leaves_out_how_the_extension_is_built() -> None:
