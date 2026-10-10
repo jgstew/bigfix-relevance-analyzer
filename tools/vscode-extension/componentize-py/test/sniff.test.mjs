@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const EXTENSION = resolve(process.env.EXTENSION_DIR ?? join(HERE, ".."));
-const { isBesXml } = createRequire(import.meta.url)(join(EXTENSION, "sniff.js"));
+const { isBesXml, HEAD_CHARS } = createRequire(import.meta.url)(join(EXTENSION, "sniff.js"));
 
 const DECLARATION = '<?xml version="1.0" encoding="UTF-8"?>';
 const SCHEMA = 'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="BES.xsd"';
@@ -82,4 +82,9 @@ test("a real public fixlet is BES XML", () => {
   const repo = resolve(HERE, "..", "..", "..", "..");
   const fixlet = join(repo, "tests", "examples", "client_relevance", "fixlets", "fixlet_multi_clause_relevance.bes");
   assert.equal(isBesXml(readFileSync(fixlet, "utf8")), true);
+});
+
+test("the extension reads exactly the characters the sniffer looks at", () => {
+  // extension.js imports this bound rather than keeping one of its own.
+  assert.equal(HEAD_CHARS, 8192);
 });

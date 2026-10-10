@@ -15,6 +15,7 @@
 // A <BES> root: an optional BOM, XML declaration, comments and whitespace first.
 const BES_ROOT = /^\uFEFF?\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--[\s\S]*?-->\s*)*<BES[\s>/]/;
 // Enough for any real preamble, and it bounds the work on a large paste.
+// extension.js reads only this much of a document.
 const HEAD_CHARS = 8192;
 
 /** Whether `text` is a BES XML document, judged by its first 8 KiB. */
@@ -22,4 +23,4 @@ function isBesXml(text) {
   return BES_ROOT.test(text.slice(0, HEAD_CHARS));
 }
 
-module.exports = { isBesXml };
+module.exports = { isBesXml, HEAD_CHARS };

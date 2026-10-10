@@ -128,9 +128,11 @@ back to XML in your settings (you lose the ActionScript and relevance colors):
 Paste a fixlet into a new, unsaved tab, or type one, and the tab is switched to
 **BigFix BES XML** and checked as you type, before it has a name. Each tab is
 switched only once, so if you change its language back, your choice sticks; turn
-`bigfixRelevance.detectBesXml` off to switch tabs yourself. A tab you set to XML
-by hand before pasting a fixlet into it is still switched, once. Saved files are
-never switched. A new file you set to BigFix BES XML yourself is checked the same
+`bigfixRelevance.detectBesXml` off to switch tabs yourself. A tab you set to
+XML, PHP or Markdown by hand before pasting a fixlet into it is still switched,
+once, because those are the languages VS Code guesses for a fixlet on its own. A
+tab that already holds a fixlet when it opens, such as one restored when VS Code
+reopens, keeps its language. Saved files are never switched. A new file you set to BigFix BES XML yourself is checked the same
 way. So is a saved file switched to it whose name is not one of the
 file types below, such as a fixlet saved as `.xml`. A file that is one of them,
 such as `.md` or `.html`, is still read as that type. To have such files open
