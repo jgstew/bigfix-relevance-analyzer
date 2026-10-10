@@ -305,3 +305,59 @@ def test_the_evaluation_reports_each_kind(tmp_path: Path) -> None:
 def test_top_k_is_a_share(limit: int) -> None:
     tool = load_tool(REPO_ROOT / "tools" / "generate_completion_data.py", "_gcd_topk")
     assert tool.top_k([0, 1, 4, None], limit) == {1: 0.25, 3: 0.5, 5: 0.75, 10: 0.75}[limit]
+
+
+# ---------------------------------------------------------------------------
+# PR #129 review
+# ---------------------------------------------------------------------------
+
+
+def test_statement_start_falls_back_to_every_visible_global() -> None:
+    """A global no content starts a statement with is still offered once its
+    name is typed (finding 1)."""
+    found = rank(context_at("exists above normal prio"), CLIENT)
+    assert names(found) == ["above normal priority"]
+    everything = names(rank(context_at(""), CLIENT, limit=5000))
+    seen = default_table().producer_counts("statement-start")
+    # The table's starts first, by count; then the rest.
+    seen_at = [at for at, name in enumerate(everything) if name in seen]
+    rest_at = [at for at, name in enumerate(everything) if name not in seen]
+    assert seen_at and rest_at and max(seen_at) < min(rest_at)
+    assert "above normal priority" in everything[min(rest_at) :]
+    # Only globals, and only what the environment can see.
+    session_only = {"bes computer", "bes fixlet"}
+    assert not session_only & set(everything)
+
+
+def test_the_label_follows_the_context_that_ranked_it() -> None:
+    """Plural or singular as content writes it *here*, not across every
+    context (finding 6)."""
+    (found,) = [
+        c for c in rank(context_at('exists key "x" of section "y" of '), CLIENT) if c.name == "file"
+    ]
+    assert found.label == "file"
+    (found,) = [
+        c for c in rank(context_at("exists preceding text of "), CLIENT) if c.name == "first"
+    ]
+    assert found.label == "first"
+    # Where the context agrees with the rest, nothing changes.
+    assert rank(context_at("files of "), CLIENT)[0].label == "folders"
+
+
+def test_names_that_cannot_match_the_partial_are_not_looked_up(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The partial filters before any per-name lookup (finding 10)."""
+    from bigfix_relevance_analyzer.completion import rank as rank_module
+
+    looked_up: list[str] = []
+    real = rank_module._visible_rows
+
+    def counted(name: str, environments: object) -> object:
+        looked_up.append(name)
+        return real(name, environments)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(rank_module, "_visible_rows", counted)
+    found = rank(context_at("files of wind"), CLIENT, limit=500)
+    assert found
+    assert all("wind" in name for name in looked_up), looked_up

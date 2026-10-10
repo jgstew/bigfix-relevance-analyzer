@@ -13,7 +13,7 @@ import pytest
 from _helpers import lsp_lines, lsp_text
 
 from bigfix_relevance_analyzer import lint
-from bigfix_relevance_analyzer.lint import LintConfig
+from bigfix_relevance_analyzer.lint import LintConfig, TextSpan
 from bigfix_relevance_analyzer.lsp.linter import DocumentCompletion, DocumentLinter
 from bigfix_relevance_analyzer.lsp.positions import utf16_length
 
@@ -210,3 +210,21 @@ def test_the_extraction_is_shared_with_hover() -> None:
     kept = linter._extractions[uri]
     linter.completions(uri, "exists files of ", (0, 16))
     assert linter._extractions[uri] is kept
+
+
+def test_an_unplaceable_multi_word_partial_offers_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without a range the client replaces only its own word: `bes c` would
+    become `bes bes computers`. Nothing is better than that (finding 8)."""
+    from bigfix_relevance_analyzer.lsp.positions import DocumentIndex
+
+    real = DocumentIndex.site_range
+
+    def unplaceable(self: DocumentIndex, site: object, span: TextSpan) -> object:
+        # Placing the cursor maps single characters; only the partial is wider.
+        return None if span.end - span.start > 1 else real(self, site, span)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(DocumentIndex, "site_range", unplaceable)
+    assert complete("a.rel", "names of bes c@")[1] == []
+    # A one-word partial is still offered, for the client's own word range.
+    _, found = complete("a.rel", "exists files of fold@")
+    assert found and found[0].range is None

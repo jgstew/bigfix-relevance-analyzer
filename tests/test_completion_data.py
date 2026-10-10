@@ -245,3 +245,35 @@ def test_the_generator_runs_as_a_script(tmp_path: Path) -> None:
         capture_output=True,
     )
     assert "after-of\tfile\t0\t-\tfolder\t1\t1\t0" in target.read_text()
+
+
+def test_tuple_and_collection_elements_are_statement_starts(tool: ModuleType) -> None:
+    starts = {
+        row[4]
+        for row in observed(tool, "(name of operating system, version of client; files)")
+        if row[0] == "statement-start"
+    }
+    assert {"name", "version", "file"} <= starts
+
+
+def test_an_indexed_collection_is_recorded(tool: ModuleType) -> None:
+    found = observed(tool, 'exists action "x" whose (name of it = "a")')
+    assert ("whose-it", "action", True, None, "name", False, False) in found
+
+
+def test_the_evaluation_scores_the_editors_context(tool: ModuleType) -> None:
+    """`_context` builds exactly what the scan builds (review finding 7)."""
+    from bigfix_relevance_analyzer.completion.context import scan_context
+
+    for text, prefix in (
+        ('exists action "x" whose (name of it = "a")', 'exists action "x" whose ('),
+        ('exists files of folder "x"', "exists files of "),
+    ):
+        (seen,) = [o for o in tool.observations(text) if o.kind != "statement-start"]
+        scanned = scan_context(prefix, len(prefix), False, None)
+        built = tool._context(seen, None)
+        assert scanned is not None
+        assert (built.expected_types, built.subject_types) == (
+            scanned.expected_types,
+            scanned.subject_types,
+        )

@@ -70,6 +70,7 @@ __all__ = [
     "applicable_to",
     "binary_operators",
     "casts",
+    "global_properties",
     "inspector_names",
     "known_types",
     "lookup",
@@ -862,6 +863,19 @@ def producers_of(types: Iterable[str], environment: TypeEnvironment) -> tuple[In
     return _in_table_order(
         (row for type_name in types for row in index.get(type_name, ())), environment
     )
+
+
+@functools.cache
+def _globals() -> tuple[Inspector, ...]:
+    """Property rows with no object. Cached, like the other indexes here."""
+    return tuple(row for row in properties() if not row.operands)
+
+
+def global_properties(environment: TypeEnvironment) -> tuple[Inspector, ...]:
+    """Every property row with no object (``operating system``, ``bes
+    computers``), visible in ``environment``, in table order: what fits at the
+    start of a statement."""
+    return tuple(row for row in _globals() if environment.visible(row))
 
 
 def applicable_to(types: Iterable[str], environment: TypeEnvironment) -> tuple[Inspector, ...]:

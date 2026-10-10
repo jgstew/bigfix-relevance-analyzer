@@ -16,8 +16,12 @@ from _corpus import corpus_cases, parsed_corpus_sites
 from bigfix_relevance_analyzer.completion.context import (
     CompletionContext,
     canonical,
+    expected_types,
     head,
     scan_context,
+    singular,
+    subject_types,
+    written_plural,
 )
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.nodes import Node, NumberOf, Of, children, walk
@@ -411,3 +415,78 @@ def test_the_scan_agrees_with_the_parser_on_every_of() -> None:
     assert not disagreements, "\n".join(disagreements[:40]) + f"\n({len(disagreements)} in all)"
     # 465 when this landed (2026-10-10); a corpus that shrank would prove less.
     assert checked >= 450, checked
+
+
+# ---------------------------------------------------------------------------
+# PR #129 review
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "prefix",
+    [
+        "files whose (exists ",
+        "files whose (exist ",
+        "files whose (not exists ",
+        "files whose (if ",
+        "files whose (if true then ",
+        "files whose (if true then true else ",
+        "files whose (exists na",
+    ],
+)
+def test_inside_whose_after_exists_or_a_conditional_is_whose_it(prefix: str) -> None:
+    """`whose (exists line whose (...) of it)` is a common predicate: the
+    filtered collection still decides what fits (review finding 2)."""
+    found = at_end(prefix)
+    assert found is not None, prefix
+    assert (found.kind, found.consumer) == ("whose-it", "file")
+
+
+@pytest.mark.parametrize("article", ["a", "an", "the", "A"])
+def test_an_article_as_a_later_word_of_a_name_extends_the_partial(article: str) -> None:
+    """Typing the `a` of `active action` must not close the list (finding 3)."""
+    found = at_end(f"exists active {article}")
+    assert found is not None
+    assert (found.kind, found.partial) == ("statement-start", f"active {article}")
+    assert found.replace == (len("exists "), len(f"exists active {article}"))
+
+
+def test_a_lone_article_is_still_a_one_word_partial() -> None:
+    found = after_of("files of an")
+    assert (found.partial, found.replace) == ("an", (len("files of "), len("files of an")))
+
+
+@pytest.mark.parametrize("separator", [",", ";"])
+def test_a_tuple_or_collection_separator_starts_an_expression(separator: str) -> None:
+    """Every element after the first gets suggestions too (finding 9)."""
+    found = at_end(f"(name of operating system{separator} ")
+    assert found is not None
+    assert found.kind == "statement-start"
+    found = at_end(f"files whose (exists (name of it{separator} ")
+    assert found is not None
+    assert (found.kind, found.consumer) == ("whose-it", "file")
+
+
+def test_the_type_helpers_are_the_scans() -> None:
+    """The generator's evaluation builds contexts with these, so it measures
+    what the editor sees (finding 7)."""
+    assert expected_types("file", indexed=False) == after_of("files of ").expected_types
+    assert expected_types("file", indexed=True) == after_of('file "x" of ').expected_types
+    assert expected_types("totally bogus", indexed=False) is None
+    # An indexed collection narrows to its indexed rows' types.
+    indexed = at_end('action "x" whose (')
+    plain = at_end("actions whose (")
+    assert indexed is not None and plain is not None
+    assert indexed.subject_types == subject_types("action", indexed=True)
+    assert plain.subject_types == subject_types("action", indexed=False)
+    assert indexed.subject_types != plain.subject_types
+    assert indexed.consumer_indexed and not plain.consumer_indexed
+
+
+def test_singular_is_shared() -> None:
+    from bigfix_relevance_analyzer import inspectors
+
+    (row,) = [r for r in inspectors.lookup("files") if r.signature == "files of <folder>"]
+    assert singular(row) == "file"
+    assert written_plural("files") and not written_plural("file")
+    assert not written_plural("windows")  # `window`'s plural, and its own row's singular

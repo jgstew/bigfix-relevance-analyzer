@@ -51,17 +51,24 @@ from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
 from typing import NamedTuple
 
-from bigfix_relevance_analyzer.completion.context import CompletionContext, canonical, head
+from bigfix_relevance_analyzer.completion.context import (
+    CompletionContext,
+    canonical,
+    expected_types,
+    head,
+    subject_types,
+    written_plural,
+)
 from bigfix_relevance_analyzer.completion.rank import CompletionTable, TableRow, rank
 from bigfix_relevance_analyzer.dialect import Dialect, is_definite
 from bigfix_relevance_analyzer.extract import (
     _is_recognized,
     extract_relevance_from_file,
 )
-from bigfix_relevance_analyzer.inspectors import InspectorKind, lookup, object_types
 from bigfix_relevance_analyzer.lint import _walk_files
 from bigfix_relevance_analyzer.nodes import (
     Binary,
+    Collection,
     Exists,
     If,
     It,
@@ -69,6 +76,7 @@ from bigfix_relevance_analyzer.nodes import (
     NumberOf,
     Of,
     Reference,
+    TupleExpr,
     Unary,
     Whose,
     children,
@@ -149,14 +157,6 @@ def source_of(repo: Path) -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 
 
-def _plural(phrase: str) -> bool:
-    """Whether ``phrase`` is written plural: some row's plural, no row's singular."""
-    rows = lookup(phrase, kind=InspectorKind.PROPERTY)
-    plural = any(row.plural_name is not None and row.plural_name.lower() == phrase for row in rows)
-    singular = any((row.singular_name or row.name).lower() == phrase for row in rows)
-    return plural and not singular
-
-
 def _name(reference: Reference | None) -> str | None:
     """The canonical name of a head, or ``None`` when there is none or the
     tables do not know it: a row keyed by a typo could never be looked up."""
@@ -175,7 +175,7 @@ def _producer(
     if name is None:
         return None
     return Observation(
-        kind, consumer, indexed, outer, name, found.index is not None, _plural(found.phrase)
+        kind, consumer, indexed, outer, name, found.index is not None, written_plural(found.phrase)
     )
 
 
@@ -205,6 +205,10 @@ def _starts(node: Node) -> Iterator[Node]:
     elif isinstance(node, If):
         for part in (node.condition, node.then_branch, node.else_branch):
             yield from _starts(part)
+    elif isinstance(node, TupleExpr | Collection):
+        # Each item after a `,` or `;` starts an expression of its own.
+        for item in node.items:
+            yield from _starts(item)
     else:
         yield node
 
@@ -245,10 +249,12 @@ def observations(text: str) -> list[Observation]:
             if seen is not None:
                 found.append(seen)
         elif isinstance(node, Whose):
-            collection = _name(head(node.collection))
-            if collection is not None:
+            filtered = head(node.collection)
+            collection = _name(filtered)
+            if filtered is not None and collection is not None:
+                indexed = filtered.index is not None
                 for of in _it_properties(node.predicate):
-                    seen = _producer("whose-it", collection, False, None, of.prop)
+                    seen = _producer("whose-it", collection, indexed, None, of.prop)
                     if seen is not None:
                         found.append(seen)
     for start in _starts(root):
@@ -341,14 +347,13 @@ def _table_rows(rows: dict[Key, tuple[int, int, int]]) -> list[TableRow]:
 
 
 def _context(seen: Observation, dialect: Dialect | None) -> CompletionContext:
-    """The context an editor would have had where ``seen`` was written."""
+    """The context an editor would have had where ``seen`` was written: built
+    with the scan's own type helpers, so the evaluation scores what it sees."""
     expected = subject = None
-    if seen.kind == "after-of" and seen.consumer is not None and canonical(seen.consumer):
-        expected = object_types(seen.consumer, indexed=seen.indexed) or object_types(seen.consumer)
-    if seen.kind == "whose-it" and seen.consumer is not None:
-        subject = frozenset(
-            row.return_type for row in lookup(seen.consumer, kind=InspectorKind.PROPERTY)
-        )
+    if seen.consumer is not None and seen.kind == "after-of":
+        expected = expected_types(seen.consumer, indexed=seen.indexed)
+    if seen.consumer is not None and seen.kind == "whose-it":
+        subject = subject_types(seen.consumer, indexed=seen.indexed)
     return CompletionContext(
         kind=seen.kind,  # type: ignore[arg-type]
         replace=(0, 0),

@@ -459,6 +459,10 @@ class DocumentLinter:
         replace: Range | None = (position, position)
         if start < end:
             typed = index.site_range(site, TextSpan(start, end))
+            if typed is None and " " in context.partial:
+                # Without a range the client replaces only its own word, the
+                # last: `bes c` would become `bes bes computers`.
+                return []
             replace = None if typed is None else (typed[0], position)
         return [
             DocumentCompletion(

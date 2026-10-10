@@ -49,10 +49,11 @@ Inspector names are suggested as you type, in three places:
 - **After `of`:** what can go there, most likely first. After `files of`,
   `folders` comes first, then `csidl folders`, `windows folders` and the
   other things that hold files.
-- **Inside `whose (`:** properties of what is being filtered. After
+- **Inside `whose (`:** properties of what is being filtered, wherever a new
+  condition starts (also after `exists`, `and`, `or` or `not`). After
   `files whose (`, `name` comes first.
-- **At the start of a statement**, and after `exists`, `not`, `and`, `or` or an
-  opening parenthesis.
+- **At the start of a statement**, and after `exists`, `not`, `and`, `or`, an
+  opening parenthesis, or the `,` or `;` between items.
 
 Suggestions are ordered by how often real BigFix content uses them in that
 place, and only names that fit are offered: client inspectors in client

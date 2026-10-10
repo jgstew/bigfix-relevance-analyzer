@@ -24,7 +24,7 @@ SOURCES: tuple[tuple[str, str], ...] = (
 )
 """The content repos mined, as ``(directory name, commit)``."""
 
-# 1027 rows
+# 1038 rows
 ROWS: str = """\
 after-of	action script	0	-	bes action	2	0	2
 after-of	activation	0	active flag	source analysis	1	0	0
@@ -820,6 +820,7 @@ statement-start	-	0	-	computer name	5	0	0
 statement-start	-	0	-	concatenation	41	38	25
 statement-start	-	0	-	content	1	0	1
 statement-start	-	0	-	current console user	1	0	0
+statement-start	-	0	-	current user	4	0	4
 statement-start	-	0	-	debianpackage	3	0	3
 statement-start	-	0	-	descendant	1	0	1
 statement-start	-	0	-	display name	1	0	1
@@ -833,7 +834,7 @@ statement-start	-	0	-	exit code	4	0	3
 statement-start	-	0	-	explicit owner	1	0	1
 statement-start	-	0	-	explicit writer	1	0	1
 statement-start	-	0	-	false	15	0	0
-statement-start	-	0	-	file	128	99	100
+statement-start	-	0	-	file	130	100	102
 statement-start	-	0	-	file ending in	2	2	2
 statement-start	-	0	-	find file	2	2	2
 statement-start	-	0	-	folder	32	27	30
@@ -861,6 +862,7 @@ statement-start	-	0	-	line containing	28	28	28
 statement-start	-	0	-	local mssql database	1	0	1
 statement-start	-	0	-	local user	2	0	2
 statement-start	-	0	-	locked line containing	2	2	2
+statement-start	-	0	-	logged on user	4	0	4
 statement-start	-	0	-	login account	1	0	1
 statement-start	-	0	-	mac	5	0	0
 statement-start	-	0	-	main gather service	16	0	2
@@ -981,45 +983,53 @@ whose-it	drive	0	-	free space	1	0	0
 whose-it	drive	0	-	name	1	0	0
 whose-it	drive	0	-	total space	3	0	0
 whose-it	drive	0	-	type	3	0	0
-whose-it	file	0	-	content	3	0	2
+whose-it	file	0	-	content	1	0	0
 whose-it	file	0	-	creation time	2	0	2
 whose-it	file	0	-	day_of_month	2	0	0
-whose-it	file	0	-	line	19	0	7
-whose-it	file	0	-	line containing	5	5	5
-whose-it	file	0	-	modification time	18	0	2
+whose-it	file	0	-	line	7	0	7
+whose-it	file	0	-	line containing	1	1	1
+whose-it	file	0	-	modification time	12	0	2
 whose-it	file	0	-	month	2	0	0
-whose-it	file	0	-	name	272	0	0
+whose-it	file	0	-	name	256	0	0
 whose-it	file	0	-	section	1	1	1
-whose-it	file	0	-	sha256	9	0	0
-whose-it	file	0	-	size	10	0	0
-whose-it	file	0	-	version	1	0	0
 whose-it	file	0	-	xml document	1	0	1
 whose-it	file	0	-	year	2	0	0
+whose-it	file	1	-	content	2	0	2
+whose-it	file	1	-	line	12	0	0
+whose-it	file	1	-	line containing	4	4	4
+whose-it	file	1	-	modification time	6	0	0
+whose-it	file	1	-	name	16	0	0
+whose-it	file	1	-	sha256	9	0	0
+whose-it	file	1	-	size	10	0	0
+whose-it	file	1	-	version	1	0	0
 whose-it	filesystem	0	-	filesystem type	1	0	0
 whose-it	filesystem	0	-	type	1	0	0
 whose-it	fixlet	0	-	analysis flag	1	0	0
-whose-it	fixlet	0	-	applicable computer count	1	0	0
 whose-it	fixlet	0	-	best activation	1	0	0
 whose-it	fixlet	0	-	id	1	0	0
 whose-it	fixlet	0	-	name	1	0	0
-whose-it	folder	0	-	file	2	2	2
-whose-it	folder	0	-	folder	2	0	2
+whose-it	fixlet	1	-	applicable computer count	1	0	0
 whose-it	folder	0	-	modification time	1	0	1
 whose-it	folder	0	-	name	28	0	0
-whose-it	key	0	-	key	2	1	2
+whose-it	folder	1	-	file	2	2	2
+whose-it	folder	1	-	folder	2	0	2
+whose-it	key	0	-	key	1	1	1
 whose-it	key	0	-	name	12	0	0
-whose-it	key	0	-	value	1387	1386	12
+whose-it	key	0	-	value	1383	1382	11
+whose-it	key	1	-	key	1	0	1
+whose-it	key	1	-	value	4	4	1
 whose-it	line	0	-	match	4	4	0
-whose-it	line containing	0	-	first	2	2	2
+whose-it	line containing	1	-	first	2	2	2
 whose-it	local user	0	-	name	2	0	0
 whose-it	member	0	-	last report time	1	0	0
 whose-it	mime field	0	-	name	9	0	0
 whose-it	name	0	-	length	2	0	0
-whose-it	package	0	-	currently installed	16	0	0
+whose-it	package	0	-	currently installed	7	0	0
 whose-it	package	0	-	name	11	0	0
-whose-it	process	0	-	id	1	0	0
+whose-it	package	1	-	currently installed	9	0	0
 whose-it	process	0	-	name	2	0	0
-whose-it	process	0	-	user	2	0	0
+whose-it	process	1	-	id	1	0	0
+whose-it	process	1	-	user	2	0	0
 whose-it	relevant fixlet	0	-	analysis flag	1	0	0
 whose-it	relevant fixlet	0	-	best activation	1	0	0
 whose-it	relevant fixlet	0	-	header	7	7	7
@@ -1030,19 +1040,20 @@ whose-it	rule	0	-	enabled	1	0	0
 whose-it	rule	0	-	inbound	1	0	0
 whose-it	rule	0	-	local ports string	1	0	1
 whose-it	rule	0	-	protocol	1	0	0
-whose-it	select object	0	-	property	3	3	0
+whose-it	select object	1	-	property	3	3	0
 whose-it	service	0	-	display name	8	0	0
 whose-it	service	0	-	running	1	0	0
 whose-it	service	0	-	start type	3	0	0
 whose-it	setting	0	-	effective date	4	0	0
 whose-it	setting	0	-	name	13	0	0
-whose-it	setting	0	-	value	36	0	1
+whose-it	setting	0	-	value	1	0	0
+whose-it	setting	1	-	value	35	0	1
 whose-it	site	0	-	name	3	0	3
 whose-it	site	0	-	type	4	0	0
 whose-it	socket	0	-	local port	3	0	3
 whose-it	socket	0	-	process	4	0	3
 whose-it	socket	0	-	tcp state	1	0	0
-whose-it	string	0	-	length	1	0	0
+whose-it	string	1	-	length	1	0	0
 whose-it	top level bes action	0	-	multiple flag	1	0	0
 whose-it	top level bes action	0	-	name	2	0	0
 whose-it	top level bes action	0	-	result	1	0	1
@@ -1052,5 +1063,5 @@ whose-it	true	0	-	value	2	2	0
 whose-it	unique value	0	-	multiplicity	2	0	0
 whose-it	value	0	-	name	4	0	0
 whose-it	volume	0	-	type	1	0	0
-whose-it	xpath	0	-	node value	4	0	0
+whose-it	xpath	1	-	node value	4	0	0
 """

@@ -20,7 +20,12 @@ from collections.abc import Iterator
 
 from _corpus import parsed_corpus_sites
 
-from bigfix_relevance_analyzer.completion.context import canonical, head, scan_context
+from bigfix_relevance_analyzer.completion.context import (
+    _opens_expression,
+    canonical,
+    head,
+    scan_context,
+)
 from bigfix_relevance_analyzer.completion.rank import rank
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.lint import _site_dialect
@@ -42,10 +47,12 @@ TOP = 3
 """The cut the floors are for: VS Code shows about this many above the fold
 when nothing typed decides the order."""
 
-FLOORS = {"after-of": 0.75, "whose-it": 0.85, "statement-start": 0.14}
+FLOORS = {"after-of": 0.75, "whose-it": 0.76, "statement-start": 0.14}
 """Top-3 accuracy per kind, measured 2026-10-10 less a margin of about two
-misses: after-of 77.9% of 272, whose-it 92.6% of 27, statement-start 18.4% of
-49. Statement starts rank low because the table's counts are not split by
+misses: after-of 77.9% of 272, whose-it 80.9% of 47, statement-start 18.4% of
+49. (Whose-it was 92.6% of 27 before the scan also claimed the seats after
+``exists``, ``if``, ``then``, ``else``, ``,`` and ``;`` inside ``whose (``;
+those 27 still score 92.6%.) Statement starts rank low because the table's counts are not split by
 dialect and most of its starts are client (`value`, `key`), while many of these
 examples are session relevance."""
 
@@ -79,13 +86,12 @@ def _first(node: Node) -> Node:
 
 
 def _opens_a_condition(text: str, offset: int) -> bool:
-    """Whether ``offset`` follows ``(``, ``and``, ``or`` or ``not``: the seats
-    inside ``whose (`` the scan claims for ``X of it``. One after ``=`` or
-    inside ``if ... then`` waits for recovery, and is not evaluated here."""
+    """Whether ``offset`` is where a new expression starts -- after ``(``,
+    ``,``, ``;``, ``and``, ``or``, ``not``, ``exists``, ``if``, ``then`` or
+    ``else`` -- the seats inside ``whose (`` the scan claims for ``X of it``.
+    One after ``=`` waits for recovery, and is not evaluated here."""
     tokens = list(code_tokens(text[:offset]))
-    return bool(tokens) and (
-        tokens[-1].text == "(" or tokens[-1].normalized in {"and", "or", "not"}
-    )
+    return bool(tokens) and _opens_expression(tokens[-1])
 
 
 def _positions(text: str, root: Node) -> Iterator[tuple[str, int, Node]]:

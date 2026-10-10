@@ -29,6 +29,7 @@ from bigfix_relevance_analyzer.inspectors import (
     applicable_to,
     binary_operators,
     casts,
+    global_properties,
     inspector_names,
     known_types,
     lookup,
@@ -980,3 +981,16 @@ def test_the_producers_index_is_built_lazily() -> None:
         "print('ok')\n"
     )
     assert _producers_index() is _producers_index()
+
+
+def test_global_properties_are_the_visible_rows_with_no_object() -> None:
+    """What fits at the start of a statement (PR #129 review, finding 1)."""
+    rows = global_properties(_client())
+    names = _names_of(rows)
+    assert {"operating system", "client", "above normal priority"} <= names
+    assert all(not row.operands and Dialect.CLIENT in row.dialects for row in rows)
+    session = _names_of(global_properties(TypeEnvironment.create(Dialect.SESSION)))
+    assert "bes computers" in session or "bes computer" in session
+    assert "above normal priority" not in session
+    order = {row: position for position, row in enumerate(properties())}
+    assert [order[row] for row in rows] == sorted(order[row] for row in rows)

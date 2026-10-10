@@ -25,13 +25,13 @@ places, measured on real content in #127:
     group, parsed on its own: a complete expression, so no recovery.
 
 ``whose-it``
-    Just inside ``whose (``, or after ``and``, ``or`` or ``not`` inside one:
-    what fits is a property of the filtered collection's type, written ``X of
-    it``.
+    Wherever a new expression starts inside ``whose (`` (see below): what
+    fits is a property of the filtered collection's type, written ``X of it``.
 
 ``statement-start``
-    Nothing before the cursor, or an opening ``(``, ``and``, ``or``,
-    ``exists``, ``not``, ``if``, ``then`` or ``else``.
+    Nothing before the cursor, or an opening ``(``, a tuple's ``,``, a
+    collection's ``;``, ``and``, ``or``, ``exists``, ``not``, ``if``, ``then``
+    or ``else``.
 
 Anywhere else -- a cast target, an operator's operand -- there is no context
 yet, and nothing inside a string, a comment, or an unlexable token. The scan is
@@ -54,7 +54,17 @@ from bigfix_relevance_analyzer.nodes import ItemOf, Node, Of, Reference, Whose
 from bigfix_relevance_analyzer.parser import try_parse
 from bigfix_relevance_analyzer.tokenizer import Token, TokenKind, _normalize_phrase, tokenize
 
-__all__ = ["CompletionContext", "ContextKind", "canonical", "head", "scan_context"]
+__all__ = [
+    "CompletionContext",
+    "ContextKind",
+    "canonical",
+    "expected_types",
+    "head",
+    "scan_context",
+    "singular",
+    "subject_types",
+    "written_plural",
+]
 
 ContextKind = Literal["after-of", "whose-it", "statement-start"]
 
@@ -82,7 +92,8 @@ class CompletionContext:
     unknown name is kept as written; ``None`` when there is no name at all."""
 
     consumer_indexed: bool = False
-    """after-of: whether the consumer has an index (``value "x" of``)."""
+    """Whether the consumer has an index: ``value "x" of`` (after-of),
+    ``action "x" whose (`` (whose-it)."""
 
     outer: str | None = None
     """after-of: what consumes the consumer (``version`` in ``version of name of |``)."""
@@ -99,13 +110,14 @@ class CompletionContext:
     """Which producer found this context."""
 
 
-_STATEMENT_START_WORDS: Final = frozenset(
-    {"and", "or", "exists", "exist", "not", "if", "then", "else"}
-)
-"""Words after which a new expression starts: what fits is anything."""
+_OPENING_WORDS: Final = frozenset({"and", "or", "exists", "exist", "not", "if", "then", "else"})
+"""Words after which a new expression starts. At the top level what fits is
+anything; inside ``whose (`` it is ``X of it`` for the filtered collection
+(``whose (exists line whose (...) of it)``)."""
 
-_WHOSE_OPENERS: Final = frozenset({"and", "or", "not"})
-"""Words after which, inside ``whose (``, a new ``X of it`` starts."""
+_OPENING_PUNCTUATION: Final = frozenset({"(", ",", ";"})
+"""Punctuation after which a new expression starts: a group, or the next item
+of a tuple or a collection."""
 
 
 def canonical(phrase: str) -> str | None:
@@ -121,18 +133,49 @@ def canonical(phrase: str) -> str | None:
     rows = inspectors.lookup(normalized, kind=InspectorKind.PROPERTY)
     if not rows:
         return None
-    singulars = [_singular(row) for row in rows]
+    singulars = [singular(row) for row in rows]
     if normalized in singulars:
         return normalized
-    for row, singular in zip(rows, singulars, strict=True):
+    for row, written in zip(rows, singulars, strict=True):
         if row.plural_name is not None and row.plural_name.lower() == normalized:
-            return singular
+            return written
     return singulars[0]
 
 
-def _singular(row: inspectors.Inspector) -> str:
+def singular(row: inspectors.Inspector) -> str:
     """A row's singular written form: the name it canonicalizes to."""
     return (row.singular_name or row.name).lower()
+
+
+def written_plural(phrase: str) -> bool:
+    """Whether ``phrase`` is written plural: some row's plural and no row's
+    singular (``windows`` is neither, being an operating system's own name)."""
+    normalized = _normalize_phrase(phrase)
+    rows = inspectors.lookup(normalized, kind=InspectorKind.PROPERTY)
+    plural = any(
+        row.plural_name is not None and row.plural_name.lower() == normalized for row in rows
+    )
+    return plural and not any(singular(row) == normalized for row in rows)
+
+
+def expected_types(name: str, *, indexed: bool) -> frozenset[str] | None:
+    """What a producer for the consumer ``name`` must return (after-of): its
+    object types, narrowed by whether it has an index when that leaves any.
+    ``None`` when ``name`` is no known property."""
+    if canonical(name) is None:
+        return None
+    return inspectors.object_types(name, indexed=indexed) or inspectors.object_types(name)
+
+
+def subject_types(name: str, *, indexed: bool) -> frozenset[str] | None:
+    """What a collection named ``name`` is (whose-it): its rows' return types,
+    narrowed by the index as :func:`expected_types` is. ``None`` when ``name``
+    is no known property."""
+    if canonical(name) is None:
+        return None
+    rows = inspectors.lookup(name, kind=InspectorKind.PROPERTY)
+    narrowed = [row for row in rows if (row.index_type is not None) is indexed]
+    return frozenset(row.return_type for row in narrowed or rows)
 
 
 def head(node: Node) -> Reference | None:
@@ -189,9 +232,10 @@ def scan_context(
     # A multi-word name being typed (`names of bes c`) is one partial: the
     # name phrase the cursor ends, back to where the parser's would start --
     # after the anchor, or after the last complete word operator (`true and
-    # va` is typing `va`). A structural word or an article being typed
-    # extends nothing.
-    if (typing is None or _is_name_word(typing)) and code and _is_name_word(code[-1]):
+    # va` is typing `va`). A structural word being typed extends nothing; an
+    # article does when it follows a name word, as the `a` of `active action`.
+    extends = typing is None or _is_name_word(typing) or typing.kind is TokenKind.ARTICLE
+    if extends and code and _is_name_word(code[-1]):
         words = [*code, typing] if typing is not None else code
         _, start = _Scan(text, words).phrase_ending_at(len(words) - 1)
         if start < len(code):
@@ -239,24 +283,25 @@ class _Scan:
                 consumer=consumer.name,
                 consumer_indexed=consumer.indexed,
                 outer=outer,
-                expected_types=_object_types(consumer),
+                expected_types=(
+                    None
+                    if consumer.name is None
+                    else expected_types(consumer.name, indexed=consumer.indexed)
+                ),
             )
+        opens = not code or _opens_expression(code[-1])
         whose = self.open_whose()
-        if whose is not None and (
-            _is_punct(code[-1], "(") or code[-1].normalized in _WHOSE_OPENERS
-        ):
+        if whose is not None and opens:
             collection = self.consumer_before(whose - 2)
-            name = collection.name if collection is not None else None
+            if collection is None or collection.name is None:
+                return make(kind="whose-it")
             return make(
                 kind="whose-it",
-                consumer=name,
-                subject_types=_return_types(collection) if collection is not None else None,
+                consumer=collection.name,
+                consumer_indexed=collection.indexed,
+                subject_types=subject_types(collection.name, indexed=collection.indexed),
             )
-        if (
-            not code
-            or _is_punct(code[-1], "(")
-            or (code[-1].kind is TokenKind.WORD and code[-1].normalized in _STATEMENT_START_WORDS)
-        ):
+        if opens:
             return make(kind="statement-start")
         return None
 
@@ -389,25 +434,11 @@ def _known_suffix(words: list[str]) -> str | None:
     return " ".join(words)
 
 
-def _object_types(consumer: _Consumer) -> frozenset[str] | None:
-    """What a producer for ``consumer`` must return: its object types, narrowed
-    by whether it has an index when that leaves any. ``None`` when the consumer
-    is no known property."""
-    if consumer.name is None or canonical(consumer.name) is None:
-        return None
-    return inspectors.object_types(
-        consumer.name, indexed=consumer.indexed
-    ) or inspectors.object_types(consumer.name)
-
-
-def _return_types(consumer: _Consumer) -> frozenset[str] | None:
-    """What a collection named ``consumer`` is: its rows' return types,
-    narrowed by the index as :func:`_object_types` is."""
-    if consumer.name is None or canonical(consumer.name) is None:
-        return None
-    rows = inspectors.lookup(consumer.name, kind=InspectorKind.PROPERTY)
-    narrowed = [row for row in rows if (row.index_type is not None) is consumer.indexed]
-    return frozenset(row.return_type for row in narrowed or rows)
+def _opens_expression(token: Token) -> bool:
+    """Whether a new expression starts after ``token``."""
+    if token.kind is TokenKind.PUNCT:
+        return token.text in _OPENING_PUNCTUATION
+    return token.kind is TokenKind.WORD and token.normalized in _OPENING_WORDS
 
 
 def _is_word(token: Token, word: str) -> bool:

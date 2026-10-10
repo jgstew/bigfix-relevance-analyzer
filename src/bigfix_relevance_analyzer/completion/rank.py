@@ -18,7 +18,9 @@ specific key the table has to the type-valid rest:
 4. then every type-valid candidate not listed yet -- the reverse lookup
    (:func:`~bigfix_relevance_analyzer.inspectors.producers_of`) after ``of``,
    the forward one (:func:`~bigfix_relevance_analyzer.inspectors.applicable_to`)
-   inside ``whose (`` -- by how often it is a producer at all in this kind, then
+   inside ``whose (``, every property with no object
+   (:func:`~bigfix_relevance_analyzer.inspectors.global_properties`) at the
+   start -- by how often it is a producer at all in this kind, then
    alphabetically. When the types are not known, every producer the table has
    for the kind, the same way.
 
@@ -34,7 +36,10 @@ What to insert
 Each candidate carries its written form (the plural when content usually writes
 it plural, as lint's ``plural-preferred`` would push the author to anyway), and
 a snippet with an index placeholder when content usually gives it one
-(``folders "$1"``, ``csidl folders ${1:0}``).
+(``folders "$1"``, ``csidl folders ${1:0}``). "Usually" is read under the most
+specific key the table has the candidate for, backing off as the order does:
+``file`` is written singular under ``key "x" of section "y" of``, though plural
+nearly everywhere else.
 """
 
 from __future__ import annotations
@@ -46,7 +51,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from bigfix_relevance_analyzer import _completion_data, inspectors
-from bigfix_relevance_analyzer.completion.context import CompletionContext
+from bigfix_relevance_analyzer.completion.context import CompletionContext, singular
 from bigfix_relevance_analyzer.inspectors import Inspector, InspectorKind
 from bigfix_relevance_analyzer.typecheck import TypeEnvironment
 
@@ -106,18 +111,17 @@ class CompletionTable:
         self.rows = tuple(rows)
         self._keys: dict[tuple[object, ...], Counter[str]] = {}
         self._producers: dict[str, Counter[str]] = {}
-        self._usage: dict[tuple[str, str], tuple[int, int, int]] = {}
+        self._usage: dict[tuple[object, ...], tuple[int, int, int]] = {}
         for row in self.rows:
-            for key in (
-                (row.kind, row.consumer, row.indexed, row.outer),
-                (row.kind, row.consumer, row.indexed),
-                (row.kind, row.consumer),
-            ):
+            keys = _backoff(row.kind, row.consumer, row.indexed, row.outer)
+            for key in keys:
                 self._keys.setdefault(key, Counter())[row.producer] += row.count
             self._producers.setdefault(row.kind, Counter())[row.producer] += row.count
-            for usage_key in ((row.kind, row.producer), ("", row.producer)):
-                count, indexed, plural = self._usage.get(usage_key, (0, 0, 0))
-                self._usage[usage_key] = (
+            # How the producer is written, under every key it can be asked by,
+            # down to the kind and then to every kind.
+            for key in (*keys, (row.kind,), ()):
+                count, indexed, plural = self._usage.get((*key, row.producer), (0, 0, 0))
+                self._usage[(*key, row.producer)] = (
                     count + row.count,
                     indexed + row.indexed_count,
                     plural + row.plural_count,
@@ -156,20 +160,32 @@ class CompletionTable:
     def seen(self, context: CompletionContext) -> list[str]:
         """The producers the table has for ``context``, in backoff order."""
         ordered: dict[str, None] = {}
-        for key in (
-            (context.kind, context.consumer, context.consumer_indexed, context.outer),
-            (context.kind, context.consumer, context.consumer_indexed),
-            (context.kind, context.consumer),
-        ):
+        for key in _context_keys(context):
             counts = self._keys.get(key)
             if counts:
                 ordered.update(dict.fromkeys(_by_count(counts, counts)))
         return list(ordered)
 
-    def usage(self, kind: str, producer: str) -> tuple[int, int, int] | None:
-        """``(count, indexed count, plural count)`` for ``producer`` in ``kind``,
-        else across every kind; ``None`` when the table never saw it."""
-        return self._usage.get((kind, producer)) or self._usage.get(("", producer))
+    def usage(self, context: CompletionContext, producer: str) -> tuple[int, int, int] | None:
+        """``(count, indexed count, plural count)`` for ``producer`` under the
+        most specific of ``context``'s keys that has it, then its kind, then
+        every kind: how content writes it *here*. ``None`` when never seen."""
+        for key in (*_context_keys(context), (context.kind,), ()):
+            found = self._usage.get((*key, producer))
+            if found is not None:
+                return found
+        return None
+
+
+def _backoff(
+    kind: str, consumer: str | None, indexed: bool, outer: str | None
+) -> tuple[tuple[object, ...], ...]:
+    """The table keys from most specific to least: what :func:`rank` backs off through."""
+    return ((kind, consumer, indexed, outer), (kind, consumer, indexed), (kind, consumer))
+
+
+def _context_keys(context: CompletionContext) -> tuple[tuple[object, ...], ...]:
+    return _backoff(context.kind, context.consumer, context.consumer_indexed, context.outer)
 
 
 @functools.cache
@@ -205,10 +221,13 @@ def rank(
     partial = context.partial.lower()
     found: list[Candidate] = []
     for name in ordered:
+        # Cheap first: a name none of whose spellings can match costs no lookup.
+        if partial and not any(_matches(partial, form, name) for form in _spellings(name)):
+            continue
         rows = _visible_rows(name, environments)
         if not rows:
             continue
-        label, snippet = _insertion(name, rows, table.usage(context.kind, name))
+        label, snippet = _insertion(name, rows, table.usage(context, name))
         if partial and not _matches(partial, label, name):
             continue
         found.append(Candidate(name, label, _detail(rows, context, snippet), snippet, len(found)))
@@ -243,14 +262,28 @@ def _type_valid(
             for row in inspectors.applicable_to(context.subject_types, environment)
         )
     elif context.kind == "statement-start":
-        return set()
+        rows = (
+            row for environment in environments for row in inspectors.global_properties(environment)
+        )
     else:
         return set(overall)
-    return {_singular(row) for row in rows}
+    return {singular(row) for row in rows}
 
 
-def _singular(row: Inspector) -> str:
-    return (row.singular_name or row.name).lower()
+@functools.cache
+def _all_spellings() -> dict[str, frozenset[str]]:
+    """Every written form of each canonical name: its singular and plurals."""
+    forms: dict[str, set[str]] = {}
+    for row in inspectors.properties():
+        name = singular(row)
+        forms.setdefault(name, {name}).update(
+            form.lower() for form in (row.plural_name,) if form is not None
+        )
+    return {name: frozenset(found) for name, found in forms.items()}
+
+
+def _spellings(name: str) -> frozenset[str]:
+    return _all_spellings().get(name, frozenset({name}))
 
 
 def _visible_rows(name: str, environments: Sequence[TypeEnvironment]) -> list[Inspector]:
@@ -258,7 +291,7 @@ def _visible_rows(name: str, environments: Sequence[TypeEnvironment]) -> list[In
     return [
         row
         for row in inspectors.lookup(name, kind=InspectorKind.PROPERTY)
-        if _singular(row) == name and any(env.visible(row) for env in environments)
+        if singular(row) == name and any(env.visible(row) for env in environments)
     ]
 
 
