@@ -180,6 +180,29 @@ updates:
     labels:
       - "dependencies"
 
+  # CodeMirror 6 for the shared editor client's Node tests (CI-only; nothing
+  # here ships). Pinned at what NiceGUI 3.18 bundles, the oldest versions the
+  # client supports (tests/test_web_assets.py holds the pins to that), so
+  # their version bumps are ignored: moving a pin would stop testing the oldest
+  # supported release, and the test would fail the PR anyway. Their transitive
+  # dependencies (@lezer/*, style-mod, ...) are still watched. Raise the floor
+  # by hand, with NICEGUI_CM, when the oldest supported CodeMirror moves.
+  - package-ecosystem: "npm"
+    directory: "/tools/editor-client"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "@codemirror/*"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
+    labels:
+      - "dependencies"
+
   # Scans .pre-commit-config.yaml and updates each hook's `rev:` (SHA-pinned
   # revs get their version comment updated too, same as the github-actions
   # entries above). No `cooldown` here: as of 2026-03, GitHub does not support

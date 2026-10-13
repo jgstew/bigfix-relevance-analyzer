@@ -1,0 +1,178 @@
+"""Tests for the browser editor files the wheel ships (#142): ``web/*.js``.
+
+``web/relevance_editor.js`` is the shared CodeMirror 6 client (Layer 3). It is
+package data, versioned with the server it talks to, and loaded by pages that
+bring their own CodeMirror: the debugger's NiceGUI app and the playground. Its
+behaviour is tested in Node (``tools/editor-client``); these hold what the
+Python side owns: that the wheel carries it, that it imports nothing, that it
+asks for no CodeMirror name NiceGUI 3.18's bundle lacks, and that its test
+package follows this repo's npm policy.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import shutil
+import subprocess
+import zipfile
+from pathlib import Path
+
+import pytest
+from _helpers import REPO_ROOT
+
+WEB = REPO_ROOT / "src" / "bigfix_relevance_analyzer" / "web"
+CLIENT = WEB / "relevance_editor.js"
+TEST_PACKAGE = REPO_ROOT / "tools" / "editor-client"
+DEPENDABOT = REPO_ROOT / ".github" / "dependabot.yml"
+TEST_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "test.yaml"
+
+NICEGUI_CM = {
+    "@codemirror/language": "6.11.2",
+    "@codemirror/state": "6.5.2",
+    "@codemirror/view": "6.38.1",
+}
+"""What NiceGUI 3.18 bundles: the oldest CodeMirror the client supports."""
+
+NICEGUI_EXPORTS = frozenset(
+    {
+        "Decoration",
+        "EditorState",
+        "EditorView",
+        "GutterMarker",
+        "Prec",
+        "RangeSetBuilder",
+        "StateEffect",
+        "StateField",
+        "ViewPlugin",
+        "closeHoverTooltips",
+        "gutter",
+        "hoverTooltip",
+        "keymap",
+        "showTooltip",
+    }
+)
+"""Names NiceGUI 3.18's CodeMirror bundle is known to export that the client
+uses (checked in bigfix-relevance-debugger against that bundle). A name added
+to ``REQUIRED_CM`` must be checked there first, then added here: the bundle
+exports neither ``@codemirror/lint`` nor ``@codemirror/autocomplete``."""
+
+
+def _source() -> str:
+    return CLIENT.read_text(encoding="utf-8")
+
+
+def _required_cm() -> list[str]:
+    match = re.search(r"export const REQUIRED_CM = \[(.*?)\];", _source(), re.S)
+    assert match, "REQUIRED_CM not found"
+    return re.findall(r'"(\w+)"', match.group(1))
+
+
+# --- the client file ----------------------------------------------------------------
+
+
+def test_the_client_imports_nothing() -> None:
+    """The page injects its CodeMirror: one copy of @codemirror/state, any bundle."""
+    source = _source()
+    assert not re.search(r"^\s*import\b", source, re.M)
+    assert "import(" not in source
+    assert "require(" not in source
+
+
+def test_the_client_asks_only_for_names_nicegui_exports() -> None:
+    required = _required_cm()
+    assert required == sorted(required)
+    assert set(required) <= NICEGUI_EXPORTS, set(required) - NICEGUI_EXPORTS
+
+
+def test_every_codemirror_name_the_client_uses_is_required() -> None:
+    """``relevanceEditor`` checks REQUIRED_CM up front, so a name used but not
+    listed would fail later, inside a page, instead of at construction."""
+    used = set(re.findall(r"\bCM\.(\w+)", _source()))
+    assert used
+    assert used <= set(_required_cm()), used - set(_required_cm())
+
+
+def test_the_client_is_ascii() -> None:
+    """Non-ASCII is written as escapes, so no repo hook rewrites it."""
+    assert _source().isascii()
+
+
+# --- the wheel ------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(shutil.which("uv") is None, reason="needs uv to build the wheel")
+def test_the_built_wheel_contains_the_client(tmp_path: Path) -> None:
+    subprocess.run(
+        ["uv", "build", "--wheel", "--out-dir", str(tmp_path), str(REPO_ROOT)],
+        check=True,
+        capture_output=True,
+    )
+    (wheel,) = tmp_path.glob("*.whl")
+    with zipfile.ZipFile(wheel) as archive:
+        shipped = archive.read("bigfix_relevance_analyzer/web/relevance_editor.js")
+    assert shipped == CLIENT.read_bytes()
+
+
+def test_the_client_is_found_through_importlib_resources() -> None:
+    """How a consumer (the debugger) finds it in the installed package."""
+    from importlib.resources import files
+
+    found = files("bigfix_relevance_analyzer") / "web" / "relevance_editor.js"
+    assert found.is_file()
+    assert "export function relevanceEditor" in found.read_text(encoding="utf-8")
+
+
+# --- its test package: this repo's npm policy ------------------------------------------
+
+
+def test_the_test_package_pins_codemirror_exactly_at_nicegui_s_versions() -> None:
+    package = json.loads((TEST_PACKAGE / "package.json").read_text(encoding="utf-8"))
+    assert package["private"] is True
+    assert package["devDependencies"] == NICEGUI_CM
+    assert "dependencies" not in package
+    assert package["engines"]["npm"] == ">=11.10.0"
+    assert "CM_MODULE=./cm.mjs" in package["scripts"]["test"]
+    lock = json.loads((TEST_PACKAGE / "package-lock.json").read_text(encoding="utf-8"))
+    for name, version in NICEGUI_CM.items():
+        assert lock["packages"][f"node_modules/{name}"]["version"] == version, name
+
+
+def test_the_test_bundle_re_exports_the_three_packages() -> None:
+    text = (TEST_PACKAGE / "cm.mjs").read_text(encoding="utf-8")
+    for name in NICEGUI_CM:
+        assert f'export * from "{name}";' in text
+
+
+def _tracked_npm_packages() -> list[Path]:
+    listed = subprocess.run(
+        ["git", "ls-files", "*package.json"],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.split()
+    return sorted(REPO_ROOT / Path(path).parent for path in listed)
+
+
+def test_every_npm_package_in_the_repo_has_the_cooldown_and_dependabot() -> None:
+    """Repo-wide, so a package added anywhere (this one is outside
+    tools/playground-wasm and tools/vscode-extension) cannot slip past the
+    per-area tests: an .npmrc refusing week-old releases, and a dependabot
+    entry with its cooldown."""
+    packages = _tracked_npm_packages()
+    assert TEST_PACKAGE in packages
+    dependabot = DEPENDABOT.read_text(encoding="utf-8")
+    for package in packages:
+        npmrc = (package / ".npmrc").read_text(encoding="utf-8")
+        assert re.search(r"^min-release-age=7$", npmrc, re.M), package
+        relative = "/" + package.relative_to(REPO_ROOT).as_posix()
+        assert f'directory: "{relative}"' in dependabot, relative
+
+
+def test_ci_runs_the_node_tests() -> None:
+    text = TEST_WORKFLOW.read_text(encoding="utf-8")
+    job = text[text.index("  editor-client:") :]
+    assert "working-directory: tools/editor-client" in job
+    assert "npm ci" in job
+    assert "npm test" in job
