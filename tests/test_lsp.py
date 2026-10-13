@@ -994,6 +994,26 @@ print("ok")
     )
 
 
+def test_a_typo_gets_replace_actions_over_the_protocol() -> None:
+    """#142 S1, as the browser client asks: `only: ["quickfix"]`, plain `changes`.
+    The published diagnostic carries the leads, and each action claims it."""
+    server = started_for_fixes(document_changes=False)
+    text = "exists oprating system\n"
+    (published,) = diagnostics(did_open(server, "t.rel", text), "t.rel")
+    leads = published["data"]["suggestions"]
+    assert leads[0] == "operating system"
+    actions = code_actions(server, "t.rel", (0, 9), (0, 9), only=["quickfix"])["result"]
+    assert [a["title"] for a in actions] == [
+        f"Replace `oprating system` with `{lead}`" for lead in leads
+    ]
+    assert all(a["kind"] == "quickfix" and a["diagnostics"] == [published] for a in actions)
+    assert len(leads) > 1
+    assert all("isPreferred" not in a for a in actions)
+    fixed = apply_workspace_edit(text, actions[0]["edit"], "t.rel")
+    assert fixed == "exists operating system\n"
+    assert diagnostics(did_change(server, "t.rel", fixed, version=2), "t.rel") == []
+
+
 def test_an_inverted_range_is_invalid() -> None:
     server = started_for_fixes()
     did_open(server, "t.rel", SETTING_TEXT)

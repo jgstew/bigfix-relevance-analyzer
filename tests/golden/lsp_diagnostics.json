@@ -41,7 +41,7 @@
   "tests/examples/session_relevance/webreports/webreport_session_relevance_basic.besrpt": [],
   "tests/examples/session_relevance/webreports/webreport_session_relevance_chart.besrpt": [],
   "tests/golden/pre_commit_bigfix/notes.md": [
-    {"code": "unknown-inspector", "message": "no dump defines `totally bogus made up inspector`", "range": {"end": {"character": 38, "line": 5}, "start": {"character": 7, "line": 5}}, "severity": 2, "source": "bigfix-relevance-analyzer"},
+    {"code": "unknown-inspector", "data": {"suggestions": []}, "message": "no dump defines `totally bogus made up inspector`", "range": {"end": {"character": 38, "line": 5}, "start": {"character": 7, "line": 5}}, "severity": 2, "source": "bigfix-relevance-analyzer"},
     {"code": "parse-error", "message": "col 17: expected ')' to close the whose predicate", "range": {"end": {"character": 16, "line": 10}, "start": {"character": 15, "line": 10}}, "severity": 1, "source": "bigfix-relevance-analyzer"},
     {"code": "unterminated-code-fence", "message": "this relevance code fence is never closed, so the relevance in it was not linted. Close it with a matching fence line", "range": {"end": {"character": 12, "line": 13}, "start": {"character": 0, "line": 13}}, "severity": 2, "source": "bigfix-relevance-analyzer"}
   ],
@@ -51,7 +51,7 @@
   ],
   "tests/golden/pre_commit_bigfix/task_errors.bes": [
     {"code": "type-error", "message": "the operator '=' is not defined for the types '<integer> = <string>'", "range": {"end": {"character": 53, "line": 7}, "start": {"character": 35, "line": 7}}, "severity": 1, "source": "bigfix-relevance-analyzer"},
-    {"code": "unknown-inspector", "message": "no dump defines `totally bogus made up inspector`", "range": {"end": {"character": 51, "line": 8}, "start": {"character": 20, "line": 8}}, "severity": 2, "source": "bigfix-relevance-analyzer"},
+    {"code": "unknown-inspector", "data": {"suggestions": []}, "message": "no dump defines `totally bogus made up inspector`", "range": {"end": {"character": 51, "line": 8}, "start": {"character": 20, "line": 8}}, "severity": 2, "source": "bigfix-relevance-analyzer"},
     {"code": "unbound-it", "message": "`it` used with no context to bind to", "range": {"end": {"character": 23, "line": 10}, "start": {"character": 21, "line": 10}}, "severity": 1, "source": "bigfix-relevance-analyzer"},
     {"code": "parse-error", "message": "col 17: expected ')' to close the group opened here", "range": {"end": {"character": 16, "line": 13}, "start": {"character": 15, "line": 13}}, "severity": 1, "source": "bigfix-relevance-analyzer"},
     {"code": "parse-error", "message": "col 13: unterminated string literal", "range": {"end": {"character": 38, "line": 14}, "start": {"character": 25, "line": 14}}, "severity": 1, "source": "bigfix-relevance-analyzer"},

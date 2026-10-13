@@ -427,6 +427,41 @@ def test_one_unknown_name_with_suggestions_keeps_the_findings_message() -> None:
     assert diagnostic_text(text, diagnostic) == "oprating system"
 
 
+def test_an_unknown_names_diagnostic_carries_its_leads_as_data() -> None:
+    """#142 S1: the leads as data, so a client needs no parse of the message."""
+    text = "nme of oprating system"
+    linter = DocumentLinter()
+    found = linter.diagnostics("file:///w/a.rel", text)
+    (finding,) = lint_text(text, linter.config)
+    assert [diagnostic_text(text, d) for d in found] == ["nme", "oprating system"]
+    assert [d["data"] for d in found] == [
+        {"suggestions": list(span.suggestions)} for span in finding.spans
+    ]
+    assert found[1]["data"]["suggestions"][:2] == ["operating system", "operating systems"]
+
+
+def test_an_unknown_name_with_no_leads_carries_an_empty_list() -> None:
+    text = "exists bogus one"
+    (diagnostic,) = DocumentLinter(config=LintConfig()).diagnostics("file:///w/a.rel", text)
+    assert diagnostic["data"] == {"suggestions": []}
+
+
+def test_only_unknown_inspector_diagnostics_carry_data() -> None:
+    text = f'{BROKEN} or exists values of setting "x" of client'
+    found = DocumentLinter().diagnostics("file:///w/a.rel", text)
+    assert found
+    assert all("data" not in d for d in found)
+
+
+def test_a_whole_line_unknown_inspector_carries_no_data() -> None:
+    """A diagnostic over the line is not over a name, so it offers nothing to
+    put in a name's place."""
+    text = 'exists file "\ud800" whose (exists bogus thing) and exists file "y"\n'
+    (diagnostic,) = DocumentLinter().diagnostics("file:///w/a.rel", text)
+    assert diagnostic["range"] == whole_line(text, 0)
+    assert "data" not in diagnostic
+
+
 def test_a_statement_level_finding_still_covers_its_line() -> None:
     text = '  exists descendants of folder "c:\\"'
     config = LintConfig(max_score=None, max_evaluation_cost=0.0)

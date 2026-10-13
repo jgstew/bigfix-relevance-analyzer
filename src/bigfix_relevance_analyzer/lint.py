@@ -116,6 +116,7 @@ import enum
 import functools
 import heapq
 import os
+import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -697,8 +698,25 @@ class TextSpan:
     the finding's message lists every name and all their leads together.
     ``None`` means the finding's message is the one to show."""
 
+    suggestions: tuple[str, ...] = ()
+    """The names this span's text may have been meant to be, best first: what
+    :attr:`message` offers, as data. Only ``unknown-inspector`` sets it, and
+    only when :attr:`LintConfig.suggest` asked for leads. Every use of a name
+    carries that name's leads, so an editor can put a lead in place of the
+    characters this span covers without asking
+    :func:`~bigfix_relevance_analyzer.inspectors.suggest` again. Only names,
+    never an operator's symbol, so a lead can always stand where the name is
+    written. Together they are :attr:`Finding.suggestions`, which takes each
+    name's leads without repeats in the order it lists the names (sorted), not
+    in span order."""
+
     def to_dict(self) -> dict[str, Any]:
-        return {"start": self.start, "end": self.end, "message": self.message}
+        return {
+            "start": self.start,
+            "end": self.end,
+            "message": self.message,
+            "suggestions": list(self.suggestions),
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -1225,6 +1243,24 @@ def _non_renderable_substitution(
     return f"{site.context} substitutes {rendered}, which has no string representation to embed"
 
 
+_NAME_LEAD: Final = re.compile(r"[a-z0-9_]+(?: [a-z0-9_]+)*")
+"""What a "did you mean" lead must look like: a name, which could stand where
+the unknown one is written. :func:`~bigfix_relevance_analyzer.inspectors.suggest`
+also searches operators' symbols -- ``concat`` finds ``&`` -- and those never
+can: ``exists &`` does not parse, and ``&`` or ``<`` written into BES XML breaks
+the file. Every inspector name has this shape, so only operators are dropped."""
+
+
+def _name_leads(name: str, dialect: Dialect | None) -> tuple[str, ...]:
+    """``name``'s leads: :func:`~bigfix_relevance_analyzer.inspectors.suggest`'s, names only."""
+    # Imported here rather than at module scope: `inspectors` is only needed
+    # on this one opt-in branch, and `lint` is otherwise reachable without
+    # paying for the search index at all.
+    from bigfix_relevance_analyzer.inspectors import suggest
+
+    return tuple(lead for lead in suggest(name, dialect=dialect) if _NAME_LEAD.fullmatch(lead))
+
+
 def _unknown_message(names: tuple[str, ...], leads: tuple[str, ...]) -> str:
     """``unknown-inspector``'s wording, for a statement's names or for one of them."""
     message = "no dump defines " + ", ".join(f"`{name}`" for name in names)
@@ -1405,27 +1441,23 @@ def lint_analysis(
 
     unknown = tuple(name for name in report.unknown_references if name not in keyword_uses)
     if unknown:
-        # Imported here rather than at module scope: `inspectors` is only needed
-        # on this one opt-in branch, and `lint` is otherwise reachable without
-        # paying for the search index at all.
         name_leads: dict[str, tuple[str, ...]] = dict.fromkeys(unknown, ())
         if config.suggest:
-            from bigfix_relevance_analyzer.inspectors import suggest as _suggest
-
             dialect = config.dialect or (report.dialect if not report.dialect_assumed else None)
-            name_leads = {name: _suggest(name, dialect=dialect) for name in unknown}
+            name_leads = {name: _name_leads(name, dialect) for name in unknown}
         leads = tuple(dict.fromkeys(lead for name in unknown for lead in name_leads[name]))
         # Every use of every name, in source order: one finding still (the
         # hook counts findings), but an editor underlines each use, and each
-        # span carries the message for its own name and its own leads, so a
-        # consumer never has to take the finding's message apart.
+        # span carries the message for its own name and its own leads (as
+        # text and as data), so a consumer never has to take the finding's
+        # message apart.
         uses: list[TextSpan] = []
         for entry in report.references:
             phrase = entry.reference.phrase
             if phrase in name_leads:
                 written = _name_span(report, entry.reference)
                 message = _unknown_message((phrase,), name_leads[phrase])
-                uses.append(TextSpan(written.start, written.end, message))
+                uses.append(TextSpan(written.start, written.end, message, name_leads[phrase]))
         # The finding itself is statement-level for its line: relative line 1,
         # which `emit` offsets by `base_line`. Passing `base_line` itself here
         # double-counted the offset for extracted sites (line 15 of an 11-line
