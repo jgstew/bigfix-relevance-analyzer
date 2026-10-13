@@ -103,10 +103,11 @@ jobs:
       - name: sha256 of the built artifacts
         run: sha256sum dist/*
 
-  # The shared CodeMirror client (src/bigfix_relevance_analyzer/web/) in Node,
-  # against tools/editor-client's exact pins of CodeMirror 6: the versions
-  # NiceGUI 3.18 ships, so the oldest the client supports. Node 22's npm
-  # predates `min-release-age`, which is fine for `npm ci` (see the .npmrc).
+  # The shared CodeMirror client and highlighter (src/bigfix_relevance_analyzer/
+  # web/) in Node, against tools/editor-client's exact pins of CodeMirror 6 (the
+  # versions NiceGUI 3.18 ships, so the oldest supported) and of the TextMate
+  # engine the highlighter's parity test runs the VS Code grammar through.
+  # Node 22's npm predates `min-release-age`, which is fine for `npm ci`.
   editor-client:
     runs-on: ubuntu-latest
     steps:

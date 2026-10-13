@@ -836,6 +836,21 @@ The page owns the text and keeps the server's copy current itself (with
 `didOpen`/`didChange`. Its Node tests are in `tools/editor-client/`, run
 against exact pins of the oldest CodeMirror versions it supports.
 
+**Highlighting** ships beside it: `web/relevance_language.js` exports
+`relevanceLanguage(CM)`, a CodeMirror `StreamLanguage` that needs only
+`CM.StreamLanguage`. `tools/generate_tmlanguage.py` writes it from the same
+rules as the VS Code TextMate grammar, and a Node test holds the two to the same
+class for every character of `tests/corpus`. Keywords and word operators get
+keyword tags (which CodeMirror's default style colors), `it` a special variable,
+and literals, comments and punctuation their usual tags; inspector names stay
+uncolored, as in the TextMate grammar.
+Its patterns use Unicode property escapes and lookbehind (Safari 16.4 or
+later). One known difference from VS Code: Oniguruma's case-insensitive
+matching also takes multi-character folds (`less` spelled with a sharp s), which a
+JavaScript pattern cannot; no real content uses them. Past 10,000 characters
+into a line CodeMirror stops coloring (VS Code at 20,000), but still reads the
+rest for its state, so the next line is colored as the grammar says.
+
 For hover-style questions, `node_at(tree, offset)` returns the innermost node
 under a character offset of the parsed statement. `nodes_at` returns the whole
 chain from the root down.
