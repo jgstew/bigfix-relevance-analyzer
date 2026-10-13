@@ -836,6 +836,15 @@ The page owns the text and keeps the server's copy current itself (with
 `didOpen`/`didChange`. Its Node tests are in `tools/editor-client/`, run
 against exact pins of the oldest CodeMirror versions it supports.
 
+**Highlighting** ships beside it: `web/relevance_language.js` exports
+`relevanceLanguage(CM)`, a CodeMirror `StreamLanguage` that needs only
+`CM.StreamLanguage`. `tools/generate_tmlanguage.py` writes it from the same
+rules as the VS Code TextMate grammar, and a Node test holds the two to the same
+class for every character of `tests/corpus`. Keywords and word operators get
+keyword tags (which CodeMirror's default style colors), `it` a special variable,
+and literals, comments and punctuation their usual tags; inspector names stay
+uncolored, as in the TextMate grammar.
+
 For hover-style questions, `node_at(tree, offset)` returns the innermost node
 under a character offset of the parsed statement. `nodes_at` returns the whole
 chain from the root down.
