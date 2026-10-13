@@ -75,6 +75,7 @@ def test_the_client_imports_nothing() -> None:
     """The page injects its CodeMirror: one copy of @codemirror/state, any bundle."""
     source = _source()
     assert not re.search(r"^\s*import\b", source, re.M)
+    assert not re.search(r"^\s*export\b[^;]*\bfrom\s*[\"']", source, re.M)
     assert "import(" not in source
     assert "require(" not in source
 
@@ -132,7 +133,12 @@ def test_the_test_package_pins_codemirror_exactly_at_nicegui_s_versions() -> Non
     assert package["devDependencies"] == NICEGUI_CM
     assert "dependencies" not in package
     assert package["engines"]["npm"] == ">=11.10.0"
-    assert "CM_MODULE=./cm.mjs" in package["scripts"]["test"]
+    script = package["scripts"]["test"]
+    assert "CM_MODULE=./cm.mjs" in script
+    # Node 22 (CI's) runs a bare directory argument as a module and fails with
+    # MODULE_NOT_FOUND; it takes files or a quoted glob.
+    assert "'test/**/*.test.mjs'" in script
+    assert not re.search(r"--test\s+\S*/(?:\s|$)", script), script
     lock = json.loads((TEST_PACKAGE / "package-lock.json").read_text(encoding="utf-8"))
     for name, version in NICEGUI_CM.items():
         assert lock["packages"][f"node_modules/{name}"]["version"] == version, name
@@ -142,6 +148,13 @@ def test_the_test_bundle_re_exports_the_three_packages() -> None:
     text = (TEST_PACKAGE / "cm.mjs").read_text(encoding="utf-8")
     for name in NICEGUI_CM:
         assert f'export * from "{name}";' in text
+
+
+@pytest.fixture
+def git_checkout() -> None:
+    """Skip outside a git checkout (an unpacked sdist), as the layout tests do."""
+    if shutil.which("git") is None or not (REPO_ROOT / ".git").exists():
+        pytest.skip("not a git checkout")
 
 
 def _tracked_npm_packages() -> list[Path]:
@@ -155,6 +168,7 @@ def _tracked_npm_packages() -> list[Path]:
     return sorted(REPO_ROOT / Path(path).parent for path in listed)
 
 
+@pytest.mark.usefixtures("git_checkout")
 def test_every_npm_package_in_the_repo_has_the_cooldown_and_dependabot() -> None:
     """Repo-wide, so a package added anywhere (this one is outside
     tools/playground-wasm and tools/vscode-extension) cannot slip past the
@@ -163,16 +177,20 @@ def test_every_npm_package_in_the_repo_has_the_cooldown_and_dependabot() -> None
     packages = _tracked_npm_packages()
     assert TEST_PACKAGE in packages
     dependabot = DEPENDABOT.read_text(encoding="utf-8")
+    entries = dependabot.split("  - package-ecosystem:")[1:]
     for package in packages:
         npmrc = (package / ".npmrc").read_text(encoding="utf-8")
         assert re.search(r"^min-release-age=7$", npmrc, re.M), package
         relative = "/" + package.relative_to(REPO_ROOT).as_posix()
-        assert f'directory: "{relative}"' in dependabot, relative
+        (entry,) = (e for e in entries if f'directory: "{relative}"' in e)
+        assert re.search(r"cooldown:\s*\n\s*default-days: 7\b", entry), relative
 
 
 def test_ci_runs_the_node_tests() -> None:
     text = TEST_WORKFLOW.read_text(encoding="utf-8")
     job = text[text.index("  editor-client:") :]
+    following = re.search(r"\n  [\w-]+:\n", job[1:])
+    job = job[: following.start() + 1] if following else job
     assert "working-directory: tools/editor-client" in job
     assert "npm ci" in job
     assert "npm test" in job

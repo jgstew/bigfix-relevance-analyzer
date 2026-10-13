@@ -4,7 +4,7 @@
   "description": "CI-only: runs the Node tests of the shared CodeMirror client (src/bigfix_relevance_analyzer/web/) against exact pins of CodeMirror 6, the versions NiceGUI 3.18 ships and so the oldest the client supports. Not part of the published artifact.",
   "type": "module",
   "scripts": {
-    "test": "CM_MODULE=./cm.mjs node --test test/"
+    "test": "CM_MODULE=./cm.mjs node --test 'test/**/*.test.mjs'"
   },
   "devDependencies": {
     "@codemirror/language": "6.11.2",

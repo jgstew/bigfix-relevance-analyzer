@@ -824,7 +824,9 @@ const transport = {
 };
 new CM.EditorView({
   doc: text,
-  extensions: [CM.basicSetup, relevanceEditor(CM, transport, { uri: "untitled:statement" })],
+  // basicSetup is the page's own (from the `codemirror` package; NiceGUI's
+  // editor has it): its autocompletion() is what shows the completions.
+  extensions: [basicSetup, relevanceEditor(CM, transport, { uri: "untitled:statement" })],
   parent,
 });
 ```
