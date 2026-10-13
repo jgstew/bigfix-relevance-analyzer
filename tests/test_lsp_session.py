@@ -218,6 +218,28 @@ def test_the_request_names_the_document_whatever_params_say(session: StatementSe
     assert result is not None
 
 
+def test_did_you_mean_comes_through_as_data_and_replacements(session: StatementSession) -> None:
+    """#142 S1 through the session: each unknown name's leads as diagnostic
+    data, and a "Replace" quick fix per lead, as the browser client asks."""
+    text = "exists oprating system"
+    (diagnostic,) = session.sync(text) or []
+    leads = diagnostic["data"]["suggestions"]
+    assert leads[0] == "operating system"
+    actions = session.request(
+        "textDocument/codeAction",
+        {
+            "range": diagnostic["range"],
+            "context": {"diagnostics": [diagnostic], "only": ["quickfix"]},
+        },
+        text,
+    )
+    assert [a["title"] for a in actions] == [
+        f"Replace `oprating system` with `{lead}`" for lead in leads
+    ]
+    [edit] = actions[0]["edit"]["changes"][StatementSession.URI]
+    assert edit == {"range": span((0, 7), (0, 22)), "newText": "operating system"}
+
+
 def test_an_error_response_raises(session: StatementSession) -> None:
     with pytest.raises(LspError) as raised:
         session.request("textDocument/nonsense", {}, "now")
