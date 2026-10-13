@@ -687,7 +687,8 @@ and CDATA included:
   construct an operator or keyword belongs to, linked to `docs/reference/`.
 
 Whitespace, comments, articles, parentheses and a statement that does not parse
-get no hover.
+get no hover, except whitespace between two words of one name: the space in
+`bes computers` hovers `bes computers`, as either word does.
 
 It completes inspector names (`textDocument/completion`) after `X of`, inside
 `whose (` and at the start of a statement. After `X of` the text to the left is
