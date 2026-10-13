@@ -1007,7 +1007,8 @@ def test_a_typo_gets_replace_actions_over_the_protocol() -> None:
         f"Replace `oprating system` with `{lead}`" for lead in leads
     ]
     assert all(a["kind"] == "quickfix" and a["diagnostics"] == [published] for a in actions)
-    assert all("isPreferred" not in a for a in actions) or len(leads) == 1
+    assert len(leads) > 1
+    assert all("isPreferred" not in a for a in actions)
     fixed = apply_workspace_edit(text, actions[0]["edit"], "t.rel")
     assert fixed == "exists operating system\n"
     assert diagnostics(did_change(server, "t.rel", fixed, version=2), "t.rel") == []

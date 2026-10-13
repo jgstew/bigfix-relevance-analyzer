@@ -81,12 +81,14 @@ is in the requested range, and plans are kept with the document's extraction
 until its text changes.
 
 An unknown name's "did you mean" leads are quick fixes too: one per lead,
-replacing that use of the name ("Replace `nme` with `name`"), preferred only
-when it is the name's one lead. They are guesses, not safe fixes, so they never
-join the fix-all actions, and a name whose diagnostic covers its whole line
-(its range could not be placed for certain) gets none. A lead is inserted as
-it is: every inspector name is plain lowercase text, which no host format
-needs escaped, and a test holds that.
+replacing that use of the name ("Replace `oprating system` with `operating
+system`"), preferred only when it is the name's one lead. They are guesses, not
+safe fixes, so they never join the fix-all actions. A name whose diagnostic
+covers its whole line (its range could not be placed for certain) gets none,
+and nor does one with a comment between its words, which replacing it would
+delete. A lead is inserted as it is, as the inspector tables spell it: lint
+keeps only leads shaped like a name (lowercase words), which no host format
+needs escaped.
 
 Completion
 ----------
@@ -795,8 +797,12 @@ def _replacements(
                 continue
             if wanted is not None and not _overlaps(found, wanted):
                 continue
+            written = finding.site.text[span.start : span.end]
+            if "/*" in written:
+                # A comment between the name's words: replacing would delete it.
+                continue
             # A name may be written over several lines; the title is one.
-            written = " ".join(finding.site.text[span.start : span.end].split())
+            written = " ".join(written.split())
             lone = len(span.suggestions) == 1
             actions.extend(
                 DocumentFix(

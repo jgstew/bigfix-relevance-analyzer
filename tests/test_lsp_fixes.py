@@ -491,7 +491,7 @@ def test_a_multi_word_replacement_gives_the_corrected_statement() -> None:
     assert apply(TYPOS, fix) == "nme of operating system\n"
 
 
-def test_the_plural_lead_keeps_its_plural() -> None:
+def test_both_numbers_of_a_name_are_offered() -> None:
     text = "names of bes computerz\n"
     titles = [fix.title for fix in suggestions("t.rel", text)]
     assert titles[:2] == [
@@ -502,9 +502,36 @@ def test_the_plural_lead_keeps_its_plural() -> None:
 
 def test_a_lone_lead_is_preferred_and_several_are_not() -> None:
     linter = DocumentLinter()
-    for fix in suggestions("t.rel", TYPOS, linter):
-        (diagnostic,) = fix.diagnostics
-        assert fix.is_preferred == (len(diagnostic["data"]["suggestions"]) == 1)
+    several = suggestions("t.rel", TYPOS, linter)
+    assert several
+    assert not any(fix.is_preferred for fix in several)
+    text = "exists bcq\n"
+    (diagnostic,) = linter.diagnostics(uri("t.rel"), text)
+    assert diagnostic["data"]["suggestions"] == ["bcc"]
+    (lone,) = suggestions("t.rel", text, linter)
+    assert lone.is_preferred
+    assert apply(text, lone) == "exists bcc\n"
+
+
+def test_a_name_with_a_comment_inside_gets_no_replacement() -> None:
+    """Replacing it would delete the comment; the leads stay on the diagnostic."""
+    text = "exists oprating /* c */ system\n"
+    (diagnostic,) = DocumentLinter().diagnostics(uri("t.rel"), text)
+    assert diagnostic["data"]["suggestions"]
+    assert suggestions("t.rel", text) == []
+
+
+@pytest.mark.parametrize(("name", "symbol"), [("concat", "&"), ("less", "<")])
+def test_an_operator_is_never_a_replacement(name: str, symbol: str) -> None:
+    """`concat` finds `&` in suggest()'s pool; inserted into BES XML it would
+    break the file, and in any file `exists &` does not parse."""
+    text = f"<BES><Task><Relevance>exists {name}</Relevance></Task></BES>\n"
+    found = suggestions("t.bes", text)
+    assert found
+    assert all(fix.edits[0][1] != symbol for fix in found)
+    for fix in found:
+        _, problems = _extract_data(Path("t.bes"), apply(text, fix).encode())
+        assert not problems
 
 
 def test_the_title_shows_a_name_split_over_lines_on_one() -> None:
@@ -570,14 +597,14 @@ def test_an_unmappable_name_gets_no_replacement() -> None:
 
 def test_every_inspector_name_needs_no_escaping_in_any_host() -> None:
     """A lead is inserted as is: into BES XML, a JavaScript string, markdown.
-    That is safe only while every name a lead can be is plain text."""
+    Lint keeps only leads shaped like a name, so nothing inserted needs
+    escaping; and what that drops is only operators (`&`, `<=`), never a name."""
     from bigfix_relevance_analyzer import all_inspectors
+    from bigfix_relevance_analyzer.inspectors import written_forms
 
-    names = {
-        name
-        for entry in all_inspectors()
-        for name in (entry.singular_name, entry.plural_name)
-        if name
-    }
-    assert names
-    assert {name for name in names if not re.fullmatch(r"[a-z0-9_ ]+", name)} == set()
+    forms = {form for entry in all_inspectors() for form in written_forms(entry)}
+    shaped = re.compile(r"[a-z0-9_]+(?: [a-z0-9_]+)*")
+    dropped = {form for form in forms if not shaped.fullmatch(form)}
+    assert len(forms) - len(dropped) > 1000
+    assert dropped
+    assert all(not any(char.isalnum() for char in form) for form in dropped), dropped

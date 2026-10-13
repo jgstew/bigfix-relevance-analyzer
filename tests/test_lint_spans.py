@@ -12,6 +12,7 @@ agree, they never move a line.
 from __future__ import annotations
 
 import dataclasses
+import re
 
 import pytest
 from _helpers import BROKEN, UNKNOWN_INSPECTOR
@@ -270,18 +271,40 @@ def test_every_use_of_a_name_shares_its_leads() -> None:
         ('names of bes computerz whose (nme of it = "x")', None),
         # Unforced and unclassifiable: lint searches every dialect.
         ("nme of oprating system", None),
+        # Source order is not name order: the finding lists its names sorted.
+        ('exists oprating system and exists nme of file "x"', Dialect.CLIENT),
+        ('exists sizee of file "x" and exists nme of file "y"', Dialect.CLIENT),
     ],
 )
 def test_the_spans_leads_together_are_the_findings_suggestions(
     statement: str, dialect: Dialect | None
 ) -> None:
-    """The finding's own list is every span's leads, de-duplicated in order."""
+    """The finding's own list is every name's leads, de-duplicated, with the
+    names in the order the finding lists them (sorted), not in source order."""
     finding = only(
         lint_text(statement, LintConfig(dialect=dialect, suggest=True)), "unknown-inspector"
     )
     assert finding.suggestions
-    merged = tuple(dict.fromkeys(lead for span in finding.spans for lead in span.suggestions))
+    by_name = {
+        " ".join(statement[span.start : span.end].lower().split()): span.suggestions
+        for span in finding.spans
+    }
+    merged = tuple(dict.fromkeys(lead for name in sorted(by_name) for lead in by_name[name]))
     assert merged == finding.suggestions
+
+
+@pytest.mark.parametrize("statement", ["exists concat", "exists less", "exists equal"])
+def test_a_lead_is_always_a_name_never_an_operator(statement: str) -> None:
+    """suggest() also searches operators' symbols (`concat` finds `&`), but a
+    lead stands in a name's place: `exists &` would not parse, and `&` or `<`
+    inserted into BES XML would break the file."""
+    assert any(not lead.replace(" ", "").isalnum() for lead in suggest(statement.split()[1]))
+    finding = only(lint_text(statement, LintConfig(suggest=True)), "unknown-inspector")
+    leads = [*finding.suggestions, *(lead for span in finding.spans for lead in span.suggestions)]
+    assert leads
+    for lead in leads:
+        assert re.fullmatch(r"[a-z0-9_]+(?: [a-z0-9_]+)*", lead), lead
+    assert "`&`" not in finding.message and "`<`" not in finding.message
 
 
 def test_no_leads_unless_suggest_asks_for_them() -> None:

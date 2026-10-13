@@ -717,9 +717,11 @@ advertised to a client that accepts `CodeAction` literals, and their edits
 carry the document's version when the client supports `documentChanges`.
 
 An unknown name's "did you mean" leads are quick fixes too: one `quickfix`
-action per lead, "Replace \`nme\` with \`name\`", replacing just that use of
-the name, and preferred only when the name has a single lead. They are guesses,
-not safe fixes, so they never join the fix-all actions. The same leads ride on
+action per lead, "Replace \`oprating system\` with \`operating system\`",
+replacing just that use of the name, and preferred only when the name has a
+single lead. They are guesses, not safe fixes, so they never join the fix-all
+actions, and a name with a comment between its words gets none. A lead is
+always a name, never an operator's symbol, so it can stand where the name is. The same leads ride on
 each `unknown-inspector` diagnostic as `data: {"suggestions": [...]}`, best
 first, so a client can build its own UI without parsing the message; no other
 diagnostic has `data`, and one that had to fall back to its whole line has none.
@@ -810,7 +812,7 @@ empty for a finding about the statement as a whole - and, for an
 `unknown-inspector` use, a `message` naming just that name with just its own
 "did you mean" leads (`null` on every other rule's spans) and those leads as a
 list in `suggestions` (empty everywhere else; together they are the finding's own
-`suggestions`). `line` keeps its meaning; a span is
+`suggestions`, which lists them by name, sorted). `line` keeps its meaning; a span is
 relative to the statement, so turning it into a file position is the
 consumer's job (`lsp.positions` does it for an editor).
 
