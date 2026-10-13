@@ -290,7 +290,8 @@ def test_whitespace_inside_a_multi_word_name_hovers_that_name(
     ("text", "needle"),
     [
         ("names of bes computers", " of"),  # between two references
-        ("names of bes computers", "s of"),  # between a name and `of`
+        ("names of bes computers", " bes"),  # between `of` and the next name
+        ("exists bes /* note */ computers", "note"),  # on a comment between its words
         ('exists key value "x" of registry', ' "x"'),  # between a name and its index
         ('exists file "x"', ' "x"'),
         ("(names of ( bes computers))", " bes"),  # inside folded parentheses
@@ -298,8 +299,7 @@ def test_whitespace_inside_a_multi_word_name_hovers_that_name(
     ],
 )
 def test_whitespace_outside_a_names_words_has_no_hover(text: str, needle: str) -> None:
-    shift = 1 if needle.startswith("s ") else 0
-    assert hover_at("a.rel", text, needle, shift=shift) is None
+    assert hover_at("a.rel", text, needle) is None
 
 
 def test_whitespace_inside_a_name_hovers_it_in_a_bes_file() -> None:
