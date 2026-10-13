@@ -716,6 +716,14 @@ action is offered only for a fix `--fix` would write. Code actions are
 advertised to a client that accepts `CodeAction` literals, and their edits
 carry the document's version when the client supports `documentChanges`.
 
+An unknown name's "did you mean" leads are quick fixes too: one `quickfix`
+action per lead, "Replace \`nme\` with \`name\`", replacing just that use of
+the name, and preferred only when the name has a single lead. They are guesses,
+not safe fixes, so they never join the fix-all actions. The same leads ride on
+each `unknown-inspector` diagnostic as `data: {"suggestions": [...]}`, best
+first, so a client can build its own UI without parsing the message; no other
+diagnostic has `data`, and one that had to fall back to its whole line has none.
+
 The protocol logic does no I/O, so it can also run without stdio. A host such
 as a WASM runtime inside an editor extension passes each parsed JSON-RPC
 message to `Server.handle()` and sends back whatever list it returns:
@@ -796,11 +804,13 @@ lint_paths_to_dict(changed_paths, LintConfig(max_score=350))
 all have `to_dict()`. `Inspector` and `RelevanceType` include the decoded
 `dialects` and `platforms` so no consumer parses `"client:windows"` for itself;
 `Finding` nests its `site` and carries a `text` key holding the same grep-able
-line the CLIs print, and a `spans` list of `{"start", "end", "message"}`: offsets
+line the CLIs print, and a `spans` list of `{"start", "end", "message", "suggestions"}`: offsets
 into the site's text (or the bare statement) for the characters it is about -
 empty for a finding about the statement as a whole - and, for an
 `unknown-inspector` use, a `message` naming just that name with just its own
-"did you mean" leads (`null` on every other rule's spans). `line` keeps its meaning; a span is
+"did you mean" leads (`null` on every other rule's spans) and those leads as a
+list in `suggestions` (empty everywhere else; together they are the finding's own
+`suggestions`). `line` keeps its meaning; a span is
 relative to the statement, so turning it into a file position is the
 consumer's job (`lsp.positions` does it for an editor).
 
@@ -1026,7 +1036,9 @@ carrying the true count and `signatures_omitted` accounting for the rest - about
 
 Turn `unknown-inspector` warnings into leads with `LintConfig(suggest=True)`:
 the message gains `-- did you mean \`registry\`?` and `Finding.suggestions`
-carries the same names as structure, so a server is not parsing prose. Off by
+carries the same names as structure, so a server is not parsing prose. Each
+use of each name also carries its own name's leads in `TextSpan.suggestions`,
+so an editor knows which lead belongs to which underline. Off by
 default, because unknown names are common in a repo running newer inspectors
 than the snapshot - that is the rule's whole rationale - and a few thousand
 sites would add real latency to a hook for a warning that blocks nothing.

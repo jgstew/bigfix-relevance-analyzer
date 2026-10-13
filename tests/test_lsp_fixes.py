@@ -78,10 +78,31 @@ def fixes(
     return (linter or DocumentLinter()).fixes(uri(name), text, range=range, only=only)
 
 
-def quick_fixes(name: str, text: str, linter: DocumentLinter | None = None) -> list[DocumentFix]:
-    """The per-statement quick fixes: kind ``quickfix``, not the fix-all entry."""
+def is_suggestion(fix: DocumentFix) -> bool:
+    """A "did you mean" replacement (#142 S1), not a safe fix."""
+    return all(d["code"] == "unknown-inspector" for d in fix.diagnostics)
+
+
+def safe_fixes(
+    name: str,
+    text: str,
+    linter: DocumentLinter | None = None,
+    *,
+    range: Range | None = WHOLE,
+    only: list[str] | None = None,
+) -> list[DocumentFix]:
+    """:func:`fixes` without the "did you mean" replacements."""
     return [
-        fix for fix in fixes(name, text, linter) if fix.kind == QUICKFIX_KIND and fix.is_preferred
+        fix for fix in fixes(name, text, linter, range=range, only=only) if not is_suggestion(fix)
+    ]
+
+
+def quick_fixes(name: str, text: str, linter: DocumentLinter | None = None) -> list[DocumentFix]:
+    """The per-statement safe fixes: kind ``quickfix``, not the fix-all entry."""
+    return [
+        fix
+        for fix in safe_fixes(name, text, linter)
+        if fix.kind == QUICKFIX_KIND and fix.is_preferred
     ]
 
 
@@ -356,7 +377,7 @@ def _golden_documents() -> list[tuple[str, str]]:
             text = path.read_bytes().removeprefix(BOM).decode("utf-8")
         except UnicodeDecodeError:
             continue
-        if fixes(path.name, text):
+        if safe_fixes(path.name, text):
             documents.append((path.relative_to(EXAMPLES).as_posix(), text))
     return documents + [(f"{case.id}/{case.name}", decoded(case)[0]) for case in CASES]
 
@@ -371,7 +392,7 @@ def test_every_action_is_pinned_and_round_trips() -> None:
     pinned: dict[str, list[dict[str, object]]] = {}
     sites = 0
     for name, text in _golden_documents():
-        found = fixes(name.rsplit("/", 1)[-1], text)
+        found = safe_fixes(name.rsplit("/", 1)[-1], text)
         pinned[name] = [
             {
                 "title": fix.title,
@@ -387,7 +408,7 @@ def test_every_action_is_pinned_and_round_trips() -> None:
             after = apply(text, fix)
             assert len(quick_fixes(name.rsplit("/", 1)[-1], after)) == len(per_site) - 1, name
         (fix_all,) = (fix for fix in found if fix.kind == FIX_ALL_KIND)
-        assert fixes(name.rsplit("/", 1)[-1], apply(text, fix_all)) == [], name
+        assert safe_fixes(name.rsplit("/", 1)[-1], apply(text, fix_all)) == [], name
     assert sites >= 5 + sum(case.sites for case in CASES)
     actual = json.dumps(pinned, indent=1, ensure_ascii=True) + "\n"
     assert actual == golden_text(GOLDEN, actual)
@@ -423,3 +444,140 @@ def test_no_fix_all_when_the_whole_file_plan_applies_nothing() -> None:
     text = '```relevance\npathnames of files "x" | "y"\n```\n'
     assert fixes("t.md", text, linter) == []
     assert fixes("t.md", text, linter, only=["source.fixAll"]) == []
+
+
+# -- "did you mean" replacements (#142 S1) ---------------------------------------------
+
+TYPOS = "nme of oprating system\n"
+
+
+def suggestions(
+    name: str,
+    text: str,
+    linter: DocumentLinter | None = None,
+    *,
+    range: Range | None = WHOLE,
+    only: list[str] | None = None,
+) -> list[DocumentFix]:
+    return [fix for fix in fixes(name, text, linter, range=range, only=only) if is_suggestion(fix)]
+
+
+def test_one_replacement_per_lead_per_unknown_name() -> None:
+    linter = DocumentLinter()
+    published = linter.diagnostics(uri("t.rel"), TYPOS)
+    found = suggestions("t.rel", TYPOS, linter)
+    leads = [d["data"]["suggestions"] for d in published]
+    assert [fix.title for fix in found] == [
+        f"Replace `{written}` with `{lead}`"
+        for written, each in zip(["nme", "oprating system"], leads, strict=True)
+        for lead in each
+    ]
+    assert all(fix.kind == QUICKFIX_KIND for fix in found)
+    # Each replaces just its own name, and claims just that name's diagnostic.
+    assert [(fix.edits, fix.diagnostics) for fix in found] == [
+        (((((0, start), (0, end)), lead),), (diagnostic,))
+        for (start, end), diagnostic in zip([(0, 3), (7, 22)], published, strict=True)
+        for lead in diagnostic["data"]["suggestions"]
+    ]
+
+
+def test_a_multi_word_replacement_gives_the_corrected_statement() -> None:
+    (fix,) = (
+        fix
+        for fix in suggestions("t.rel", TYPOS)
+        if fix.title == "Replace `oprating system` with `operating system`"
+    )
+    assert fix.edits == ((((0, 7), (0, 22)), "operating system"),)
+    assert apply(TYPOS, fix) == "nme of operating system\n"
+
+
+def test_the_plural_lead_keeps_its_plural() -> None:
+    text = "names of bes computerz\n"
+    titles = [fix.title for fix in suggestions("t.rel", text)]
+    assert titles[:2] == [
+        "Replace `bes computerz` with `bes computer`",
+        "Replace `bes computerz` with `bes computers`",
+    ]
+
+
+def test_a_lone_lead_is_preferred_and_several_are_not() -> None:
+    linter = DocumentLinter()
+    for fix in suggestions("t.rel", TYPOS, linter):
+        (diagnostic,) = fix.diagnostics
+        assert fix.is_preferred == (len(diagnostic["data"]["suggestions"]) == 1)
+
+
+def test_the_title_shows_a_name_split_over_lines_on_one() -> None:
+    text = "nme of Oprating\n  System\n"
+    found = suggestions("t.rel", text)
+    (fix, *_) = (fix for fix in found if "System" in fix.title)
+    assert fix.title == "Replace `Oprating System` with `operating system`"
+    assert fix.edits == ((((0, 7), (1, 8)), "operating system"),)
+    assert apply(text, fix) == "nme of operating system\n"
+
+
+def test_replacements_follow_the_range() -> None:
+    on_typo = suggestions("t.rel", TYPOS, range=((0, 10), (0, 10)))
+    assert on_typo
+    assert all(fix.edits[0][0] == ((0, 7), (0, 22)) for fix in on_typo)
+    # Touching counts, as for the safe fixes.
+    assert suggestions("t.rel", TYPOS, range=((0, 3), (0, 3)))[0].edits[0][0] == ((0, 0), (0, 3))
+    assert suggestions("t.rel", TYPOS, range=((0, 5), (0, 5))) == []
+
+
+def test_replacements_are_quick_fixes_for_only() -> None:
+    """The browser client sends `only: ["quickfix"]`; fix on save must not
+    pick up a guess."""
+    assert suggestions("t.rel", TYPOS, only=["quickfix"]) == suggestions("t.rel", TYPOS)
+    assert fixes("t.rel", TYPOS, only=["source.fixAll"]) == []
+    assert fixes("t.rel", TYPOS, only=["source"]) == []
+    assert fixes("t.rel", TYPOS, only=["refactor"]) == []
+
+
+def test_no_replacements_without_suggest() -> None:
+    assert fixes("t.rel", TYPOS, DocumentLinter(config=LintConfig())) == []
+
+
+def test_replacements_come_after_the_statements_safe_fixes() -> None:
+    text = f"{SETTING} and exists oprating system\n"
+    found = fixes("t.rel", text)
+    assert (found[0].kind, is_suggestion(found[0])) == (QUICKFIX_KIND, False)
+    assert found[-1].kind == FIX_ALL_KIND
+    assert [is_suggestion(fix) for fix in found[1:-1]] == [True] * (len(found) - 2)
+    assert {apply(text, fix) for fix in found if fix.title.endswith("`operating system`")} == {
+        f"{SETTING} and exists operating system\n"
+    }
+
+
+def test_a_bes_replacement_lands_through_the_source_map() -> None:
+    text = (
+        "<BES>\n<Task>\n\t<Relevance>exists file &quot;x&quot; whose "
+        "(exists oprating system)</Relevance>\n</Task>\n</BES>\n"
+    )
+    (fix, *_) = suggestions("t.bes", text)
+    assert fix.title == "Replace `oprating system` with `operating system`"
+    after = apply(text, fix)
+    assert "(exists operating system)</Relevance>" in after
+    assert "&quot;x&quot;" in after
+    assert suggestions("t.bes", after) == []
+
+
+def test_an_unmappable_name_gets_no_replacement() -> None:
+    """The diagnostic falls back to the whole line; no name range, no edit."""
+    text = 'exists file "\ud800" whose (exists oprating system) and exists file "y"\n'
+    assert suggestions("t.rel", text) == []
+
+
+def test_every_inspector_name_needs_no_escaping_in_any_host() -> None:
+    """A lead is inserted as is: into BES XML, a JavaScript string, markdown.
+    That is safe only while every name a lead can be is plain text."""
+    from bigfix_relevance_analyzer import all_inspectors
+
+    names = {
+        name
+        for entry in all_inspectors()
+        for name in (entry.singular_name, entry.plural_name)
+        if name
+    }
+    assert names
+    assert {name for name in names if not re.fullmatch(r"[a-z0-9_ ]+", name)} == set()

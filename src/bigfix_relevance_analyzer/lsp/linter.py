@@ -26,7 +26,9 @@ findings, and one per use of each unknown name for ``unknown-inspector``,
 which lint reports as a single finding per statement. A span with a message of
 its own (:attr:`~bigfix_relevance_analyzer.lint.TextSpan.message`) shows that
 instead of the finding's: each unknown name's diagnostic names just that name
-and offers just its leads.
+and offers just its leads. It also carries those leads as data,
+``data: {"suggestions": [...]}`` (:attr:`~bigfix_relevance_analyzer.lint.TextSpan.suggestions`),
+so a client needs no parse of the message; no other diagnostic has ``data``.
 
 Otherwise -- a statement-level rule, an extraction problem, or a span that
 cannot be placed for certain -- the diagnostic covers the finding's whole line,
@@ -77,6 +79,14 @@ plan it refuses is no action, with the reason logged at debug level. An editor
 asks on every cursor move, so nothing is planned unless a fixable diagnostic
 is in the requested range, and plans are kept with the document's extraction
 until its text changes.
+
+An unknown name's "did you mean" leads are quick fixes too: one per lead,
+replacing that use of the name ("Replace `nme` with `name`"), preferred only
+when it is the name's one lead. They are guesses, not safe fixes, so they never
+join the fix-all actions, and a name whose diagnostic covers its whole line
+(its range could not be placed for certain) gets none. A lead is inserted as
+it is: every inspector name is plain lowercase text, which no host format
+needs escaped, and a test holds that.
 
 Completion
 ----------
@@ -184,6 +194,9 @@ FIX_ALL_KIND: Final = "source.fixAll.bigfix-relevance"
 ``editor.codeActionsOnSave`` names to fix on save."""
 
 FIX_ALL_TITLE: Final = "Fix all safe issues in this file"
+
+_UNKNOWN_INSPECTOR: Final = "unknown-inspector"
+"""The rule whose diagnostics carry leads, and whose leads are quick fixes."""
 
 DEFAULT_CACHE_SIZE: Final = 2048
 """Sites whose findings the linter keeps -- as many as lint keeps analyses."""
@@ -512,10 +525,12 @@ class DocumentLinter:
         diagnostic in ``range`` (all of them when ``range`` is ``None``), each
         applying that statement's whole fix; then, when the file has two or
         more, a second-choice quick fix for all of them; then the
-        :data:`FIX_ALL_KIND` action. ``only`` keeps just the kinds it names or
-        is a prefix of, as LSP's ``context.only`` does, and asking for the
-        fix-all kind by name gets it wherever ``range`` is: fix on save. The
-        file type is chosen exactly as :meth:`diagnostics` chooses it.
+        :data:`FIX_ALL_KIND` action. Between the statements' fixes and the
+        fix-all ones, a :data:`QUICKFIX_KIND` action per "did you mean" lead
+        of each unknown name in ``range``. ``only`` keeps just the kinds it
+        names or is a prefix of, as LSP's ``context.only`` does, and asking
+        for the fix-all kind by name gets it wherever ``range`` is: fix on
+        save. The file type is chosen exactly as :meth:`diagnostics` chooses it.
         """
 
         def wanted(kind: str) -> bool:
@@ -530,16 +545,22 @@ class DocumentLinter:
         findings = _lint_extracted(
             extracted.path, extracted.sites, extracted.problems, self.config, self._judge
         )
+        replacements = (
+            _replacements(extracted.index, findings, range) if wanted(QUICKFIX_KIND) else []
+        )
         fixable = site_fixes(findings)
         if not fixable:
-            return []
+            return replacements
         # One pass over the findings, each fixable diagnostic kept with its
         # range, so the range test compares tuples rather than reading dicts.
         index = extracted.index
         ranged: dict[int, list[tuple[Range, Diagnostic]]] = {}
         for finding in findings:
             if finding.site is not None and finding.autofix is not None:
-                ranged.setdefault(id(finding.site), []).extend(_ranged_diagnostics(index, finding))
+                ranged.setdefault(id(finding.site), []).extend(
+                    (found, diagnostic)
+                    for found, diagnostic, _ in _ranged_diagnostics(index, finding)
+                )
 
         def published(fix: SiteFix) -> tuple[Diagnostic, ...]:
             return tuple(diagnostic for _, diagnostic in ranged.get(id(fix.site), ()))
@@ -552,7 +573,7 @@ class DocumentLinter:
         ]
         asked_for_all = only is not None and wanted(FIX_ALL_KIND)
         if not in_range and not asked_for_all:
-            return []
+            return replacements
 
         actions: list[DocumentFix] = []
         if wanted(QUICKFIX_KIND):
@@ -568,6 +589,7 @@ class DocumentLinter:
                             is_preferred=True,
                         )
                     )
+        actions.extend(replacements)
         if (len(fixable) > 1 and in_range and wanted(QUICKFIX_KIND)) or wanted(FIX_ALL_KIND):
             whole = self._planned(extracted, None)
             # Only what the whole-file plan applied: it may refuse a site alone
@@ -724,11 +746,14 @@ def _overlaps(found: Range, wanted: Range) -> bool:
 def _diagnostics(index: DocumentIndex, finding: Finding) -> list[Diagnostic]:
     """``finding``'s diagnostics: one per span when all of them map, else one
     over its whole line. See the module docstring."""
-    return [diagnostic for _, diagnostic in _ranged_diagnostics(index, finding)]
+    return [diagnostic for _, diagnostic, _ in _ranged_diagnostics(index, finding)]
 
 
-def _ranged_diagnostics(index: DocumentIndex, finding: Finding) -> list[tuple[Range, Diagnostic]]:
-    """:func:`_diagnostics`, each with its range as a tuple."""
+def _ranged_diagnostics(
+    index: DocumentIndex, finding: Finding
+) -> list[tuple[Range, Diagnostic, TextSpan | None]]:
+    """:func:`_diagnostics`, each with its range as a tuple and the span it
+    covers (``None`` for the whole-line fallback)."""
     severity = _SEVERITIES[finding.severity]
     site = finding.site
     if site is not None and finding.spans:
@@ -736,23 +761,75 @@ def _ranged_diagnostics(index: DocumentIndex, finding: Finding) -> list[tuple[Ra
         mapped = [found for found in ranges if found is not None]
         if len(mapped) == len(ranges):
             return [
-                (found, _diagnostic(found, severity, finding.code, span.message or finding.message))
+                (
+                    found,
+                    _diagnostic(
+                        found,
+                        severity,
+                        finding.code,
+                        span.message or finding.message,
+                        {"suggestions": list(span.suggestions)}
+                        if finding.code == _UNKNOWN_INSPECTOR
+                        else None,
+                    ),
+                    span,
+                )
                 for found, span in zip(mapped, finding.spans, strict=True)
             ]
     line = max(finding.line - 1, 0)
     whole = ((line, 0), (line, index.line_length(line)))
-    return [(whole, _diagnostic(whole, severity, finding.code, finding.message))]
+    return [(whole, _diagnostic(whole, severity, finding.code, finding.message), None)]
 
 
-def _diagnostic(found: Range, severity: _DiagnosticSeverity, code: str, message: str) -> Diagnostic:
-    """A diagnostic over ``found``: 0-based lines, UTF-16 code unit characters."""
-    return {
+def _replacements(
+    index: DocumentIndex, findings: Sequence[Finding], wanted: Range | None
+) -> list[DocumentFix]:
+    """A quick fix per lead of each unknown name in ``wanted`` (all of them
+    when ``None``), in finding, span and lead order. See the module docstring."""
+    actions: list[DocumentFix] = []
+    for finding in findings:
+        if finding.code != _UNKNOWN_INSPECTOR or finding.site is None:
+            continue
+        for found, diagnostic, span in _ranged_diagnostics(index, finding):
+            if span is None or not span.suggestions:
+                continue
+            if wanted is not None and not _overlaps(found, wanted):
+                continue
+            # A name may be written over several lines; the title is one.
+            written = " ".join(finding.site.text[span.start : span.end].split())
+            lone = len(span.suggestions) == 1
+            actions.extend(
+                DocumentFix(
+                    f"Replace `{written}` with `{lead}`",
+                    QUICKFIX_KIND,
+                    (diagnostic,),
+                    ((found, lead),),
+                    is_preferred=lone,
+                )
+                for lead in span.suggestions
+            )
+    return actions
+
+
+def _diagnostic(
+    found: Range,
+    severity: _DiagnosticSeverity,
+    code: str,
+    message: str,
+    data: Mapping[str, Any] | None = None,
+) -> Diagnostic:
+    """A diagnostic over ``found``: 0-based lines, UTF-16 code unit characters.
+    ``data`` only when given: no other diagnostic has the key."""
+    diagnostic: Diagnostic = {
         "range": lsp_range(found),
         "severity": int(severity),
         "code": code,
         "source": SOURCE,
         "message": message,
     }
+    if data is not None:
+        diagnostic["data"] = dict(data)
+    return diagnostic
 
 
 def lsp_range(found: Range) -> dict[str, dict[str, int]]:

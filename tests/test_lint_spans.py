@@ -16,7 +16,7 @@ import dataclasses
 import pytest
 from _helpers import BROKEN, UNKNOWN_INSPECTOR
 
-from bigfix_relevance_analyzer import TextSpan
+from bigfix_relevance_analyzer import Dialect, TextSpan, suggest
 from bigfix_relevance_analyzer.analyzer import analyze
 from bigfix_relevance_analyzer.extract import (
     extract_relevance_from_actionscript,
@@ -57,8 +57,14 @@ def line_of(text: str, offset: int) -> int:
 def test_a_text_span_is_a_frozen_start_and_end() -> None:
     span = TextSpan(3, 7)
     assert (span.start, span.end) == (3, 7)
-    assert [field.name for field in dataclasses.fields(TextSpan)] == ["start", "end", "message"]
+    assert [field.name for field in dataclasses.fields(TextSpan)] == [
+        "start",
+        "end",
+        "message",
+        "suggestions",
+    ]
     assert span.message is None
+    assert span.suggestions == ()
     with pytest.raises(dataclasses.FrozenInstanceError):
         span.start = 1  # type: ignore[misc]
 
@@ -224,6 +230,82 @@ def test_spans_of_other_rules_have_no_message_of_their_own() -> None:
         assert all(span.message is None for span in finding.spans), finding.code
 
 
+# ---------------------------------------------------------------------------
+# Each unknown use's own leads (#142, S1)
+# ---------------------------------------------------------------------------
+
+
+def test_each_unknown_use_carries_its_own_names_leads() -> None:
+    """Per written name, in span order: an editor can tell which lead belongs
+    to which underline without asking :func:`suggest` again."""
+    text = "nme of Oprating  System"
+    finding = only(
+        lint_text(text, LintConfig(dialect=Dialect.CLIENT, suggest=True)), "unknown-inspector"
+    )
+    assert [span.suggestions for span in finding.spans] == [
+        suggest("nme", dialect=Dialect.CLIENT),
+        suggest("oprating system", dialect=Dialect.CLIENT),
+    ]
+    assert finding.spans[1].suggestions[0] == "operating system"
+
+
+def test_every_use_of_a_name_shares_its_leads() -> None:
+    text = "nme of NME of operating system"
+    finding = only(
+        lint_text(text, LintConfig(dialect=Dialect.CLIENT, suggest=True)), "unknown-inspector"
+    )
+    first, second = (span.suggestions for span in finding.spans)
+    assert first == second == suggest("nme", dialect=Dialect.CLIENT)
+
+
+@pytest.mark.parametrize(
+    ("statement", "dialect"),
+    [
+        ("nme of Oprating  System", Dialect.CLIENT),
+        ("nme of nme of operating system", Dialect.CLIENT),
+        ("names of bes computerz", Dialect.SESSION),
+        # Unforced: lint classifies the statement, and the spans follow it.
+        ('names of filez of folder "/etc"', None),  # classified client
+        ("names of bes computerz", None),  # classified session
+        ('names of bes computerz whose (nme of it = "x")', None),
+        # Unforced and unclassifiable: lint searches every dialect.
+        ("nme of oprating system", None),
+    ],
+)
+def test_the_spans_leads_together_are_the_findings_suggestions(
+    statement: str, dialect: Dialect | None
+) -> None:
+    """The finding's own list is every span's leads, de-duplicated in order."""
+    finding = only(
+        lint_text(statement, LintConfig(dialect=dialect, suggest=True)), "unknown-inspector"
+    )
+    assert finding.suggestions
+    merged = tuple(dict.fromkeys(lead for span in finding.spans for lead in span.suggestions))
+    assert merged == finding.suggestions
+
+
+def test_no_leads_unless_suggest_asks_for_them() -> None:
+    finding = only(lint_text("nme of oprating system", LintConfig()), "unknown-inspector")
+    assert finding.spans
+    assert all(span.suggestions == () for span in finding.spans)
+
+
+def test_spans_of_other_rules_have_no_leads() -> None:
+    for finding in lint_text(
+        'exists file "x" whose (size of it = "big") or ' + BROKEN, LintConfig(suggest=True)
+    ):
+        assert finding.spans
+        assert all(span.suggestions == () for span in finding.spans), finding.code
+
+
+def test_a_spans_leads_serialize_as_a_list() -> None:
+    text = "exists oprating system"
+    finding = only(lint_text(text, LintConfig(suggest=True)), "unknown-inspector")
+    (span,) = finding.to_dict()["spans"]
+    assert span["suggestions"] == list(finding.spans[0].suggestions)
+    assert span["suggestions"][0] == "operating system"
+
+
 def test_unknown_inspector_with_one_name() -> None:
     finding = only(lint_text(f"exists {UNKNOWN_INSPECTOR}", LintConfig()), "unknown-inspector")
     assert [(span.start, span.end) for span in finding.spans] == [(7, 7 + len(UNKNOWN_INSPECTOR))]
@@ -319,7 +401,7 @@ def test_to_dict_adds_spans_and_keeps_every_other_key() -> None:
         "text",
         "spans",
     ]
-    assert payload["spans"] == [{"start": 12, "end": 25, "message": None}]
+    assert payload["spans"] == [{"start": 12, "end": 25, "message": None, "suggestions": []}]
     assert payload["text"] == str(finding)
 
 

@@ -697,8 +697,22 @@ class TextSpan:
     the finding's message lists every name and all their leads together.
     ``None`` means the finding's message is the one to show."""
 
+    suggestions: tuple[str, ...] = ()
+    """The names this span's text may have been meant to be, best first: what
+    :attr:`message` offers, as data. Only ``unknown-inspector`` sets it, and
+    only when :attr:`LintConfig.suggest` asked for leads. Every use of a name
+    carries that name's leads, so an editor can put a lead in place of the
+    characters this span covers without asking
+    :func:`~bigfix_relevance_analyzer.inspectors.suggest` again. Together, in
+    span order and without repeats, they are :attr:`Finding.suggestions`."""
+
     def to_dict(self) -> dict[str, Any]:
-        return {"start": self.start, "end": self.end, "message": self.message}
+        return {
+            "start": self.start,
+            "end": self.end,
+            "message": self.message,
+            "suggestions": list(self.suggestions),
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -1417,15 +1431,16 @@ def lint_analysis(
         leads = tuple(dict.fromkeys(lead for name in unknown for lead in name_leads[name]))
         # Every use of every name, in source order: one finding still (the
         # hook counts findings), but an editor underlines each use, and each
-        # span carries the message for its own name and its own leads, so a
-        # consumer never has to take the finding's message apart.
+        # span carries the message for its own name and its own leads (as
+        # text and as data), so a consumer never has to take the finding's
+        # message apart.
         uses: list[TextSpan] = []
         for entry in report.references:
             phrase = entry.reference.phrase
             if phrase in name_leads:
                 written = _name_span(report, entry.reference)
                 message = _unknown_message((phrase,), name_leads[phrase])
-                uses.append(TextSpan(written.start, written.end, message))
+                uses.append(TextSpan(written.start, written.end, message, name_leads[phrase]))
         # The finding itself is statement-level for its line: relative line 1,
         # which `emit` offsets by `base_line`. Passing `base_line` itself here
         # double-counted the offset for extracted sites (line 15 of an 11-line
