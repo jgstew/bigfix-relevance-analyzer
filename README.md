@@ -800,6 +800,42 @@ Code. Its source is `tools/vscode-extension/componentize-py/`. Beside it,
 `bigfix-relevance-lsp` from a local Python instead; see
 `tools/vscode-extension/README.md`.
 
+**A CodeMirror 6 client ships in the wheel**, as package data:
+`bigfix_relevance_analyzer/web/relevance_editor.js`. It gives a browser editor
+the same diagnostics (underlines and a gutter), completion, hover, and quick
+fixes (in the hover and on Mod-.) that VS Code gets. It imports nothing: the
+page passes its own CodeMirror namespace, so any CodeMirror 6 bundle works,
+including NiceGUI's. It needs `@codemirror/view` >= 6.38, `state` >= 6.5 and
+`language` >= 6.11, and only the names it lists in `REQUIRED_CM`. Find it
+with `importlib.resources`:
+
+```python
+from importlib.resources import files
+
+client = files("bigfix_relevance_analyzer") / "web" / "relevance_editor.js"
+```
+
+```js
+import { relevanceEditor } from "./relevance_editor.js";
+
+const transport = {
+  request: (method, params) => sendToServer(method, params), // a Promise of the result
+  onNotification: (handler) => onServerNotification(handler), // publishDiagnostics
+};
+new CM.EditorView({
+  doc: text,
+  // basicSetup is the page's own (from the `codemirror` package; NiceGUI's
+  // editor has it): its autocompletion() is what shows the completions.
+  extensions: [basicSetup, relevanceEditor(CM, transport, { uri: "untitled:statement" })],
+  parent,
+});
+```
+
+The page owns the text and keeps the server's copy current itself (with
+`StatementSession` on the Python side, say); the client sends no
+`didOpen`/`didChange`. Its Node tests are in `tools/editor-client/`, run
+against exact pins of the oldest CodeMirror versions it supports.
+
 For hover-style questions, `node_at(tree, offset)` returns the innermost node
 under a character offset of the parsed statement. `nodes_at` returns the whole
 chain from the root down.
