@@ -61,8 +61,10 @@ const RULES = [
 const COMMENT_BEGIN = new RegExp("/\\*", "uy");
 const COMMENT_END = new RegExp("\\*/", "gu");
 const STRING_BEGIN = new RegExp("\"", "uy");
-const STRING_END = new RegExp("\"", "gu");
-const ESCAPE = new RegExp("%[0-9A-Fa-f]{2}", "gu");
+// A string's end (group 1) or an escape, whichever comes first, the end on a
+// tie, as TextMate tries a begin/end rule's end first. One search, not two:
+// searching each to the end of the line per escape was quadratic.
+const STRING_NEXT = new RegExp("(\")|%[0-9A-Fa-f]{2}", "gu");
 const WORD = new RegExp("[\\p{Alpha}\\p{M}\\p{Decimal_Number}\\p{Pc}\\u00b2\\u00b3\\u00b9\\u00bc-\\u00be]+", "uy");
 
 // CodeMirror's stream parser stops asking for tokens once one starts past this
@@ -94,14 +96,10 @@ function step(stream, state) {
     return "blockComment";
   }
   if (state.inside === "string") {
-    // The end and the escapes compete as in TextMate: the earliest wins, the
-    // end on a tie (it is tried first).
-    const end = search(STRING_END, text, stream.pos);
-    const escape = search(ESCAPE, text, stream.pos);
-    const next = [end, escape].filter(Boolean).sort((a, b) => a.index - b.index)[0];
+    const next = search(STRING_NEXT, text, stream.pos);
     if (next && next.index === stream.pos) {
       stream.pos += next[0].length;
-      if (next === end) {
+      if (next[1] !== undefined) {
         state.inside = null;
         return "string";
       }

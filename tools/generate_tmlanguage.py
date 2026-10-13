@@ -792,8 +792,10 @@ const RULES = [
 const COMMENT_BEGIN = new RegExp({comment_begin}, "uy");
 const COMMENT_END = new RegExp({comment_end}, "gu");
 const STRING_BEGIN = new RegExp({string_begin}, "uy");
-const STRING_END = new RegExp({string_end}, "gu");
-const ESCAPE = new RegExp({escape}, "gu");
+// A string's end (group 1) or an escape, whichever comes first, the end on a
+// tie, as TextMate tries a begin/end rule's end first. One search, not two:
+// searching each to the end of the line per escape was quadratic.
+const STRING_NEXT = new RegExp({string_next}, "gu");
 const WORD = new RegExp({word}, "uy");
 
 // CodeMirror's stream parser stops asking for tokens once one starts past this
@@ -825,14 +827,10 @@ function step(stream, state) {{
     return {comment_token};
   }}
   if (state.inside === "string") {{
-    // The end and the escapes compete as in TextMate: the earliest wins, the
-    // end on a tie (it is tried first).
-    const end = search(STRING_END, text, stream.pos);
-    const escape = search(ESCAPE, text, stream.pos);
-    const next = [end, escape].filter(Boolean).sort((a, b) => a.index - b.index)[0];
+    const next = search(STRING_NEXT, text, stream.pos);
     if (next && next.index === stream.pos) {{
       stream.pos += next[0].length;
-      if (next === end) {{
+      if (next[1] !== undefined) {{
         state.inside = null;
         return {string_token};
       }}
@@ -927,8 +925,12 @@ _JS_ESCAPES = {
     "&": "&",
 }
 
-_JS_UNPORTABLE = ("(?i)", "(?>", "*+", "++", "?+", "}+", "[:", "(?~")
+_JS_UNPORTABLE = ("(?>", "*+", "++", "?+", "}+", "[:", "(?~")
 """Oniguruma constructs JavaScript lacks or reads differently."""
+
+_JS_INLINE_FLAGS = re.compile(r"\(\?[imx-]")
+"""An inline flag group, ``(?i)`` or ``(?i:...)`` past the start: an older
+JavaScript engine (Node 22) refuses the whole module over one."""
 
 
 def _js_regex(pattern: str) -> tuple[str, str]:
@@ -944,7 +946,7 @@ def _js_regex(pattern: str) -> tuple[str, str]:
     flags = "u"
     if pattern.startswith("(?i)"):
         pattern, flags = pattern.removeprefix("(?i)"), "iu"
-    if any(part in pattern for part in _JS_UNPORTABLE):
+    if any(part in pattern for part in _JS_UNPORTABLE) or _JS_INLINE_FLAGS.search(pattern):
         raise SystemExit(f"pattern not portable to JavaScript: {pattern!r}")
     out: list[str] = []
     in_class = False
@@ -953,6 +955,8 @@ def _js_regex(pattern: str) -> tuple[str, str]:
         char = pattern[index]
         if char == "\\":
             escaped = pattern[index + 1 : index + 2]
+            if not escaped:
+                raise SystemExit(f"pattern ends in a lone backslash: {pattern!r}")
             if in_class or escaped not in _JS_ESCAPES:
                 raise SystemExit(f"escape \\{escaped} not portable to JavaScript: {pattern!r}")
             out.append(_JS_ESCAPES[escaped])
@@ -964,9 +968,25 @@ def _js_regex(pattern: str) -> tuple[str, str]:
             in_class = True
         elif char == "]":
             in_class = False
+        elif in_class and pattern.startswith("&&", index):
+            # Intersection in Oniguruma, two ampersands in JavaScript.
+            raise SystemExit(f"class intersection not portable to JavaScript: {pattern!r}")
+        elif char == "." and not in_class:
+            # JavaScript's `.` also stops at \r, U+2028 and U+2029.
+            raise SystemExit(f"`.` not portable to JavaScript: {pattern!r}")
         out.append(char)
         index += 1
     return "".join(out), flags
+
+
+def _js_plain(pattern: str) -> str:
+    """:func:`_js_regex`'s source for a pattern that must need no flag but ``u``."""
+    source, flags = _js_regex(pattern)
+    if flags != "u":
+        raise SystemExit(f"pattern needs flags the tokenizer does not give it: {pattern!r}")
+    if re.search(r"\((?!\?)", source):
+        raise SystemExit(f"pattern has a capture group the tokenizer would misread: {pattern!r}")
+    return source
 
 
 def codemirror_language() -> str:
@@ -1004,11 +1024,10 @@ def codemirror_language() -> str:
         textmate_tokens=textmate_tokens,
         rules="\n".join(rules),
         word=json.dumps(f"{_JS_WORD}+"),
-        comment_begin=json.dumps(_js_regex(comment["begin"])[0]),
-        comment_end=json.dumps(_js_regex(comment["end"])[0]),
-        string_begin=json.dumps(_js_regex(string["begin"])[0]),
-        string_end=json.dumps(_js_regex(string["end"])[0]),
-        escape=json.dumps(_js_regex(escape["match"])[0]),
+        comment_begin=json.dumps(_js_plain(comment["begin"])),
+        comment_end=json.dumps(_js_plain(comment["end"])),
+        string_begin=json.dumps(_js_plain(string["begin"])),
+        string_next=json.dumps(f"({_js_plain(string['end'])})|{_js_plain(escape['match'])}"),
         comment_token=json.dumps(_codemirror_token(comment["name"])),
         string_token=json.dumps(_codemirror_token(string["name"])),
         escape_token=json.dumps(_codemirror_token(escape["name"])),

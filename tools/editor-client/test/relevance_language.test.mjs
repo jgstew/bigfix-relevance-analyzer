@@ -207,6 +207,18 @@ test("a line past CodeMirror's 10,000 characters leaves the next line right", ()
   assert.ok(codemirrorClasses(text).slice(10001, long.length).every((c) => c === null));
 });
 
+test("a long string of escapes tokenizes in linear time", () => {
+  // Each escape once searched to the string's end: quadratic, about 9 s for
+  // this 1 MB line (now well under 0.1 s). The bound leaves a slow CI runner
+  // plenty of room and still fails the quadratic version.
+  const line = '"' + "%41".repeat(333334) + '" and x';
+  const started = performance.now();
+  const state = CM.EditorState.create({ doc: line, extensions: [relevanceLanguage(CM)] });
+  assert.ok(CM.ensureSyntaxTree(state, state.doc.length, 60000));
+  const elapsed = performance.now() - started;
+  assert.ok(elapsed < 3000, `${Math.round(elapsed)} ms for a 1 MB string of escapes`);
+});
+
 test("percent escapes inside a string, and not outside one", () => {
   assertSameClasses('"100%25 sure" & %41 & "%zz"');
 });

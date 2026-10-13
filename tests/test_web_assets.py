@@ -123,7 +123,22 @@ def test_the_committed_highlighter_is_what_the_generator_produces() -> None:
 
 @pytest.mark.parametrize(
     "pattern",
-    [r"\Afoo", r"foo\z", r"\Gfoo", r"\hfoo", r"a?+", r"(?>a)", r"[[:alpha:]]", r"[\-a]", r"\Kx"],
+    [
+        r"\Afoo",
+        r"foo\z",
+        r"\Gfoo",
+        r"\hfoo",
+        r"a?+",
+        r"(?>a)",
+        r"[[:alpha:]]",
+        r"[\-a]",
+        r"\Kx",
+        r"[a&&b]",  # intersection in Oniguruma, two ampersands in JavaScript
+        r"(?i:a)b",  # an inline flag group: a load error on Node 22
+        r"x(?-i)y",
+        r"a.b",  # `.` stops at \r and U+2028 too in JavaScript
+        "foo\\",  # a lone trailing backslash
+    ],
 )
 def test_the_generator_refuses_what_javascript_would_read_differently(pattern: str) -> None:
     """Oniguruma syntax that JavaScript reads as something else, or not at all,
@@ -140,7 +155,9 @@ def test_every_generated_pattern_is_unicode_mode() -> None:
     assert generator._js_regex(r"\b(?:of)\b")[1] == "u"
     assert generator._js_regex(r"!=|\&|\-") == ("!=|&|-", "u")
     assert generator._js_regex(r"is\s+not")[0] == r"is\p{White_Space}+not"
-    for _, flags in re.findall(r'new RegExp\(("(?:[^"\\]|\\.)*"), "(\w+)"\)', _source(LANGUAGE)):
+    found = re.findall(r'new RegExp\(("(?:[^"\\]|\\.)*"), "(\w+)"\)', _source(LANGUAGE))
+    assert len(found) >= 15, len(found)
+    for _, flags in found:
         assert "u" in flags
 
 
