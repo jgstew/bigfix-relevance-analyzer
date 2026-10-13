@@ -257,6 +257,56 @@ def test_trivia_and_grouping_have_no_hover(text: str, needle: str) -> None:
     assert hover_at("a.rel", text, needle) is None
 
 
+# -- whitespace inside a multi-word name (#142 S2) -----------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "needle", "word"),
+    [
+        ("names of bes computers", " computers", "bes"),
+        ("name of operating system", " system", "system"),
+        # More than one space, or a line break, is still inside the name. (The
+        # end of a line is no character, so the cursor is on the next line.)
+        ("name of operating   system", "  system", "operating"),
+        ("name of operating\n  system", "  system", "operating"),
+        # Between two words of the name, a comment notwithstanding.
+        ("exists bes /* note */ computers", " /*", "bes"),
+        # Inside the name, before its index argument.
+        ('exists key value "x" of registry', " value", "key"),
+        ("(names of (bes computers))", " computers", "bes"),
+    ],
+)
+def test_whitespace_inside_a_multi_word_name_hovers_that_name(
+    text: str, needle: str, word: str
+) -> None:
+    """With the cursor between two of a name's words, the name is under it:
+    the same hover, over the same text, as on either word."""
+    on_space = shown("a.rel", text, needle)
+    assert on_space == shown("a.rel", text, word)
+    assert "**`" in on_space[0]
+
+
+@pytest.mark.parametrize(
+    ("text", "needle"),
+    [
+        ("names of bes computers", " of"),  # between two references
+        ("names of bes computers", "s of"),  # between a name and `of`
+        ('exists key value "x" of registry', ' "x"'),  # between a name and its index
+        ('exists file "x"', ' "x"'),
+        ("(names of ( bes computers))", " bes"),  # inside folded parentheses
+        ("name of the operating system", " operating"),  # after an article
+    ],
+)
+def test_whitespace_outside_a_names_words_has_no_hover(text: str, needle: str) -> None:
+    shift = 1 if needle.startswith("s ") else 0
+    assert hover_at("a.rel", text, needle, shift=shift) is None
+
+
+def test_whitespace_inside_a_name_hovers_it_in_a_bes_file() -> None:
+    doc = BES.format(body="exists bes computers whose (name of it = &quot;x&quot;)")
+    assert shown("a.bes", doc, " computers") == shown("a.bes", doc, "computers")
+
+
 def test_a_statement_that_does_not_parse_has_no_hover() -> None:
     assert hover_at("a.rel", 'exists file "unterminated', "file") is None
     assert hover_at("a.rel", "exists file whose (", "file") is None

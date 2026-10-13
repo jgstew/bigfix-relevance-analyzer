@@ -12,7 +12,10 @@ with a diagnostic.
 
 There is no hover, rather than a vague one, on whitespace, comments, articles
 and grouping parentheses, and anywhere in a statement that does not parse: a
-wrong tree is worse than none (issue 96, item 3).
+wrong tree is worse than none (issue 96, item 3). The one whitespace that does
+hover is between two words of one name: in ``names of bes computers`` the
+space inside ``bes computers`` is part of that name, as either word is
+(issue 142, S2).
 
 Mapping the editor's position to the offset, and the answer's span back to a
 range, is :class:`~bigfix_relevance_analyzer.lsp.positions.DocumentIndex`'s;
@@ -106,11 +109,17 @@ def describe(analysis: RelevanceAnalysis, offset: int) -> Hover | None:
     if root is None:
         return None
     token = _token_at(analysis.tokens, offset)
-    if token is None or token.kind in _NO_HOVER_TOKENS:
+    if token is None:
         return None
-    if token.kind is TokenKind.PUNCT and token.text in ("(", ")"):
+    node: Node | None
+    if token.kind is TokenKind.WHITESPACE:
+        node = _name_around(analysis.tokens, root, offset)
+    elif token.kind in _NO_HOVER_TOKENS or (
+        token.kind is TokenKind.PUNCT and token.text in ("(", ")")
+    ):
         return None
-    node = node_at(root, offset)
+    else:
+        node = node_at(root, offset)
     if node is None:
         return None
     words = _keywords(analysis.tokens, node)
@@ -126,6 +135,25 @@ def describe(analysis: RelevanceAnalysis, offset: int) -> Hover | None:
         # A construct spans its operands; what the cursor is on is its keyword.
         span = TextSpan(token.offset, _end(token))
     return Hover(markdown, span)
+
+
+def _name_around(tokens: tuple[Token, ...], root: Node, offset: int) -> Reference | None:
+    """The reference whose name has whitespace at ``offset`` between two of its
+    words, else ``None``. Only between its words: not before the first (an
+    article, or a grouping parenthesis the parser folds into the span), and not
+    between the name and its index argument (``key "x"``)."""
+    node = node_at(root, offset)
+    if not isinstance(node, Reference):
+        return None
+    stop = node.span.end if node.index is None else node.index.span.start
+    words = [
+        token
+        for token in tokens
+        if token.kind is TokenKind.WORD and node.span.start <= token.offset and _end(token) <= stop
+    ]
+    if len(words) < 2 or not words[0].offset < offset < words[-1].offset:
+        return None
+    return node
 
 
 def _token_at(tokens: tuple[Token, ...], offset: int) -> Token | None:
