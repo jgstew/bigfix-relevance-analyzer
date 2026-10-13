@@ -40,6 +40,10 @@ if TYPE_CHECKING:
 __all__ = ["DocumentLinter", "LspError", "Server", "StatementSession"]
 
 
+def __dir__() -> list[str]:
+    return sorted({*globals(), *__all__})
+
+
 def __getattr__(name: str) -> Any:
     if name == "Server":
         from bigfix_relevance_analyzer.lsp.server import Server

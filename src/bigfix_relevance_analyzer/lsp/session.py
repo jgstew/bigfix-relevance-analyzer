@@ -54,6 +54,10 @@ class LspError(Exception):
         self.message = message
         """The server's message, without the code."""
 
+    def __reduce__(self) -> tuple[type[LspError], tuple[int, str]]:
+        # `args` holds only the formatted text, which __init__ cannot take back.
+        return type(self), (self.code, self.message)
+
 
 class StatementSession:
     """One relevance statement held in an in-process :class:`~bigfix_relevance_analyzer.lsp.Server`.
@@ -111,6 +115,10 @@ class StatementSession:
 
         None means "nothing new", not "no diagnostics": :attr:`diagnostics`
         always has the latest. Raises :class:`RuntimeError` once closed.
+
+        The server never fails a notification: should linting itself fail, it
+        logs the error and publishes nothing, which reads here as no
+        diagnostics for that text.
         """
         if self._closed:
             raise RuntimeError("StatementSession is closed")
@@ -155,14 +163,19 @@ class StatementSession:
         return self._call(method, {**params, "textDocument": {"uri": self.URI}})
 
     def close(self) -> None:
-        """Close the document and shut the server down. Safe to call twice."""
+        """Close the document and shut the server down. Safe to call twice.
+
+        Closed afterwards in any case: a ``shutdown`` already sent through
+        :meth:`request` makes this raise :class:`LspError` once, not again."""
         if self._closed:
             return
+        self._closed = True
         if self._text is not None:
             self._notify("textDocument/didClose", {"textDocument": {"uri": self.URI}})
-        self._call("shutdown", None)
-        self._notify("exit", None)
-        self._closed = True
+        try:
+            self._call("shutdown", None)
+        finally:
+            self._notify("exit", None)
 
     def _call(self, method: str, params: Mapping[str, Any] | None) -> Any:
         self._ids += 1

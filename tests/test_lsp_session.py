@@ -61,16 +61,30 @@ def test_importing_the_package_still_loads_neither_server_nor_session() -> None:
 
 
 def test_importing_the_session_brings_everything_a_wasm_snapshot_needs() -> None:
-    """componentize-py keeps only what is imported at build time: importing the
-    session module must import the server it drives, at module level."""
+    """componentize-py keeps only what is imported at build time: once the
+    session module is imported, using it in every dialect imports nothing more."""
     run_fresh_python(
-        "import sys\n"
-        "import bigfix_relevance_analyzer.lsp.session\n"
-        "for name in ('bigfix_relevance_analyzer.lsp.server',"
-        " 'bigfix_relevance_analyzer.lsp.linter',"
-        " 'bigfix_relevance_analyzer.completion.rank'):\n"
-        "    assert name in sys.modules, name\n"
-        "print('ok')\n"
+        """
+import sys
+import bigfix_relevance_analyzer.lsp.session as session_module
+from bigfix_relevance_analyzer import Dialect
+before = set(sys.modules)
+for dialect in (None, Dialect.CLIENT, Dialect.SESSION):
+    session = session_module.StatementSession(dialect=dialect)
+    texts = ('nme of oprating system', 'names of bes computers', 'exists value of setting "x"')
+    for text in texts:
+        session.sync(text)
+        point = {"line": 0, "character": 8}
+        session.request("textDocument/hover", {"position": point}, text)
+        session.request("textDocument/completion", {"position": point}, text)
+        whole = {"start": {"line": 0, "character": 0}, "end": point}
+        context = {"diagnostics": []}
+        session.request("textDocument/codeAction", {"range": whole, "context": context}, text)
+    session.close()
+new = sorted(set(sys.modules) - before)
+assert not new, new
+print("ok")
+"""
     )
 
 
@@ -267,6 +281,7 @@ def test_dialect_defaults_to_whatever_the_statement_says() -> None:
 
     assert session.dialect is None
     assert "session" not in hover_text(session, "name of computer", 10)
+    session.close()
 
 
 def test_a_forced_dialect_reaches_the_server() -> None:
@@ -274,6 +289,7 @@ def test_a_forced_dialect_reaches_the_server() -> None:
 
     assert session.dialect is Dialect.SESSION
     assert "session" in hover_text(session, "name of computer", 10)
+    session.close()
 
 
 def test_a_server_forced_to_a_dialect_by_its_linter() -> None:
@@ -316,6 +332,33 @@ def test_closed_session_refuses_work() -> None:
         session.sync("now")
     with pytest.raises(RuntimeError, match="closed"):
         session.request("textDocument/hover", {"position": at(0, 0)}, "now")
+
+
+def test_close_still_closes_after_a_shutdown_sent_by_hand() -> None:
+    """A caller that sent `shutdown` through request() learns the server already
+    shut down, once; the session is closed either way."""
+    session = StatementSession()
+    session.sync("now")
+    session.request("shutdown", {}, "now")
+    with pytest.raises(LspError):
+        session.close()
+    session.close()  # closed: a no-op, not the same error again
+    with pytest.raises(RuntimeError, match="closed"):
+        session.sync("now")
+
+
+def test_an_lsp_error_survives_pickling_and_copying() -> None:
+    import copy
+    import pickle
+
+    error = LspError(-32601, "Method not found: x")
+    for again in (pickle.loads(pickle.dumps(error)), copy.copy(error)):
+        assert isinstance(again, LspError)
+        assert (again.code, again.message, str(again)) == (error.code, error.message, str(error))
+
+
+def test_dir_lists_the_lazy_names() -> None:
+    assert {"Server", "StatementSession", "LspError", "DocumentLinter"} <= set(dir(lsp_package))
 
 
 def test_a_session_never_synced_closes_too() -> None:
