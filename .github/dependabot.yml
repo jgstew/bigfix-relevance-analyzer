@@ -186,9 +186,9 @@ updates:
   # their version updates are ignored: moving a pin would stop testing the
   # oldest supported release, and the test would fail the PR anyway. npm
   # version updates cover only a manifest's own dependencies, so expect no
-  # version-update PRs for these. (vscode-textmate and vscode-oniguruma, the
-  # highlighter's parity test engine, are updated as usual.) It is here for security
-  # alerts and for the repo-wide policy test, and `ignore` likely
+  # version-update PRs for these. vscode-textmate and vscode-oniguruma, the
+  # highlighter's parity-test engine, are updated as usual. The entry is
+  # also here for security alerts and the repo-wide policy test; `ignore` likely
   # holds back security updates of @codemirror/* too: acceptable for a test
   # package. Raise the floor by hand, with NICEGUI_CM, when the oldest
   # supported CodeMirror moves.

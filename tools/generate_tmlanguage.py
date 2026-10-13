@@ -789,12 +789,16 @@ const RULES = [
 {rules}
 ];
 
-const COMMENT_BEGIN = new RegExp({comment_begin}, "y");
-const COMMENT_END = new RegExp({comment_end}, "g");
-const STRING_BEGIN = new RegExp({string_begin}, "y");
-const STRING_END = new RegExp({string_end}, "g");
-const ESCAPE = new RegExp({escape}, "g");
+const COMMENT_BEGIN = new RegExp({comment_begin}, "uy");
+const COMMENT_END = new RegExp({comment_end}, "gu");
+const STRING_BEGIN = new RegExp({string_begin}, "uy");
+const STRING_END = new RegExp({string_end}, "gu");
+const ESCAPE = new RegExp({escape}, "gu");
 const WORD = new RegExp({word}, "uy");
+
+// CodeMirror's stream parser stops asking for tokens once one starts past this
+// many characters into a line (C.MaxLineLength in @codemirror/language).
+const MAX_LINE_LENGTH = 10000;
 
 /** The first match of global `regex` in `text` at or after `from`, or null. */
 function search(regex, text, from) {{
@@ -802,14 +806,15 @@ function search(regex, text, from) {{
   return regex.exec(text);
 }}
 
-/** Whether sticky `regex` matches `text` at `at`; its length, or -1. */
+/** The length of sticky `regex`'s match in `text` at `from`, or -1. */
 function at(regex, text, from) {{
   regex.lastIndex = from;
   const match = regex.exec(text);
   return match ? match[0].length : -1;
 }}
 
-function token(stream, state) {{
+/** The relevance tokenizer: the line's next token, from `state`. */
+function step(stream, state) {{
   const text = stream.string;
   if (state.inside === "comment") {{
     const end = search(COMMENT_END, text, stream.pos);
@@ -864,6 +869,17 @@ function token(stream, state) {{
   return null;
 }}
 
+function token(stream, state) {{
+  if (stream.pos > MAX_LINE_LENGTH) {{
+    // CodeMirror asks for no more tokens on this line after this one, and the
+    // rest goes uncolored. Read it anyway, so a comment or string that opens
+    // or closes past the cut leaves the next line in the right state.
+    while (!stream.eol()) step(stream, state);
+    return null;
+  }}
+  return step(stream, state);
+}}
+
 /** The relevance language: a StreamLanguage, an extension in its own right. */
 export function relevanceLanguage(CM) {{
   const missing = REQUIRED_CM.filter((name) => !(name in CM));
@@ -888,28 +904,69 @@ def _codemirror_token(scope: str) -> str:
     return CODEMIRROR_TOKENS[base]
 
 
-# Oniguruma's word characters are Unicode's; JavaScript's `\w` and `\b` know
-# only ASCII, so a non-ASCII letter then `and` would read as the operator. These spell
-# Oniguruma's out, for the `u` flag.
-_JS_WORD = r"[\p{L}\p{M}\p{N}\p{Pc}]"
+# Oniguruma's word characters, near enough: Alphabetic, marks, decimal digits
+# (by their long name, which the typos hook leaves alone), connector
+# punctuation, and the Latin-1 superscripts and fractions it also counts.
+# JavaScript's `\w` and `\b` know only ASCII, so `\b` is spelled out with
+# these for the `u` flag. Unicode-version drift between the two engines'
+# tables (letters newer than vscode-oniguruma's) remains, in rare scripts only.
+_JS_WORD = r"[\p{Alpha}\p{M}\p{Decimal_Number}\p{Pc}\u00b2\u00b3\u00b9\u00bc-\u00be]"
 _JS_BOUNDARY = rf"(?:(?<={_JS_WORD})(?!{_JS_WORD})|(?<!{_JS_WORD})(?={_JS_WORD}))"
+
+# Escapes the relevance grammar uses, outside character classes, and what each
+# becomes in a `u`-flag JavaScript pattern. `\s` is Unicode's White_Space in
+# Oniguruma (NEL included, U+FEFF not), which JavaScript's `\s` is not. Every
+# other escape fails generation: Oniguruma's `\A`, `\z`, `\G`, `\h`, `\K` would
+# match plain letters, or nothing like the original, in JavaScript.
+_JS_ESCAPES = {
+    "b": _JS_BOUNDARY,
+    "s": r"\p{White_Space}",
+    **{char: f"\\{char}" for char in "*+?|.()[]{}^$/\\"},
+    # Not syntax characters: a `u` pattern refuses the identity escape.
+    "-": "-",
+    "&": "&",
+}
+
+_JS_UNPORTABLE = ("(?i)", "(?>", "*+", "++", "?+", "}+", "[:", "(?~")
+"""Oniguruma constructs JavaScript lacks or reads differently."""
 
 
 def _js_regex(pattern: str) -> tuple[str, str]:
     """A TextMate (Oniguruma) pattern as JavaScript ``RegExp`` source and flags.
 
-    The leading ``(?i)`` becomes the ``i`` flag, and each ``\\b`` becomes
-    :data:`_JS_BOUNDARY` under the ``u`` flag. Nothing else the relevance
-    grammar uses differs; the Node parity test is the check."""
-    flags = ""
+    Always the ``u`` flag, so a stray escape throws in JavaScript rather than
+    matching a letter. The leading ``(?i)`` becomes the ``i`` flag, and the
+    escapes in :data:`_JS_ESCAPES` are translated; anything else Oniguruma
+    reads differently fails generation. One difference stays: under ``(?i)``
+    Oniguruma also matches multi-character case folds (sharp s for ``ss``, the
+    ``st`` ligature), which a JavaScript pattern cannot; no real statement has
+    them, and the Node parity test covers the rest."""
+    flags = "u"
     if pattern.startswith("(?i)"):
-        pattern, flags = pattern.removeprefix("(?i)"), "i"
-    if any(part in pattern for part in ("(?i)", "*+", "++", r"\w")):
+        pattern, flags = pattern.removeprefix("(?i)"), "iu"
+    if any(part in pattern for part in _JS_UNPORTABLE):
         raise SystemExit(f"pattern not portable to JavaScript: {pattern!r}")
-    if r"\b" in pattern:
-        pattern = re.sub(r"(?<!\\)\\b", lambda _: _JS_BOUNDARY, pattern)
-        flags += "u"
-    return pattern, flags
+    out: list[str] = []
+    in_class = False
+    index = 0
+    while index < len(pattern):
+        char = pattern[index]
+        if char == "\\":
+            escaped = pattern[index + 1 : index + 2]
+            if in_class or escaped not in _JS_ESCAPES:
+                raise SystemExit(f"escape \\{escaped} not portable to JavaScript: {pattern!r}")
+            out.append(_JS_ESCAPES[escaped])
+            index += 2
+            continue
+        if char == "[":
+            if in_class:
+                raise SystemExit(f"nested class not portable to JavaScript: {pattern!r}")
+            in_class = True
+        elif char == "]":
+            in_class = False
+        out.append(char)
+        index += 1
+    return "".join(out), flags
 
 
 def codemirror_language() -> str:
@@ -947,10 +1004,10 @@ def codemirror_language() -> str:
         textmate_tokens=textmate_tokens,
         rules="\n".join(rules),
         word=json.dumps(f"{_JS_WORD}+"),
-        comment_begin=json.dumps(comment["begin"]),
-        comment_end=json.dumps(comment["end"]),
-        string_begin=json.dumps(string["begin"]),
-        string_end=json.dumps(string["end"]),
+        comment_begin=json.dumps(_js_regex(comment["begin"])[0]),
+        comment_end=json.dumps(_js_regex(comment["end"])[0]),
+        string_begin=json.dumps(_js_regex(string["begin"])[0]),
+        string_end=json.dumps(_js_regex(string["end"])[0]),
         escape=json.dumps(_js_regex(escape["match"])[0]),
         comment_token=json.dumps(_codemirror_token(comment["name"])),
         string_token=json.dumps(_codemirror_token(string["name"])),

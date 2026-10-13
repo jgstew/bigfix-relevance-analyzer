@@ -1,7 +1,7 @@
 {
   "name": "bigfix-relevance-editor-client-test",
   "private": true,
-  "description": "CI-only: runs the Node tests of the shared CodeMirror client (src/bigfix_relevance_analyzer/web/) against exact pins of CodeMirror 6, the versions NiceGUI 3.18 ships and so the oldest the client supports. Not part of the published artifact.",
+  "description": "CI-only: Node tests of the shared CodeMirror client and highlighter (src/bigfix_relevance_analyzer/web/), against exact pins of CodeMirror 6 (the versions NiceGUI 3.18 ships, so the oldest supported) and of the TextMate engine VS Code uses, for the highlighter's parity test. Not part of the published artifact.",
   "type": "module",
   "scripts": {
     "test": "CM_MODULE=./cm.mjs node --test 'test/**/*.test.mjs'"

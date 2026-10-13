@@ -110,6 +110,8 @@ function corpus() {
 }
 
 function assertSameClasses(text, id = text) {
+  // CodeMirror splits lines on \r as well; TextMate here only on \n.
+  assert.ok(!text.includes("\r"), `${id}: no carriage returns in parity inputs`);
   const expected = textmateClasses(text);
   const actual = codemirrorClasses(text);
   for (let i = 0; i < text.length; i++) {
@@ -176,6 +178,33 @@ test("word boundaries are Unicode's, as in Oniguruma", () => {
   ]) {
     assertSameClasses(text);
   }
+});
+
+test("word characters are Oniguruma's, not just letters and numbers", () => {
+  // A circled letter is a word character to Oniguruma (Alphabetic); a circled
+  // digit is not (No, not And); superscript two is.
+  for (const text of ["\u24b6and x", "x \u2460and y", "False\u2460", "1\u00b2 and 2", "x and\u00b2"]) {
+    assertSameClasses(text);
+  }
+});
+
+test("white space inside an operator is Oniguruma's: NEL is, U+FEFF is not", () => {
+  for (const text of ["is\u0085not x", "is\ufeffnot x", "is\u00a0not x", "1 is\tnot   equal  to 2", "a does  not\tcontain b"]) {
+    assertSameClasses(text);
+  }
+});
+
+test("a line past CodeMirror's 10,000 characters leaves the next line right", () => {
+  // CodeMirror stops asking for tokens 10,000 characters into a line (VS Code
+  // at 20,000). The rest of the line goes uncolored, but the state it ends in
+  // must still be the true one: here a string closes past the cut.
+  const long = "x ".repeat(5000) + 'xx"a" and 1';
+  const next = 'exists file "b" and true';
+  const text = `${long}\n${next}`;
+  const expected = textmateClasses(text).slice(long.length + 1);
+  const actual = codemirrorClasses(text).slice(long.length + 1);
+  assert.deepEqual(actual, expected);
+  assert.ok(codemirrorClasses(text).slice(10001, long.length).every((c) => c === null));
 });
 
 test("percent escapes inside a string, and not outside one", () => {

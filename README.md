@@ -844,6 +844,12 @@ class for every character of `tests/corpus`. Keywords and word operators get
 keyword tags (which CodeMirror's default style colors), `it` a special variable,
 and literals, comments and punctuation their usual tags; inspector names stay
 uncolored, as in the TextMate grammar.
+Its patterns use Unicode property escapes and lookbehind (Safari 16.4 or
+later). One known difference from VS Code: Oniguruma's case-insensitive
+matching also takes multi-character folds (`less` spelled with a sharp s), which a
+JavaScript pattern cannot; no real content uses them. Past 10,000 characters
+into a line CodeMirror stops coloring (VS Code at 20,000), though the next line
+is still right.
 
 For hover-style questions, `node_at(tree, offset)` returns the innermost node
 under a character offset of the parsed statement. `nodes_at` returns the whole

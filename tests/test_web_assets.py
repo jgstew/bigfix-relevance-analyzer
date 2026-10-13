@@ -39,7 +39,7 @@ NICEGUI_CM = {
 }
 """What NiceGUI 3.18 bundles: the oldest CodeMirror the client supports."""
 
-TEXTMATE_ENGINE = {"vscode-oniguruma": "2.0.1", "vscode-textmate": "9.3.2"}
+TEXTMATE_ENGINE = ("vscode-oniguruma", "vscode-textmate")
 """The TextMate engine the highlighter's parity test runs the grammar through."""
 
 NICEGUI_EXPORTS = frozenset(
@@ -121,8 +121,32 @@ def test_the_committed_highlighter_is_what_the_generator_produces() -> None:
     assert _source(LANGUAGE) == text, f"{LANGUAGE.name} is stale; rerun {GENERATOR.name}"
 
 
+@pytest.mark.parametrize(
+    "pattern",
+    [r"\Afoo", r"foo\z", r"\Gfoo", r"\hfoo", r"a?+", r"(?>a)", r"[[:alpha:]]", r"[\-a]", r"\Kx"],
+)
+def test_the_generator_refuses_what_javascript_would_read_differently(pattern: str) -> None:
+    """Oniguruma syntax that JavaScript reads as something else, or not at all,
+    fails generation instead of loading as a different pattern."""
+    generator = load_tool(GENERATOR, "_generate_tmlanguage")
+    with pytest.raises(SystemExit):
+        generator._js_regex(pattern)
+
+
+def test_every_generated_pattern_is_unicode_mode() -> None:
+    """With the `u` flag, a stray escape throws in JavaScript instead of
+    silently matching a letter."""
+    generator = load_tool(GENERATOR, "_generate_tmlanguage")
+    assert generator._js_regex(r"\b(?:of)\b")[1] == "u"
+    assert generator._js_regex(r"!=|\&|\-") == ("!=|&|-", "u")
+    assert generator._js_regex(r"is\s+not")[0] == r"is\p{White_Space}+not"
+    for _, flags in re.findall(r'new RegExp\(("(?:[^"\\]|\\.)*"), "(\w+)"\)', _source(LANGUAGE)):
+        assert "u" in flags
+
+
 def test_the_highlighter_has_a_rule_for_every_textmate_match_rule() -> None:
-    """The same rules, in the same order, with the same patterns."""
+    """Every TextMate match rule, with its pattern translated (the stale-file
+    test above holds their order)."""
     generator = load_tool(GENERATOR, "_generate_tmlanguage")
     grammar = generator.relevance_grammar()
     repository = grammar["repository"]
@@ -169,10 +193,16 @@ def test_the_client_is_found_through_importlib_resources() -> None:
 # --- its test package: this repo's npm policy ------------------------------------------
 
 
-def test_the_test_package_pins_codemirror_exactly_at_nicegui_s_versions() -> None:
+def test_the_test_package_pins_codemirror_at_nicegui_s_and_the_rest_exactly() -> None:
+    """CodeMirror at NiceGUI's versions (dependabot leaves those alone); the
+    TextMate engine exactly too, at whatever version dependabot last moved it
+    to, with the lockfile agreeing."""
     package = json.loads((TEST_PACKAGE / "package.json").read_text(encoding="utf-8"))
     assert package["private"] is True
-    assert package["devDependencies"] == {**NICEGUI_CM, **TEXTMATE_ENGINE}
+    pins = package["devDependencies"]
+    assert {name: pins.get(name) for name in NICEGUI_CM} == NICEGUI_CM
+    assert set(pins) == {*NICEGUI_CM, *TEXTMATE_ENGINE}
+    assert all(re.fullmatch(r"\d+\.\d+\.\d+", version) for version in pins.values()), pins
     assert "dependencies" not in package
     assert package["engines"]["npm"] == ">=11.10.0"
     script = package["scripts"]["test"]
@@ -182,7 +212,7 @@ def test_the_test_package_pins_codemirror_exactly_at_nicegui_s_versions() -> Non
     assert "'test/**/*.test.mjs'" in script
     assert not re.search(r"--test\s+\S*/(?:\s|$)", script), script
     lock = json.loads((TEST_PACKAGE / "package-lock.json").read_text(encoding="utf-8"))
-    for name, version in {**NICEGUI_CM, **TEXTMATE_ENGINE}.items():
+    for name, version in pins.items():
         assert lock["packages"][f"node_modules/{name}"]["version"] == version, name
 
 
