@@ -19,14 +19,18 @@
 //   - Mod-. : the quick fixes at the cursor;
 //   - every edit applied as one transaction, so undo reverts it.
 //
-// Document sync is "host" mode: the page owns the text and keeps the server's
-// copy current itself (e.g. Python holding an in-process
-// lsp.StatementSession), so this client sends no didOpen/didChange. A "client"
-// mode for pages that talk to a server directly (the playground) is planned.
+// Document sync has two modes (the `documentSync` option):
+//   "host" (the default): the page owns the text and keeps the server's copy
+//     current itself (e.g. Python holding an in-process lsp.StatementSession),
+//     so this client sends no initialize, didOpen or didChange;
+//   "client": the page talks to a server directly (the playground), and this
+//     client sends initialize, didOpen, a debounced full-text didChange per
+//     burst of edits, and didClose; see createClientSync.
 //
-// The transport is two functions:
+// The transport is two functions, and a third for client mode:
 //   request(method, params) -> Promise<result>   rejects on an error response
 //   onNotification(handler(method, params))      server -> client messages
+//   notify(method, params)                       client -> server notifications
 
 /** The CodeMirror names this client uses; all are stable CodeMirror 6 API. */
 export const REQUIRED_CM = [
@@ -267,6 +271,107 @@ export function renderMarkdown(markdown) {
   return root;
 }
 
+// --- client-mode document sync (no CodeMirror) ---------------------------------------
+
+/**
+ * Keeps a server's copy of one document current, for `documentSync: "client"`.
+ * `getText()` returns the editor's text now. Returns:
+ *   start(): send `initialize`, then `initialized` and `didOpen` (version 1,
+ *     the text as it is when initialize answers); once only;
+ *   ready: a Promise of whether the document is open on the server;
+ *   capabilities: the server's, once ready;
+ *   changed(): the text changed; a full-text `didChange` follows `delay` ms
+ *     after the last of a burst of changes, its version one more than the last;
+ *   flush(): send a pending change now (before any request about the text);
+ *   accepts(params): whether `publishDiagnostics` params are for the text the
+ *     editor has now: this document, the version last sent, nothing unsent;
+ *   close(): send `didClose` (if open) and stop.
+ * The version is set before each notification is sent, so a server that
+ * publishes diagnostics from inside `notify` (one on the main thread) is
+ * current.
+ */
+export function createClientSync(transport, { getText, uri = "untitled:statement", languageId = "bigfix-relevance", delay = 250 }) {
+  let started = false;
+  let open = false;
+  let closed = false;
+  let dirty = false;
+  let version = 0;
+  let timer = null;
+  let ready = Promise.resolve(false);
+  const cancel = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+  };
+  const sync = {
+    capabilities: null,
+    get ready() {
+      return ready;
+    },
+    start() {
+      if (started) return;
+      started = true;
+      ready = (async () => {
+        let result;
+        try {
+          result = await transport.request("initialize", {
+            processId: null,
+            rootUri: null,
+            capabilities: {
+              textDocument: {
+                codeAction: { codeActionLiteralSupport: { codeActionKind: { valueSet: ["quickfix", "source"] } } },
+                completion: { completionItem: { snippetSupport: false } },
+                hover: { contentFormat: ["markdown", "plaintext"] },
+                publishDiagnostics: { versionSupport: true },
+              },
+              workspace: { workspaceEdit: { documentChanges: false } },
+            },
+          });
+        } catch {
+          closed = true;
+          return false;
+        }
+        if (closed) return false;
+        sync.capabilities = (result && result.capabilities) || {};
+        transport.notify("initialized", {});
+        version = 1;
+        open = true;
+        dirty = false;
+        transport.notify("textDocument/didOpen", { textDocument: { uri, languageId, version, text: getText() } });
+        return true;
+      })();
+    },
+    changed() {
+      if (closed || !open) return; // before didOpen, the text it sends is the latest
+      dirty = true;
+      cancel();
+      timer = setTimeout(sync.flush, delay);
+    },
+    flush() {
+      cancel();
+      if (closed || !open || !dirty) return;
+      version += 1;
+      dirty = false;
+      transport.notify("textDocument/didChange", {
+        textDocument: { uri, version },
+        contentChanges: [{ text: getText() }],
+      });
+    },
+    accepts(params) {
+      if (closed || !open || dirty || !params) return false;
+      if (params.uri !== undefined && params.uri !== uri) return false;
+      return params.version === undefined || params.version === version;
+    },
+    close() {
+      cancel();
+      if (closed) return;
+      closed = true;
+      if (open) transport.notify("textDocument/didClose", { textDocument: { uri } });
+      open = false;
+    },
+  };
+  return sync;
+}
+
 // --- the extension -----------------------------------------------------------------
 
 /**
@@ -274,8 +379,14 @@ export function renderMarkdown(markdown) {
  *   uri: the server's name for the document (default "untitled:statement",
  *     what the analyzer's embedded StatementSession uses); edits for other
  *     documents are ignored.
+ *   documentSync: "host" (default) or "client"; see the top of this file. In
+ *     client mode the transport needs `notify`, one editor view uses the
+ *     extensions (the first; later ones get no sync), and diagnostics for any
+ *     other version than the text the editor has are dropped.
+ *   syncDelay: client mode's debounce, in ms, before a didChange (default 250).
  *   triggerCharacters: the server's completionProvider.triggerCharacters,
- *     which also open completion while typing (word characters always do).
+ *     which also open completion while typing (word characters always do). In
+ *     client mode, the server's own are used when this is not given.
  *   classPrefix: for the CSS classes (default "cm-bfr").
  *
  * Tooltips use CodeMirror's defaults: a host whose page covers part of the
@@ -288,8 +399,21 @@ export function renderMarkdown(markdown) {
 export function relevanceEditor(CM, transport, options = {}) {
   const missing = REQUIRED_CM.filter((name) => !(name in CM));
   if (missing.length) throw new Error(`relevanceEditor: CM lacks ${missing.join(", ")}`);
-  const { classPrefix = "cm-bfr", uri = "untitled:statement", triggerCharacters = [] } = options;
+  const { classPrefix = "cm-bfr", uri = "untitled:statement", documentSync = "host", syncDelay = 250 } = options;
+  if (documentSync !== "host" && documentSync !== "client") {
+    throw new Error(`relevanceEditor: documentSync is "host" or "client", not ${JSON.stringify(documentSync)}`);
+  }
+  if (documentSync === "client" && typeof transport.notify !== "function") {
+    throw new Error('relevanceEditor: documentSync "client" needs transport.notify');
+  }
+  let triggerCharacters = options.triggerCharacters || [];
   const css = (name) => `${classPrefix}-${name}`;
+  // Client mode: the view the sync belongs to, and the sync itself.
+  let syncView = null;
+  const sync =
+    documentSync === "client"
+      ? createClientSync(transport, { uri, delay: syncDelay, getText: () => (syncView ? syncView.state.doc.toString() : "") })
+      : null;
 
   // Diagnostics, mapped through edits until the next publish replaces them.
   const setDiagnostics = CM.StateEffect.define();
@@ -328,7 +452,9 @@ export function relevanceEditor(CM, transport, options = {}) {
   let latest = null;
   const applyDiagnostics = (view, params) => {
     const doc = view.state.doc;
-    if (typeof params.text === "string" && params.text !== doc.toString()) return;
+    if (sync) {
+      if (view !== syncView || !sync.accepts(params)) return;
+    } else if (typeof params.text === "string" && params.text !== doc.toString()) return;
     view.dispatch({ effects: setDiagnostics.of(placeDiagnostics(doc, params.diagnostics || [])) });
   };
   transport.onNotification((method, params) => {
@@ -342,15 +468,33 @@ export function relevanceEditor(CM, transport, options = {}) {
         this.view = view;
         views.add(view);
         if (latest) queueMicrotask(() => applyDiagnostics(view, latest));
+        if (sync && !syncView) {
+          syncView = view;
+          sync.start();
+          sync.ready.then((ok) => {
+            const characters = ok && sync.capabilities.completionProvider?.triggerCharacters;
+            if (!options.triggerCharacters && Array.isArray(characters)) triggerCharacters = characters;
+          });
+        }
+      }
+      update(update) {
+        if (sync && update.view === syncView && update.docChanged) sync.changed();
       }
       destroy() {
         views.delete(this.view);
+        if (sync && this.view === syncView) sync.close();
       }
     },
   );
 
   const request = async (method, params) => {
     try {
+      if (sync) {
+        // The server answers about the text it has: open it, then send any
+        // edit still waiting for its debounce.
+        if (!(await sync.ready)) return null;
+        sync.flush();
+      }
       return await transport.request(method, { ...params, textDocument: { uri } });
     } catch {
       return null; // an error reply or a closed editor: nothing to show

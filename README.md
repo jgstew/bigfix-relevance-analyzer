@@ -831,10 +831,16 @@ new CM.EditorView({
 });
 ```
 
-The page owns the text and keeps the server's copy current itself (with
-`StatementSession` on the Python side, say); the client sends no
-`didOpen`/`didChange`. Its Node tests are in `tools/editor-client/`, run
-against exact pins of the oldest CodeMirror versions it supports.
+By default (`documentSync: "host"`) the page owns the text and keeps the
+server's copy current itself (with `StatementSession` on the Python side, say);
+the client sends no `didOpen`/`didChange`. A page that talks to a server
+directly passes `documentSync: "client"` and a transport with
+`notify(method, params)` as well: the client then sends `initialize`, `didOpen`,
+a full-text `didChange` after each burst of edits (debounced, `syncDelay` ms,
+default 250; flushed before any request), and `didClose`, and drops
+diagnostics published for any other version than the editor's. Its Node tests
+are in `tools/editor-client/`, run against exact pins of the oldest CodeMirror
+versions it supports.
 
 To check a host's own CodeMirror bundle, `bigfix_relevance_analyzer.web_assets`
 describes the shipped modules as data: `web_dir()` is the directory above,
