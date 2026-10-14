@@ -836,6 +836,11 @@ The page owns the text and keeps the server's copy current itself (with
 `didOpen`/`didChange`. Its Node tests are in `tools/editor-client/`, run
 against exact pins of the oldest CodeMirror versions it supports.
 
+To check a host's own CodeMirror bundle, `bigfix_relevance_analyzer.web_assets`
+describes the shipped modules as data: `web_dir()` is the directory above,
+`WEB_MODULES` names its files, and `REQUIRED_CM` maps each file to the
+CodeMirror names it needs, so nothing has to parse the JavaScript.
+
 **Highlighting** ships beside it: `web/relevance_language.js` exports
 `relevanceLanguage(CM)`, a CodeMirror `StreamLanguage` that needs only
 `CM.StreamLanguage`. `tools/generate_tmlanguage.py` writes it from the same

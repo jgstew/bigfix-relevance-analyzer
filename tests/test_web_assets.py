@@ -5,10 +5,10 @@
 grammar's tables (Layer 4). Both are package data, versioned with the server,
 and loaded by pages that bring their own CodeMirror: the debugger's NiceGUI app
 and the playground. Their behaviour is tested in Node (``tools/editor-client``);
-these hold what the Python side owns: that the wheel carries them, that they
-import nothing, that they ask for no CodeMirror name NiceGUI 3.18's bundle
-lacks, that the generated one is current, and that the test package follows
-this repo's npm policy.
+these hold what the Python side owns: that ``web_assets`` describes them (#159),
+that the wheel carries them, that they import nothing, that they ask for no
+CodeMirror name NiceGUI 3.18's bundle lacks, that the generated one is current,
+and that the test package follows this repo's npm policy.
 """
 
 from __future__ import annotations
@@ -19,9 +19,13 @@ import shutil
 import subprocess
 import zipfile
 from pathlib import Path
+from typing import cast
 
 import pytest
-from _helpers import REPO_ROOT, load_tool
+from _helpers import REPO_ROOT, load_tool, run_fresh_python
+
+from bigfix_relevance_analyzer import web_assets
+from bigfix_relevance_analyzer.web_assets import REQUIRED_CM, WEB_MODULES, web_dir
 
 WEB = REPO_ROOT / "src" / "bigfix_relevance_analyzer" / "web"
 CLIENT = WEB / "relevance_editor.js"
@@ -71,10 +75,68 @@ def _source(path: Path = CLIENT) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def _required_cm(path: Path = CLIENT) -> list[str]:
+# --- the Python API (#159) -------------------------------------------------------------
+
+
+def test_the_api_lists_every_shipped_file_and_nothing_else() -> None:
+    assert set(WEB_MODULES) == {path.name for path in WEB.glob("*.js")}
+    assert set(WEB_MODULES) == {path.name for path in SHIPPED}
+    assert len(WEB_MODULES) == len(set(WEB_MODULES))
+    assert set(REQUIRED_CM) == set(WEB_MODULES)
+    assert web_assets.__all__ == ["REQUIRED_CM", "WEB_MODULES", "web_dir"]
+
+
+@pytest.mark.parametrize("path", SHIPPED, ids=lambda path: path.name)
+def test_the_api_s_required_cm_is_what_the_javascript_declares(path: Path) -> None:
+    """The JavaScript is the source of truth; this is the one place that reads it."""
     match = re.search(r"export const REQUIRED_CM = \[(.*?)\];", _source(path), re.S)
     assert match, "REQUIRED_CM not found"
-    return re.findall(r'"(\w+)"', match.group(1))
+    # Only double-quoted plain names, so no entry can slip past the findall.
+    assert re.fullmatch(r'\s*(?:"\w+",?\s*)*', match.group(1)), match.group(1)
+    declared = tuple(re.findall(r'"(\w+)"', match.group(1)))
+    assert declared
+    assert REQUIRED_CM[path.name] == declared
+
+
+def test_the_api_s_constants_are_read_only() -> None:
+    assert isinstance(WEB_MODULES, tuple)
+    with pytest.raises(TypeError):
+        cast("dict[str, tuple[str, ...]]", REQUIRED_CM)["relevance_editor.js"] = ()
+    assert all(isinstance(names, tuple) for names in REQUIRED_CM.values())
+
+
+def test_web_dir_is_the_importlib_resources_path_and_reads_every_module() -> None:
+    from importlib.resources import files
+
+    assert web_dir() == files("bigfix_relevance_analyzer") / "web"
+    for name in WEB_MODULES:
+        assert (web_dir() / name).read_bytes() == (WEB / name).read_bytes(), name
+
+
+def test_importing_the_package_does_not_import_the_web_api() -> None:
+    """Hosts of the editor ask for it; nobody else pays for it."""
+    run_fresh_python(
+        "import sys\n"
+        "import bigfix_relevance_analyzer\n"
+        "assert 'bigfix_relevance_analyzer.web_assets' not in sys.modules\n"
+        "print('ok')\n"
+    )
+
+
+def test_the_web_api_needs_no_codec_beyond_utf8() -> None:
+    """Like the rest of src/, it may run inside a WASM component without UTF-16."""
+    run_fresh_python(
+        """
+import sys
+for name in ("encodings.utf_16", "encodings.utf_16_le", "encodings.utf_16_be"):
+    sys.modules[name] = None
+from bigfix_relevance_analyzer.web_assets import REQUIRED_CM, WEB_MODULES, web_dir
+for name in WEB_MODULES:
+    assert "REQUIRED_CM" in (web_dir() / name).read_text(encoding="utf-8")
+assert REQUIRED_CM["relevance_language.js"] == ("StreamLanguage",)
+print("ok")
+"""
+    )
 
 
 # --- the shipped files --------------------------------------------------------------
@@ -92,8 +154,8 @@ def test_a_shipped_file_imports_nothing(path: Path) -> None:
 
 @pytest.mark.parametrize("path", SHIPPED, ids=lambda path: path.name)
 def test_a_shipped_file_asks_only_for_names_nicegui_exports(path: Path) -> None:
-    required = _required_cm(path)
-    assert required == sorted(required)
+    required = REQUIRED_CM[path.name]
+    assert list(required) == sorted(required)
     assert set(required) <= NICEGUI_EXPORTS, set(required) - NICEGUI_EXPORTS
 
 
@@ -103,7 +165,7 @@ def test_every_codemirror_name_a_shipped_file_uses_is_required(path: Path) -> No
     would fail later, inside a page, instead of at construction."""
     used = set(re.findall(r"\bCM\.(\w+)", _source(path)))
     assert used
-    assert used <= set(_required_cm(path)), used - set(_required_cm(path))
+    assert used <= set(REQUIRED_CM[path.name]), used - set(REQUIRED_CM[path.name])
 
 
 @pytest.mark.parametrize("path", SHIPPED, ids=lambda path: path.name)
@@ -193,6 +255,11 @@ def test_the_built_wheel_contains_the_web_files(tmp_path: Path) -> None:
     )
     (wheel,) = tmp_path.glob("*.whl")
     with zipfile.ZipFile(wheel) as archive:
+        prefix = "bigfix_relevance_analyzer/web/"
+        names = archive.namelist()
+        in_wheel = {name.removeprefix(prefix) for name in names if name.startswith(prefix)}
+        assert in_wheel == set(WEB_MODULES)
+        assert "bigfix_relevance_analyzer/web_assets.py" in names
         for path in SHIPPED:
             shipped = archive.read(f"bigfix_relevance_analyzer/web/{path.name}")
             assert shipped == path.read_bytes(), path.name
