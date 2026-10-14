@@ -243,3 +243,67 @@ test("an exit callback that throws on the trap path is logged, not an unhandled 
   assert.deepEqual(unhandled, []);
   assert.equal(logged.length, 2);
 });
+
+test("a write whose promise rejects exits 1, not an unhandled rejection", async () => {
+  const reader = fakeReader();
+  const exits = [];
+  const unhandled = [];
+  const onUnhandled = (reason) => unhandled.push(reason);
+  process.on("unhandledRejection", onUnhandled);
+  try {
+    const writer = { write: () => Promise.reject(new Error("port closed")) };
+    listen(reader, writer, fakeComponent(), (code) => exits.push(code), { log: () => {} });
+    reader.send({ jsonrpc: "2.0", id: 1, method: "x" });
+    await tick();
+    await tick();
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+  }
+  assert.deepEqual(unhandled, []);
+  assert.deepEqual(exits, [1]);
+});
+
+test("a message delivered during a write is handled after the current replies are written", () => {
+  const reader = fakeReader();
+  const written = [];
+  const component = {
+    handle: (text) => {
+      const { id } = JSON.parse(text);
+      return JSON.stringify([`a${id}`, `b${id}`]);
+    },
+    exitCode: () => undefined,
+  };
+  const writer = {
+    write: (message) => {
+      written.push(message);
+      if (message === "a1") reader.send({ jsonrpc: "2.0", id: 2, method: "y" });
+    },
+  };
+  listen(reader, writer, component, () => {}, { log: () => {} });
+  reader.send({ jsonrpc: "2.0", id: 1, method: "x" });
+  assert.deepEqual(written, ["a1", "b1", "a2", "b2"]);
+});
+
+test("a trap on a client's response (an id, no method) writes no reply and exits 1", () => {
+  const reader = fakeReader();
+  const writer = fakeWriter();
+  const exits = [];
+  const component = { handle: () => { throw new Error("trap"); }, exitCode: () => undefined };
+  listen(reader, writer, component, (code) => exits.push(code), { log: () => {} });
+  reader.send({ jsonrpc: "2.0", id: 7, result: null });
+  assert.deepEqual(writer.written, []);
+  assert.deepEqual(exits, [1]);
+});
+
+test("odd inputs never throw out of the reader: a null message, a throwing log", () => {
+  const reader = fakeReader();
+  const exits = [];
+  const component = { handle: () => { throw new Error("trap"); }, exitCode: () => undefined };
+  listen(reader, fakeWriter(), component, (code) => exits.push(code), {
+    log: () => {
+      throw new Error("log failed");
+    },
+  });
+  assert.doesNotThrow(() => reader.send(null));
+  assert.deepEqual(exits, [1]);
+});
