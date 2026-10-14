@@ -383,19 +383,14 @@ jobs:
     needs: [version, finalize]
     permissions:
       # a called workflow gets at most what its caller job grants; id-token is
-      # for the Entra ID (azure/login) OIDC exchange
+      # for the OIDC exchanges: Entra ID (azure/login) for the Marketplace,
+      # trusted publishing for Open VSX
       contents: read
       id-token: write
     uses: ./.github/workflows/publish-vscode-extension.yaml # zizmor: ignore[self-repository]
     with:
       version: ${{ needs.version.outputs.version }}
-    # An environment secret reaches a called workflow only when the caller
-    # passes it; otherwise it is an empty string, with no error. Passed by
-    # name, though it exists only in the `openvsx-publisher` environment: the
-    # called job that sets that environment gets its value. By name rather
-    # than `secrets: inherit`, so the publish workflow sees nothing else.
-    secrets:
-      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+    # No `secrets:` - both registries authenticate through OIDC.
 
   # Asks jgstew/jgstew.github.io to pick up the playground from the release
   # that just went public. That repo's own workflow does the work: it downloads

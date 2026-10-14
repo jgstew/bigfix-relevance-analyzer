@@ -499,25 +499,21 @@ def _job(workflow: str, name: str) -> str:
     return match.group(1)
 
 
-def test_the_release_passes_the_open_vsx_token_to_the_publish_workflow() -> None:
-    """A called workflow gets an environment secret only when its caller passes
-    it, by name or with `secrets: inherit`; otherwise it is an empty string
-    with no error. The v1.29.0 release's Open VSX job failed exactly so."""
-    marketplace = _job(RELEASE.read_text("utf-8"), "marketplace")
-    assert "uses: ./.github/workflows/publish-vscode-extension.yaml" in marketplace
-    assert re.search(
-        r"^    secrets:\n      OVSX_PAT: \$\{\{ secrets\.OVSX_PAT \}\}$", marketplace, re.MULTILINE
-    )
-    # By name, not every secret the repository has.
-    assert not re.search(r"^    secrets: inherit", marketplace, re.MULTILINE)
-    # ...and a caller that forgets it fails to start rather than running blind.
+def test_open_vsx_publishes_through_trusted_publishing() -> None:
+    """Open VSX takes an OIDC token, not a PAT. A PAT always wins over the OIDC
+    exchange, so none may be passed; and a called workflow gets at most the
+    permissions its caller job grants, so the release must grant id-token."""
+    release = RELEASE.read_text("utf-8")
     publish = PUBLISH.read_text("utf-8")
-    call = publish.split("  workflow_call:\n", 1)[1].split("  workflow_dispatch:\n", 1)[0]
-    assert re.search(
-        r"^    secrets:\n      OVSX_PAT:\n(?:        #.*\n)*        required: true$",
-        call,
-        re.MULTILINE,
-    )
+    marketplace = _job(release, "marketplace")
+    assert "uses: ./.github/workflows/publish-vscode-extension.yaml" in marketplace
+    assert re.search(r"^      id-token: write$", marketplace, re.MULTILINE)
+    assert not re.search(r"^    secrets:", marketplace, re.MULTILINE)
+    openvsx = _job(publish, "publish-openvsx")
+    assert re.search(r"^      id-token: write$", openvsx, re.MULTILINE)
+    assert re.search(r"ovsx@\$\{OVSX_VERSION\}\" publish --trusted-publishing ", openvsx)
+    for text in (release, publish):
+        assert "secrets.OVSX_PAT" not in text
 
 
 def test_the_build_can_take_a_given_wheel(tmp_path: Path) -> None:
