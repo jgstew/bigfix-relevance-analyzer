@@ -47,7 +47,8 @@ on:
   # Only when something these pages are built or tested from changes: the
   # package that goes into the wheel, its lock (the `wasm` group's
   # componentize-py pin), everything under tools/playground-wasm/ (scripts,
-  # templates, npm locks), tests/corpus/ (the parity job's statements),
+  # templates, npm locks), tools/wasm-common/ (its shared browser flags and
+  # wasi:sockets stub), tests/corpus/ (the parity job's statements),
   # .pre-commit-config.yaml (the uv version both build jobs read) and this
   # file. Path filters do not apply to workflow_dispatch or workflow_call, so
   # a manual run and the release's call still always run. Safe to filter
@@ -59,6 +60,8 @@ on:
       - "pyproject.toml"
       - "uv.lock"
       - "tools/playground-wasm/**"
+      # The browser shims and flags the componentize-py build imports.
+      - "tools/wasm-common/**"
       - "tests/corpus/**"
       # The logo, which the build embeds as the favicon.
       - "docs/images/**"

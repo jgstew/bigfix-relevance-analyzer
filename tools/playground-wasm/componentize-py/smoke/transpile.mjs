@@ -20,27 +20,21 @@
 // bundled version dies with MODULE_NOT_FOUND on that file. The symlink keeps
 // the real package layout intact, which is what the shim expects.
 //
-// The three flag choices below are the ones that took real debugging, so they
-// are spelled out rather than left to be rediscovered:
+// The browser-essential flags -- jco's --no-nodejs-compat and the
+// wasi:sockets map to the stub, esbuild's browser platform and condition -- and
+// the stub itself come from ../../../wasm-common/jco_browser.js, shared with
+// the VS Code extension's web server (#139); its comments say why each is
+// required.
+// The two below are this page's own choices:
 //
-// --no-nodejs-compat is REQUIRED, not an optimisation. Without it jco's glue
-//   contains `await import('node:fs/promises')` for loading cores off disk, and
-//   esbuild's browser build cannot resolve it. This is the first hard error you
-//   hit trying to bundle jco output for a browser.
+// --tla-compat: the glue does not top-level-await its own instantiation; the
+//   page awaits `$init` instead (see ../build-playground/template.html).
 //
 // --base64-cutoff 0 keeps every core as a separate file. The default (4096)
 //   inlines the small ones as base64 inside the JS, which would then get
 //   base64'd a second time on its way into the page -- 1.78x on ~20 MiB. Keep
 //   them raw here and let build_playground.py encode each exactly once.
 //   Side effect worth knowing: 0 yields ~14 cores where the default yields ~5.
-//
-// --map 'wasi:sockets/*=...' swaps preview2-shim's sockets for the local stub.
-//   componentize-py's CPython links the `socket` module, so the component
-//   imports wasi:sockets even though the analyzer never opens one, and
-//   preview2-shim's *browser* build still ships the pre-resource flat-function
-//   shape for wasi:sockets/ip-name-lookup. Without the map, instantiation dies
-//   with "unexpectedly undefined local import 'ResolveAddressStream'". See
-//   ../build-playground/sockets_stub.js.
 //
 // Not used, deliberately: --instantiation async. It would let the page pass
 // core modules in directly, but the page already intercepts window.fetch for
@@ -60,6 +54,8 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { ESBUILD_BROWSER_ARGS, SOCKETS_STUB, jcoBrowserArgs, nodeBuiltinsIn } from "../../../wasm-common/jco_browser.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BUILD = resolve(HERE, "..", "build-playground");
@@ -123,10 +119,10 @@ const transpiled = join(workDir, "transpiled");
 rmSync(workDir, { recursive: true, force: true });
 mkdirSync(workDir, { recursive: true });
 
-// The stub and the bundle entry are source (in ../build-playground/); copy them
-// in so the whole bundle input is one generated directory and the entry's
-// `./transpiled/analyzer.js` import resolves.
-copyFileSync(join(BUILD, "sockets_stub.js"), join(workDir, "sockets_stub.js"));
+// The stub (../../../wasm-common/) and the bundle entry (../build-playground/)
+// are source; copy them in so the whole bundle input is one generated directory
+// and the entry's `./transpiled/analyzer.js` import resolves.
+copyFileSync(SOCKETS_STUB, join(workDir, "sockets_stub.js"));
 copyFileSync(join(BUILD, "entry.mjs"), join(workDir, "entry.mjs"));
 
 // The work directory lives under dist/, so nothing in it can resolve
@@ -144,12 +140,10 @@ run(
     "-o",
     transpiled,
     "--tla-compat",
-    "--no-nodejs-compat",
     "--base64-cutoff",
     "0",
     // Resolved relative to the emitted glue, which lands in transpiled/.
-    "--map",
-    "wasi:sockets/*=../sockets_stub.js#*",
+    ...jcoBrowserArgs("../sockets_stub.js"),
   ],
   `jco ${JCO_VERSION} transpile`
 );
@@ -178,24 +172,13 @@ function bundle(outfile, platformArgs, label) {
   );
 }
 
-bundle(
-  "bundle.mjs",
-  [
-    "--platform=browser",
-    // This is what selects preview2-shim's browser entry (in-memory virtual FS)
-    // over its Node one. If it stops taking effect, the unresolved-node:-import
-    // check below is what catches it.
-    "--conditions=browser",
-  ],
-  `esbuild ${ESBUILD_VERSION} bundle (browser)`
-);
+bundle("bundle.mjs", ESBUILD_BROWSER_ARGS, `esbuild ${ESBUILD_VERSION} bundle (browser)`);
 
-// A `node:` specifier surviving into the BROWSER bundle means the browser
-// condition did not apply and the page would fail at load. Assert rather than
-// hope -- the alternative is a 10 MiB page that throws on open. (The Node
-// bundle is expected to contain them, so it is not checked.)
+// A `node:` specifier surviving into the bundle means the browser condition did
+// not apply and the page would fail at load. Assert rather than hope -- the
+// alternative is a 10 MiB page that throws on open.
 const browserBundle = readFileSync(join(workDir, "bundle.mjs"), "utf8");
-const nodeImports = [...new Set(browserBundle.match(/node:[a-z_/]+/g) ?? [])];
+const nodeImports = nodeBuiltinsIn(browserBundle);
 if (nodeImports.length) {
   throw new Error(
     `bundle still references Node builtins (${nodeImports.join(", ")}) -- the ` +

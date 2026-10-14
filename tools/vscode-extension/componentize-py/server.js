@@ -56,6 +56,10 @@ async function main() {
 
   // `handle` is synchronous, so messages are answered strictly in the order
   // they arrive, which is what the Python server assumes.
+  //
+  // tools/wasm-common/pump.js is the shared, tested form of this loop, for
+  // browser hosts; this copy stays until #139 bundles this file, since vsce
+  // ships only what is inside the extension's folder.
   reader.listen((message) => {
     let replies;
     try {

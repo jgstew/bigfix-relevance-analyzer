@@ -6,7 +6,7 @@
 // sibling smoke stage exercises the component through jco's Node output, but
 // the page depends on things that exist only in a browser -- preview2-shim's
 // *browser* build (whose stale wasi:sockets shape is why
-// ../build-playground/sockets_stub.js exists), DecompressionStream inflating
+// ../../../wasm-common/sockets_stub.js exists), DecompressionStream inflating
 // the embedded cores, and a window.fetch intercept serving core-module URLs
 // that were never fetchable in the first place.
 //

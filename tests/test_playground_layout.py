@@ -65,6 +65,8 @@ RETIRED_PATHS = (
     "tools/pyodide-smoke",
     # The workflow was renamed once it stopped being Pyodide-only.
     "workflows/pyodide.yaml",
+    # Moved to tools/wasm-common/, shared with the VS Code web server (#142, #139).
+    "build-playground/sockets_stub.js",
 )
 
 # The workflow that builds and tests both playgrounds. Named for what it

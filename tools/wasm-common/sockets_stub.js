@@ -1,4 +1,4 @@
-// wasi:sockets stub for the browser build.
+// wasi:sockets stub for browser builds of componentize-py components.
 //
 // componentize-py's CPython links the `socket` module, so the component
 // *imports* wasi:sockets even though the analyzer never opens a socket.
@@ -6,8 +6,8 @@
 // wasi:sockets/ip-name-lookup, so the transpiled glue fails at instantiation
 // with "unexpectedly undefined local import 'ResolveAddressStream'". These
 // resource classes are never constructed -- every entry point throws, which is
-// the correct behaviour for a page that has no network access anyway.
-const nope = (what) => { throw new Error(`wasi:sockets is not available in this page (${what})`); };
+// the correct behaviour for a page or Worker with no network access anyway.
+const nope = (what) => { throw new Error(`wasi:sockets is not available here (${what})`); };
 
 class Network { static _create() { nope("Network"); } }
 class ResolveAddressStream { resolveNextAddress() { nope("resolveNextAddress"); } subscribe() { nope("subscribe"); } }

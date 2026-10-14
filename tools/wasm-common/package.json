@@ -1,0 +1,12 @@
+{
+  "name": "bigfix-relevance-wasm-common",
+  "private": true,
+  "description": "Shared browser plumbing for componentize-py components (#142, #139): the wasi:sockets stub, the jco/esbuild browser flags, and pump.js. No dependencies; the tests use node:test. Not part of the published artifact.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test 'test/**/*.test.mjs'"
+  },
+  "engines": {
+    "npm": ">=11.10.0"
+  }
+}
