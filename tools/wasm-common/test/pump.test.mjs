@@ -171,3 +171,75 @@ test("logs to console.error by default", () => {
   }
   assert.equal(logged.length, 1);
 });
+
+test("a write that throws after handle succeeded exits 1, and nothing is handled after", () => {
+  const reader = fakeReader();
+  const exits = [];
+  const logged = [];
+  const component = fakeComponent();
+  const writer = { write: () => { throw new Error("port closed"); } };
+  listen(reader, writer, component, (code) => exits.push(code), { log: (...a) => logged.push(a) });
+  assert.doesNotThrow(() => reader.send({ jsonrpc: "2.0", id: 1, method: "x" }));
+  assert.deepEqual(exits, [1]);
+  assert.equal(logged.length, 1);
+  reader.send({ jsonrpc: "2.0", id: 2, method: "y" });
+  assert.equal(component.seen.length, 1);
+});
+
+test("exitCode trapping exits 1 instead of throwing out of the reader", () => {
+  const reader = fakeReader();
+  const exits = [];
+  const component = { handle: () => "[]", exitCode: () => { throw new Error("RuntimeError: unreachable"); } };
+  listen(reader, fakeWriter(), component, (code) => exits.push(code), { log: () => {} });
+  assert.doesNotThrow(() => reader.send({ jsonrpc: "2.0", method: "x" }));
+  assert.deepEqual(exits, [1]);
+});
+
+test("handle returning something other than a JSON array exits 1", () => {
+  const reader = fakeReader();
+  const exits = [];
+  const component = { handle: () => "null", exitCode: () => undefined };
+  listen(reader, fakeWriter(), component, (code) => exits.push(code), { log: () => {} });
+  assert.doesNotThrow(() => reader.send({ jsonrpc: "2.0", method: "x" }));
+  assert.deepEqual(exits, [1]);
+});
+
+test("exit is called once even when a write delivers the next message re-entrantly", () => {
+  const reader = fakeReader();
+  const exits = [];
+  const component = fakeComponent({ exitAfter: "exit" });
+  let nested = false;
+  const writer = {
+    write: () => {
+      if (!nested) {
+        nested = true;
+        reader.send({ jsonrpc: "2.0", method: "exit", params: { code: 0 } });
+      }
+    },
+  };
+  listen(reader, writer, component, (code) => exits.push(code), { log: () => {} });
+  // A request whose own handling also reports exit 0 (the component is shared).
+  component.handle(JSON.stringify({ jsonrpc: "2.0", method: "exit", params: { code: 0 } }));
+  reader.send({ jsonrpc: "2.0", id: 1, method: "shutdown" });
+  assert.deepEqual(exits, [0]);
+});
+
+test("an exit callback that throws on the trap path is logged, not an unhandled rejection", async () => {
+  const reader = fakeReader();
+  const logged = [];
+  const unhandled = [];
+  const onUnhandled = (reason) => unhandled.push(reason);
+  process.on("unhandledRejection", onUnhandled);
+  try {
+    listen(reader, fakeWriter(), fakeComponent({ trapOn: "x" }), () => { throw new Error("exit failed"); }, {
+      log: (...a) => logged.push(a),
+    });
+    reader.send({ jsonrpc: "2.0", id: 1, method: "x" });
+    await tick();
+    await tick();
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+  }
+  assert.deepEqual(unhandled, []);
+  assert.equal(logged.length, 2);
+});

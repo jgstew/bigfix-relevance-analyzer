@@ -6,7 +6,7 @@ use the same pieces instead of copies:
 
 * ``sockets_stub.js``, the ``wasi:sockets`` stand-in preview2-shim's browser
   build needs;
-* ``browser.js``, the jco and esbuild flags that select the browser shims, and
+* ``jco_browser.js``, the jco and esbuild flags that select the browser shims, and
   the check that no ``node:`` import survived bundling;
 * ``pump.js``, the transport-agnostic message -> ``handle`` -> replies loop.
 
@@ -30,7 +30,7 @@ PLAYGROUND = REPO_ROOT / "tools" / "playground-wasm" / "componentize-py"
 TRANSPILE = PLAYGROUND / "smoke" / "transpile.mjs"
 TEST_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "test.yaml"
 WASM_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "wasm-html.yaml"
-SHARED = ("sockets_stub.js", "browser.js", "pump.js")
+SHARED = ("sockets_stub.js", "jco_browser.js", "pump.js")
 
 
 @pytest.mark.parametrize("name", SHARED)
@@ -46,10 +46,10 @@ def test_each_shared_file_exists_once(name: str) -> None:
 
 def test_the_playground_build_imports_the_shared_flags_and_stub() -> None:
     text = TRANSPILE.read_text(encoding="utf-8")
-    assert re.search(r'from "\.\./\.\./\.\./wasm-common/browser\.js";', text)
+    assert re.search(r'from "\.\./\.\./\.\./wasm-common/jco_browser\.js";', text)
     for name in ("SOCKETS_STUB", "jcoBrowserArgs", "ESBUILD_BROWSER_ARGS", "nodeBuiltinsIn"):
         assert re.search(rf"\b{name}\b", text), name
-    # The browser-essential flags live in browser.js only.
+    # The browser-essential flags live in jco_browser.js only.
     assert '"--no-nodejs-compat"' not in text
     assert "wasi:sockets/*=" not in text
     assert '"--conditions=browser"' not in text

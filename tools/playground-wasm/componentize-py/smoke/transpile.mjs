@@ -22,8 +22,9 @@
 //
 // The browser-essential flags -- jco's --no-nodejs-compat and the
 // wasi:sockets map to the stub, esbuild's browser platform and condition -- and
-// the stub itself come from ../../../wasm-common/browser.js, shared with the VS
-// Code extension's web server (#139); its comments say why each is required.
+// the stub itself come from ../../../wasm-common/jco_browser.js, shared with
+// the VS Code extension's web server (#139); its comments say why each is
+// required.
 // The two below are this page's own choices:
 //
 // --tla-compat: the glue does not top-level-await its own instantiation; the
@@ -54,7 +55,7 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ESBUILD_BROWSER_ARGS, SOCKETS_STUB, jcoBrowserArgs, nodeBuiltinsIn } from "../../../wasm-common/browser.js";
+import { ESBUILD_BROWSER_ARGS, SOCKETS_STUB, jcoBrowserArgs, nodeBuiltinsIn } from "../../../wasm-common/jco_browser.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BUILD = resolve(HERE, "..", "build-playground");
