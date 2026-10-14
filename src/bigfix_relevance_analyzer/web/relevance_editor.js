@@ -346,7 +346,7 @@ export function createClientSync(transport, { getText, uri = "untitled:statement
   const sync = {
     capabilities: null,
     get ready() {
-      return ready;
+      return broken ? Promise.resolve(false) : ready;
     },
     start() {
       if (broken) return;
@@ -520,7 +520,7 @@ export function relevanceEditor(CM, transport, options = {}) {
         if (view !== syncView) return null;
         // The server answers about the text it has: open it, then send any
         // edit still waiting for its debounce.
-        if (!(await sync.ready)) return null;
+        if (!(await sync.ready) || view !== syncView) return null; // the view may have gone meanwhile
         sync.flush();
       }
       return await transport.request(method, { ...params, textDocument: { uri } });

@@ -263,6 +263,24 @@ test("start twice is one initialize", async () => {
   assert.equal(transport.sent("initialize").length, 1);
 });
 
+test("once a notify has failed, ready is false, even for a start that came before", async () => {
+  for (const failing of ["textDocument/didChange", "textDocument/didClose"]) {
+    const transport = recording();
+    transport.notify = (method) => {
+      transport.calls.push({ kind: "notify", method });
+      if (method === failing) throw new Error("trap");
+    };
+    const sync = createClientSync(transport, { uri: URI, delay: DELAY, getText: () => "x" });
+    sync.start();
+    assert.equal(await sync.ready, true);
+    sync.changed();
+    sync.flush();
+    sync.close();
+    sync.start();
+    assert.equal(await sync.ready, false, failing);
+  }
+});
+
 // --- the option on relevanceEditor -------------------------------------------------
 
 test("client mode needs transport.notify", () => {
