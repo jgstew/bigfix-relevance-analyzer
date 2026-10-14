@@ -58,6 +58,7 @@ except ImportError:  # pragma: no cover - only in a WASI build without pyexpat
     xml.parsers.expat = _stub
     _EXPAT = "stub"
 
+import lsp_shim
 import wit_world
 
 # Covers the function-local import at lint.py:804, which the build-time snapshot
@@ -74,7 +75,7 @@ print(f"componentize-py build: expat={_EXPAT} analyzer={__version__}", file=sys.
 
 
 class WitWorld(wit_world.WitWorld):
-    """Implements the two exports of the `analyzer` world."""
+    """Implements the exports of the `analyzer` world."""
 
     def analyze(self, text: str) -> str:
         # json.dumps here rather than in JS on purpose: the Pyodide page does
@@ -89,3 +90,12 @@ class WitWorld(wit_world.WitWorld):
         # component. It does -- componentize-py carries non-.py files from
         # --python-path -- and the smoke test asserts this is not "0.0.0".
         return __version__
+
+    def handle(self, message: str) -> str:
+        # The language server the page's editor talks to: ../../common/lsp_shim.py,
+        # which componentize.py stages beside this file and the Pyodide page
+        # loads too, so both runtimes run the same shim.
+        return lsp_shim.handle(message)
+
+    def exit_code(self) -> int | None:
+        return lsp_shim.exit_code()

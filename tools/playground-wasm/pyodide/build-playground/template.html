@@ -78,6 +78,8 @@ const PYODIDE_ASM_MJS_BASE64 = "%%PYODIDE_ASM_MJS_BASE64%%";
 const PYODIDE_WASM_BASE64 = "%%PYODIDE_WASM_BASE64%%";
 const PYTHON_STDLIB_ZIP_BASE64 = "%%PYTHON_STDLIB_ZIP_BASE64%%";
 const PYODIDE_LOCK_JSON_BASE64 = "%%PYODIDE_LOCK_JSON_BASE64%%";
+// ../../common/lsp_shim.py, the language server the componentize-py page runs too.
+const LSP_SHIM_PY_BASE64 = "%%LSP_SHIM_PY_BASE64%%";
 
 async function boot() {
   // Per-phase timing, printed as a table once boot() finishes.
@@ -137,6 +139,14 @@ from bigfix_relevance_analyzer import __version__, analyze_relevance_to_dict
 `);
   mark("import bigfix_relevance_analyzer (zipimport, no extraction)");
 
+  // The language server: the same shim the componentize-py component imports,
+  // so the parity test compares runtimes rather than two copies of it.
+  pyodide.FS.mkdirTree("/tmp/playground");
+  pyodide.FS.writeFile("/tmp/playground/lsp_shim.py", textFromBase64(LSP_SHIM_PY_BASE64));
+  pyodide.runPython('sys.path.insert(0, "/tmp/playground")');
+  const lspShim = pyodide.pyimport("lsp_shim");
+  mark("import lsp_shim (the language server)");
+
   // The seam the shared script is written against. A JSON *string*, not a
   // parsed object -- json.dumps on the Python side is what makes this page's
   // output directly comparable to the componentize-py page's.
@@ -144,6 +154,16 @@ from bigfix_relevance_analyzer import __version__, analyze_relevance_to_dict
     pyodide.globals.set("_playground_input", text);
     return pyodide.runPython("json.dumps(analyze_relevance_to_dict(_playground_input))");
   };
+  // The editor's seam: one JSON-RPC message in, the JSON array of replies out,
+  // as a string -- the same contract as the component's `handle` export.
+  // A Pyodide that has suffered a fatal error (a stack overflow kills it) can
+  // still return something that is not a string: say so rather than pass it on.
+  window.lspHandle = (message) => {
+    const reply = lspShim.handle(message);
+    if (typeof reply !== "string") throw new Error("the language server is not running (Pyodide failed)");
+    return reply;
+  };
+  window.lspExitCode = () => lspShim.exit_code() ?? null;
 
   const totalMs = Math.round(timings.reduce((sum, t) => sum + t.ms, 0));
   console.table(timings);

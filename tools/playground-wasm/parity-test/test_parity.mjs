@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Loads both built playground pages in one browser and asserts they produce
-// byte-identical JSON for the same inputs.
+// byte-identical JSON for the same inputs: the analysis of every statement, and
+// the language server's reply to every step of ../common/lsp_script.mjs.
 //
 // This is the reason two runtimes are kept. Each runtime's own browser-test
 // proves its page renders the expected badges for five cases; neither can tell
@@ -29,6 +30,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 
 import { CASES } from "../common/cases.mjs";
+import { LSP_STATEMENTS, runLspScript } from "../common/lsp_script.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CORPUS_DIR = resolve(HERE, "..", "..", "..", "tests", "corpus");
@@ -89,6 +91,11 @@ if (corpus.length < 50) {
   process.exit(1);
 }
 
+// The LSP script runs over the shared cases and the statements chosen for each
+// editor feature; not the whole corpus, since each statement costs dozens of
+// requests.
+const lspStatements = [...new Set([...CASES.map((c) => c.text), ...LSP_STATEMENTS])];
+
 const browser = await chromium.launch();
 
 /** Boot one built page and run the whole corpus through it in the browser. */
@@ -120,9 +127,14 @@ async function collect(htmlPath) {
     return out;
   }, corpus);
 
+  // The language server (#142): the same script on both pages, every reply
+  // kept as the raw string each page's lspHandle returned. Run after the
+  // analyses, since it ends with shutdown and exit.
+  const lsp = await page.evaluate(runLspScript, lspStatements);
+
   const timings = await page.evaluate(() => window.__bootTimings);
   await page.close();
-  return { results, timings, problems };
+  return { results, lsp, timings, problems };
 }
 
 const [left, right] = await Promise.all([collect(pages[0]), collect(pages[1])]);
@@ -185,11 +197,38 @@ if (differing.length) {
   failures++;
 }
 
+// The language server's replies, step by step: same steps, same strings.
+const lspDiffering = [];
+const steps = Math.max(left.lsp.transcript.length, right.lsp.transcript.length);
+for (let i = 0; i < steps; i++) {
+  const a = left.lsp.transcript[i];
+  const b = right.lsp.transcript[i];
+  if (!a || !b || a.step !== b.step || a.message !== b.message || a.reply !== b.reply) {
+    lspDiffering.push({ step: (a ?? b).step, a: a?.reply, b: b?.reply });
+  }
+}
+if (left.lsp.exitCode !== right.lsp.exitCode) {
+  lspDiffering.push({ step: "exitCode", a: String(left.lsp.exitCode), b: String(right.lsp.exitCode) });
+}
+if (lspDiffering.length) {
+  console.error(`FAIL: ${lspDiffering.length} language-server step(s) replied differently:`);
+  for (const { step, a = "", b = "" } of lspDiffering.slice(0, 10)) {
+    let at = 0;
+    while (at < a.length && at < b.length && a[at] === b[at]) at++;
+    const from = Math.max(0, at - 70);
+    console.error(`  ${step} -- first differs at character ${at}`);
+    console.error(`    ${label(0)}: ...${a.slice(from, at + 70)}...`);
+    console.error(`    ${label(1)}: ...${b.slice(from, at + 70)}...`);
+  }
+  failures++;
+}
+
 if (failures) {
   console.error(`\n${failures} parity check(s) failed`);
   process.exit(1);
 }
 console.log(
   `All ${corpus.length} statements produced byte-identical JSON in both runtimes, ` +
-    `with no console errors.`
+    `and all ${left.lsp.transcript.length} language-server steps over ` +
+    `${lspStatements.length} statements byte-identical replies, with no console errors.`
 );

@@ -1,5 +1,5 @@
 // The entire JS<->Python boundary for the playground, and deliberately no
-// larger: two exports, strings only, no records and no resources.
+// larger: strings only, no records and no resources.
 //
 // That is not a simplification -- it is what the Pyodide playground already
 // does. Its boot() hands one string to Python and reads back one JSON string
@@ -19,4 +19,10 @@ world analyzer {
     export analyze: func(text: string) -> string;
     /// The installed bigfix-relevance-analyzer version, e.g. "1.11.0".
     export version: func() -> string;
+    /// The page editor's language server (#142): one JSON-RPC message in, a
+    /// JSON array of the messages to send back out. The same shape as the VS
+    /// Code extension's `lsp` world, from the one shim in ../../../common/.
+    export handle: func(message: string) -> string;
+    /// None until the client sends `exit`; then 0 if `shutdown` came first, 1 if not.
+    export exit-code: func() -> option<s32>;
 }

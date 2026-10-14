@@ -124,6 +124,7 @@ def build(wheel: Path | None = None) -> tuple[Path, str]:
         wit_dir=HERE / "wit",
         world=WORLD,
         app_module=HERE / "app.py",
+        extra_modules=(),
     )
 
     # For Node, not the browser: no --no-nodejs-compat, so the glue reads its
