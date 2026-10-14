@@ -131,6 +131,14 @@ def test_unparsable_json_is_a_parse_error_not_an_exception(server: Any) -> None:
     assert response["error"]["code"] == -32700
 
 
+def test_a_message_nested_too_deep_to_parse_is_an_error_reply(server: Any) -> None:
+    """json.loads raises RecursionError, not ValueError, past the recursion limit."""
+    depth = sys.getrecursionlimit() * 10
+    (response,) = json.loads(server.handle("[" * depth + "]" * depth))
+    assert response["id"] is None
+    assert response["error"]["code"] == -32700
+
+
 def test_exit_code_is_none_until_exit(server: Any) -> None:
     initialize(server)
     assert server.exit_code() is None

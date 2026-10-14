@@ -18,6 +18,7 @@ export const LSP_STATEMENTS = [
   "(name of operating system\n  , version of client)", // two lines
   'exists file "unterminated', // a parse error
   "name of operating system \u{1F600}", // a character two UTF-16 units wide
+  'name of "\u{1F600}" & nme of client', // positions after a character two UTF-16 units wide
 ];
 
 /**

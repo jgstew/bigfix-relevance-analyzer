@@ -30,7 +30,7 @@ def handle(message: str) -> str:
     """One JSON-RPC message in; the JSON array of the replies out. Never raises."""
     try:
         parsed = json.loads(message)
-    except ValueError as error:
+    except (ValueError, RecursionError) as error:  # nested past the recursion limit
         return json.dumps([error_response(None, ErrorCode.PARSE_ERROR, str(error))])
     # Server.handle never raises: a failing handler becomes an error response.
     return json.dumps(_server.handle(parsed))

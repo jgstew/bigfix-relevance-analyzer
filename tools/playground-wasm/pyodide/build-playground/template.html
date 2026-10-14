@@ -156,7 +156,13 @@ from bigfix_relevance_analyzer import __version__, analyze_relevance_to_dict
   };
   // The editor's seam: one JSON-RPC message in, the JSON array of replies out,
   // as a string -- the same contract as the component's `handle` export.
-  window.lspHandle = (message) => lspShim.handle(message);
+  // A Pyodide that has suffered a fatal error (a stack overflow kills it) can
+  // still return something that is not a string: say so rather than pass it on.
+  window.lspHandle = (message) => {
+    const reply = lspShim.handle(message);
+    if (typeof reply !== "string") throw new Error("the language server is not running (Pyodide failed)");
+    return reply;
+  };
   window.lspExitCode = () => lspShim.exit_code() ?? null;
 
   const totalMs = Math.round(timings.reduce((sum, t) => sum + t.ms, 0));

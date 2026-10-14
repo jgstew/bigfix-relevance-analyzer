@@ -14,6 +14,12 @@
       window.lspHandle(message) -> string    a JSON array of the replies
       window.lspExitCode() -> number | null  null until the client sends `exit`
 
+  There is one server for the page's whole life, with no reset: a client sends
+  `initialize` once and never `exit` (after it the server answers nothing
+  useful), and treats a throw from lspHandle as the server being gone. Each
+  call runs synchronously on the main thread, so a client keeps what it sends
+  small and debounced.
+
   A *string*, not a parsed object, deliberately: it is what both runtimes
   natively produce, and it is what makes comparing the two pages a byte
   comparison. run() parses it for rendering and stashes the raw string on
