@@ -9,6 +9,7 @@ parsing them out of the JavaScript::
 
     from bigfix_relevance_analyzer.web_assets import REQUIRED_CM, web_dir
 
+    my_bundle_exports: set[str] = ...  # what the host's CodeMirror bundle exports
     missing = {n for names in REQUIRED_CM.values() for n in names} - my_bundle_exports
     client = web_dir() / "relevance_editor.js"
 
@@ -28,7 +29,7 @@ from typing import Final
 
 __all__ = ["REQUIRED_CM", "WEB_MODULES", "web_dir"]
 
-WEB_MODULES: Final = ("relevance_editor.js", "relevance_language.js")
+WEB_MODULES: Final[tuple[str, ...]] = ("relevance_editor.js", "relevance_language.js")
 """Every file in ``web/``, by name."""
 
 REQUIRED_CM: Final[Mapping[str, tuple[str, ...]]] = MappingProxyType(
@@ -53,7 +54,9 @@ REQUIRED_CM: Final[Mapping[str, tuple[str, ...]]] = MappingProxyType(
     }
 )
 """The CodeMirror names each module in ``WEB_MODULES`` takes from the page's
-namespace, sorted: what a host's bundle must export."""
+namespace, sorted: what a host's bundle must export. Read-only; serialize
+``dict(REQUIRED_CM)``, since a ``MappingProxyType`` neither JSON-dumps nor
+pickles."""
 
 
 def web_dir() -> Traversable:

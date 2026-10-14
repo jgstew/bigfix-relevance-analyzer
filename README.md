@@ -815,11 +815,6 @@ from importlib.resources import files
 client = files("bigfix_relevance_analyzer") / "web" / "relevance_editor.js"
 ```
 
-`bigfix_relevance_analyzer.web_assets` describes the shipped modules as data:
-`web_dir()` is that directory, `WEB_MODULES` names its files, and
-`REQUIRED_CM` maps each file to the CodeMirror names it needs, so a host can
-check its own bundle against them without parsing the JavaScript.
-
 ```js
 import { relevanceEditor } from "./relevance_editor.js";
 
@@ -840,6 +835,11 @@ The page owns the text and keeps the server's copy current itself (with
 `StatementSession` on the Python side, say); the client sends no
 `didOpen`/`didChange`. Its Node tests are in `tools/editor-client/`, run
 against exact pins of the oldest CodeMirror versions it supports.
+
+To check a host's own CodeMirror bundle, `bigfix_relevance_analyzer.web_assets`
+describes the shipped modules as data: `web_dir()` is the directory above,
+`WEB_MODULES` names its files, and `REQUIRED_CM` maps each file to the
+CodeMirror names it needs, so nothing has to parse the JavaScript.
 
 **Highlighting** ships beside it: `web/relevance_language.js` exports
 `relevanceLanguage(CM)`, a CodeMirror `StreamLanguage` that needs only

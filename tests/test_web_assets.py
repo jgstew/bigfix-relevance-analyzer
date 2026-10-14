@@ -91,6 +91,8 @@ def test_the_api_s_required_cm_is_what_the_javascript_declares(path: Path) -> No
     """The JavaScript is the source of truth; this is the one place that reads it."""
     match = re.search(r"export const REQUIRED_CM = \[(.*?)\];", _source(path), re.S)
     assert match, "REQUIRED_CM not found"
+    # Only double-quoted plain names, so no entry can slip past the findall.
+    assert re.fullmatch(r'\s*(?:"\w+",?\s*)*', match.group(1)), match.group(1)
     declared = tuple(re.findall(r'"(\w+)"', match.group(1)))
     assert declared
     assert REQUIRED_CM[path.name] == declared
