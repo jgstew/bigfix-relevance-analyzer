@@ -23,6 +23,11 @@ runs this package in the browser as WebAssembly, so nothing needs installing.
 The page is a single self-contained file that fetches nothing, so the relevance
 you paste never leaves your browser. It is updated on
 each release.
+Its editor is the same CodeMirror client and language server the wheel ships
+(see [Language server](#language-server)): highlighting, diagnostics,
+completion (as you type, or Ctrl+Space; on a Mac, where that switches input
+source, Alt+\`), hover, and quick fixes (Ctrl+., Cmd+. on a Mac); Ctrl+Enter
+(Cmd+Enter) analyzes the statement.
 
 ### VS Code extension
 

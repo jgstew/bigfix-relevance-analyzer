@@ -36,6 +36,11 @@ name: wasm-html
 # 20.9 -> 21.9 MiB raw, 7.4 -> 7.9 MiB gzipped) and its boot as the parity job
 # reports it from ~109 to ~112 ms; the Pyodide page is unchanged at 18.0 MiB.
 #
+# Both pages' editor is CodeMirror 6 with the wheel's web/ modules (#142 C1,
+# editor-bundle/): a 421 KiB script inlined in each page. Measured the same
+# way: the component page 11.3 -> 11.7 MiB, the Pyodide page 18.0 -> 18.4 MiB,
+# boot unchanged (~113 ms).
+#
 # Pyodide is kept because of the third job. The two runtimes embed different
 # CPython builds produced by different toolchains, so `parity` loads both built
 # pages in one browser and asserts their JSON output is byte-identical over
@@ -159,6 +164,7 @@ jobs:
           cache-dependency-path: |
             tools/playground-wasm/pyodide/smoke/package-lock.json
             tools/playground-wasm/pyodide/browser-test/package-lock.json
+            tools/playground-wasm/editor-bundle/package-lock.json
 
       - name: npm ci
         working-directory: tools/playground-wasm/pyodide/smoke
@@ -188,6 +194,17 @@ jobs:
         working-directory: tools/playground-wasm/pyodide/smoke
         run: node precompile_wheel.mjs --wheel ../../../../dist/*.whl --out ../../../../dist/precompiled.zip
 
+      # The editor (#142 C1): CodeMirror 6 and the wheel's own web/ modules,
+      # bundled into one classic script that the page inlines -- the page stays
+      # a single offline file.
+      - name: npm ci (editor bundle)
+        working-directory: tools/playground-wasm/editor-bundle
+        run: npm ci
+
+      - name: bundle the editor
+        working-directory: tools/playground-wasm/editor-bundle
+        run: node build.mjs --out ../../../dist/playground-editor.js
+
       # the smoke stage's npm ci above already fetched the exact Pyodide
       # release this repo pins, as the "pyodide" npm package -- that package
       # ships its own runtime assets (the wasm binary, stdlib zip, etc.) for
@@ -206,6 +223,7 @@ jobs:
           python3 tools/playground-wasm/pyodide/build-playground/build_playground.py \
             --wheel dist/precompiled.zip \
             --pyodide-dir tools/playground-wasm/pyodide/smoke/node_modules/pyodide \
+            --editor-bundle dist/playground-editor.js \
             --out playground/bigfix-relevance-analyzer-pyodide-playground.html
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -315,6 +333,7 @@ jobs:
           cache-dependency-path: |
             tools/playground-wasm/componentize-py/smoke/package-lock.json
             tools/playground-wasm/componentize-py/browser-test/package-lock.json
+            tools/playground-wasm/editor-bundle/package-lock.json
 
       - name: npm ci
         working-directory: tools/playground-wasm/componentize-py/smoke
@@ -335,6 +354,17 @@ jobs:
         working-directory: tools/playground-wasm/componentize-py/smoke
         run: node smoke.mjs ../../../../dist/componentize/web | tee -a "$GITHUB_STEP_SUMMARY"
 
+      # The editor (#142 C1): CodeMirror 6 and the wheel's own web/ modules,
+      # bundled into one classic script that the page inlines -- the page stays
+      # a single offline file.
+      - name: npm ci (editor bundle)
+        working-directory: tools/playground-wasm/editor-bundle
+        run: npm ci
+
+      - name: bundle the editor
+        working-directory: tools/playground-wasm/editor-bundle
+        run: node build.mjs --out ../../../dist/playground-editor.js
+
       # The ~20 MiB of core Wasm goes in gzipped, and the page inflates it with
       # DecompressionStream. Raw base64 would make this page ~28 MiB -- bigger
       # than the Pyodide one instead of considerably smaller.
@@ -342,6 +372,7 @@ jobs:
         run: |
           python3 tools/playground-wasm/componentize-py/build-playground/build_playground.py \
             --work dist/componentize/web \
+            --editor-bundle dist/playground-editor.js \
             --out playground/bigfix-relevance-analyzer-component-playground.html
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

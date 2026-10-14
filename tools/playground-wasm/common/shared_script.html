@@ -26,6 +26,11 @@
   window.__lastJson for the parity test to read.
 -->
 <script>
+// The editor: CodeMirror and the wheel's web/ modules, bundled by
+// ../editor-bundle/build.mjs. Publishes window.playgroundEditor.
+%%EDITOR_JS%%
+</script>
+<script>
 "use strict";
 
 function bytesFromBase64(b64) {
@@ -44,6 +49,21 @@ const statusEl = document.getElementById("status");
 const outputEl = document.getElementById("output");
 const inputEl = document.getElementById("input");
 const runEl = document.getElementById("run");
+
+// The statement is edited in CodeMirror, mounted over #input's sample text. The
+// language server joins once boot() has wired window.lspHandle (runBoot).
+const editor = (() => {
+  const sample = inputEl.textContent.trim();
+  inputEl.textContent = "";
+  return window.playgroundEditor.mount(inputEl, {
+    doc: sample,
+    onRun: () => {
+      if (!runEl.disabled) run();
+    },
+  });
+})();
+// For the browser tests, and for anyone poking at the page from the console.
+window.playgroundInput = editor;
 
 function setStatus(text, isError) {
   statusEl.textContent = text;
@@ -314,7 +334,7 @@ window.lspExitCode = () => {
 };
 
 function run() {
-  const text = inputEl.value;
+  const text = editor.getText();
   if (!text.trim()) return;
   try {
     setStatus("Analyzing...");
@@ -330,12 +350,6 @@ function run() {
   }
 }
 
-inputEl.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey) {
-    event.preventDefault();
-    if (!runEl.disabled) run();
-  }
-});
 runEl.addEventListener("click", run);
 
 function withTimeout(promise, ms, message) {
@@ -355,6 +369,7 @@ function runBoot(bootPromise, { timeoutMs, timeoutMessage, failureMessage }) {
     .then(({ version, totalMs }) => {
       setStatus(`Ready -- bigfix_relevance_analyzer ${version} (loaded in ${(totalMs / 1000).toFixed(1)}s).`);
       setVersion(version);
+      editor.connect(window.lspHandle);
       runEl.disabled = false;
       run();
     })

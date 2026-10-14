@@ -105,7 +105,7 @@ def _encode_cores(transpiled: Path) -> tuple[str, int, int]:
     return json.dumps(encoded), raw_total, gz_total
 
 
-def build(work_dir: Path, template_path: Path, out_path: Path) -> None:
+def build(work_dir: Path, editor_bundle: Path, template_path: Path, out_path: Path) -> None:
     """Fill ``template_path``'s placeholders and write the result to ``out_path``."""
     _check_pinned_version_matches()
 
@@ -127,6 +127,7 @@ def build(work_dir: Path, template_path: Path, out_path: Path) -> None:
     substitutions = {
         "%%CORES_GZIP_JSON%%": cores_json,
         "%%BUNDLE_JS%%": bundle_path.read_text(encoding="utf-8"),
+        "%%EDITOR_JS%%": embed.editor_js(editor_bundle),
     }
 
     # embed.render injects the shared UI partials, then these substitutions, and
@@ -147,6 +148,11 @@ def main(argv: list[str] | None = None) -> int:
         required=True,
         help="directory transpile.mjs wrote (expects bundle.mjs and transpiled/)",
     )
+    parser.add_argument(
+        "--editor-bundle",
+        required=True,
+        help="the editor script ../../editor-bundle/build.mjs wrote",
+    )
     parser.add_argument("--template", default=str(DEFAULT_TEMPLATE), help="template HTML path")
     parser.add_argument("--out", required=True, help="output HTML path")
     args = parser.parse_args(argv)
@@ -155,7 +161,7 @@ def main(argv: list[str] | None = None) -> int:
     if not work_dir.is_dir():
         raise SystemExit(f"--work {work_dir} is not a directory")
 
-    build(work_dir, Path(args.template), Path(args.out))
+    build(work_dir, Path(args.editor_bundle), Path(args.template), Path(args.out))
     return 0
 
 

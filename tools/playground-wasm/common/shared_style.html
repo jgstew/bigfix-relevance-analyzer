@@ -24,6 +24,15 @@
     --accent: #2563eb;
     --error: #b91c1c;
     --mono: ui-monospace, "SF Mono", Consolas, "Liberation Mono", monospace;
+    /* The editor's (#142): tokens, selection, current line. */
+    --hl-keyword: #6d28d9;
+    --hl-string: #a31515;
+    --hl-escape: #8a4b00;
+    --hl-number: #0b6e4f;
+    --hl-constant: #0550ae;
+    --hl-comment: #5f6672;
+    --selection: #c7d2fe;
+    --active-line: rgba(37, 99, 235, 0.06);
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -34,6 +43,14 @@
       --panel: #1c1f24;
       --accent: #60a5fa;
       --error: #f87171;
+      --hl-keyword: #c4b5fd;
+      --hl-string: #fca5a5;
+      --hl-escape: #fcd34d;
+      --hl-number: #86efac;
+      --hl-constant: #93c5fd;
+      --hl-comment: #9aa1ab;
+      --selection: #3b4a6b;
+      --active-line: rgba(96, 165, 250, 0.08);
     }
   }
   * { box-sizing: border-box; }
@@ -52,18 +69,29 @@
   h1 .logo { width: 2em; height: 2em; flex: none; }
   .subtitle { color: var(--muted); margin: 0 0 1.5rem; font-size: 0.92rem; }
   .subtitle a { color: var(--accent); }
-  textarea {
-    width: 100%;
+  /* The editor (#142): CodeMirror in #input, see editor-bundle/editor.mjs. */
+  #input .cm-editor {
     min-height: 4.5rem;
-    padding: 0.75rem;
     font: 0.95rem/1.4 var(--mono);
     color: var(--fg);
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 8px;
-    resize: vertical;
   }
-  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #input .cm-editor.cm-focused { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #input .cm-scroller { font: inherit; min-height: 4.5rem; }
+  #input .cm-gutters { background: var(--panel); border-right-color: var(--border); color: var(--muted); }
+  #input .cm-tooltip { color: var(--fg); background: var(--panel); border-color: var(--border); }
+  #input .cm-content { caret-color: var(--fg); }
+  #input .cm-cursor, #input .cm-dropCursor { border-left-color: var(--fg); }
+  #input .cm-editor .cm-selectionBackground,
+  #input .cm-editor.cm-focused .cm-selectionBackground,
+  #input .cm-content ::selection { background: var(--selection); }
+  #input .cm-activeLine { background: var(--active-line); }
+  #input .cm-activeLineGutter { background: var(--active-line); color: var(--fg); }
+  #input .cm-bfr-action { font-weight: normal; padding: 1px 6px; color: inherit; border-color: var(--border); background: transparent; }
+  #input .cm-bfr-action:hover, #input .cm-bfr-action:focus-visible { background: var(--active-line); }
+  #input .cm-bfr-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.6rem; }
   button {
     font: inherit;
