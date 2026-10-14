@@ -1,4 +1,4 @@
-// wasi:sockets stub for the browser build.
+// wasi:sockets stub for browser builds of componentize-py components.
 //
 // componentize-py's CPython links the `socket` module, so the component
 // *imports* wasi:sockets even though the analyzer never opens a socket.
