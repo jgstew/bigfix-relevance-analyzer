@@ -276,24 +276,30 @@ export function renderMarkdown(markdown) {
 /**
  * Keeps a server's copy of one document current, for `documentSync: "client"`.
  * `getText()` returns the editor's text now. Returns:
- *   start(): send `initialize`, then `initialized` and `didOpen` (version 1,
- *     the text as it is when initialize answers); once only;
- *   ready: a Promise of whether the document is open on the server;
- *   capabilities: the server's, once ready;
+ *   start(): open the document: the first time, send `initialize` and then
+ *     `initialized`; then `didOpen` with the text as it is by then. After
+ *     close(), start() opens it again at a higher version (a remounted
+ *     editor) without a second `initialize`, which a server refuses;
+ *   ready: a Promise of whether the document is open on the server (never
+ *     rejects);
+ *   capabilities: the server's, once initialized;
  *   changed(): the text changed; a full-text `didChange` follows `delay` ms
  *     after the last of a burst of changes, its version one more than the last;
  *   flush(): send a pending change now (before any request about the text);
  *   accepts(params): whether `publishDiagnostics` params are for the text the
  *     editor has now: this document, the version last sent, nothing unsent;
- *   close(): send `didClose` (if open) and stop.
+ *   close(): send `didClose` (if open).
  * The version is set before each notification is sent, so a server that
  * publishes diagnostics from inside `notify` (one on the main thread) is
- * current.
+ * current. A `notify` or `initialize` that fails (a trapped server) ends the
+ * sync for good: nothing more is sent, no diagnostics are accepted, and every
+ * `ready` is false.
  */
 export function createClientSync(transport, { getText, uri = "untitled:statement", languageId = "bigfix-relevance", delay = 250 }) {
-  let started = false;
+  let initializing = null; // a Promise of whether initialize succeeded
+  let broken = false;
+  let wanted = false; // start() called and no close() since
   let open = false;
-  let closed = false;
   let dirty = false;
   let version = 0;
   let timer = null;
@@ -302,71 +308,85 @@ export function createClientSync(transport, { getText, uri = "untitled:statement
     if (timer !== null) clearTimeout(timer);
     timer = null;
   };
+  const send = (method, params) => {
+    try {
+      transport.notify(method, params);
+      return true;
+    } catch {
+      broken = true;
+      open = false;
+      cancel();
+      return false;
+    }
+  };
+  const initialize = async () => {
+    let result;
+    try {
+      result = await transport.request("initialize", {
+        processId: null,
+        rootUri: null,
+        capabilities: {
+          textDocument: {
+            codeAction: { codeActionLiteralSupport: { codeActionKind: { valueSet: ["quickfix", "source"] } } },
+            completion: { completionItem: { snippetSupport: false } },
+            hover: { contentFormat: ["markdown", "plaintext"] },
+            publishDiagnostics: { versionSupport: true },
+          },
+          workspace: { workspaceEdit: { documentChanges: false } },
+        },
+      });
+    } catch {
+      broken = true;
+      return false;
+    }
+    if (broken) return false;
+    sync.capabilities = (result && result.capabilities) || {};
+    return send("initialized", {});
+  };
   const sync = {
     capabilities: null,
     get ready() {
       return ready;
     },
     start() {
-      if (started) return;
-      started = true;
-      ready = (async () => {
-        let result;
-        try {
-          result = await transport.request("initialize", {
-            processId: null,
-            rootUri: null,
-            capabilities: {
-              textDocument: {
-                codeAction: { codeActionLiteralSupport: { codeActionKind: { valueSet: ["quickfix", "source"] } } },
-                completion: { completionItem: { snippetSupport: false } },
-                hover: { contentFormat: ["markdown", "plaintext"] },
-                publishDiagnostics: { versionSupport: true },
-              },
-              workspace: { workspaceEdit: { documentChanges: false } },
-            },
-          });
-        } catch {
-          closed = true;
-          return false;
-        }
-        if (closed) return false;
-        sync.capabilities = (result && result.capabilities) || {};
-        transport.notify("initialized", {});
-        version = 1;
+      if (broken) return;
+      wanted = true;
+      if (open) return;
+      if (!initializing) initializing = initialize();
+      ready = initializing.then((ok) => {
+        if (!ok || broken || !wanted) return false;
+        if (open) return true; // an earlier start() opened it
+        version += 1;
         open = true;
         dirty = false;
-        transport.notify("textDocument/didOpen", { textDocument: { uri, languageId, version, text: getText() } });
-        return true;
-      })();
+        return send("textDocument/didOpen", { textDocument: { uri, languageId, version, text: getText() } });
+      });
     },
     changed() {
-      if (closed || !open) return; // before didOpen, the text it sends is the latest
+      if (broken || !open) return; // before didOpen, the text it sends is the latest
       dirty = true;
       cancel();
       timer = setTimeout(sync.flush, delay);
     },
     flush() {
       cancel();
-      if (closed || !open || !dirty) return;
+      if (broken || !open || !dirty) return;
       version += 1;
       dirty = false;
-      transport.notify("textDocument/didChange", {
-        textDocument: { uri, version },
-        contentChanges: [{ text: getText() }],
-      });
+      send("textDocument/didChange", { textDocument: { uri, version }, contentChanges: [{ text: getText() }] });
     },
     accepts(params) {
-      if (closed || !open || dirty || !params) return false;
+      if (broken || !open || dirty || !params) return false;
       if (params.uri !== undefined && params.uri !== uri) return false;
       return params.version === undefined || params.version === version;
     },
     close() {
       cancel();
-      if (closed) return;
-      closed = true;
-      if (open) transport.notify("textDocument/didClose", { textDocument: { uri } });
+      wanted = false;
+      if (!open) return;
       open = false;
+      dirty = false;
+      send("textDocument/didClose", { textDocument: { uri } });
     },
   };
   return sync;
@@ -380,9 +400,11 @@ export function createClientSync(transport, { getText, uri = "untitled:statement
  *     what the analyzer's embedded StatementSession uses); edits for other
  *     documents are ignored.
  *   documentSync: "host" (default) or "client"; see the top of this file. In
- *     client mode the transport needs `notify`, one editor view uses the
- *     extensions (the first; later ones get no sync), and diagnostics for any
- *     other version than the text the editor has are dropped.
+ *     client mode the transport needs `notify`; one view at a time is synced
+ *     (the first mounted: other views get no answers, as the server has only
+ *     its text), a view mounted after it is destroyed opens the document
+ *     again, and diagnostics for any other version than the text the editor
+ *     has are dropped.
  *   syncDelay: client mode's debounce, in ms, before a didChange (default 250).
  *   triggerCharacters: the server's completionProvider.triggerCharacters,
  *     which also open completion while typing (word characters always do). In
@@ -482,14 +504,20 @@ export function relevanceEditor(CM, transport, options = {}) {
       }
       destroy() {
         views.delete(this.view);
-        if (sync && this.view === syncView) sync.close();
+        if (sync && this.view === syncView) {
+          sync.close();
+          syncView = null; // the next view to mount opens the document again
+        }
       }
     },
   );
 
-  const request = async (method, params) => {
+  // `view` is the editor asking: in client mode only the synced one gets
+  // answers, since the server knows no other view's text.
+  const request = async (method, params, view) => {
     try {
       if (sync) {
+        if (view !== syncView) return null;
         // The server answers about the text it has: open it, then send any
         // edit still waiting for its debounce.
         if (!(await sync.ready)) return null;
@@ -505,10 +533,14 @@ export function relevanceEditor(CM, transport, options = {}) {
   // document changed while the server answered (they'd be for other text).
   const quickFixes = async (view, from, to, diagnostics) => {
     const doc = view.state.doc;
-    const actions = await request("textDocument/codeAction", {
-      range: { start: positionAt(doc, from), end: positionAt(doc, to) },
-      context: { diagnostics: diagnostics.map((d) => d.lsp), only: ["quickfix"] },
-    });
+    const actions = await request(
+      "textDocument/codeAction",
+      {
+        range: { start: positionAt(doc, from), end: positionAt(doc, to) },
+        context: { diagnostics: diagnostics.map((d) => d.lsp), only: ["quickfix"] },
+      },
+      view,
+    );
     if (view.state.doc !== doc) return null;
     return (actions || []).filter(isQuickFix);
   };
@@ -580,7 +612,7 @@ export function relevanceEditor(CM, transport, options = {}) {
       .field(diagnosticField)
       .list.filter((d) => (side < 0 ? d.from < pos && pos <= d.to : d.from <= pos && pos < d.to));
     const [info, found] = await Promise.all([
-      request("textDocument/hover", { position: positionAt(doc, pos) }),
+      request("textDocument/hover", { position: positionAt(doc, pos) }, view),
       here.length
         ? quickFixes(view, Math.min(...here.map((d) => d.from)), Math.max(...here.map((d) => d.to)), here)
         : [],
@@ -714,7 +746,10 @@ export function relevanceEditor(CM, transport, options = {}) {
       if (!shouldAskImplicitly(before, triggerCharacters)) return null;
     }
     const doc = context.state.doc;
-    const result = await request("textDocument/completion", { position: positionAt(doc, context.pos) });
+    // Client mode answers only the synced view: the one whose document this is.
+    const view = sync ? (syncView && syncView.state.doc === doc ? syncView : null) : undefined;
+    if (sync && !view) return null;
+    const result = await request("textDocument/completion", { position: positionAt(doc, context.pos) }, view);
     if (context.aborted) return null;
     return completionResult(doc, result, context.pos);
   };

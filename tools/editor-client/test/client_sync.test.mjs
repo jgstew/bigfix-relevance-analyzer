@@ -183,12 +183,66 @@ test("close sends didClose, cancels a pending change, and ends the sync", async 
   assert.deepEqual(transport.sent("textDocument/didClose")[0].params, { textDocument: { uri: URI } });
 });
 
-test("close before initialize answers sends nothing more", async () => {
+test("start after close reopens the document at a higher version, without a second initialize", async () => {
+  const { transport, sync, setText } = setup();
+  sync.start();
+  await sync.ready;
+  sync.close();
+  setText("names of bes computers");
+  sync.start();
+  assert.equal(await sync.ready, true);
+  assert.deepEqual(transport.methods(), [
+    "initialize",
+    "initialized",
+    "textDocument/didOpen",
+    "textDocument/didClose",
+    "textDocument/didOpen",
+  ]);
+  const reopened = transport.sent("textDocument/didOpen")[1].params.textDocument;
+  assert.deepEqual([reopened.version, reopened.text], [2, "names of bes computers"]);
+  assert.equal(sync.accepts({ uri: URI, version: 2 }), true);
+  assert.equal(sync.accepts({ uri: URI, version: 1 }), false);
+});
+
+test("close then start before initialize answers opens once, when it does", async () => {
+  const { transport, sync } = setup();
+  sync.start();
+  sync.close();
+  sync.start();
+  assert.equal(await sync.ready, true);
+  assert.deepEqual(transport.methods(), ["initialize", "initialized", "textDocument/didOpen"]);
+});
+
+test("a notify that throws (a trapped server) closes the sync instead of rejecting", async () => {
+  const transport = recording();
+  let throwOn = "textDocument/didOpen";
+  transport.notify = (method) => {
+    transport.calls.push({ kind: "notify", method });
+    if (method === throwOn) throw new Error("trap");
+  };
+  const sync = createClientSync(transport, { uri: URI, delay: DELAY, getText: () => "x" });
+  sync.start();
+  assert.equal(await sync.ready, false);
+  assert.equal(sync.accepts({ uri: URI, version: 1 }), false);
+
+  const second = recording();
+  second.notify = transport.notify;
+  throwOn = "textDocument/didChange";
+  const other = createClientSync(second, { uri: URI, delay: DELAY, getText: () => "y" });
+  other.start();
+  await other.ready;
+  other.changed();
+  assert.doesNotThrow(() => other.flush());
+  assert.equal(other.accepts({ uri: URI, version: 2 }), false);
+  assert.doesNotThrow(() => other.close());
+});
+
+test("close before initialize answers: initialized follows it, but no didOpen", async () => {
   const { transport, sync } = setup();
   sync.start();
   sync.close();
   assert.equal(await sync.ready, false);
-  assert.deepEqual(transport.methods(), ["initialize"]);
+  assert.deepEqual(transport.methods(), ["initialize", "initialized"]);
 });
 
 test("a failed initialize leaves the sync closed: ready is false, nothing else is sent", async () => {
