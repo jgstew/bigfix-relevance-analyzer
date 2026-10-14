@@ -123,7 +123,9 @@ updates:
     labels:
       - "dependencies"
 
-  # codemirror and esbuild; bundles the playground pages' editor (#142 C1)
+  # codemirror and esbuild; bundles the playground pages' editor (#142 C1).
+  # CodeMirror's packages move together (one @codemirror/state on the page),
+  # so they are bumped in one PR.
   - package-ecosystem: "npm"
     directory: "/tools/playground-wasm/editor-bundle"
     schedule:
@@ -131,6 +133,12 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    groups:
+      codemirror:
+        patterns:
+          - "codemirror"
+          - "@codemirror/*"
+          - "@lezer/*"
     labels:
       - "dependencies"
 

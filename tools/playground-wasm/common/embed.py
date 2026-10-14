@@ -74,7 +74,9 @@ def editor_js(path: Path) -> str:
     """The editor script ../editor-bundle/build.mjs wrote, checked fit to inline.
 
     It goes into a ``<script>`` element as text, so it must not contain
-    ``</script`` (which would end the element early), and it must be ASCII
+    ``</script`` (which would end the element early) or ``<!--`` (which, with
+    a ``<script`` after it, makes the parser stop treating ``</script>`` as
+    the end), and it must be ASCII
     (``build.mjs`` passes ``--charset=ascii``) so the page's encoding cannot
     change what it says.
     """
@@ -83,6 +85,8 @@ def editor_js(path: Path) -> str:
     text = path.read_text(encoding="utf-8")
     if re.search(r"</script", text, re.IGNORECASE):
         raise SystemExit(f"{path} contains '</script' and cannot be inlined")
+    if "<!--" in text:
+        raise SystemExit(f"{path} contains '<!--' and cannot be inlined")
     if not text.isascii():
         raise SystemExit(f"{path} is not ASCII -- build it with esbuild's --charset=ascii")
     if "playgroundEditor" not in text:

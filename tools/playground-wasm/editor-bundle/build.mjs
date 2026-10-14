@@ -28,5 +28,5 @@ execFileSync(
 
 // Inlined into an HTML <script> element: the text must not close it early.
 const text = readFileSync(out, "utf8");
-if (/<\/script/i.test(text)) throw new Error(`${out} contains "</script" and cannot be inlined`);
+if (/<\/script|<!--/i.test(text)) throw new Error(`${out} contains "</script" or "<!--" and cannot be inlined`);
 process.stderr.write(`  editor bundle ${(statSync(out).size / 1024).toFixed(0)} KiB\n`);

@@ -25,8 +25,9 @@ you paste never leaves your browser. It is updated on
 each release.
 Its editor is the same CodeMirror client and language server the wheel ships
 (see [Language server](#language-server)): highlighting, diagnostics,
-completion (Ctrl+Space), hover, and quick fixes (Ctrl+.); Ctrl+Enter
-(Cmd+Enter on a Mac) analyzes the statement.
+completion (as you type, or Ctrl+Space; on a Mac, where that switches input
+source, Alt+\`), hover, and quick fixes (Ctrl+., Cmd+. on a Mac); Ctrl+Enter
+(Cmd+Enter) analyzes the statement.
 
 ### VS Code extension
 

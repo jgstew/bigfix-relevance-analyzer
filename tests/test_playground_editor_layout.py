@@ -25,15 +25,14 @@ RUNTIMES = ("componentize-py", "pyodide")
 
 
 def test_the_bundle_package_pins_codemirror_and_esbuild_exactly() -> None:
+    """Exactly, with the lockfile agreeing. Its esbuild may differ from the smoke
+    stage's for a while: dependabot bumps each directory in its own PR."""
     package = json.loads((BUNDLE / "package.json").read_text(encoding="utf-8"))
     assert package["private"] is True
     pins = package["dependencies"]
     codemirror = {"codemirror", "@codemirror/state", "@codemirror/view", "@codemirror/language"}
-    assert set(pins) == {*codemirror, "esbuild"}
+    assert set(pins) == {*codemirror, "@codemirror/autocomplete", "@lezer/highlight", "esbuild"}
     assert all(re.fullmatch(r"\d+\.\d+\.\d+", v) for v in pins.values()), pins
-    smoke_package = PLAYGROUND / "componentize-py" / "smoke" / "package.json"
-    smoke = json.loads(smoke_package.read_text(encoding="utf-8"))
-    assert pins["esbuild"] == smoke["dependencies"]["esbuild"], "one esbuild for both bundles"
     lock = json.loads((BUNDLE / "package-lock.json").read_text(encoding="utf-8"))
     for name, version in pins.items():
         assert lock["packages"][f"node_modules/{name}"]["version"] == version, name
@@ -72,6 +71,7 @@ def test_the_shared_script_inlines_and_mounts_the_editor() -> None:
     [
         ('window.playgroundEditor={};x="</script>"', "</script"),
         ('window.playgroundEditor={};x="</SCRIPT"', "</script"),
+        ('window.playgroundEditor={};x="<!--"', "<!--"),
         ('window.playgroundEditor={};x="' + chr(0xE9) + '"', "ASCII"),  # an e-acute
         ("window.somethingElse={}", "playgroundEditor"),
     ],
