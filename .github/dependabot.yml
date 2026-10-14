@@ -123,6 +123,17 @@ updates:
     labels:
       - "dependencies"
 
+  # codemirror and esbuild; bundles the playground pages' editor (#142 C1)
+  - package-ecosystem: "npm"
+    directory: "/tools/playground-wasm/editor-bundle"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
   # The VS Code extension proofs of concept under tools/vscode-extension/ (issue
   # #10). Unlike the playground packages above, this one ships to users once an
   # extension is packaged, so a compromised dependency would run in their

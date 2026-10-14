@@ -15,7 +15,7 @@
   and are shared with the Pyodide page. What is left here is only what is
   genuinely componentize-py-specific: the embedded core modules and boot().
 
-  componentize-py is the preferred runtime of the two: this page is ~11 MiB
+  componentize-py is the preferred runtime of the two: this page is ~12 MiB
   against Pyodide's ~17.7 MiB and boots in ~450 ms against ~1500 ms, with
   byte-identical output. The Pyodide page is kept as the parity baseline.
 -->
@@ -35,11 +35,11 @@
     <a href="https://github.com/jgstew/bigfix-relevance-analyzer/issues/10" target="_blank" rel="noopener">issue #10</a>.
   </p>
 
-  <textarea id="input" spellcheck="false"
-    >exists running application "winlogon.exe" AND version of operating system >= "10.0"</textarea>
+  <!-- An editor (CodeMirror, ../../editor-bundle/) replaces this text at load. -->
+  <div id="input">exists running application "winlogon.exe" AND version of operating system >= "10.0"</div>
   <div class="row">
     <button id="run" disabled>Analyze</button>
-    <span class="hint">Enter to analyze &middot; Shift+Enter for a new line</span>
+    <span class="hint">Ctrl+Enter (&#8984;+Enter on a Mac) to analyze &middot; Ctrl+Space for completions &middot; Ctrl+. (&#8984;+.) for quick fixes</span>
   </div>
   <p id="status">Loading HTML&hellip; ( ~ 10 seconds, depends on your connection )</p>
 
@@ -51,7 +51,7 @@
 <script>
 "use strict";
 
-// Runs before the ~11 MiB script below has downloaded, and bails out
+// Runs before the ~12 MiB script below has downloaded, and bails out
 // (cancelling that download) on a browser that cannot run it. Two requirements
 // here rather than Pyodide's one: the core wasm modules are embedded gzipped,
 // so DecompressionStream is as load-bearing as WebAssembly itself.
@@ -63,7 +63,7 @@ if (window.__wasmProblem) {
     window.__wasmProblem,
     "bigfix-relevance-analyzer needs WebAssembly to run the component here, " +
       "and DecompressionStream to unpack it -- the component's ~22 MiB of " +
-      "wasm is stored gzipped so this page can stay around 11 MiB."
+      "wasm is stored gzipped so this page can stay around 12 MiB."
   );
 } else {
   document.getElementById("status").textContent = "Support OK, loading the component... ( ~ 10 seconds )";

@@ -105,15 +105,23 @@ export function checkLspTranscript({ transcript, exitCode }) {
   const index = (text) => LSP_STATEMENTS.indexOf(text);
   const expect = (ok, what) => ok || failures.push(what);
 
+  // The page's editor initializes the page's one server at boot (#142 C1), so
+  // the script's own initialize is answered "already initialized"; the
+  // editor's checks (editor_checks.mjs) cover what its capabilities enable.
+  const [init] = reply("initialize");
+  const editorInitialized = init?.error?.message === "already initialized";
   for (const entry of transcript) {
+    if (entry.step === "initialize" && editorInitialized) continue;
     for (const message of JSON.parse(entry.reply)) {
       expect(!message.error, `${entry.step}: error ${JSON.stringify(message.error)}`);
     }
   }
-  const capabilities = result("initialize")?.capabilities ?? {};
-  expect(capabilities.hoverProvider, "initialize: no hoverProvider");
-  expect(capabilities.completionProvider, "initialize: no completionProvider");
-  expect(capabilities.codeActionProvider, "initialize: no codeActionProvider");
+  if (!editorInitialized) {
+    const capabilities = init?.result?.capabilities ?? {};
+    expect(capabilities.hoverProvider, "initialize: no hoverProvider");
+    expect(capabilities.completionProvider, "initialize: no completionProvider");
+    expect(capabilities.codeActionProvider, "initialize: no codeActionProvider");
+  }
 
   const name = index("name of operating system");
   const hover = result(`${name} hover @8`);

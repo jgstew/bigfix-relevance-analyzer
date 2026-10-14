@@ -52,18 +52,20 @@
   h1 .logo { width: 2em; height: 2em; flex: none; }
   .subtitle { color: var(--muted); margin: 0 0 1.5rem; font-size: 0.92rem; }
   .subtitle a { color: var(--accent); }
-  textarea {
-    width: 100%;
+  /* The editor (#142): CodeMirror in #input, see editor-bundle/editor.mjs. */
+  #input .cm-editor {
     min-height: 4.5rem;
-    padding: 0.75rem;
     font: 0.95rem/1.4 var(--mono);
     color: var(--fg);
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 8px;
-    resize: vertical;
   }
-  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #input .cm-editor.cm-focused { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #input .cm-scroller { font: inherit; min-height: 4.5rem; }
+  #input .cm-gutters { background: var(--panel); border-right-color: var(--border); color: var(--muted); }
+  #input .cm-tooltip { color: var(--fg); background: var(--panel); border-color: var(--border); }
+  #input .cm-bfr-action { font-weight: normal; padding: 1px 6px; color: inherit; border-color: var(--border); background: transparent; }
   .row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.6rem; }
   button {
     font: inherit;

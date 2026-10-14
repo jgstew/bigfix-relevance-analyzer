@@ -70,6 +70,26 @@ def read_partial(name: str) -> str:
     return text.lstrip("\n")
 
 
+def editor_js(path: Path) -> str:
+    """The editor script ../editor-bundle/build.mjs wrote, checked fit to inline.
+
+    It goes into a ``<script>`` element as text, so it must not contain
+    ``</script`` (which would end the element early), and it must be ASCII
+    (``build.mjs`` passes ``--charset=ascii``) so the page's encoding cannot
+    change what it says.
+    """
+    if not path.is_file():
+        raise SystemExit(f"no editor bundle at {path} -- did editor-bundle/build.mjs run?")
+    text = path.read_text(encoding="utf-8")
+    if re.search(r"</script", text, re.IGNORECASE):
+        raise SystemExit(f"{path} contains '</script' and cannot be inlined")
+    if not text.isascii():
+        raise SystemExit(f"{path} is not ASCII -- build it with esbuild's --charset=ascii")
+    if "playgroundEditor" not in text:
+        raise SystemExit(f"{path} does not publish window.playgroundEditor: not the editor bundle?")
+    return text
+
+
 def render(template_path: Path, substitutions: dict[str, str]) -> str:
     """Return ``template_path`` with the shared partials, the logo and ``substitutions`` filled in.
 

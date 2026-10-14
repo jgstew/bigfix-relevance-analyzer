@@ -22,6 +22,7 @@ import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 
 import { CASES } from "../../common/cases.mjs";
+import { checkEditor } from "../../common/editor_checks.mjs";
 import { LSP_STATEMENTS, checkLspTranscript, runLspScript } from "../../common/lsp_script.mjs";
 
 const htmlPath = process.argv[2];
@@ -38,6 +39,10 @@ page.on("console", (msg) => {
   if (msg.type() === "error") consoleErrors.push(msg.text());
 });
 page.on("pageerror", (err) => consoleErrors.push(String(err)));
+const network = [];
+page.on("request", (request) => {
+  if (!/^(file|data|blob):/.test(request.url())) network.push(request.url());
+});
 
 await page.goto(pathToFileURL(htmlPath).href);
 // Wait for boot to finish *or* for the pre-flight check to refuse the browser.
@@ -60,7 +65,7 @@ if (wasmProblem) {
 let failures = 0;
 for (const { text, expectBadges } of CASES) {
   const badges = await page.evaluate(async (input) => {
-    document.getElementById("input").value = input;
+    window.playgroundInput.setText(input);
     await run();
     return document.querySelector("#output p")?.innerText ?? null;
   }, text);
@@ -73,6 +78,16 @@ for (const { text, expectBadges } of CASES) {
   }
 }
 
+// The editor (#142 C1), before the LSP script below ends the server with exit.
+for (const [name, failure] of await checkEditor(page)) {
+  if (failure) {
+    console.error(`FAIL: editor: ${name}: ${failure}`);
+    failures++;
+  } else {
+    console.log(`ok: editor: ${name}`);
+  }
+}
+
 // The language server the editor talks to (#142): what an editor needs from
 // it, through the page's lspHandle seam. Last, since it ends with exit.
 const lspFailures = checkLspTranscript(await page.evaluate(runLspScript, LSP_STATEMENTS));
@@ -82,6 +97,12 @@ if (lspFailures.length) {
   failures++;
 } else {
   console.log(`ok: language server (hover, completion, diagnostics, quick fixes, fix-all, exit)`);
+}
+
+if (network.length) {
+  console.error(`FAIL: the page made ${network.length} network request(s), but must work offline:`);
+  for (const url of network.slice(0, 10)) console.error(`  ${url}`);
+  failures++;
 }
 
 if (consoleErrors.length) {
