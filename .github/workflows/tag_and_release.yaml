@@ -365,7 +365,9 @@ jobs:
             --notes-file "${NOTES_FILE}" \
             --draft=false
 
-  # Publishes the released .vsix to the VS Code Marketplace. After `finalize`
+  # Publishes the released .vsix to the VS Code Marketplace and Open VSX.
+  # Open VSX's trusted publisher names THIS file (it matches the run's
+  # top-level workflow), so Open VSX is published only from here. After `finalize`
   # on purpose, unlike PyPI: the Marketplace never accepts a version twice, so
   # it gets the extension only once the release it came from is public, and
   # publish-vscode-extension.yaml takes the .vsix from that published release
@@ -376,8 +378,8 @@ jobs:
   # still exercises everything up to that step (the release download and
   # checksum, Entra ID login, and `vsce verify-pat`), so the setup is proven
   # before anything goes to the Marketplace. If this job fails, the release is
-  # already published; re-run it with "Re-run failed jobs", or run
-  # publish-vscode-extension.yaml by hand with the version.
+  # already published; re-run it with "Re-run failed jobs". Running
+  # publish-vscode-extension.yaml by hand covers only the Marketplace.
   marketplace:
     name: Publish VS Code extension
     needs: [version, finalize]

@@ -19,16 +19,23 @@ name: Publish VS Code Extension
 #
 # Callers:
 #   * tag_and_release.yaml, after `finalize` publishes the release
-#   * workflow_dispatch, to (re)publish an existing release by hand -- for
-#     example if the release's own run failed here. --skip-duplicate makes
-#     publishing a version the Marketplace already has a no-op.
+#   * workflow_dispatch, to (re)publish an existing release to the
+#     Marketplace by hand -- for example if the release's own run failed
+#     here. --skip-duplicate makes publishing a version the Marketplace
+#     already has a no-op. Open VSX is skipped (see below); to retry it, use
+#     "Re-run failed jobs" on the release's own Tag and Release run.
 #
 # Open VSX authenticates with trusted publishing: `ovsx publish
 # --trusted-publishing` exchanges the job's GitHub OIDC token for a
-# short-lived publishing token, so no Open VSX token is stored anywhere. The
-# trusted publisher registered for the `jgstew` namespace on open-vsx.org
-# names this repository and workflow. Never add an OVSX_PAT secret back: a PAT
-# always takes precedence over the OIDC exchange.
+# short-lived publishing token, so no Open VSX token is stored anywhere.
+#
+# Open VSX matches the token's `workflow_ref` claim: the workflow the run
+# STARTED from, not this called one. So the extension's trusted publisher
+# (an extension can have only one) names tag_and_release.yaml, with the
+# `openvsx-publisher` environment. A workflow_dispatch run of this file can
+# never match it, so publish-openvsx runs only under tag_and_release.yaml.
+# Never add an OVSX_PAT secret back: a PAT always takes precedence over the
+# OIDC exchange.
 #
 # Every step runs on every call except the last: the actual `vsce publish` is
 # inert until the repository variable VSCE_PUBLISH is set to `true`. Until
@@ -151,6 +158,9 @@ jobs:
 
   publish-openvsx:
     name: Publish to Open VSX
+    # github.workflow_ref is the top-level workflow, the same claim Open VSX
+    # matches (see the header): run only where the trusted publisher can match.
+    if: startsWith(github.workflow_ref, format('{0}/.github/workflows/tag_and_release.yaml@', github.repository))
     runs-on: ubuntu-latest
     # Any protection rules on it (required reviewer, branch restriction) gate
     # this job, and the trusted publisher may pin it. Holds no secret.
