@@ -516,6 +516,20 @@ def test_open_vsx_publishes_through_trusted_publishing() -> None:
         assert "secrets.OVSX_PAT" not in text
 
 
+def test_open_vsx_runs_only_where_its_trusted_publisher_can_match() -> None:
+    """Open VSX matches the token's workflow_ref, the top-level workflow, and an
+    extension has one trusted publisher: tag_and_release.yaml. A manual run of
+    the publish workflow could only fail there, so the job skips itself."""
+    openvsx = _job(PUBLISH.read_text("utf-8"), "publish-openvsx")
+    assert re.search(
+        r"^    if: startsWith\(github\.workflow_ref, format\('\{0\}/\.github/workflows/"
+        r"tag_and_release\.yaml@', github\.repository\)\)$",
+        openvsx,
+        re.MULTILINE,
+    )
+    assert RELEASE.name == "tag_and_release.yaml"
+
+
 def test_the_build_can_take_a_given_wheel(tmp_path: Path) -> None:
     """A release builds from the wheel it publishes, not from a rebuild of the tree."""
     build = load_tool(PRIMARY / "build-component" / "build_component.py", "_build_component")
