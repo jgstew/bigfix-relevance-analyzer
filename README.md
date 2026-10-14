@@ -815,6 +815,11 @@ from importlib.resources import files
 client = files("bigfix_relevance_analyzer") / "web" / "relevance_editor.js"
 ```
 
+`bigfix_relevance_analyzer.web_assets` describes the shipped modules as data:
+`web_dir()` is that directory, `WEB_MODULES` names its files, and
+`REQUIRED_CM` maps each file to the CodeMirror names it needs, so a host can
+check its own bundle against them without parsing the JavaScript.
+
 ```js
 import { relevanceEditor } from "./relevance_editor.js";
 
