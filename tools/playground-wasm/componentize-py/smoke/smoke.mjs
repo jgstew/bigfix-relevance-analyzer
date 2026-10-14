@@ -27,6 +27,8 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { join, resolve } from "node:path";
 
+import { lspSmoke } from "../../common/lsp_script.mjs";
+
 const workDir = process.argv[2];
 if (!workDir) {
   console.error("usage: node smoke.mjs <work-dir>");
@@ -109,6 +111,11 @@ if (payload.dialect?.classified !== "client") {
 if (payload.parse?.ok !== true) fail(`expected parse.ok === true, got ${JSON.stringify(payload.parse)}`);
 if (payload.types?.ok !== true) fail(`expected types.ok === true, got ${JSON.stringify(payload.types)}`);
 
+// The language server the page's editor talks to (#142): the `handle` and
+// `exit-code` exports, through ../../common/lsp_shim.py.
+const lspFailures = lspSmoke(component.handle, component.exitCode, version);
+if (lspFailures.length) fail(`language server: ${lspFailures.join("; ")}`);
+
 // Plain Markdown on stdout, nothing CI-specific -- this script has no idea
 // whether it's running in a GitHub Action, a terminal, or anything else, and it
 // stays that way on purpose: where this output *goes* (a log, a step summary,
@@ -127,7 +134,7 @@ console.log(`\
 
 \`bigfix_relevance_analyzer\` ${version}, compiled by componentize-py into a single Wasm component together with its own CPython, then transpiled by jco -- no system Python involved. See [issue #10](https://github.com/jgstew/bigfix-relevance-analyzer/issues/10).
 
-Instantiated in **${bootMs} ms** from ${new Set(coreCount ?? []).size} core module(s). The interpreter is pre-initialized at build time, so there is no stdlib unpack and no import cost here -- only Wasm compilation.
+Instantiated in **${bootMs} ms** from ${new Set(coreCount ?? []).size} core module(s); its language server (\`handle\`) answered initialize, didOpen and hover. The interpreter is pre-initialized at build time, so there is no stdlib unpack and no import cost here -- only Wasm compilation.
 
 **Input:** \`${payload.text}\`
 

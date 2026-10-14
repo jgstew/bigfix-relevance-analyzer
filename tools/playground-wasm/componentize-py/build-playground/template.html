@@ -15,7 +15,7 @@
   and are shared with the Pyodide page. What is left here is only what is
   genuinely componentize-py-specific: the embedded core modules and boot().
 
-  componentize-py is the preferred runtime of the two: this page is ~10 MiB
+  componentize-py is the preferred runtime of the two: this page is ~11 MiB
   against Pyodide's ~17.7 MiB and boots in ~450 ms against ~1500 ms, with
   byte-identical output. The Pyodide page is kept as the parity baseline.
 -->
@@ -51,7 +51,7 @@
 <script>
 "use strict";
 
-// Runs before the ~10 MiB script below has downloaded, and bails out
+// Runs before the ~11 MiB script below has downloaded, and bails out
 // (cancelling that download) on a browser that cannot run it. Two requirements
 // here rather than Pyodide's one: the core wasm modules are embedded gzipped,
 // so DecompressionStream is as load-bearing as WebAssembly itself.
@@ -62,8 +62,8 @@ if (window.__wasmProblem) {
   preflightBailout(
     window.__wasmProblem,
     "bigfix-relevance-analyzer needs WebAssembly to run the component here, " +
-      "and DecompressionStream to unpack it -- the component's ~20 MiB of " +
-      "wasm is stored gzipped so this page can stay around 10 MiB."
+      "and DecompressionStream to unpack it -- the component's ~22 MiB of " +
+      "wasm is stored gzipped so this page can stay around 11 MiB."
   );
 } else {
   document.getElementById("status").textContent = "Support OK, loading the component... ( ~ 10 seconds )";
@@ -142,6 +142,11 @@ async function boot() {
   // exactly what the Pyodide page's analyzeJson returns -- that symmetry is
   // what makes ../../parity-test/ a byte comparison.
   window.analyzeJson = component.analyze;
+  // The editor's language server (../../common/lsp_shim.py, which the Pyodide
+  // page runs too): one JSON-RPC message in, the JSON array of replies out.
+  // exitCode() is undefined for none; both pages report null.
+  window.lspHandle = component.handle;
+  window.lspExitCode = () => component.exitCode() ?? null;
 
   const totalMs = Math.round(timings.reduce((sum, t) => sum + t.ms, 0));
   console.table(timings);

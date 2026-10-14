@@ -17,8 +17,9 @@ that runtime actually consumes.
 
 Two things here are load-bearing and easy to get wrong.
 
-**Only the app module goes on the Python path.** ``componentize-py`` bundles what
-it finds in each ``-p`` directory, so pointing it at this source directory --
+**Only the app module (and the shim it imports) goes on the Python path.**
+``componentize-py`` bundles what it finds in each ``-p`` directory, so pointing
+it at this source directory --
 which also holds a template, a JS stub and these scripts -- put 3.5 MiB of
 non-Python files inside the component, measured. Worse, a built page left in
 here would be embedded into the next component. ``app.py`` is therefore copied
@@ -43,6 +44,9 @@ from pathlib import Path
 HERE = Path(__file__).parent
 WIT_DIR = HERE / "wit"
 APP_MODULE = HERE / "app.py"
+
+# Staged beside the app: the language-server shim both playground runtimes share.
+EXTRA_MODULES = (HERE.parent.parent / "common" / "lsp_shim.py",)
 
 # The world in wit/analyzer.wit. The app module may not share this name --
 # componentize-py generates a module for the world and Python cannot load two
@@ -73,13 +77,15 @@ def componentize(
     wit_dir: Path = WIT_DIR,
     world: str = WORLD,
     app_module: Path = APP_MODULE,
+    extra_modules: tuple[Path, ...] = EXTRA_MODULES,
 ) -> Path:
     """Build the component into ``work_dir`` and return its path.
 
     The defaults build this playground's ``analyzer`` world. The VS Code
     extension (tools/vscode-extension/componentize-py/build-component/) passes
-    its own WIT directory, world and app module, to get the same two-pass build
-    for a different set of exports.
+    its own WIT directory, world and app module, and no extra modules, to get
+    the same two-pass build for a different set of exports. ``extra_modules``
+    are staged beside the app module, importable by name.
     """
     deps = work_dir / "deps"
     bindings = work_dir / "bindings"
@@ -108,8 +114,10 @@ def componentize(
         "generate bindings",
     )
 
-    # Only the app module, nothing else from this source directory.
-    shutil.copy2(app_module, app_dir / app_module.name)
+    # Only the app module and the modules it imports by name, nothing else from
+    # these source directories.
+    for module in (app_module, *extra_modules):
+        shutil.copy2(module, app_dir / module.name)
 
     componentize_argv = [
         "componentize-py",

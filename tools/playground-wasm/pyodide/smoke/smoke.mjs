@@ -13,7 +13,10 @@
 
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadPyodide } from "pyodide";
+
+import { lspSmoke } from "../../common/lsp_script.mjs";
 
 const wheelPath = process.argv[2];
 if (!wheelPath) {
@@ -73,6 +76,18 @@ if (payload.dialect?.classified !== "client") {
 if (payload.parse?.ok !== true) fail(`expected parse.ok === true, got ${JSON.stringify(payload.parse)}`);
 if (payload.types?.ok !== true) fail(`expected types.ok === true, got ${JSON.stringify(payload.types)}`);
 
+// The language server the page's editor talks to (#142): the shim the page
+// loads, ../../common/lsp_shim.py, imported from Pyodide's filesystem as there.
+pyodide.FS.mkdirTree("/tmp/playground");
+pyodide.FS.writeFile(
+  "/tmp/playground/lsp_shim.py",
+  readFileSync(fileURLToPath(new URL("../../common/lsp_shim.py", import.meta.url)))
+);
+pyodide.runPython('import sys; sys.path.insert(0, "/tmp/playground")');
+const lspShim = pyodide.pyimport("lsp_shim");
+const lspFailures = lspSmoke((m) => lspShim.handle(m), () => lspShim.exit_code(), version);
+if (lspFailures.length) fail(`language server: ${lspFailures.join("; ")}`);
+
 // Plain Markdown on stdout, nothing CI-specific -- this script has no idea
 // whether it's running in a GitHub Action, a terminal, or anything else, and
 // it stays that way on purpose: where this output *goes* (a log, a step
@@ -85,7 +100,7 @@ const referenceRows = payload.references
 console.log(`\
 ## bigfix-relevance-analyzer under Pyodide (Node)
 
-\`bigfix_relevance_analyzer\` ${version}, built as a wheel this run and installed into Pyodide (WASM CPython) via micropip -- no system Python involved. See [issue #10](https://github.com/jgstew/bigfix-relevance-analyzer/issues/10).
+\`bigfix_relevance_analyzer\` ${version}, built as a wheel this run and installed into Pyodide (WASM CPython) via micropip -- no system Python involved. Its language server (\`lsp_shim.handle\`) answered initialize, didOpen and hover. See [issue #10](https://github.com/jgstew/bigfix-relevance-analyzer/issues/10).
 
 **Input:** \`${payload.text}\`
 

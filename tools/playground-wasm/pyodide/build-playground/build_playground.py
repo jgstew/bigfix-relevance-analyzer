@@ -49,6 +49,11 @@ PYODIDE_VERSION = "314.0.7"
 DEFAULT_TEMPLATE = Path(__file__).parent / "template.html"
 PACKAGE_JSON = Path(__file__).parent.parent / "smoke" / "package.json"
 
+# The language-server shim both playground runtimes share (#142): the page writes
+# it into Pyodide's filesystem and imports it, as componentize.py stages it
+# beside the component's app.py.
+LSP_SHIM = Path(__file__).parent.parent.parent / "common" / "lsp_shim.py"
+
 # Filename -> template placeholder, for the files read from --pyodide-dir.
 _PYODIDE_ASSETS = {
     "pyodide.mjs": "%%PYODIDE_MJS_BASE64%%",
@@ -80,7 +85,10 @@ def build(wheel_path: Path, pyodide_dir: Path, template_path: Path, out_path: Pa
     """Fill ``template_path``'s placeholders and write the result to ``out_path``."""
     _check_pinned_version_matches()
 
-    substitutions = {"%%WHEEL_BASE64%%": embed.b64_file(wheel_path)}
+    substitutions = {
+        "%%WHEEL_BASE64%%": embed.b64_file(wheel_path),
+        "%%LSP_SHIM_PY_BASE64%%": embed.b64_file(LSP_SHIM),
+    }
     for filename, placeholder in _PYODIDE_ASSETS.items():
         asset_path = pyodide_dir / filename
         if not asset_path.is_file():

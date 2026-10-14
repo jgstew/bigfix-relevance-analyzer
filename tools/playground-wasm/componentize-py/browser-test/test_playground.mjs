@@ -22,6 +22,7 @@ import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 
 import { CASES } from "../../common/cases.mjs";
+import { LSP_STATEMENTS, checkLspTranscript, runLspScript } from "../../common/lsp_script.mjs";
 
 const htmlPath = process.argv[2];
 if (!htmlPath) {
@@ -70,6 +71,17 @@ for (const { text, expectBadges } of CASES) {
   } else {
     console.log(`ok: ${JSON.stringify(text)} -> ${badges}`);
   }
+}
+
+// The language server the editor talks to (#142): what an editor needs from
+// it, through the page's lspHandle seam. Last, since it ends with exit.
+const lspFailures = checkLspTranscript(await page.evaluate(runLspScript, LSP_STATEMENTS));
+if (lspFailures.length) {
+  console.error(`FAIL: language server: ${lspFailures.length} problem(s):`);
+  for (const line of lspFailures) console.error(`  ${line}`);
+  failures++;
+} else {
+  console.log(`ok: language server (hover, completion, diagnostics, quick fixes, fix-all, exit)`);
 }
 
 if (consoleErrors.length) {

@@ -9,6 +9,11 @@
       window.analyzeJson(text) -> string     the JSON of analyze_relevance_to_dict
 
   Each runtime's boot() sets that, and everything here is written against it.
+  boot() also sets the language server's seam, for the editor (#142):
+
+      window.lspHandle(message) -> string    a JSON array of the replies
+      window.lspExitCode() -> number | null  null until the client sends `exit`
+
   A *string*, not a parsed object, deliberately: it is what both runtimes
   natively produce, and it is what makes comparing the two pages a byte
   comparison. run() parses it for rendering and stashes the raw string on
@@ -294,6 +299,12 @@ function renderError(err) {
 // bug in the template, not something to paper over with a null check.
 window.analyzeJson = () => {
   throw new Error("analyzeJson called before boot() finished wiring it");
+};
+window.lspHandle = () => {
+  throw new Error("lspHandle called before boot() finished wiring it");
+};
+window.lspExitCode = () => {
+  throw new Error("lspExitCode called before boot() finished wiring it");
 };
 
 function run() {

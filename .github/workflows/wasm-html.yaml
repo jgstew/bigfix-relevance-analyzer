@@ -29,6 +29,13 @@ name: wasm-html
 # with identical per-analysis throughput. That is why componentize-py is
 # preferred.
 #
+# Both pages also run the language server their editor talks to (#142 H1:
+# common/lsp_shim.py, behind the component's `handle` export). Measured
+# 2026-10-14 on an Apple-silicon Mac, Chromium headless, against the same
+# build without it: the component page went from 10.7 to 11.3 MiB (core wasm
+# 20.9 -> 21.9 MiB raw, 7.4 -> 7.9 MiB gzipped) and its boot as the parity job
+# reports it from ~109 to ~112 ms; the Pyodide page is unchanged at 18.0 MiB.
+#
 # Pyodide is kept because of the third job. The two runtimes embed different
 # CPython builds produced by different toolchains, so `parity` loads both built
 # pages in one browser and asserts their JSON output is byte-identical over
