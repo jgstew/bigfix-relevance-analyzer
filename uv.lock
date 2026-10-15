@@ -160,7 +160,7 @@ wasm = [{ name = "componentize-py", specifier = "==0.25.1" }]
 
 [[package]]
 name = "bigfix-remote-client-relevance"
-version = "1.4.4"
+version = "1.5.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asyncssh" },
@@ -174,9 +174,9 @@ dependencies = [
     { name = "typer" },
     { name = "zstandard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b4/92/8d4f0b9adbc3aed25fd0506c22376c5eb6d97176ffa676d0df36ed2d0ed7/bigfix_remote_client_relevance-1.4.4.tar.gz", hash = "sha256:209e38e57c745f9e290b147abbcd48e0e35f403b0ff453cb6d451bce36a875f8", size = 444687, upload-time = "2026-10-07T18:03:14.365Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6c/59/ac8a9550a15aa7768d0d6fcdc25a93a859b0a02145c5849d4d89f605d117/bigfix_remote_client_relevance-1.5.2.tar.gz", hash = "sha256:bb43932cbef592f66ad17767a2f08c4d2b3817ec5ff47cec6eeba2024d7af805", size = 471100, upload-time = "2026-10-07T19:57:08.464Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/54/6c/91c4b228dd5de247163d0ca7ce0972635ef7fb56f62ed53ab31df756657f/bigfix_remote_client_relevance-1.4.4-py3-none-any.whl", hash = "sha256:3f7a1d3dd1a543775d3fb8a4374b20278add6db371c93e5a1a8c652e061971f5", size = 136109, upload-time = "2026-10-07T18:03:12.892Z" },
+    { url = "https://files.pythonhosted.org/packages/01/57/c279448ab277646f0af47f6d320e793199c6c8f693af5c9ba6ac9e32d022/bigfix_remote_client_relevance-1.5.2-py3-none-any.whl", hash = "sha256:8b681b52aefb1022749d002421c60bcadad3d6c73ebabd4d9ea1136686d2bd06", size = 151728, upload-time = "2026-10-07T19:57:07.308Z" },
 ]
 
 [[package]]
