@@ -205,6 +205,7 @@ From a real BigFix console and Web Reports, October 2026:
 | `location` | `about://` | the Web Reports server |
 | ~12 MiB page | imported and loaded | saved and loaded, but 19.4 s server time before the first byte (0.6 s download, 0.13 s analyzer start); not cached between loads |
 | Small report, analyzer fetched | | 0.06 s server time, Evaluate usable at 0.36 s; first load fetched the published playground (11.7 MB) in 0.55 s, analyzer ready at 2.1 s |
+| Small report, reopened | | 0.07 s server time, Evaluate usable at 0.35 s; analyzer from the IndexedDB cache (HEAD request only), ready at 0.83 s |
 
 ## Limits and next steps
 
