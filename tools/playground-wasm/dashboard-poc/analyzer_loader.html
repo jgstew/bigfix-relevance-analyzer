@@ -226,22 +226,42 @@ async function boot() {
   };
 }
 
-const go = () =>
-  boot().catch((err) => {
-    // A set recorded as not starting says so itself (and how to retry).
-    window.rdbg.onAnalyzerFailed(err.doesNotStart ? err.message : `could not load it: ${err.message || err}`);
-  });
+// The load in progress (boot, or Reload's forget-then-boot), if any. Only one
+// runs at a time: two would mount two editors and share servedCores and
+// globalThis.__component, so one could fail and record a false "does not
+// start".
+let booting = null;
+
+function run(steps) {
+  booting = steps()
+    .catch((err) => {
+      // A set recorded as not starting says so itself (and how to retry).
+      window.rdbg.onAnalyzerFailed(err.doesNotStart ? err.message : `could not load it: ${err.message || err}`);
+    })
+    .finally(() => {
+      booting = null;
+    });
+}
+
+const go = () => run(boot);
 
 // Reload the analyzer (Log and diagnostics): forget this browser's copy and
 // any "does not start" record, then load and start it again. core.js has
-// already put the editor's text back in the plain text box.
-function reload(done) {
+// already put the editor's text back in the plain text box. core.js keeps
+// the button disabled while a load runs; a click that comes through anyway
+// (after the 5-minute watchdog gave up on a load still running) is ignored,
+// and that load reports when it ends.
+function reload() {
+  if (booting) {
+    LOG("analyzer: still loading; Reload ignored until that load ends");
+    return;
+  }
   if (unmount) unmount();
   unmount = null;
-  forgetAnalyzer(URLS, ENV)
-    .catch((err) => LOG(`analyzer: could not clear the cache (${err.message || err})`))
-    .then(go)
-    .finally(done);
+  run(async () => {
+    await forgetAnalyzer(URLS, ENV).catch((err) => LOG(`analyzer: could not clear the cache (${err.message || err})`));
+    await boot();
+  });
 }
 
 const problem =
