@@ -206,7 +206,9 @@ From `tools/playground-wasm/dashboard-poc/`, after `npm ci`:
 
 The browser tests serve the repository root over HTTP and make a split set
 from the local playground (`split_fixture.mjs`), standing in for the real one
-until it is published. They cover: Evaluate before the analyzer arrives, a
+until it is published. With `SPLIT_ANALYZER_DIR` set to a real build of the
+set (the analyzer build's `playground/analyzer/`), they copy and use that
+instead. They cover: Evaluate before the analyzer arrives, a
 first load then a cached reload that fetches only the manifest, falling back
 to the single-file page, an unreachable analyzer, folded diagnostics,
 FastQuery's backoff and live rows, and a new Evaluate abandoning a running

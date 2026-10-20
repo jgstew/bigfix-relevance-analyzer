@@ -6,12 +6,13 @@
 //   node tools/playground-wasm/dashboard-poc/test_reports.mjs
 //
 // The fake Web Report takes the analyzer from a split set (MANIFEST.md) that
-// split_fixture.mjs makes from the local playground build, falling back to
-// that single-file page itself. Everything is served over HTTP from the
+// split_fixture.mjs makes from the local playground build, or, with
+// SPLIT_ANALYZER_DIR set, a copy of a real one (the analyzer build's
+// playground/analyzer/); it falls back to that single-file page itself. Everything is served over HTTP from the
 // repository root (split files and fetch() do not work from file://).
 
 import assert from "node:assert/strict";
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { cpSync, createReadStream, existsSync, rmSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { dirname, extname, join, normalize, sep } from "node:path";
 import { after, before, describe, test } from "node:test";
@@ -62,7 +63,10 @@ function serve(req, res, path) {
 let browser;
 let base;
 before(async () => {
-  writeSplitSet(join(ROOT, PLAYGROUND), join(ROOT, OUT, "analyzer"));
+  const splitDir = join(ROOT, OUT, "analyzer");
+  rmSync(splitDir, { recursive: true, force: true });
+  if (process.env.SPLIT_ANALYZER_DIR) cpSync(process.env.SPLIT_ANALYZER_DIR, splitDir, { recursive: true });
+  else writeSplitSet(join(ROOT, PLAYGROUND), splitDir);
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   base = `http://127.0.0.1:${server.address().port}`;
   browser = await chromium.launch();
@@ -104,7 +108,7 @@ describe("Web Report", () => {
 
     await analyzerSettled(page);
     assert.match(await fact(page, "analyzer"), /loaded \(bigfix_relevance_analyzer [\d.]+, downloaded/);
-    assert.match(await fact(page, "analyzer source"), /analyzer\/manifest\.json \(analyzer 0\.0\.0-fixture, downloaded \d+ files/, await page.locator("#log").inputValue());
+    assert.match(await fact(page, "analyzer source"), /analyzer\/manifest\.json \(analyzer [\w.-]+, downloaded \d+ files/, await page.locator("#log").inputValue());
     await page.locator(".cm-editor").waitFor();
     assert.ok(requests.includes(`GET /${OUT}/analyzer/glue.mjs`));
     assert.ok(!requests.some((r) => r.endsWith(PLAYGROUND)), "the single-file page should not be needed");
@@ -120,7 +124,7 @@ describe("Web Report", () => {
     // Reopened: from the cache, fetching only the manifest.
     const again = await open(context, "relevance-debugger-webreport-fake.html");
     await analyzerSettled(again.page);
-    assert.match(await fact(again.page, "analyzer source"), /\(analyzer 0\.0\.0-fixture, cached\)/);
+    assert.match(await fact(again.page, "analyzer source"), /\(analyzer [\w.-]+, cached\)/);
     const analyzerRequests = again.requests.filter((r) => r.includes("/analyzer/") || r.endsWith(PLAYGROUND));
     assert.deepEqual(analyzerRequests, [`GET /${MANIFEST}`]);
     await again.page.locator(".cm-editor").waitFor();
