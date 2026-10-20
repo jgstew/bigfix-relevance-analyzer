@@ -145,9 +145,29 @@ indent and a trailing newline.
    `version()`, `handle(message) -> JSON array string` (the language server),
    and `exitCode()`.
 
+9. A consumer that keeps its own cache may reuse a cached file instead of
+   downloading it when a new manifest arrives, if the file's entry in the
+   manifest it was cached under has the same `sha256` as its entry in the new
+   manifest (and, for a core cached as inflated wasm, the same `raw_sha256`).
+   Reused bytes are verified as rule 5 says: hashed against the new manifest,
+   or, where only a JS SHA-256 is available, trusted because they were
+   checked against that same hash when they downloaded. Rules 4 and 6 still
+   apply to the new set as a whole. Producers need nothing for this: an
+   unchanged core keeps its bytes because it is gzipped with level 9 and
+   mtime 0.
+
+How the Web Reports loader does it: it follows rules 1 to 3 and 5 to 9, with
+one difference in rule 4: it refuses a set that fails, but does not re-read
+the manifest; it keeps the older cached set if it has one, or tries its next
+configured source. It also has a
+consumer-side safety net that the contract does not need: a set that checks
+out but does not start is downloaded once more, then recorded against that
+manifest's text so it is not downloaded again in that browser (see
+`dashboard-poc/README.md`).
+
 How `index.html` does it: it uses the browser's HTTP cache as its only cache
 and persists nothing itself. It fetches everything with `no-cache`, so a
-reload costs one 304 per file. It follows rules 1 and 3 to 8; rule 2 does not
+reload costs one 304 per file. It follows rules 1 and 3 to 8; rules 2 and 9 do not
 apply, since it keeps no cache of its own. For rule 7 it uses the inline module
 script. It uses `crypto.subtle` where it exists and its own JS SHA-256
 elsewhere. If the set is refused, it shows the reason in place of the
