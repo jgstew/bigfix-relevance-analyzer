@@ -149,17 +149,22 @@ indent and a trailing newline.
    downloading it when a new manifest arrives, if the file's entry in the
    manifest it was cached under has the same `sha256` as its entry in the new
    manifest (and, for a core cached as inflated wasm, the same `raw_sha256`).
-   Reused bytes are verified as rule 5 says: hashed against the new manifest,
-   or, where only a JS SHA-256 is available, trusted because they were
-   checked against that same hash when they downloaded. Rules 4 and 6 still
-   apply to the new set as a whole. Producers need nothing for this: an
+   Rehash reused bytes against the new manifest where that is cheap
+   (`crypto.subtle`). Where only a JS SHA-256 is available, a consumer may
+   instead trust them after checking their size, because they were checked
+   against that same hash when they downloaded: this is an explicit
+   exception to rule 5, for bytes from the consumer's own cache only. Rules
+   4 and 6 still apply to the new set as a whole. Producers need nothing for this: an
    unchanged core keeps its bytes because it is gzipped with level 9 and
    mtime 0.
 
-How the Web Reports loader does it: it follows rules 1 to 3 and 5 to 9, with
-one difference in rule 4: it refuses a set that fails, but does not re-read
+How the Web Reports loader does it: it follows rules 1 to 3 and 6 to 9, with
+two differences. Rule 4: it refuses a set that fails, but does not re-read
 the manifest; it keeps the older cached set if it has one, or tries its next
-configured source. It also has a
+configured source. Rule 5: everything it downloads is checked by size and
+sha256, but without `crypto.subtle` (plain http) it does not hash its own
+cached bytes again: an unchanged cached set is used as is, and reused files
+are checked by size only (rule 9's exception). It also has a
 consumer-side safety net that the contract does not need: a set that checks
 out but does not start is downloaded once more, then recorded against that
 manifest's text so it is not downloaded again in that browser (see

@@ -174,22 +174,34 @@ template.html -+- core.js              ES5 only; UI and every evaluation path, b
   skips module scripts entirely.
 - **A set that checks out but does not start** (the editor bundle or glue
   throws, or `$init` rejects) goes through `loadAndStart()`'s safety net in
-  `loader.mjs`; `analyzer_loader.html` only supplies `start(pieces)`. A
-  cached set gets one more chance: it is dropped from the cache and
-  downloaded afresh, then started again. A freshly downloaded set that does
-  not start (including that retry) is recorded in IndexedDB under
-  `nostart:<cache key>`, with the sha256 of its manifest's text (the
-  single-file page: its `Last-Modified`), the error and the time. A later load
-  that finds the same manifest stops there, before downloading or starting
-  anything, and shows the recorded error; a changed manifest (a new release)
-  is tried again. So a browser where the analyzer cannot run costs at most
-  one extra download per release, never a loop. Network and checksum failures
-  are handled before this (other sources, the cached set) and never recorded.
-  A set built partly from reused files counts as cached here, so its retry
-  downloads every file. **Reload the analyzer** (`forgetAnalyzer()`) deletes
-  the cached sets and records of the configured sources, then runs the load
-  and start again; `core.js` puts the editor's text back in the plain text
-  box meanwhile.
+  `loader.mjs`; `analyzer_loader.html` only supplies `start(pieces)`.
+  - A cached set gets one more chance, once per set and browser: it is
+    dropped from the cache and downloaded afresh, then started again. Which
+    set had that retry is kept under `retried:<cache key>`, so a set that
+    fails now and then is recorded the next time it fails from the cache,
+    not downloaded again on every such load.
+  - A set that does not start after that, or that was freshly downloaded in
+    the first place, is recorded in IndexedDB under `nostart:<cache key>`,
+    with the sha256 of its manifest's text (the single-file page: its
+    `Last-Modified`), the error and the time. A later load that finds the same
+    manifest stops there, before downloading or starting anything, and shows
+    the recorded error (and, if a newer manifest failed to download, that
+    too). A changed manifest (a new release) is tried again.
+  - The single-file page, if HEAD sends no `Last-Modified`: the GET carries
+    `If-Modified-Since` with the recorded one, and a 304 counts as the same
+    page. Cross-origin, that header needs a CORS preflight; if the server
+    refuses it, the page downloads and is refused after the download.
+  - So a browser where the analyzer cannot run costs at most one extra
+    download of each release's set, never a loop. A set built partly from
+    reused files counts as cached here, so for it the worst case is that
+    partial download plus one full one. Network and checksum failures are
+    handled before this (other sources, the cached set) and never recorded.
+  - **Reload the analyzer** (`forgetAnalyzer()`) deletes the cached sets,
+    records and retry notes of the configured sources, then runs the load and
+    start again; `core.js` puts the editor's text back in the plain text box
+    meanwhile. It is disabled while a load runs, and the loader runs one load
+    at a time (a click that gets through is ignored). A Reload that never
+    ends gives up after 5 minutes, as the first load does.
 - **Session relevance** goes through the page's `Relevance(query, {success,
   failure})` (async), falling back to `EvaluateRelevance(query)` (sync). Both
   hosts return native values (a boolean, a `Date` for a time), so the query is
@@ -312,7 +324,7 @@ From a real BigFix console and Web Reports, October 2026:
   how many computers gave them), the per-level breakdown, Fix all, and export.
 - **A "does not start" record outlives a fix in the browser** (an extension,
   a policy, memory) until the next release or Reload the analyzer: that is
-  the price of never looping. For the single-file page served without
+  the price of never looping. For the single-file page served without any
   `Last-Modified`, only Reload the analyzer clears it.
 - **Not released yet:** the two outputs are built and tested in CI but not
   attached to releases next to the playground.
