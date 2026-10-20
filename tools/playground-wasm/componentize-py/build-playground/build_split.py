@@ -5,7 +5,7 @@
         --work dist/componentize/web \\
         --editor-bundle dist/playground-editor.js \\
         --out playground/analyzer \\
-        --zip playground/bigfix-relevance-analyzer-analyzer.zip
+        --zip playground/bigfix-relevance-analyzer-web.zip
 
 The single-file page (``build_playground.py``, beside this) embeds everything
 in one ~12 MiB HTML file, which is what makes it work offline -- and what makes
