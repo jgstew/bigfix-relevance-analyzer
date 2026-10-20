@@ -77,7 +77,21 @@ export async function fromPage(url, env) {
     return { pieces: cached, how: "cached", key, fresh: false };
   }
   const started = env.now();
-  const res = await env.fetch(url, { cache: "no-store" });
+  // HEAD gave no Last-Modified, so it cannot say whether a page recorded as
+  // not starting changed: ask the GET, so the same page costs a 304, not a
+  // download. The header makes a cross-origin request preflighted; if that
+  // fails, download as before (the check after the download still applies).
+  const record = !unreachable && lastModified === null ? await env.cacheGet(recordKey(key)) : undefined;
+  let res;
+  if (record && record.id) {
+    try {
+      res = await env.fetch(url, { cache: "no-store", headers: { "If-Modified-Since": record.id } });
+    } catch (err) {
+      env.log(`analyzer: ${url} refused a conditional request (${err.message || err}); downloading it`);
+    }
+    if (res && res.status === 304) throw doesNotStart(record);
+  }
+  if (!res) res = await env.fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const html = await res.text();
   const found = extract(html);
@@ -301,7 +315,7 @@ export async function fromManifest(configured, env) {
   } catch (err) {
     if (!cached) throw err;
     env.log(`analyzer: the newer manifest at ${url} failed (${err.message}); keeping the cached set`);
-    await refuseIfRecorded(key, manifestId(cached.manifestText), env);
+    await refuseIfRecorded(key, manifestId(cached.manifestText), env, `the newer manifest failed: ${err.message}`);
     return { pieces: cached, how: `cached (the newer manifest failed: ${err.message})`, key, fresh: false };
   }
 }
@@ -402,10 +416,14 @@ async function reusable(manifest, previous, env) {
 const manifestId = (text) => sha256Hex(new TextEncoder().encode(text));
 const setId = (got) => (got.key.startsWith("manifest:") ? manifestId(got.pieces.manifestText) : got.pieces.lastModified ?? null);
 const recordKey = (key) => `nostart:${key}`;
+// The id of the last set loadAndStart() downloaded again because its cached
+// copy did not start: each set gets that retry once per browser.
+const retriedKey = (key) => `retried:${key}`;
 
-function doesNotStart(record) {
+function doesNotStart(record, also) {
   const err = new Error(
     `it does not start in this browser (${record.what}; tried ${record.time}): ${record.error}. ` +
+      (also ? `Also, ${also}. ` : "") +
       "Reload the analyzer under Log and diagnostics to try again",
   );
   err.doesNotStart = true;
@@ -415,9 +433,10 @@ function doesNotStart(record) {
 // Throws if the set `id` names, from the source cached under `key`, is
 // recorded as not starting in this browser: then nothing is downloaded or run
 // until the source changes (a new release) or the record is forgotten.
-async function refuseIfRecorded(key, id, env) {
+// `also`: anything else the message should say.
+async function refuseIfRecorded(key, id, env, also) {
   const record = await env.cacheGet(recordKey(key));
-  if (record && record.id === id) throw doesNotStart(record);
+  if (record && record.id === id) throw doesNotStart(record, also);
 }
 
 async function startOrRecord(got, start, env) {
@@ -437,22 +456,31 @@ async function startOrRecord(got, start, env) {
 
 // loadPieces(), then start(pieces) (the page's: it runs the analyzer), with a
 // safety net for a set that downloads and checks out but does not start. A
-// cached set gets one more chance: it is dropped and downloaded afresh. A
-// fresh set that does not start is recorded against its manifest (or page
-// Last-Modified), so later loads stop before downloading it; a new release
-// is tried again. At worst, one extra download per release per browser.
+// cached set gets one more chance, once per set and browser: it is dropped
+// and downloaded afresh. A set that does not start after that (or that was
+// downloaded fresh in the first place) is recorded against its manifest (or
+// page Last-Modified), so later loads stop before downloading it; a new
+// release is tried again. At worst, one extra download per release per
+// browser (for a set partly reused from the cache: that partial download,
+// then one full one).
 // Network and checksum failures are loadPieces' and never land here.
 export async function loadAndStart(urls, env, start) {
   const got = await loadPieces(urls, env);
   if (got.fresh) return startOrRecord(got, start, env);
+  const id = setId(got);
+  const retried = await env.cacheGet(retriedKey(got.key));
+  // Already retried for this set (it started then, but not now): an
+  // intermittent failure must not cost a download on every load.
+  if (retried && retried.id === id) return startOrRecord(got, start, env);
   try {
     return { ...got, started: await start(got.pieces) };
   } catch (err) {
     env.log(`analyzer: the cached set from ${got.source} did not start (${err.message || err}); downloading it again`);
     try {
+      await env.cachePut(retriedKey(got.key), { id, time: new Date().toISOString() });
       await env.cacheDelete(got.key);
-    } catch (delErr) {
-      env.log(`analyzer: could not drop it from the cache (${delErr})`);
+    } catch (cacheErr) {
+      env.log(`analyzer: could not update the cache (${cacheErr})`);
     }
   }
   return startOrRecord(await loadPieces(urls, env), start, env);
@@ -465,7 +493,7 @@ export async function forgetAnalyzer(urls, env) {
   const removed = [];
   for (const url of urls) {
     const key = isManifestUrl(url) ? `manifest:${new URL(url, env.baseUrl).href}` : `page:${url}`;
-    for (const k of [key, recordKey(key)]) {
+    for (const k of [key, recordKey(key), retriedKey(key)]) {
       if ((await env.cacheGet(k)) === undefined) continue;
       await env.cacheDelete(k);
       removed.push(k);
