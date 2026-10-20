@@ -453,7 +453,7 @@ describe("console dashboard", () => {
 // console's IE11 engine on Windows, which CI does not have.
 describe("console dashboard: qna on this computer", () => {
   const CONSOLE = "relevance-debugger-console-fake.html";
-  const QNA_LINE = /^cmd\.exe \/c ""C:\\Program Files \(x86\)\\BigFix Enterprise\\BES Client\\qna\.exe" -t -showtypes < "(C:\\Users\\me\\AppData\\Local\\Temp\\rad\d+\.tmp\.qna)" > "(C:\\Users\\me\\AppData\\Local\\Temp\\rad\d+\.tmp\.out)" 2>&1"$/;
+  const QNA_LINE = /^cmd\.exe \/c ""C:\\Program Files \(x86\)\\BigFix Enterprise\\BES Client\\qna\.exe" -t -showtypes < "(C:\\Users\\me\\AppData\\Local\\Temp\\rad\d+\.tmp\.qna)" > "(C:\\Users\\me\\AppData\\Local\\Temp\\rad\d+\.tmp\.out)" 2>&1(?: & type nul > "(C:\\Users\\me\\AppData\\Local\\Temp\\rad\d+\.tmp\.done)")?"$/;
 
   // A console page with fake ActiveX, `config` set before Evaluate, and the
   // query sent as client relevance to this computer only.
@@ -474,6 +474,20 @@ describe("console dashboard: qna on this computer", () => {
 
   const done = (page, timeout = 10_000) => page.waitForFunction(() => document.getElementById("status").textContent === "Done.", null, { timeout });
   const ax = (page) => page.evaluate(() => JSON.parse(JSON.stringify(window.__ax)));
+  // No temp file of the run on `line` is left behind.
+  const cleanedUp = (got, line) => {
+    const m = QNA_LINE.exec(line);
+    assert.ok(m, line);
+    for (const path of m.slice(1).filter(Boolean)) assert.ok(!(path in got.files), `${path} left behind`);
+  };
+  const kills = (got) => got.commands.filter((c) => c.via === "Run");
+  // Starts a run of fake qna and returns its pid once it is running.
+  async function started(page, config) {
+    await page.evaluate((c) => Object.assign(window.__ax.config, c), config);
+    await evaluate(page, "name of operating system");
+    await page.waitForFunction(() => window.__ax.commands.length >= 1);
+    return (await ax(page)).commands[0].pid;
+  }
 
   test("WMI available: qna starts hidden, answers show, temp files go", async () => {
     const context = await browser.newContext();
@@ -585,5 +599,132 @@ describe("console dashboard: qna on this computer", () => {
       assert.match(await page.locator("#results tbody tr").first().textContent(), /qna says exists file "a & b/);
       await context.close();
     }
+  });
+
+  // Review of #191, finding 1: WMI gives a pid, not a handle, and Windows
+  // reuses pids.
+  test("a pid reused before Cancel: the unrelated process is not killed", async () => {
+    const context = await browser.newContext();
+    const { page, errors } = await qnaPage(context);
+    const pid = await started(page, { delayMs: 5000 });
+    await page.waitForTimeout(300);
+    await page.evaluate((p) => window.__ax.reuse(p), pid);
+    await page.click("#cancel");
+    const got = await ax(page);
+    assert.deepEqual(kills(got), [], "taskkill went to whatever holds the pid now");
+    assert.deepEqual(got.terminated, []);
+    assert.equal(got.processes[pid].killed, false);
+    cleanedUp(got, got.commands[0].line);
+    assert.deepEqual(errors, []);
+    await context.close();
+  });
+
+  test("a qna that dies and whose pid is reused ends the run without waiting for the timeout", async () => {
+    const context = await browser.newContext();
+    const { page, errors } = await qnaPage(context);
+    await page.fill("#timeoutSec", "30");
+    const pid = await started(page, { delayMs: null });
+    await page.evaluate((p) => window.__ax.reuse(p), pid);
+    await done(page, 5000);
+    const got = await ax(page);
+    assert.deepEqual(kills(got), []);
+    assert.equal(got.processes[pid].killed, false);
+    assert.equal(await page.locator("#results tbody tr").count(), 1);
+    cleanedUp(got, got.commands[0].line);
+    assert.deepEqual(errors, []);
+    await context.close();
+  });
+
+  // Finding 2: a lookup that keeps failing must not cost the timeout and the answer.
+  test("WMI lookups that fail: the answer still comes when qna finishes", async () => {
+    const context = await browser.newContext();
+    const { page, errors } = await qnaPage(context, { wmiQuery: "throws" });
+    await page.fill("#timeoutSec", "30");
+    await evaluate(page, "name of operating system");
+    await done(page, 5000);
+    const got = await ax(page);
+    assert.deepEqual(got.commands.map((c) => c.via), ["WMI"]);
+    assert.match(await page.locator("#results tbody tr").first().textContent(), /qna says name of operating system/);
+    assert.match(await page.locator("#log").inputValue(), /could not check on pid \d+: Generic failure/);
+    cleanedUp(got, got.commands[0].line);
+    assert.deepEqual(errors, []);
+    await context.close();
+  });
+
+  // Finding 3: a started process must never be followed by a second qna.
+  for (const [mode, note] of [
+    ["create-string", null],
+    ["create-odd", /Win32_Process\.Create returned 9 with pid \d+/],
+  ]) {
+    test(`Create (${mode}) that started a process is not followed by Exec`, async () => {
+      const context = await browser.newContext();
+      const { page, errors } = await qnaPage(context, { wmi: mode });
+      await evaluate(page, "name of operating system");
+      await done(page);
+      const got = await ax(page);
+      assert.deepEqual(got.commands.map((c) => c.via), ["WMI"], JSON.stringify(got.commands));
+      assert.match(await fact(page, "qna launch"), /^qna launch: WMI hidden \(pid \d+\)$/);
+      assert.match(await page.locator("#results tbody tr").first().textContent(), /qna says name of operating system/);
+      if (note) assert.match(await page.locator("#log").inputValue(), note);
+      assert.deepEqual(errors, []);
+      await context.close();
+    });
+  }
+
+  // Finding 4: the WMI path needs its own way to end the process.
+  test("Cancel when taskkill cannot run ends cmd.exe through WMI", async () => {
+    const context = await browser.newContext();
+    const { page, errors } = await qnaPage(context, { runThrows: true });
+    const pid = await started(page, { delayMs: 5000 });
+    await page.waitForTimeout(300);
+    await page.click("#cancel");
+    const got = await ax(page);
+    assert.equal(kills(got).length, 1);
+    assert.deepEqual(got.terminated, [pid]);
+    assert.equal(got.processes[pid].killed, true);
+    cleanedUp(got, got.commands[0].line);
+    assert.deepEqual(errors, []);
+    await context.close();
+  });
+
+  // Finding 5: WMI lookups block the console's UI thread.
+  test("WMI is asked about the process at most about once a second", async () => {
+    const context = await browser.newContext();
+    const { page } = await qnaPage(context, { delayMs: 3000 });
+    await evaluate(page, "name of operating system");
+    await done(page);
+    const got = await ax(page);
+    assert.ok(got.wmiLookups <= 5, `${got.wmiLookups} WMI lookups in a 3 s run`);
+    await context.close();
+  });
+
+  test("Cancel on the Exec fallback kills its tree hidden and cleans up", async () => {
+    const context = await browser.newContext();
+    const { page, errors } = await qnaPage(context, { wmi: "connect" });
+    const pid = await started(page, { delayMs: 3000 });
+    await page.waitForTimeout(300);
+    await page.click("#cancel");
+    const got = await ax(page);
+    assert.equal(got.commands[0].via, "Exec");
+    assert.deepEqual(kills(got), [{ via: "Run", line: `taskkill /F /T /PID ${pid}`, style: 0, wait: true }]);
+    assert.equal(got.processes[pid].killed, true);
+    cleanedUp(got, got.commands[0].line);
+    await page.waitForTimeout(3500);
+    assert.equal(await page.locator("#results tbody tr").count(), 0, "no late results");
+    assert.deepEqual(errors, []);
+    await context.close();
+  });
+
+  test("a qna that has finished before the first check still answers", async () => {
+    const context = await browser.newContext();
+    const { page, errors } = await qnaPage(context, { delayMs: 0 });
+    await evaluate(page, "name of operating system");
+    await done(page);
+    const got = await ax(page);
+    assert.deepEqual(got.commands.map((c) => c.via), ["WMI"]);
+    assert.match(await page.locator("#results tbody tr").first().textContent(), /qna says name of operating system/);
+    cleanedUp(got, got.commands[0].line);
+    assert.deepEqual(errors, []);
+    await context.close();
   });
 });

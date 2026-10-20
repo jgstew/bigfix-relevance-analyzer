@@ -52,10 +52,13 @@ Client relevance runs on:
 
 - **This computer (qna):** the BigFix client on the machine running the
   console. Its path comes from the registry, falling back to the default
-  install folders. The first run may show an ActiveX safety prompt. qna
-  starts with no window, through WMI (`Win32_Process.Create`); where WMI is
-  blocked it falls back to `WScript.Shell.Exec`, and a command window flashes
-  briefly. Diagnostics' `qna launch` line says which ran, and why.
+  install folders. Where the zone's ActiveX setting is "Prompt", the first
+  run may show two ActiveX safety prompts: `WScript.Shell` and
+  `WbemScripting.SWbemLocator` (WMI) are both not marked safe for scripting.
+  qna starts with no window, through WMI (`Win32_Process.Create`); answering
+  No to the WMI prompt, or WMI being blocked, falls back to
+  `WScript.Shell.Exec`, and a command window flashes briefly. Diagnostics'
+  `qna launch` line says which ran, and why.
 - **FastQuery:** 5 random computers that reported in the last hour by default
   (`ids of bes computers whose (last report time of it > now - 1 * hour)`),
   or the computer IDs you type. Answers appear as they arrive. It waits until
@@ -214,16 +217,24 @@ template.html -+- core.js              ES5 only; UI and every evaluation path, b
 - **qna** gets the query through a temp file on stdin, never on a command line
   (`cmd /c ""qna.exe" -t -showtypes < in > out 2>&1"`), so cmd metacharacters
   in relevance are harmless and large output cannot stall the pipe. That
-  command line is started through WMI: `Win32_Process.Create` with a
-  `Win32_ProcessStartup` whose `ShowWindow` is 0 (hidden) and the temp folder
-  as its working directory, keeping the process id. `WScript.Shell.Exec`
-  cannot hide a console program's window, and `Run(line, 0)` hides it but
-  returns nothing to wait on or end. If any WMI step fails (ActiveX or WMI
-  blocked, `ConnectServer` refused, `Create` not returning 0), it logs why
-  and uses `Exec` as before. The page polls the process with `setTimeout`
-  rather than busy-waiting (WMI: `SELECT ProcessId FROM Win32_Process WHERE
-  ProcessId=<pid>` until it is gone; Exec: `Status`), then parses the
-  `A:`/`E:`/`T:`/`I:` lines.
+  command line, plus `& type nul > "<temp>.done"` after qna, is started
+  through WMI: `Win32_Process.Create` with a `Win32_ProcessStartup` whose
+  `ShowWindow` is 0 (hidden) and the temp folder as its working directory.
+  `WScript.Shell.Exec` cannot hide a console program's window, and
+  `Run(line, 0)` hides it but returns nothing to wait on or end. If WMI
+  fails before a process exists (ActiveX or WMI blocked, `ConnectServer`
+  refused, `Create` failing with no process id), it logs why and uses `Exec`
+  as before; once `Create` reports a process id it never falls back, so qna
+  never runs twice on the same files. The page polls with `setTimeout`
+  rather than busy-waiting, then parses the `A:`/`E:`/`T:`/`I:` lines. On
+  the WMI path the run ends when the `.done` file appears; WMI gives a pid,
+  not a handle, and Windows reuses pids, so the process is known by its pid
+  and `CreationDate` (`Win32_Process.Handle='<pid>'`, looked up right after
+  `Create` and about once a second after, a synchronous call on the UI
+  thread). That catches a cmd.exe that died without the `.done` file, and
+  Cancel or the timeout runs `taskkill` only while the pid is still that
+  process. If the lookups fail, the run still ends on the `.done` file or
+  the timeout. On the Exec path, `Status` says when it is done.
 - **FastQuery** uses the console's `API.Post("clientquery", xml, cb)` with the
   query XML-escaped and `<ComputerID>` targets, then polls
   `API.Get("clientqueryresults/{id}?output=json", cb)` with the backoff above.
@@ -267,7 +278,7 @@ From `tools/playground-wasm/dashboard-poc/`, after `npm ci`:
 |---|---|
 | `npm run test:es5` | `core.js` parses as ES5, so nothing in it can stop the script in IE11. |
 | `npm run test:unit` | `test_loader.mjs`, `test_manifest.mjs` and `test_resilience.mjs` (`node --test`, no browser): extraction from the single-file page, the manifest contract, both caches, checksums, fallbacks, the does-not-start safety net and its records, `forgetAnalyzer()`, and reusing unchanged files. |
-| `npm run test:browser` | `test_reports.mjs` (Playwright): the built `-fake.html` pages in Chromium. Needs `build_poc.py --fake-hosts` and the local component playground build first. The console's qna path runs against `fake_activex.js` (a pretend `WScript.Shell`, `FileSystemObject` and WMI, loaded by the test only): hidden WMI start, each Exec fallback, Cancel, timeout, and cmd metacharacters. |
+| `npm run test:browser` | `test_reports.mjs` (Playwright): the built `-fake.html` pages in Chromium. Needs `build_poc.py --fake-hosts` and the local component playground build first. The console's qna path runs against `fake_activex.js` (a pretend `WScript.Shell`, `FileSystemObject` and WMI, loaded by the test only): hidden WMI start, each Exec fallback, a `Create` that reports a process with an odd return value, Cancel (on both paths, and when `taskkill` cannot run), timeout, a reused pid, failing WMI lookups, how often WMI is asked, and cmd metacharacters. |
 
 The browser tests serve the repository root over HTTP and make a split set
 from the local playground (`split_fixture.mjs`), standing in for the real one
@@ -326,7 +337,16 @@ From a real BigFix console and Web Reports, October 2026:
   machine's code page fails with a message saying so. Cancel and the timeout
   end qna's whole process tree (`taskkill /T`, itself run hidden), not just
   `cmd.exe`. Where WMI is unavailable, qna falls back to `Exec` and its brief
-  console window.
+  console window. If `taskkill` cannot run, the WMI path ends cmd.exe alone
+  through WMI (qna itself may then run on to its end).
+- **The two qna paths can answer differently.** A process from
+  `Win32_Process.Create` gets an environment built from the user's token by
+  the WMI provider host (WmiPrvSE), not a copy of the console's, and may
+  differ in bitness (64-bit `cmd.exe` through WMI, where `Exec` from the
+  console starts it under WOW64). Inspectors that read the environment or
+  depend on the native versus WOW64 view of files and the registry may
+  answer differently depending on which path ran; diagnostics' `qna launch`
+  line names it.
 - **The Web Report needs internet access** from the browser for the first
   load of each analyzer version, and runs code fetched from jgstew.com inside
   the user's Web Reports session. The fallback to the single-file page also
