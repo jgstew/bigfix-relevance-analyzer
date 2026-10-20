@@ -47,7 +47,7 @@ TARGETS = {
 # fake_host.js's mode for each target's -fake.html page.
 FAKE_MODES = {"console": "console", "webreport": "webreports"}
 # Where the Web Report gets the analyzer, tried in order: the split analyzer
-# (MANIFEST.md), then the single-file playground page, which stays in place
+# (../SPLIT_ANALYZER.md), then the single-file playground page, which stays in place
 # (no longer updated) until every report has moved to the manifest.
 ANALYZER_URLS = [
     "https://www.jgstew.com/files/analyzer/manifest.json",

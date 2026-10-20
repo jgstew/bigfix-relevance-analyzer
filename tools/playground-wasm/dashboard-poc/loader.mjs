@@ -8,7 +8,7 @@
 //           baseUrl }  (what relative URLs resolve against: the page)
 //
 // Two kinds of source, by URL: a split analyzer's manifest.json (the
-// contract is MANIFEST.md), or the single-file playground page.
+// contract is ../SPLIT_ANALYZER.md), or the single-file playground page.
 //
 // Either way the result is the same set of pieces: { editor (script text),
 // glue (module text), cores: { name: Uint8Array } } where each core's bytes
@@ -121,7 +121,7 @@ const SHA256_HEX = /^[0-9a-f]{64}$/;
 const CORE_NAME = /^analyzer\.core\d*\.wasm$/;
 const GLUE_CORES = /"\.\/(analyzer\.core\d*\.wasm)"/g;
 
-// The manifest, checked against MANIFEST.md (format 1); throws on anything
+// The manifest, checked against ../SPLIT_ANALYZER.md (format 1); throws on anything
 // else.
 export function parseManifest(text) {
   let m;

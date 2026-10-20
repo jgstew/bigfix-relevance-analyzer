@@ -34,7 +34,7 @@ deployment (see [What we measured](#what-we-measured)):
   before sending the first byte, against 0.6 s of download. So the report
   carries only the core, and fetches the analyzer after it is usable, keeping
   it in the browser: from the split analyzer at
-  `https://www.jgstew.com/files/analyzer/` ([MANIFEST.md](MANIFEST.md)), or,
+  `https://www.jgstew.com/files/analyzer/` ([SPLIT_ANALYZER.md](../SPLIT_ANALYZER.md)), or,
   until that is published, from the single-file playground page.
 
 ## Using it
@@ -80,7 +80,7 @@ Where the analyzer comes from is a list of URLs, tried in order
 (`--analyzer-url`, repeatable; see [Building](#building)). The default:
 
 1. `https://www.jgstew.com/files/analyzer/manifest.json`: the split analyzer
-   ([MANIFEST.md](MANIFEST.md)). Each load fetches only this small file; the
+   ([SPLIT_ANALYZER.md](../SPLIT_ANALYZER.md)). Each load fetches only this small file; the
    rest downloads again only when it changes.
 2. `https://www.jgstew.com/files/bigfix-relevance-analyzer-playground.html`:
    the single-file playground page, which stays in place (no longer updated)
@@ -122,7 +122,7 @@ template.html -+- core.js              ES5 only; UI and every evaluation path, b
   pieces: the editor bundle, the component glue jco generated, and the gzipped
   core wasm modules that glue loads. `loader.mjs` holds the logic, with
   `fetch`, the cache and `crypto.subtle` passed in so Node tests can drive it.
-  - From a **manifest** ([MANIFEST.md](MANIFEST.md)): it fetches
+  - From a **manifest** ([SPLIT_ANALYZER.md](../SPLIT_ANALYZER.md)): it fetches
     `manifest.json` (`cache: "no-cache"`) and, unless its text is identical
     to the cached one, every file it names. It checks each file's size and
     sha256 (or, for a core a server decompressed in transit, `raw_size` and

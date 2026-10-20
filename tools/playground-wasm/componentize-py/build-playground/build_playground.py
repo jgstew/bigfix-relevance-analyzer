@@ -81,6 +81,27 @@ def _check_pinned_version_matches() -> None:
         )
 
 
+def gzip_cores(transpiled: Path) -> tuple[dict[str, bytes], int]:
+    """Return every core as name -> gzip(bytes), sorted by name, plus the raw total.
+
+    Shared with ``build_split.py``, which publishes these same bytes as
+    separate ``.gz`` files, so the two outputs can never gzip differently.
+    """
+    cores = sorted(transpiled.glob("analyzer.core*.wasm"))
+    if not cores:
+        raise SystemExit(f"no analyzer.core*.wasm found in {transpiled} -- did transpile.mjs run?")
+
+    packed: dict[str, bytes] = {}
+    raw_total = 0
+    for core in cores:
+        data = core.read_bytes()
+        raw_total += len(data)
+        # mtime=0 so a rebuild of unchanged input produces an identical page;
+        # gzip stamps the current time into its header otherwise.
+        packed[core.name] = gzip.compress(data, compresslevel=9, mtime=0)
+    return packed, raw_total
+
+
 def _encode_cores(transpiled: Path) -> tuple[str, int, int]:
     """Return the cores as a JSON object of name -> base64(gzip(bytes)).
 
@@ -88,21 +109,9 @@ def _encode_cores(transpiled: Path) -> tuple[str, int, int]:
     report them -- the size story is the whole reason this page is viable, so
     it is worth printing rather than leaving to be measured by hand.
     """
-    cores = sorted(transpiled.glob("analyzer.core*.wasm"))
-    if not cores:
-        raise SystemExit(f"no analyzer.core*.wasm found in {transpiled} -- did transpile.mjs run?")
-
-    encoded: dict[str, str] = {}
-    raw_total = gz_total = 0
-    for core in cores:
-        data = core.read_bytes()
-        # mtime=0 so a rebuild of unchanged input produces an identical page;
-        # gzip stamps the current time into its header otherwise.
-        packed = gzip.compress(data, compresslevel=9, mtime=0)
-        raw_total += len(data)
-        gz_total += len(packed)
-        encoded[core.name] = base64.b64encode(packed).decode("ascii")
-    return json.dumps(encoded), raw_total, gz_total
+    packed, raw_total = gzip_cores(transpiled)
+    encoded = {name: base64.b64encode(data).decode("ascii") for name, data in packed.items()}
+    return json.dumps(encoded), raw_total, sum(len(data) for data in packed.values())
 
 
 def build(work_dir: Path, editor_bundle: Path, template_path: Path, out_path: Path) -> None:

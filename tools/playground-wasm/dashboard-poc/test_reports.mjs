@@ -5,7 +5,7 @@
 //   python3 tools/playground-wasm/dashboard-poc/build_poc.py --fake-hosts
 //   node tools/playground-wasm/dashboard-poc/test_reports.mjs
 //
-// The fake Web Report takes the analyzer from a split set (MANIFEST.md) that
+// The fake Web Report takes the analyzer from a split set (../SPLIT_ANALYZER.md) that
 // split_fixture.mjs makes from the local playground build, or, with
 // SPLIT_ANALYZER_DIR set, a copy of a real one (the analyzer build's
 // playground/analyzer/); it falls back to that single-file page itself. Everything is served over HTTP from the

@@ -381,6 +381,27 @@ jobs:
           path: playground/bigfix-relevance-analyzer-component-playground.html
           if-no-files-found: error
 
+      # The same analyzer as separate files (editor, glue, gzipped cores, a
+      # manifest naming the version, and an index.html that loads them over
+      # HTTP), for pages that fetch the analyzer at run time instead of
+      # embedding it. tools/playground-wasm/SPLIT_ANALYZER.md is the contract.
+      # Built from the same --work directory as the page above, so glue and
+      # cores come from one transpile. The zip is the same files, flat, and is
+      # what the release attaches.
+      - name: build the split analyzer set
+        run: |
+          python3 tools/playground-wasm/componentize-py/build-playground/build_split.py \
+            --work dist/componentize/web \
+            --editor-bundle dist/playground-editor.js \
+            --out playground/analyzer \
+            --zip playground/bigfix-relevance-analyzer-analyzer.zip
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bigfix-relevance-analyzer-analyzer
+          path: playground/bigfix-relevance-analyzer-analyzer.zip
+          if-no-files-found: error
+
       # Everything from here tests the built page in a real browser, which is
       # the only place preview2-shim's *browser* build, DecompressionStream and
       # the page's fetch intercept are exercised at all. Placed after the
@@ -407,12 +428,22 @@ jobs:
         working-directory: tools/playground-wasm/componentize-py/browser-test
         run: node test_playground.mjs ../../../../playground/bigfix-relevance-analyzer-component-playground.html
 
+      # The split set's index.html, served over HTTP by the test itself (split
+      # files cannot load from file://): the same cases, editor and language
+      # server checks as the single-file page, plus the reload cache path,
+      # cores already inflated in transit, a manifest replaced mid-load, and
+      # corrupt or missing files being refused.
+      - name: test the split analyzer set in a real browser
+        if: inputs.release_artifact == ''
+        working-directory: tools/playground-wasm/componentize-py/browser-test
+        run: node test_split_analyzer.mjs ../../../../playground/analyzer
+
   # The relevance debugger dashboard proof of concept
   # (tools/playground-wasm/dashboard-poc/): its ES5 check, the unit tests of
   # the Web Report's analyzer loader, and the built console and Web Report
   # pages in a real browser against fake BigFix hosts. The Web Report's
-  # analyzer comes from the component playground page the job above built,
-  # and from a split set (MANIFEST.md) the test makes from it.
+  # analyzer comes from the real split set the job above built (its release
+  # zip), falling back to the component playground page it built too.
   dashboard-poc:
     if: inputs.release_artifact == ''
     runs-on: ubuntu-latest
@@ -437,6 +468,14 @@ jobs:
           name: bigfix-relevance-analyzer-component-playground
           path: playground
 
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: bigfix-relevance-analyzer-analyzer
+          path: split
+
+      - name: unpack the split analyzer set
+        run: unzip -q split/bigfix-relevance-analyzer-analyzer.zip -d split/analyzer
+
       - name: npm ci
         working-directory: tools/playground-wasm/dashboard-poc
         run: npm ci
@@ -460,6 +499,8 @@ jobs:
 
       - name: test the built pages in a real browser
         working-directory: tools/playground-wasm/dashboard-poc
+        env:
+          SPLIT_ANALYZER_DIR: ${{ github.workspace }}/split/analyzer
         run: npm run test:browser
 
   # The job that justifies building two runtimes: same inputs, two entirely

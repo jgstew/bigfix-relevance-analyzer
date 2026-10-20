@@ -1,4 +1,4 @@
-// A split analyzer set (MANIFEST.md, format 1) made from a built single-file
+// A split analyzer set (../SPLIT_ANALYZER.md, format 1) made from a built single-file
 // playground page, for test_reports.mjs: the real producer is the analyzer's
 // release build, this is a stand-in so the Web Report can be tested against
 // the contract before that exists.

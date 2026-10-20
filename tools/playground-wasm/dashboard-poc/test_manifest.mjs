@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Unit tests for loading the split analyzer (files/analyzer/manifest.json and
-// the files it names; the contract is MANIFEST.md) in loader.mjs.
+// the files it names; the contract is ../SPLIT_ANALYZER.md) in loader.mjs.
 //
 //   node --test tools/playground-wasm/dashboard-poc/
 
