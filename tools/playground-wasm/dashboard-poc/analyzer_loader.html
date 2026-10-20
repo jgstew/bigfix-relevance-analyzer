@@ -20,12 +20,14 @@
   used as is.
 
   Fetching, extracting and caching live in loader.mjs (inlined at
-  %%LOADER_MJS%% by build_poc.py, and unit-tested by test_loader.mjs); this
-  file supplies the browser's fetch and IndexedDB, starts the analyzer and
-  draws the analysis panel.
+  %%LOADER_MJS%% by build_poc.py, and unit-tested by test_loader.mjs,
+  test_manifest.mjs and test_resilience.mjs), and so does what happens when a
+  set that checked out does not start (loadAndStart's safety net). This file
+  supplies the browser's fetch and IndexedDB, start(pieces), the Reload the
+  analyzer hook, and draws the analysis panel.
 -->
 <script type="module">
-// loader.mjs: extract(), fromPage(), fromManifest(), loadPieces(), dialectChoice().
+// loader.mjs: loadAndStart(), forgetAnalyzer(), dialectChoice(), and what they use.
 %%LOADER_MJS%%
 
 const LOG = (text) => window.rdbg.log(text);
@@ -63,20 +65,23 @@ async function cacheOp(mode, fn) {
 
 const cacheGet = (url) => cacheOp("readonly", (s) => s.get(url)).catch(() => undefined);
 const cachePut = (url, value) => cacheOp("readwrite", (s) => s.put(value, url));
+const cacheDelete = (url) => cacheOp("readwrite", (s) => s.delete(url));
 
 // ---- running the pieces ----------------------------------------------------
 
-async function start(pieces) {
-  // The editor bundle is a self-contained IIFE.
-  new Function(pieces.editor)();
+// The cores the glue is served: those of the set being started. A set can be
+// started more than once in a page (loadAndStart's retry, Reload the
+// analyzer), so the fetch intercept is installed once and reads this.
+let servedCores = {};
+const realFetch = window.fetch.bind(window);
 
-  // The glue fetches each core by URL; hand back the stored bytes instead.
-  const realFetch = window.fetch.bind(window);
+// The glue fetches each core by URL; hand back the stored bytes instead.
+function interceptCores() {
   window.fetch = async (input, init) => {
     const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const name = href.split("/").pop();
-    if (href.startsWith(CORE_BASE) && Object.hasOwn(pieces.cores, name)) {
-      const bytes = pieces.cores[name];
+    if (href.startsWith(CORE_BASE) && Object.hasOwn(servedCores, name)) {
+      const bytes = servedCores[name];
       // Gzipped as published, or plain wasm if a server inflated it in transit.
       const gzipped = bytes[0] === 0x1f && bytes[1] === 0x8b;
       const body = gzipped ? new Response(bytes).body.pipeThrough(new DecompressionStream("gzip")) : bytes;
@@ -84,6 +89,15 @@ async function start(pieces) {
     }
     return realFetch(input, init);
   };
+}
+
+// Runs a set: throws if it does not start (loadAndStart's safety net).
+async function start(pieces) {
+  // The editor bundle is a self-contained IIFE.
+  new Function(pieces.editor)();
+  servedCores = pieces.cores;
+  // A component left by an earlier attempt must not pass for this one.
+  globalThis.__component = undefined;
 
   const glue = pieces.glue.split("import.meta.url").join(JSON.stringify(CORE_BASE));
   const blobUrl = URL.createObjectURL(new Blob([glue], { type: "text/javascript" }));
@@ -151,22 +165,25 @@ function renderAnalysis(payload) {
 
 // ---- boot --------------------------------------------------------------------
 
+const URLS = (window.RDBG_BUILD && window.RDBG_BUILD.analyzerUrls) || [];
+const ENV = {
+  fetch: realFetch,
+  cacheGet,
+  cachePut,
+  cacheDelete,
+  log: LOG,
+  now: () => performance.now(),
+  // Missing on plain http (an insecure context): then sha256 is checked in JavaScript.
+  subtle: globalThis.crypto && globalThis.crypto.subtle,
+  baseUrl: document.baseURI,
+};
+// Undoes a mounted editor, for Reload the analyzer.
+let unmount = null;
+
 async function boot() {
-  const urls = (window.RDBG_BUILD && window.RDBG_BUILD.analyzerUrls) || [];
   const started = performance.now();
-  const env = {
-    fetch: window.fetch.bind(window),
-    cacheGet,
-    cachePut,
-    log: LOG,
-    now: () => performance.now(),
-    // Missing on plain http (an insecure context): then only sizes are checked.
-    subtle: globalThis.crypto && globalThis.crypto.subtle,
-    baseUrl: document.baseURI,
-  };
-  const { pieces, how, source } = await loadPieces(urls, env);
+  const { started: component, how, source } = await loadAndStart(URLS, ENV, start);
   window.rdbg.fact("analyzer source", source);
-  const component = await start(pieces);
 
   const host = document.getElementById("editorHost");
   const editor = window.playgroundEditor.mount(host, {
@@ -195,11 +212,36 @@ async function boot() {
   // change, whatever made it (typing, paste, a completion, a quick fix). The
   // editor bundle exposes no change hook, so watch its DOM.
   let pending = null;
-  new MutationObserver(() => {
+  const observer = new MutationObserver(() => {
     clearTimeout(pending);
     pending = setTimeout(() => analyze(editor.getText().trim()), ANALYZE_DELAY_MS);
-  }).observe(editor.view.contentDOM, { childList: true, characterData: true, subtree: true });
+  });
+  observer.observe(editor.view.contentDOM, { childList: true, characterData: true, subtree: true });
   analyze(editor.getText().trim());
+  unmount = () => {
+    observer.disconnect();
+    clearTimeout(pending);
+    editor.view.destroy();
+    host.replaceChildren();
+  };
+}
+
+const go = () =>
+  boot().catch((err) => {
+    // A set recorded as not starting says so itself (and how to retry).
+    window.rdbg.onAnalyzerFailed(err.doesNotStart ? err.message : `could not load it: ${err.message || err}`);
+  });
+
+// Reload the analyzer (Log and diagnostics): forget this browser's copy and
+// any "does not start" record, then load and start it again. core.js has
+// already put the editor's text back in the plain text box.
+function reload(done) {
+  if (unmount) unmount();
+  unmount = null;
+  forgetAnalyzer(URLS, ENV)
+    .catch((err) => LOG(`analyzer: could not clear the cache (${err.message || err})`))
+    .then(go)
+    .finally(done);
 }
 
 const problem =
@@ -209,10 +251,9 @@ const problem =
 if (problem) {
   window.rdbg.onAnalyzerFailed(problem);
 } else {
+  interceptCores();
+  window.rdbg.setAnalyzerReload(reload);
   // After the page is usable: Evaluate works while this loads.
-  const go = () => boot().catch((err) => {
-    window.rdbg.onAnalyzerFailed(`could not load it: ${err.message || err}`);
-  });
   if (document.readyState === "complete") go();
   else window.addEventListener("load", go, { once: true });
 }
