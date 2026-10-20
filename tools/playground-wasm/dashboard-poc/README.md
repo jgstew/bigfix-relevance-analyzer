@@ -12,7 +12,7 @@ script, and each fits what its host can actually do.
 | Session relevance | **yes** | **yes**, always |
 | Client relevance on this computer (`qna`) | **yes** | no |
 | Client relevance with FastQuery | **yes** | no |
-| File size | ~45 KB | ~55 KB (the analyzer is fetched separately and cached) |
+| File size | ~45 KB | ~65 KB (the analyzer is fetched separately and cached) |
 
 The split follows from how each host renders pages, measured in a real
 deployment (see [What we measured](#what-we-measured)):
@@ -170,7 +170,7 @@ template.html -+- core.js              ES5 only; UI and every evaluation path, b
 
 ## Building
 
-The builder needs only Python and this folder; the analyzer is fetched at
+The builder needs only Python 3.11 or later and this folder; the analyzer is fetched at
 run time.
 
 ```bash
@@ -252,7 +252,9 @@ From a real BigFix console and Web Reports, October 2026:
   Web Report tell the user more precisely.
 - **qna needs a BigFix client on the console machine**, and the relevance is
   flattened to one line (qna reads one query per line). The temp file is
-  written as ANSI, so non-ASCII text in relevance may not survive.
+  written as ANSI, so relevance with characters outside the console
+  machine's code page fails with a message saying so. Cancel and the timeout
+  end qna's whole process tree (`taskkill /T`), not just `cmd.exe`.
 - **The Web Report needs internet access** from the browser for the first
   load of each analyzer version, and runs code fetched from jgstew.com inside
   the user's Web Reports session. The fallback to the single-file page also
@@ -260,5 +262,8 @@ From a real BigFix console and Web Reports, October 2026:
   page can become a redirect and the fallback can go.
 - **Not yet carried over from the debugger:** the answer tally (answers by
   how many computers gave them), the per-level breakdown, Fix all, and export.
-- **Not in CI yet:** the ES5 parse check, Playwright runs against the fake
-  hosts, and attaching the two outputs to releases next to the playground.
+- **Not released yet:** the two outputs are built and tested in CI but not
+  attached to releases next to the playground.
+- **Not tested on a real console here:** the qna path (ActiveX) runs only in
+  the console's IE11 engine, so its process handling and file cleanup are
+  checked by reading, and by the measurements above, not by CI.

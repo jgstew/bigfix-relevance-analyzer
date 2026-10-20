@@ -30,6 +30,8 @@
   var POLL_FIRST_MS = 2000;
   var POLL_GROWTH = 1.5;
   var POLL_MAX_MS = 15000;
+  // How long past its timeout FastQuery waits for a REST reply that never came.
+  var REPLY_MARGIN_MS = 5000;
 
   var host = null;
   var analyzer = null; // set by rdbg.onAnalyzer
@@ -276,7 +278,8 @@
       }
       callHost(query, tag, function (err2, res2) {
         if (err2) finish(err2, [], mode);
-        else finish(null, toList(res2), mode + ", host values (no string cast: " + err + ")");
+        // Web Reports hands back "" for no answers.
+        else finish(null, res2 === "" ? [] : toList(res2), mode + ", host values (no string cast: " + err + ")");
       });
     });
   }
@@ -306,11 +309,22 @@
   function parseQna(text) {
     var out = { answers: [], errors: [], times: [], types: [] };
     var lines = text.split(/\r?\n/);
+    var last = null; // the tag of the previous line, for continuation lines
     for (var i = 0; i < lines.length; i++) {
       // With stdin redirected, qna's "Q: " prompt is not followed by a newline,
       // so it prefixes the next output line ("Q: A: ...").
+      var prompted = /^Q:/.test(lines[i]);
       var m = /^([AETI]): ?(.*)$/.exec(lines[i].replace(/^(Q: ?)+/, ""));
-      if (!m) continue;
+      if (!m) {
+        // A line with no tag and no prompt continues a multi-line answer.
+        if (!prompted && last === "A" && lines[i] !== "") {
+          out.answers[out.answers.length - 1] += "\n" + lines[i];
+        } else {
+          last = null;
+        }
+        continue;
+      }
+      last = m[1];
       if (m[1] === "A") out.answers.push(m[2]);
       else if (m[1] === "E") out.errors.push(m[2]);
       else if (m[1] === "T") out.times.push(m[2]);
@@ -342,16 +356,41 @@
     var base = fso.GetSpecialFolder(2).Path + "\\" + fso.GetTempName();
     inFile = base + ".qna";
     outFile = base + ".out";
+    var f = null;
     try {
-      var f = fso.CreateTextFile(inFile, true, false);
+      f = fso.CreateTextFile(inFile, true, false);
       f.WriteLine(oneLine);
       f.Close();
+      f = null;
+    } catch (e) {
+      // An ANSI text file cannot hold characters outside the code page.
+      try {
+        if (f) f.Close();
+      } catch (e2) {}
+      cleanup();
+      done("could not write the relevance for qna (characters outside this computer's code page?): " + errText(e));
+      return;
+    }
+    try {
       exec = shell.Exec('cmd.exe /c ""' + qna + '" -t -showtypes < "' + inFile + '" > "' + outFile + '" 2>&1"');
     } catch (e) {
+      cleanup();
       done("could not start qna: " + errText(e));
       return;
     }
     var started = now();
+    // Terminate() would end only cmd.exe and leave qna.exe running (and its
+    // temp files open), so end the whole tree, then clean up.
+    function stop() {
+      try {
+        shell.Run("taskkill /F /T /PID " + exec.ProcessID, 0, true);
+      } catch (e) {
+        try {
+          exec.Terminate();
+        } catch (e2) {}
+      }
+      cleanup();
+    }
     function cleanup() {
       try {
         fso.DeleteFile(inFile, true);
@@ -360,20 +399,12 @@
         fso.DeleteFile(outFile, true);
       } catch (e) {}
     }
-    ctx.cancels.push(function () {
-      try {
-        exec.Terminate();
-      } catch (e) {}
-      cleanup();
-    });
+    ctx.cancels.push(stop);
     function poll() {
       if (ctx.cancelled) return;
       if (exec.Status === 0) {
         if (now() - started > timeoutMs) {
-          try {
-            exec.Terminate();
-          } catch (e) {}
-          cleanup();
+          stop();
           done("qna did not finish within " + timeoutMs / 1000 + " s");
           return;
         }
@@ -419,10 +450,14 @@
 
   function parseIds(text) {
     var out = [];
+    var seen = {};
     var parts = text.split(/[\s,;]+/);
     for (var i = 0; i < parts.length; i++) {
-      if (/^\d+$/.test(parts[i])) out.push(parts[i]);
-      else if (parts[i] !== "") return null;
+      if (/^\d+$/.test(parts[i])) {
+        // Each computer once: answers are counted per computer.
+        if (!seen[parts[i]]) out.push(parts[i]);
+        seen[parts[i]] = true;
+      } else if (parts[i] !== "") return null;
     }
     return out;
   }
@@ -466,12 +501,28 @@
   // onUpdate(rows, count, nextMs) after every check, with all results so far
   // (they are cumulative); done(error, rows, why) once. Waits the whole
   // timeout for computers that have not answered, unless ctx is cancelled.
-  function evalFast(ctx, query, ids, timeoutMs, onUpdate, done) {
+  function evalFast(ctx, query, ids, timeoutMs, onUpdate, reportDone) {
     var started = now();
     var timer = null;
     var delay = POLL_FIRST_MS;
+    var lastRows = [];
+    var finished = false;
+    // Once only, and never after a cancel.
+    function done(err, rows, why) {
+      if (finished || ctx.cancelled) return;
+      finished = true;
+      clearTimeout(timer);
+      clearTimeout(watchdog);
+      reportDone(err, rows || lastRows, why);
+    }
+    // A REST call whose callback never fires would otherwise leave the run
+    // waiting forever: end it a little after the timeout with what came in.
+    var watchdog = setTimeout(function () {
+      done("no reply from the console's REST API within " + Math.round((timeoutMs + REPLY_MARGIN_MS) / 1000) + " s", lastRows);
+    }, timeoutMs + REPLY_MARGIN_MS);
     ctx.cancels.push(function () {
       clearTimeout(timer);
+      clearTimeout(watchdog);
     });
     try {
       window.API.Post("clientquery", clientQueryXml(query, ids), function (error, status, body) {
@@ -503,6 +554,7 @@
             done("could not read FastQuery results (status " + status + "): " + (error ? errText(error) : errText(e)));
             return;
           }
+          lastRows = rows;
           var seen = {};
           var count = 0;
           for (var i = 0; i < rows.length; i++) {
@@ -930,6 +982,9 @@
     },
     evaluate: evaluate,
     showDialect: showDialect,
+    // For test_reports.mjs: the parts of the console paths a test can check
+    // without ActiveX or a real console.
+    internals: { parseQna: parseQna, parseIds: parseIds, clientQueryXml: clientQueryXml, toList: toList },
     log: log,
     fact: fact,
   };

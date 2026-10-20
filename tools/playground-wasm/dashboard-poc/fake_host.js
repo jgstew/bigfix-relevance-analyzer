@@ -19,7 +19,7 @@
     setTimeout(function () {
       if (/nonexistent/.test(inner)) return callbacks.failure("Singular expression refers to nonexistent object.");
       if (CLIENT_ONLY.test(inner)) return callbacks.failure('The property "' + CLIENT_ONLY.exec(inner)[0] + '" is not defined.');
-      if (wrapped && /^bes computers$/.test(inner)) return callbacks.failure('The operator "string" is not defined.');
+      if (wrapped && /^bes computers( whose \(false\))?$/.test(inner)) return callbacks.failure('The operator "string" is not defined.');
       var values;
       if (/ids of bes computers/.test(inner)) values = IDS.slice(0);
       else if (inner === "in web reports context") values = [mode === "webreports"];
@@ -28,6 +28,8 @@
       else if (/whose \(false\)/.test(inner)) values = [];
       else values = ["answer one", "answer two"];
       if (wrapped) return callbacks.success(values.map(String).join(DELIM));
+      // Measured: Web Reports hands back an empty string for no answers.
+      if (!values.length) return callbacks.success(mode === "webreports" ? "" : values);
       callbacks.success(values.length === 1 ? values[0] : values);
     }, 50);
   };

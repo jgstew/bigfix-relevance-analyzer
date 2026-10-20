@@ -6,6 +6,7 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { gunzipSync } from "node:zlib";
 
 import { extract } from "./loader.mjs";
 
@@ -27,11 +28,11 @@ export function writeSplitSet(playgroundHtml, outDir, version = "0.0.0-fixture")
     version,
     editor: write("editor.js", pieces.editor),
     glue: write("glue.mjs", pieces.glue),
-    cores: Object.entries(pieces.cores).map(([name, b64]) => ({
-      name,
-      ...write(`${name}.gz`, Buffer.from(b64, "base64")),
-      encoding: "gzip",
-    })),
+    cores: Object.entries(pieces.cores).map(([name, b64]) => {
+      const gz = Buffer.from(b64, "base64");
+      const raw = gunzipSync(gz);
+      return { name, ...write(`${name}.gz`, gz), encoding: "gzip", raw_size: raw.length, raw_sha256: sha256(raw) };
+    }),
   };
   writeFileSync(join(outDir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
   return manifest;

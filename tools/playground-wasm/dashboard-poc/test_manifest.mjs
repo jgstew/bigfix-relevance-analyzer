@@ -9,8 +9,10 @@ import { createHash, webcrypto } from "node:crypto";
 import { describe, test } from "node:test";
 import { gzipSync } from "node:zlib";
 
-import { loadPieces, parseManifest } from "./loader.mjs";
-import { memoryEnv, playgroundPage } from "./test_loader.mjs";
+import { randomBytes } from "node:crypto";
+
+import { loadPieces, parseManifest, sha256Hex } from "./loader.mjs";
+import { memoryEnv, playgroundPage } from "./fixtures.mjs";
 
 const DIR = "https://example.test/files/analyzer/";
 const MANIFEST = `${DIR}manifest.json`;
@@ -31,7 +33,7 @@ function splitSet({ version = "1.38.1", coreNames = ["analyzer.core.wasm", "anal
     const gz = gzipSync(raw, { level: 9 });
     const path = `${name}.gz`;
     routes[DIR + path] = { body: gz };
-    return { name, path, encoding: "gzip", size: gz.length, sha256: sha256(gz) };
+    return { name, path, encoding: "gzip", size: gz.length, sha256: sha256(gz), raw_size: raw.length, raw_sha256: sha256(raw) };
   });
   routes[`${DIR}editor.js`] = { body: editor };
   routes[`${DIR}glue.mjs`] = { body: glue };
@@ -55,6 +57,19 @@ function env(routes, store) {
 }
 
 const fileGets = (calls) => calls.filter((c) => c.startsWith("GET ") && !c.endsWith("manifest.json"));
+
+describe("sha256Hex (for pages without crypto.subtle)", () => {
+  for (const [what, bytes] of [
+    ["empty input", new Uint8Array(0)],
+    ["abc", new TextEncoder().encode("abc")],
+    ["55 bytes (one block with padding)", new Uint8Array(55).fill(7)],
+    ["56 bytes (padding spills into a second block)", new Uint8Array(56).fill(7)],
+    ["64 bytes", new Uint8Array(64).fill(255)],
+    ["1 MiB of random bytes", new Uint8Array(randomBytes(1 << 20))],
+  ]) {
+    test(`matches node:crypto on ${what}`, () => assert.equal(sha256Hex(bytes), sha256(bytes)));
+  }
+});
 
 describe("parseManifest", () => {
   const good = () => structuredClone(splitSet().manifest);
@@ -132,18 +147,30 @@ describe("loadPieces (split analyzer manifest)", () => {
     await assert.rejects(loadPieces([MANIFEST], env(set.routes).env), /editor\.js.*sha256/);
   });
 
-  test("without crypto.subtle (plain http) only sizes are checked", async () => {
-    const set = splitSet({ tweak: (m) => ({ ...m, editor: { ...m.editor, sha256: "0".repeat(64) } }) });
-    const plain = memoryEnv(set.routes); // no subtle
-    const got = await loadPieces([MANIFEST], plain.env);
-    assert.match(got.how, /sizes only/);
+  test("without crypto.subtle (plain http) sha256 is still checked, in JavaScript", async () => {
+    const good = memoryEnv(splitSet().routes); // no subtle
+    assert.match((await loadPieces([MANIFEST], good.env)).how, /checked sizes and sha256/);
+    const bad = splitSet({ tweak: (m) => ({ ...m, editor: { ...m.editor, sha256: "0".repeat(64) } }) });
+    await assert.rejects(loadPieces([MANIFEST], memoryEnv(bad.routes).env), /editor\.js.*sha256/);
   });
 
-  test("a core the server already decompressed is accepted as wasm", async () => {
+  test("a core the server already decompressed is checked against raw_size and raw_sha256", async () => {
     const set = splitSet();
     set.routes[`${DIR}analyzer.core.wasm.gz`] = { body: set.cores["analyzer.core.wasm"] };
     const got = await loadPieces([MANIFEST], env(set.routes).env);
     assert.deepEqual([...got.pieces.cores["analyzer.core.wasm"].slice(0, 4)], WASM_MAGIC.slice(0, 4));
+  });
+
+  test("a decompressed core that does not match raw_sha256 is refused", async () => {
+    const set = splitSet({ tweak: (m) => ({ ...m, cores: [{ ...m.cores[0], raw_sha256: "0".repeat(64) }, m.cores[1]] }) });
+    set.routes[`${DIR}analyzer.core.wasm.gz`] = { body: set.cores["analyzer.core.wasm"] };
+    await assert.rejects(loadPieces([MANIFEST], env(set.routes).env), /analyzer\.core\.wasm\.gz.*raw_sha256/);
+  });
+
+  test("a decompressed core cannot be verified without raw_sha256, so it is refused", async () => {
+    const set = splitSet({ tweak: (m) => ({ ...m, cores: m.cores.map(({ raw_size, raw_sha256, ...c }) => c) }) });
+    set.routes[`${DIR}analyzer.core.wasm.gz`] = { body: set.cores["analyzer.core.wasm"] };
+    await assert.rejects(loadPieces([MANIFEST], env(set.routes).env), /no raw_sha256/);
   });
 
   test("cores that do not match the glue are refused", async () => {
@@ -163,6 +190,37 @@ describe("loadPieces (split analyzer manifest)", () => {
     assert.match(got.how, /^downloaded/);
     assert.ok(calls.includes(`GET ${DIR}glue.mjs`), calls.join("\n"));
     assert.match(got.source, /^analyzer\/manifest\.json /);
+  });
+
+  test("a newer manifest whose files fail keeps the cached set", async () => {
+    const store = new Map();
+    await loadPieces([MANIFEST], env(splitSet({ version: "1.38.1" }).routes, store).env);
+    const newer = splitSet({ version: "1.39.0" });
+    newer.routes[`${DIR}glue.mjs`] = { body: "gone", status: 503 };
+    const second = env(newer.routes, store);
+    const got = await loadPieces([MANIFEST, PAGE], second.env);
+    assert.match(got.how, /^cached \(the newer manifest failed: glue\.mjs: HTTP 503\)/);
+    assert.equal(got.pieces.version, "1.38.1");
+    assert.ok(!second.calls.includes(`GET ${PAGE}`), "should not fall back while a good set is cached");
+  });
+
+  test("a network error on a file names the file", async () => {
+    const set = splitSet();
+    set.routes[`${DIR}glue.mjs`] = "offline";
+    await assert.rejects(loadPieces([MANIFEST], env(set.routes).env), /glue\.mjs: .*Failed to fetch/);
+  });
+
+  test("a cached set that no longer matches the manifest's checksums is downloaded again", async () => {
+    const set = splitSet();
+    const store = new Map();
+    await loadPieces([MANIFEST], env(set.routes, store).env);
+    const [key] = store.keys();
+    store.get(key).glue = "globalThis.__component={evil:1};";
+    const second = env(set.routes, store);
+    const got = await loadPieces([MANIFEST], second.env);
+    assert.match(got.how, /^downloaded/);
+    assert.equal(got.pieces.glue, set.glue);
+    assert.ok(second.logs.some((l) => /cached set .*does not match/.test(l)), second.logs.join("\n"));
   });
 
   test("manifest unreachable with a cached set: uses it", async () => {

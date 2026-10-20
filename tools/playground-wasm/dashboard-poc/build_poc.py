@@ -11,8 +11,9 @@ Writes two targets from one template and one ES5 core (see README.md):
   IE11 engine, which has no WebAssembly.
 * ``relevance-debugger-webreport.html``: the fragment to paste into a Web
   Reports custom report. Session relevance, plus the analyzer, which it
-  fetches after loading from the published playground page (``--analyzer-url``,
-  repeatable, tried in order) and caches in the browser. Web Reports
+  fetches after loading (``--analyzer-url``, repeatable, tried in order:
+  by default the split analyzer's manifest at jgstew.com, then the
+  single-file playground page) and caches in the browser. Web Reports
   regenerates a custom report on every load, so the report itself stays small.
 * ``relevance-debugger-<target>-page.html``: each target as a whole page for a
   plain browser, and with ``--fake-hosts`` also ``-fake.html`` pages that load
@@ -139,8 +140,9 @@ def _render(target: str, built: str, analyzer_urls: list[str]) -> tuple[str, str
             "%%HEAD%%": "%%HEAD%%",
             "%%BODY%%": "%%BODY%%",
             "%%SAMPLE%%": sample,
-            # "</" escaped so a URL can never close the <script> element.
-            "%%BUILD_JSON%%": json.dumps(build_info).replace("</", "<\\/"),
+            # No "<" at all, so a URL can neither close the <script> element
+            # nor start "<!--<script", after which "</script>" would not.
+            "%%BUILD_JSON%%": json.dumps(build_info).replace("<", "\\u003c"),
             "%%CORE_JS%%": core,
             "%%ANALYZER%%": loader,
         },

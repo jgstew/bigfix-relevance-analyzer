@@ -14,71 +14,11 @@ import { dirname, join } from "node:path";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { memoryEnv, playgroundPage } from "./fixtures.mjs";
 import { dialectChoice, extract, loadPieces } from "./loader.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REAL_PLAYGROUND = join(HERE, "../../../playground/bigfix-relevance-analyzer-component-playground.html");
-
-// ---- fixtures ------------------------------------------------------------------
-
-// A page laid out like the built single-file playground, in miniature.
-export function playgroundPage({ cores = { "analyzer.core.wasm": "AAAA", "analyzer.core2.wasm": "BBBB" }, extra = "" } = {}) {
-  const coreUrls = Object.keys(cores)
-    .map((n) => `kt(new URL("./${n}",import.meta.url))`)
-    .join(",");
-  return [
-    "<!doctype html><html><body>",
-    "<script>",
-    "// The editor: CodeMirror and the wheel's web/ modules, bundled by",
-    "// ../editor-bundle/build.mjs. Publishes window.playgroundEditor.",
-    "(()=>{window.playgroundEditor={mount(){}}})();",
-    "</script>",
-    '<script type="module">',
-    `const CORES_GZIP = ${JSON.stringify(cores)};`,
-    "async function boot() {",
-    "  return 1;",
-    "}",
-    `let s=[${coreUrls}];globalThis.__component={};`,
-    "// window.__wasmProblem was already handled (and window.stop() called) above.",
-    "</script>",
-    extra,
-    "</body></html>",
-  ].join("\n");
-}
-
-// A fake fetch over `routes` (url -> {body, status, lastModified} or "offline"),
-// recording every call as "METHOD url".
-export function fakeFetch(routes) {
-  const calls = [];
-  const fetch = async (url, init = {}) => {
-    const method = init.method || "GET";
-    calls.push(`${method} ${url}`);
-    const route = routes[url];
-    if (route === undefined || route === "offline") throw new TypeError("Failed to fetch");
-    const headers = new Headers();
-    if (route.lastModified) headers.set("Last-Modified", route.lastModified);
-    const status = route.status || 200;
-    return new Response(method === "HEAD" ? null : route.body, { status, headers });
-  };
-  return { fetch, calls };
-}
-
-export function memoryEnv(routes, store = new Map()) {
-  const { fetch, calls } = fakeFetch(routes);
-  const logs = [];
-  return {
-    env: {
-      fetch,
-      cacheGet: async (key) => store.get(key),
-      cachePut: async (key, value) => void store.set(key, structuredClone(value)),
-      log: (text) => logs.push(text),
-      now: () => 0,
-    },
-    calls,
-    logs,
-    store,
-  };
-}
 
 const PAGE = "https://example.test/playground.html";
 const MONDAY = "Mon, 19 Oct 2026 00:00:00 GMT";
@@ -154,6 +94,23 @@ describe("loadPieces (single-file playground page)", () => {
     const got = await loadPieces([PAGE], offline.env);
     assert.equal(got.how, "cached");
     assert.ok(offline.logs.some((l) => /unreachable/.test(l)));
+  });
+
+  test("a server that refuses HEAD: downloads again rather than trusting the cache forever", async () => {
+    const store = new Map();
+    await loadPieces([PAGE], memoryEnv({ [PAGE]: { body: playgroundPage(), lastModified: MONDAY } }, store).env);
+    const second = memoryEnv({ [PAGE]: { body: playgroundPage(), headStatus: 405 } }, store);
+    const got = await loadPieces([PAGE], second.env);
+    assert.match(got.how, /^downloaded/);
+    assert.deepEqual(second.calls, [`HEAD ${PAGE}`, `GET ${PAGE}`]);
+  });
+
+  test("a server with no Last-Modified: downloads again", async () => {
+    const store = new Map();
+    await loadPieces([PAGE], memoryEnv({ [PAGE]: { body: playgroundPage(), lastModified: MONDAY } }, store).env);
+    const second = memoryEnv({ [PAGE]: { body: playgroundPage() } }, store);
+    const got = await loadPieces([PAGE], second.env);
+    assert.match(got.how, /^downloaded/);
   });
 
   test("offline without a cached copy: fails", async () => {

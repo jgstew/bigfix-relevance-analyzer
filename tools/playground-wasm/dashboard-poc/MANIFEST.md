@@ -40,7 +40,9 @@ All paths are bare file names relative to `manifest.json`: no `/`, no `..`.
       "path": "analyzer.core.wasm.gz",
       "encoding": "gzip",
       "size": 1234567,
-      "sha256": "<64 hex>"
+      "sha256": "<64 hex>",
+      "raw_size": 4567890,
+      "raw_sha256": "<64 hex>"
     }
   ]
 }
@@ -53,6 +55,9 @@ All paths are bare file names relative to `manifest.json`: no `/`, no `..`.
   `new URL("./<name>", import.meta.url)`. Every `analyzer.core*.wasm` name the
   glue mentions has exactly one entry, and no entry is unused.
 - `cores[].encoding` is `"gzip"`, the only value in format 1.
+- `cores[].raw_size` and `cores[].raw_sha256` describe the inflated wasm, so a
+  core a server decompressed in transit can still be verified. Added within
+  format 1; consumers check them when they are present and need them.
 
 ## Rules for consumers
 
@@ -63,12 +68,22 @@ All paths are bare file names relative to `manifest.json`: no `/`, no `..`.
   cached set as current only if the manifest text is identical; otherwise
   fetch every file again (also `cache: "no-cache"`) and replace the set
   together. Never mix files from two manifests.
-- Check each file's `size`. Check `sha256` where `crypto.subtle` exists (it
-  is missing in insecure contexts, such as a Web Reports server on plain
-  `http://`). On a mismatch, use none of the set.
+- Verify every file by `sha256` before using or caching it, also where
+  `crypto.subtle` is missing (insecure contexts, such as a Web Reports server
+  on plain `http://`): use a JavaScript SHA-256 there (`loader.mjs` has one).
+  On any mismatch, use none of the set.
 - A server may decompress a `.gz` file in transit (`Content-Encoding: gzip`).
-  Tell by the bytes: gzip starts `1f 8b`, wasm starts `00 61 73 6d`. Only
-  check `size`/`sha256` on the bytes as published.
+  Tell by the bytes: gzip starts `1f 8b`, wasm starts `00 61 73 6d`. Check a
+  core that arrived inflated against `raw_size` and `raw_sha256`; without
+  them it cannot be verified, so refuse it.
+- Re-verify a cached set against its manifest before running it: browser
+  storage is shared with every page on the origin.
+- If a newer manifest's set fails to download or verify, keep using the
+  cached set rather than nothing.
+
+The canonical contract is `../SPLIT_ANALYZER.md`, from the producer's pull
+request (jgstew/bigfix-relevance-analyzer#177); this copy records what the
+Web Report's loader implements, and goes once that is merged.
 
 ## Rules for the producer
 

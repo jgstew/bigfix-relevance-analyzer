@@ -163,6 +163,24 @@ describe("Web Report", () => {
     }
   });
 
+  test("no answers on the no-string-cast path is no answers, not one blank one", async () => {
+    // Keep the analyzer away, so the plain text box stays the input.
+    const gone = (req, res) => res.writeHead(404).end("gone");
+    overrides = new Map([[`/${MANIFEST}`, gone], [`/${PLAYGROUND}`, gone]]);
+    try {
+      const context = await browser.newContext();
+      const { page } = await open(context, "relevance-debugger-webreport-fake.html");
+      await page.fill("#rel", "bes computers whose (false)");
+      await page.click("#evaluate");
+      await page.locator("#wrResult .summary").waitFor();
+      assert.match(await page.locator("#wrResult .summary").textContent(), /^0 answers/);
+      assert.match(await page.locator("#wrResult .summary").textContent(), /no string cast/);
+      await context.close();
+    } finally {
+      overrides = new Map();
+    }
+  });
+
   test("log and diagnostics start folded away", async () => {
     const context = await browser.newContext();
     const { page } = await open(context, "relevance-debugger-webreport-fake.html");
@@ -173,6 +191,52 @@ describe("Web Report", () => {
 });
 
 describe("console dashboard", () => {
+  test("internals: qna output, typed IDs and the FastQuery request", async () => {
+    const context = await browser.newContext();
+    const { page } = await open(context, "relevance-debugger-console-fake.html");
+    const got = await page.evaluate(() => {
+      const t = window.rdbg.internals;
+      return {
+        qna: t.parseQna("Q: A: first line\r\nsecond line\r\nQ: T: 12\r\nQ: I: singular string\r\nQ: "),
+        ids: t.parseIds("101, 101 102;101"),
+        badIds: t.parseIds("101, x"),
+        xml: t.clientQueryXml('exists file "a&b" whose (size of it < 3)', ["7"]),
+      };
+    });
+    assert.deepEqual(got.qna.answers, ["first line\nsecond line"]);
+    assert.deepEqual(got.qna.times, ["12"]);
+    assert.deepEqual(got.ids, ["101", "102"]);
+    assert.equal(got.badIds, null);
+    assert.match(got.xml, /<QueryText>exists file "a&amp;b" whose \(size of it &lt; 3\)<\/QueryText>/);
+    await context.close();
+  });
+
+  test("a FastQuery reply that never comes ends at the timeout", async () => {
+    const context = await browser.newContext();
+    const { page } = await open(context, "relevance-debugger-console-fake.html");
+    await page.evaluate(() => {
+      window.API.Get = () => {}; // never calls back
+    });
+    await page.fill("#timeoutSec", "5");
+    await page.click("#evaluate");
+    await page.waitForFunction(() => document.getElementById("status").textContent === "Done.", null, { timeout: 15_000 });
+    assert.match(await page.locator("#results").textContent(), /no reply/);
+    await context.close();
+  });
+
+  test("Cancel stops a running FastQuery", async () => {
+    const context = await browser.newContext();
+    const { page } = await open(context, "relevance-debugger-console-fake.html");
+    await page.click("#evaluate");
+    await page.waitForFunction(() => window.__fake.gets.length >= 1);
+    await page.click("#cancel");
+    assert.equal(await page.locator("#status").textContent(), "Cancelled.");
+    const gets = await page.evaluate(() => window.__fake.gets.length);
+    await page.waitForTimeout(5000);
+    assert.equal(await page.evaluate(() => window.__fake.gets.length), gets);
+    await context.close();
+  });
+
   test("FastQuery backs off, draws rows as they arrive and ends at the timeout", async () => {
     const context = await browser.newContext();
     const { page, errors } = await open(context, "relevance-debugger-console-fake.html");
