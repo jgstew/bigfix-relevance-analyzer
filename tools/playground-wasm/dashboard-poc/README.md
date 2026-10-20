@@ -65,9 +65,13 @@ Client relevance runs on:
 
 ### Web Report
 
-1. Build or take `relevance-debugger-webreport.html`.
-2. In Web Reports, create a custom report and paste the file's contents as its
-   HTML.
+1. Build or take the Web Report, as either file:
+   - `relevance-debugger-webreport.beswrpt`: put it in a BigFix site's server
+     files (for example a repository site's `ServerFiles/`), and Web Reports
+     picks it up from the site on its own, named "Relevance Debugger".
+   - `relevance-debugger-webreport.html`: the same report as a bare fragment.
+2. With the `.html`, create a custom report in Web Reports instead and paste
+   the file's contents as its HTML.
 3. **Evaluate** works as soon as the page shows, in a plain text box. The
    analyzer follows: the first time, the browser downloads it (~12 MB); after
    that it comes from the browser's own storage, and each load only checks
@@ -240,14 +244,15 @@ Outputs, in `playground/dashboard-poc/` (gitignored):
 | File | What it is |
 |---|---|
 | `relevance-debugger-console.ojo` | The console dashboard. |
-| `relevance-debugger-webreport.html` | The Web Report fragment to paste. |
+| `relevance-debugger-webreport.beswrpt` | The Web Report as `<BESWebReport>` XML (Name `Relevance Debugger`, Type `CustomReport`, Source `JGStew`, the report in `<Data>`), for a site's server files. |
+| `relevance-debugger-webreport.html` | The same Web Report as a fragment to paste into a custom report. |
 | `relevance-debugger-<target>-page.html` | Each target as a whole page, for a plain browser. |
 | `relevance-debugger-<target>-fake.html` | With `--fake-hosts`: the same, running against `fake_host.js`, a pretend console or Web Reports. Its Web Report takes the analyzer from `analyzer/manifest.json` next to it (a split set `test_reports.mjs` makes), then the local playground build, `playground/bigfix-relevance-analyzer-component-playground.html` (`--fake-analyzer-url`). |
 
 The builder fails if a placeholder is left over, if the page has characters
 XML cannot carry, if it contains `<?relevance` (Web Reports would evaluate
-it), if a script contains `</script` before its end, or if the `.ojo` does
-not parse back to the same HTML.
+it), if a script contains `</script` before its end, or if the `.ojo` or
+`.beswrpt` does not parse back to the same HTML.
 
 ### Tests
 
