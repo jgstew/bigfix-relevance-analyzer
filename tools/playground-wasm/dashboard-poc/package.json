@@ -12,7 +12,7 @@
   },
   "scripts": {
     "test:es5": "acorn --ecma5 --silent core.js",
-    "test:unit": "node --test test_loader.mjs test_manifest.mjs",
+    "test:unit": "node --test test_loader.mjs test_manifest.mjs test_resilience.mjs",
     "test:browser": "node --test test_reports.mjs"
   }
 }

@@ -362,3 +362,5 @@ export function dialectChoice(payload) {
   }
   return { dialects: ["session", "client"], why: "the analyzer could not tell" };
 }
+export async function loadAndStart(urls, env, start) { const got = await loadPieces(urls, env); return { ...got, started: await start(got.pieces) }; }
+export async function forgetAnalyzer() { return []; }
