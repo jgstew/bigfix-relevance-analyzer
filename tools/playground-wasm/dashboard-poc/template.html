@@ -72,7 +72,7 @@
   #rdbg .badge { display: inline-block; border-radius: 10px; padding: 1px 9px; margin: 0 6px 4px 0; font-size: 12px; border: 1px solid #d0d7de; background: #f6f8fa; }
   #rdbg .badge.ok { border-color: #a6dbb4; background: #edf9f0; color: #1a7f37; }
   #rdbg .badge.error { border-color: #f1aeb5; background: #fff1f0; color: #b42318; }
-  #rdbg details { margin: 0 0 14px 0; border: 1px solid #d0d7de; border-radius: 6px; padding: 8px 14px; }
+  #rdbg details { display: block; margin: 0 0 14px 0; border: 1px solid #d0d7de; border-radius: 6px; padding: 8px 14px; }
   #rdbg summary { cursor: pointer; font-weight: 600; color: #57606a; display: block; }
   #rdbg.no-details summary:before { content: "\25B8\00a0\00a0"; }
   #rdbg.no-details details[open] summary:before { content: "\25BE\00a0\00a0"; }
@@ -113,7 +113,7 @@
         <label><input type="checkbox" id="useFast" checked="checked" /> FastQuery:
           <input type="number" id="fastCount" value="5" min="1" max="100" /> random computers that reported in the last hour</label>
         <label>or computer IDs <input type="text" id="ids" placeholder="e.g. 1234, 5678" /></label>
-        <label>timeout <input type="number" id="timeoutSec" value="60" min="5" max="600" /> s</label>
+        <label>timeout <input type="number" id="timeoutSec" value="90" min="5" max="600" /> s</label>
         <div id="clientWhy" class="hint"></div>
       </div>
     </div>

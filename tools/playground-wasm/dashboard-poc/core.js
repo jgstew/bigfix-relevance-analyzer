@@ -21,12 +21,22 @@
   var SESSION_TARGETS = "ids of bes computers whose (last report time of it > now - 1 * hour)";
   var DELIM = "<~rdbg~>";
   var MAX_SHOWN = 200;
+  // FastQuery polling backs off while waiting: the first check comes
+  // POLL_FIRST_MS after the last, each gap grows by POLL_GROWTH up to
+  // POLL_MAX_MS, and the last check lands on the timeout. Answers that have
+  // not come in early are less likely to come in at all.
+  var POLL_FIRST_MS = 2000;
+  var POLL_GROWTH = 1.5;
+  var POLL_MAX_MS = 15000;
 
   var host = null;
   var analyzer = null; // set by rdbg.onAnalyzer
   var analyzerNote = "not loaded yet";
   var editor = null; // {getText} once the analyzer mounts CodeMirror
-  var run = null; // the evaluation in progress: {cancelled, cancels: [fn]}
+  // The evaluation in progress, {cancelled, cancels: [fn]}. Each run's
+  // callbacks hold their own one, so an abandoned run's late replies are
+  // dropped rather than landing in the next run's results.
+  var run = null;
   var facts = {}; // diagnostics, in insertion order via factOrder
   var factOrder = [];
 
@@ -266,7 +276,7 @@
   // The relevance goes into a temp file and reaches qna on stdin, never on a
   // command line, so cmd metacharacters in it are harmless. Output goes to a
   // file too, so a large answer cannot fill the pipe and stall qna.
-  function evalLocal(query, timeoutMs, done) {
+  function evalLocal(ctx, query, timeoutMs, done) {
     var fso, shell, exec, inFile, outFile;
     try {
       fso = new window.ActiveXObject("Scripting.FileSystemObject");
@@ -304,14 +314,14 @@
         fso.DeleteFile(outFile, true);
       } catch (e) {}
     }
-    if (run) {
-      run.cancels.push(function () {
-        try {
-          exec.Terminate();
-        } catch (e) {}
-      });
-    }
+    ctx.cancels.push(function () {
+      try {
+        exec.Terminate();
+      } catch (e) {}
+      cleanup();
+    });
     function poll() {
+      if (ctx.cancelled) return;
       if (exec.Status === 0) {
         if (now() - started > timeoutMs) {
           try {
@@ -407,13 +417,19 @@
     );
   }
 
-  // onUpdate(rows) on every poll with all results so far (they are
-  // cumulative); done(error, rows, why) once.
-  function evalFast(query, ids, timeoutMs, onUpdate, done) {
+  // onUpdate(rows, count, nextMs) after every check, with all results so far
+  // (they are cumulative); done(error, rows, why) once. Waits the whole
+  // timeout for computers that have not answered, unless ctx is cancelled.
+  function evalFast(ctx, query, ids, timeoutMs, onUpdate, done) {
     var started = now();
-    var xml = clientQueryXml(query, ids);
+    var timer = null;
+    var delay = POLL_FIRST_MS;
+    ctx.cancels.push(function () {
+      clearTimeout(timer);
+    });
     try {
-      window.API.Post("clientquery", xml, function (error, status, body) {
+      window.API.Post("clientquery", clientQueryXml(query, ids), function (error, status, body) {
+        if (ctx.cancelled) return;
         fact("API.Post clientquery", "status " + status + (error ? ", error " + errText(error) : ""));
         var m = /<ID>\s*(\d+)\s*<\/ID>/.exec(String(body || ""));
         if (error || !m) {
@@ -428,19 +444,11 @@
       return;
     }
 
-    var lastCount = -1;
-    var stable = 0;
-    var timer = null;
-    if (run) {
-      run.cancels.push(function () {
-        clearTimeout(timer);
-      });
-    }
-
     function poll(queryId) {
+      if (ctx.cancelled) return;
       try {
         window.API.Get("clientqueryresults/" + queryId + "?output=json", function (error, status, body) {
-          if (run && run.cancelled) return;
+          if (ctx.cancelled) return;
           var rows;
           try {
             rows = JSON.parse(body).results || [];
@@ -449,7 +457,6 @@
             done("could not read FastQuery results (status " + status + "): " + (error ? errText(error) : errText(e)));
             return;
           }
-          onUpdate(rows);
           var seen = {};
           var count = 0;
           for (var i = 0; i < rows.length; i++) {
@@ -458,14 +465,17 @@
               count++;
             }
           }
-          stable = count === lastCount ? stable + 1 : 0;
-          lastCount = count;
           if (count >= ids.length) return done(null, rows, "all " + count + " answered");
-          if (count > 0 && stable >= 3) return done(null, rows, count + " of " + ids.length + " answered, no change for 3 polls");
-          if (now() - started > timeoutMs) return done(null, rows, count + " of " + ids.length + " answered before the timeout");
+          var left = timeoutMs - (now() - started);
+          if (left <= 0) {
+            return done(null, rows, count + " of " + ids.length + " answered within " + Math.round(timeoutMs / 1000) + " s");
+          }
+          var wait = Math.min(delay, left);
+          delay = Math.min(delay * POLL_GROWTH, POLL_MAX_MS);
+          onUpdate(rows, count, wait);
           timer = setTimeout(function () {
             poll(queryId);
-          }, 2000);
+          }, wait);
         });
       } catch (e) {
         done("API.Get threw: " + errText(e));
@@ -562,18 +572,34 @@
     return (editor ? editor.getText() : $("rel").value).replace(/^\s+|\s+$/g, "");
   }
 
-  function finishRun(message) {
+  // Only the current run may finish the page's run state.
+  function finishRun(ctx, message) {
+    if (run !== ctx) return;
     run = null;
-    $("evaluate").disabled = false;
     if ($("cancel")) $("cancel").disabled = true;
     setText("status", message);
   }
 
+  // Evaluate stays clickable while a run is going: a new query abandons it.
   function startRun() {
+    if (run) stopRun("abandoned for a new query");
     run = { cancelled: false, cancels: [] };
-    $("evaluate").disabled = true;
     if ($("cancel")) $("cancel").disabled = false;
     setText("status", "Evaluating...");
+    return run;
+  }
+
+  function stopRun(why) {
+    var ctx = run;
+    if (!ctx) return;
+    ctx.cancelled = true;
+    for (var i = 0; i < ctx.cancels.length; i++) {
+      try {
+        ctx.cancels[i]();
+      } catch (e) {}
+    }
+    log("previous run " + why);
+    finishRun(ctx, "Cancelled.");
   }
 
   // Web Reports: analysis, then session relevance, always. Client relevance
@@ -602,9 +628,10 @@
       setText("wrResult", "Session relevance can only be evaluated in Web Reports.", "hint");
       return;
     }
-    startRun();
+    var ctx = startRun();
     log("session: evaluating");
     evalSession(query, function (err, answers, info) {
+      if (ctx.cancelled) return;
       out.innerHTML = "";
       out.className = "";
       var summary = document.createElement("p");
@@ -637,8 +664,40 @@
         }
       }
       log("session: " + (err ? "error" : answers.length + " answer(s)"));
-      finishRun("Done.");
+      finishRun(ctx, "Done.");
     });
+  }
+
+  // FastQuery's rows in the console table, redrawn on every check: one per
+  // computer that answered, then one per target still waiting.
+  function fastQueryRows(ids, why) {
+    var drawn = [];
+    return function (rows, final) {
+      for (var d = 0; d < drawn.length; d++) {
+        if (drawn[d].parentNode) drawn[d].parentNode.removeChild(drawn[d]);
+      }
+      drawn = [];
+      var byComputer = {};
+      var order = [];
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        var key = String(r.computerID);
+        if (!byComputer[key]) {
+          byComputer[key] = { name: r.computerName, answers: [], errors: [], ms: r.ResponseTime };
+          order.push(key);
+        }
+        (r.isFailure ? byComputer[key].errors : byComputer[key].answers).push(r.result);
+      }
+      for (var k = 0; k < order.length; k++) {
+        var c = byComputer[order[k]];
+        drawn.push(addRow(["client", "FastQuery", c.name + " (" + order[k] + ")", answersCell(c.answers), c.errors.join("; "), c.ms + " ms"]));
+      }
+      for (var n = 0; n < ids.length; n++) {
+        if (!byComputer[ids[n]]) {
+          drawn.push(addRow(["client", "FastQuery", ids[n], final ? "" : "waiting...", "", final ? "no answer" : why]));
+        }
+      }
+    };
   }
 
   // Console: session and/or client relevance, as picked or guessed.
@@ -647,10 +706,10 @@
     if (!query) return;
     var choice = chooseDialects(query);
     var paths = clientPaths();
+    var ctx = startRun();
     setText("dialectWhy", "Runs " + choice.dialects.join(" then ") + ": " + choice.why + ".");
     clearResults();
-    startRun();
-    var timeoutMs = Math.max(5, parseInt($("timeoutSec").value, 10) || 60) * 1000;
+    var timeoutMs = Math.max(5, parseInt($("timeoutSec").value, 10) || 90) * 1000;
     var steps = [];
 
     for (var d = 0; d < choice.dialects.length; d++) {
@@ -662,6 +721,7 @@
           }
           log("session: evaluating");
           evalSession(query, function (err, answers, info) {
+            if (ctx.cancelled) return;
             addRow(["session", "this deployment", "", err ? "" : answersCell(answers), err, answers.length + " answer(s), " + info]);
             log("session: " + (err ? "error" : answers.length + " answer(s)"));
             next();
@@ -678,7 +738,8 @@
         if ($("useLocal").checked) {
           steps.push(function (next) {
             log("client: qna on this computer");
-            evalLocal(query, timeoutMs, function (err, answers, info) {
+            evalLocal(ctx, query, timeoutMs, function (err, answers, info) {
+              if (ctx.cancelled) return;
               addRow(["client", "this computer (qna)", "", err && !answers ? "" : answersCell(answers || []), err, info || ""]);
               log("client qna: " + (err ? "error" : (answers || []).length + " answer(s)"));
               next();
@@ -689,40 +750,27 @@
           steps.push(function (next) {
             var count = Math.max(1, parseInt($("fastCount").value, 10) || 5);
             pickTargets(count, function (err, ids, why) {
+              if (ctx.cancelled) return;
               if (err) {
                 addRow(["client", "FastQuery", "", "", err, ""]);
                 return next();
               }
               log("FastQuery targets: " + ids.join(", ") + " (" + why + ")");
-              var placeholder = addRow(["client", "FastQuery", "", "waiting for " + ids.length + " computer(s)...", "", why]);
+              var draw = fastQueryRows(ids, why);
+              draw([], false);
               evalFast(
+                ctx,
                 query,
                 ids,
                 timeoutMs,
-                function (rows) {
-                  setText("status", "FastQuery: " + rows.length + " result row(s) so far...");
+                function (rows, answered, nextMs) {
+                  draw(rows, false);
+                  setText("status", "FastQuery: " + answered + " of " + ids.length + " answered; checking again in " + Math.round(nextMs / 1000) + " s...");
                 },
                 function (err2, rows, why2) {
-                  placeholder.parentNode.removeChild(placeholder);
+                  if (ctx.cancelled) return;
+                  draw(rows || [], true);
                   if (err2) addRow(["client", "FastQuery", "", "", err2, why]);
-                  var byComputer = {};
-                  var order = [];
-                  for (var i = 0; i < (rows || []).length; i++) {
-                    var r = rows[i];
-                    var key = String(r.computerID);
-                    if (!byComputer[key]) {
-                      byComputer[key] = { name: r.computerName, answers: [], errors: [], ms: r.ResponseTime };
-                      order.push(key);
-                    }
-                    (r.isFailure ? byComputer[key].errors : byComputer[key].answers).push(r.result);
-                  }
-                  for (var k = 0; k < order.length; k++) {
-                    var c = byComputer[order[k]];
-                    addRow(["client", "FastQuery", c.name + " (" + order[k] + ")", answersCell(c.answers), c.errors.join("; "), c.ms + " ms"]);
-                  }
-                  for (var n = 0; n < ids.length; n++) {
-                    if (!byComputer[ids[n]] && !err2) addRow(["client", "FastQuery", ids[n], "", "", "no answer yet"]);
-                  }
                   log("FastQuery: " + (err2 || why2));
                   next();
                 }
@@ -735,29 +783,20 @@
 
     var i = 0;
     function next() {
-      if (!run || run.cancelled) return;
-      if (i >= steps.length) return finishRun("Done.");
+      if (ctx.cancelled) return;
+      if (i >= steps.length) return finishRun(ctx, "Done.");
       steps[i++](next);
     }
     next();
   }
 
   function evaluate() {
-    if (run) return;
     if (target === "console") evaluateConsole();
     else evaluateWebReport();
   }
 
   function cancel() {
-    if (!run) return;
-    run.cancelled = true;
-    for (var i = 0; i < run.cancels.length; i++) {
-      try {
-        run.cancels[i]();
-      } catch (e) {}
-    }
-    log("cancelled");
-    finishRun("Cancelled.");
+    stopRun("cancelled");
   }
 
   function copyDiagnostics() {

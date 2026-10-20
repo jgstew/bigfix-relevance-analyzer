@@ -49,10 +49,12 @@ Client relevance runs on:
   command window may flash briefly.
 - **FastQuery:** 5 random computers that reported in the last hour by default
   (`ids of bes computers whose (last report time of it > now - 1 * hour)`),
-  or the computer IDs you type. Results stream in; it stops when every target
-  has answered, when nothing new arrives for 3 polls, at the timeout (60 s by
-  default), or on Cancel. Computers that never answer are listed as such;
-  partial results are normal.
+  or the computer IDs you type. Answers appear as they arrive. It waits until
+  every target has answered or for 90 seconds (the timeout box), checking
+  often at first and then less often: 2 s apart, each gap 1.5x the last, up
+  to 15 s, with the last check at the deadline. Computers that never answer
+  are listed as "no answer"; partial results are normal. Cancel stops it, and
+  so does clicking Evaluate again: a new query abandons the one in progress.
 
 ### Web Report
 
@@ -66,8 +68,9 @@ Client relevance runs on:
 ### Log and diagnostics
 
 Both builds keep a log and a diagnostics panel folded away under **Log and
-diagnostics** at the bottom (IE11 has no `<details>`, so the core supplies the
-folding there). Diagnostics record the browser engine, which BigFix functions
+diagnostics** at the bottom. IE11 has no `<details>`: the core supplies the
+folding there, and the styles set `display: block` on it, since IE11 lays out
+unknown elements inline. Diagnostics record the browser engine, which BigFix functions
 exist, and the shape of each host reply, keyed by query. **Copy** puts it on
 the clipboard, for bug reports.
 
@@ -106,8 +109,12 @@ template.html -+- core.js        ES5 only; UI and every evaluation path, both ta
   the `A:`/`E:`/`T:`/`I:` lines.
 - **FastQuery** uses the console's `API.Post("clientquery", xml, cb)` with the
   query XML-escaped and `<ComputerID>` targets, then polls
-  `API.Get("clientqueryresults/{id}?output=json", cb)` every 2 s. Results are
-  cumulative and there is no "done" flag, hence the stop rules above.
+  `API.Get("clientqueryresults/{id}?output=json", cb)` with the backoff above.
+  Results are cumulative and there is no "done" flag, so it waits for every
+  target or the timeout.
+- **Each run has its own cancel token.** Its callbacks check it, so an
+  abandoned run's late replies are dropped instead of landing in the next
+  run's results.
 
 ## Building
 
