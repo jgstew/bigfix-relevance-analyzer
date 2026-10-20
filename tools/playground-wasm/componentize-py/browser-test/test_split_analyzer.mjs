@@ -16,8 +16,16 @@
 //   changed      the first manifest.json the page sees is from another build;
 //                its files fail to verify, the page re-reads the manifest, sees
 //                it changed, and boots from the new set alone
+//   core count   the first manifest lists a core this folder does not have
+//                (404); the page re-reads the manifest and boots from the new one
 //   corrupt      a byte of glue.mjs flipped (sha256), a core truncated (size),
-//                manifest.json missing: the page says so and does not boot
+//                an inflated core that is not the manifest's (raw_sha256),
+//                manifest.json missing, an unknown format, a "../" path, a
+//                version the component does not report: the page says so and
+//                does not boot
+//   insecure     served from a hostname that is not a secure context, so there
+//                is no crypto.subtle: the page verifies with its JS SHA-256,
+//                boots, and still refuses a flipped byte
 //
 // Usage: node test_split_analyzer.mjs <path-to-playground/analyzer>
 
@@ -86,11 +94,19 @@ async function serve({ override, gzipInTransit = false } = {}) {
     res.writeHead(200, headers).end(body);
   });
   await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
-  const origin = `http://127.0.0.1:${server.address().port}`;
-  return { origin, log, close: () => new Promise((ok) => server.close(ok)) };
+  const { port } = server.address();
+  return {
+    origin: `http://127.0.0.1:${port}`,
+    insecureOrigin: `http://${INSECURE_HOST}:${port}`,
+    log,
+    close: () => new Promise((ok) => server.close(ok)),
+  };
 }
 
-const browser = await chromium.launch();
+// split.test is this machine too, but unlike 127.0.0.1 it is not a secure
+// context, so the page there has no crypto.subtle.
+const INSECURE_HOST = "split.test";
+const browser = await chromium.launch({ args: [`--host-resolver-rules=MAP ${INSECURE_HOST} 127.0.0.1`] });
 let failures = 0;
 const fail = (message) => {
   console.error(`FAIL: ${message}`);
@@ -135,6 +151,8 @@ async function load(page, url, { reload = false } = {}) {
     runDisabled: document.getElementById("run").disabled,
     version: document.getElementById("version")?.textContent ?? null,
     arrivals: Object.values(window.__coreArrivals ?? {}),
+    sha256Impl: window.__sha256Impl ?? null,
+    secure: window.isSecureContext,
   }));
 }
 
@@ -211,14 +229,24 @@ function expectBooted(label, state) {
 }
 
 /** Boot (or refuse) in a fresh browser context against a bent server. */
-async function scenario(label, serveOptions) {
+async function scenario(label, serveOptions, { insecure = false } = {}) {
   const server = await serve(serveOptions);
-  const { context, page, consoleErrors } = await openPage();
-  const state = await load(page, `${server.origin}/index.html`);
+  const { context, page, consoleErrors, requests } = await openPage();
+  const state = await load(page, `${insecure ? server.insecureOrigin : server.origin}/index.html`);
   await context.close();
   await server.close();
-  return { state, consoleErrors, log: server.log };
+  return { state, consoleErrors, log: server.log, requests };
 }
+
+/** A manifest.json body: the real manifest with `change` applied to a copy. */
+function doctored(change) {
+  const copy = structuredClone(manifest);
+  change(copy);
+  return Buffer.from(JSON.stringify(copy, null, 2) + "\n");
+}
+const serveManifest = (body, onlyFirst = false) => ({
+  override: (name, count) => (name === "manifest.json" && (!onlyFirst || count === 1) ? body : undefined),
+});
 
 // --- a server that already inflated the .gz cores -------------------------
 
@@ -285,10 +313,87 @@ function expectRefused(label, state, pattern) {
   expectRefused("manifest.json missing (404)", state, /manifest\.json.*404/s);
 }
 
+{
+  const body = doctored((m) => {
+    m.cores[0].raw_sha256 = "0".repeat(64);
+  });
+  const { state } = await scenario("wrong raw core", { ...serveManifest(body), gzipInTransit: true });
+  expectRefused(`${manifest.cores[0].path} inflated in transit but not the manifest's`, state, /raw_sha256/);
+}
+
+{
+  const { state } = await scenario("unknown format", serveManifest(doctored((m) => (m.format = 2))));
+  expectRefused("manifest.json with format 2", state, /format 2/);
+}
+
+{
+  const { state, requests } = await scenario("parent path", serveManifest(doctored((m) => (m.editor.path = "../editor.js"))));
+  expectRefused('an editor path of "../editor.js"', state, /malformed editor entry/);
+  const escaped = requests.filter((url) => !new URL(url).pathname.startsWith("/") || url.includes(".."));
+  if (escaped.length) fail(`the page fetched outside its folder: ${escaped.join(", ")}`);
+}
+
+{
+  const { state } = await scenario("version mismatch", serveManifest(doctored((m) => (m.version = "0.0.0-not-this-build"))));
+  if (state.status === "Done." || !state.isError || !state.runDisabled || !/0\.0\.0-not-this-build/.test(state.output)) {
+    fail(`a manifest naming another version should stop the boot, got status ${JSON.stringify(state.status)}: ${state.output}`);
+  } else {
+    pass(`a manifest naming another version: refused -- ${state.output.split("\n")[0]}`);
+  }
+}
+
+// --- the manifest switched to a different core count under the page --------
+
+{
+  // An older set's manifest, one core more than this folder holds: that core
+  // 404s, the re-read manifest differs, and the page starts over with it.
+  const body = doctored((m) => {
+    m.cores.push({ ...m.cores[m.cores.length - 1], name: "analyzer.core99.wasm", path: "analyzer.core99.wasm.gz" });
+  });
+  const { state, log } = await scenario("core count", serveManifest(body, true));
+  if (expectBooted("manifest with another core count, then the real one", state)) {
+    const manifestReads = log.filter((entry) => entry.name === "manifest.json").length;
+    const missing = log.filter((entry) => entry.name === "analyzer.core99.wasm.gz").map((entry) => entry.status);
+    if (manifestReads === 2 && JSON.stringify(missing) === "[404]") pass("a 404 re-read manifest.json once and booted from the new set");
+    else fail(`expected one 404 then a second manifest read, got ${manifestReads} reads and ${JSON.stringify(missing)}`);
+  }
+}
+
+// --- no crypto.subtle: the page's own SHA-256 --------------------------------
+
+{
+  const { state, consoleErrors } = await scenario("insecure", {}, { insecure: true });
+  if (state.secure !== false) fail(`${INSECURE_HOST} was expected not to be a secure context`);
+  if (expectBooted("not a secure context (no crypto.subtle)", state)) {
+    if (state.sha256Impl === "js") pass("verified every file with the page's JS SHA-256");
+    else fail(`expected the JS SHA-256 fallback, got ${JSON.stringify(state.sha256Impl)}`);
+  }
+  if (consoleErrors.length) fail(`insecure: console error(s):\n  ${consoleErrors.join("\n  ")}`);
+}
+
+{
+  const { state } = await scenario("insecure in transit", { gzipInTransit: true }, { insecure: true });
+  if (expectBooted("no crypto.subtle, cores inflated in transit", state)) {
+    if (state.arrivals.every((a) => a === "wasm") && state.sha256Impl === "js") pass("checked every inflated core's raw_sha256 in JS");
+    else fail(`expected wasm arrivals checked in JS, got ${JSON.stringify(state.arrivals)} / ${state.sha256Impl}`);
+  }
+}
+
+{
+  const flipped = Buffer.from(FILES.get(manifest.glue.path));
+  flipped[flipped.length - 2] ^= 0x01;
+  const { state } = await scenario(
+    "insecure corrupt glue",
+    { override: (name) => (name === manifest.glue.path ? flipped : undefined) },
+    { insecure: true },
+  );
+  expectRefused("no crypto.subtle, glue.mjs with one byte flipped", state, new RegExp(`${manifest.glue.path}.*sha-?256`, "is"));
+}
+
 await browser.close();
 
 if (failures) {
   console.error(`${failures} check(s) failed`);
   process.exit(1);
 }
-console.log(`all checks passed: ${CASES.length} case(s), editor, language server, cache, in-transit gzip, changed manifest, corruption`);
+console.log(`all checks passed: ${CASES.length} case(s), editor, language server, cache, in-transit gzip, changed manifest, core count, corruption, no crypto.subtle`);

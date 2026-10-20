@@ -14,6 +14,7 @@ Reports custom report embedding the analyzer had to do. This writes the same
 pieces as files instead, in one flat, always-latest folder:
 
     manifest.json              the version, and every file's size and sha256
+                               (and each core's inflated raw_size/raw_sha256)
     editor.js                  the editor bundle, unmodified
     glue.mjs                   jco's bundle.mjs, unmodified
     analyzer.core*.wasm.gz     each core module, gzipped exactly as the page does
@@ -27,6 +28,13 @@ Two invariants this script exists to hold:
 * **glue and cores match.** They come from the same ``--work`` directory (one
   jco transpile), and every ``analyzer.core*.wasm`` name the glue mentions must
   be a core on disk and vice versa -- a hard failure otherwise.
+* **the version is the transpiled wheel's.** It is read from the
+  ``.dist-info`` componentize.py staged beside ``--work`` (``<work>/../deps``),
+  which is exactly what the component's ``version()`` reads at run time -- not
+  from ``pyproject.toml``, which a stale ``dist/`` can disagree with.
+* **the glue uses ``import.meta`` only as ``import.meta.url``.** Consumers that
+  run it from a blob: URL substitute that literal text, so the build fails if
+  it is missing or if any other ``import.meta`` use appears.
 * **manifest.json is written last**, after every file it names, and removed
   before any of them is touched. A reader that sees a manifest therefore sees
   a set that was completely written. All inputs are validated before the
@@ -40,12 +48,13 @@ verifies against the release's SHA256SUMS.txt and unpacks as-is.
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import json
 import re
 import sys
-import tomllib
 import zipfile
+from email.parser import HeaderParser
 from pathlib import Path
 from typing import Any
 
@@ -71,6 +80,11 @@ GLUE = "glue.mjs"
 # chooses.
 _CORE_NAME_RE = re.compile(r"analyzer\.core\d*\.wasm")
 
+# Any `import.meta` that is not exactly `import.meta.url` (`.resolve(`, a bare
+# `import.meta`, a future property): the contract promises consumers there is
+# none, see the module docstring.
+_OTHER_IMPORT_META_RE = re.compile(r"import\.meta(?!\.url\b)")
+
 # Files a previous build may have left that this one did not write. Only these
 # are ever removed: the folder is build output, but nothing else in it is ours.
 _SET_FILE_RE = re.compile(
@@ -82,11 +96,36 @@ _SET_FILE_RE = re.compile(
 _ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 
 
-def package_version() -> str:
-    """The version in pyproject.toml -- the one the wheel, and so the glue, was built at."""
-    data = tomllib.loads(build_playground.PYPROJECT.read_text(encoding="utf-8"))
-    version: str = data["project"]["version"]
-    return version
+def staged_version(deps: Path) -> str:
+    """The version of the wheel componentize.py staged into ``deps``.
+
+    Read from its ``.dist-info/METADATA``, the same file ``importlib.metadata``
+    reads inside the component, so this is what ``version()`` will report.
+    """
+    found = sorted(deps.glob("bigfix_relevance_analyzer-*.dist-info"))
+    if len(found) != 1:
+        raise SystemExit(
+            f"expected exactly one bigfix_relevance_analyzer-*.dist-info in {deps} (staged by "
+            f"componentize.py), found {[p.name for p in found] or 'none'}"
+        )
+    metadata = HeaderParser().parsestr((found[0] / "METADATA").read_text(encoding="utf-8"))
+    version = metadata["Version"]
+    if not version:
+        raise SystemExit(f"{found[0] / 'METADATA'} has no Version")
+    return str(version)
+
+
+def check_import_meta(glue: str, glue_path: Path) -> None:
+    """The glue must reference ``import.meta.url`` and no other ``import.meta``."""
+    if "import.meta.url" not in glue:
+        raise SystemExit(f"{glue_path} never uses import.meta.url -- not jco's glue?")
+    other = _OTHER_IMPORT_META_RE.search(glue)
+    if other:
+        context = glue[max(0, other.start() - 40) : other.end() + 40]
+        raise SystemExit(
+            f"{glue_path} uses import.meta other than as import.meta.url, which consumers "
+            f"that substitute import.meta.url cannot handle: ...{context!r}..."
+        )
 
 
 def glue_core_names(glue: str) -> set[str]:
@@ -114,7 +153,10 @@ def write_zip(zip_path: Path, files: dict[str, bytes]) -> None:
         for name, data in files.items():
             info = zipfile.ZipInfo(name, date_time=_ZIP_TIME)
             info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = 0o644 << 16
+            # Unix, a regular file, 0644: the same bytes whichever OS builds it
+            # (ZipInfo would otherwise record the building OS).
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
             archive.writestr(info, data, compresslevel=9)
 
 
@@ -123,7 +165,7 @@ def build(
     editor_bundle: Path,
     out_dir: Path,
     *,
-    version: str | None = None,
+    deps_dir: Path | None = None,
     template_path: Path = DEFAULT_TEMPLATE,
     zip_path: Path | None = None,
 ) -> dict[str, Any]:
@@ -139,9 +181,12 @@ def build(
     # Everything is read and checked before out_dir is touched.
     editor = embed.editor_js(editor_bundle).encode("ascii")
     glue = glue_path.read_bytes()
+    glue_text = glue.decode("utf-8")
+    check_import_meta(glue_text, glue_path)
     cores, raw_total = build_playground.gzip_cores(transpiled)
+    version = staged_version(deps_dir if deps_dir is not None else work_dir.parent / "deps")
 
-    wanted = glue_core_names(glue.decode("utf-8"))
+    wanted = glue_core_names(glue_text)
     missing = sorted(wanted - cores.keys())
     unused = sorted(cores.keys() - wanted)
     if missing or unused:
@@ -156,9 +201,21 @@ def build(
     for name, packed in cores.items():
         path = f"{name}.gz"
         files[path] = packed
-        entry = _entry(path, packed)
-        # name, path, encoding, size, sha256: the contract's order.
-        core_entries.append({"name": name, "path": path, "encoding": "gzip", **entry})
+        raw = gzip.decompress(packed)
+        # name, path, encoding, size, sha256, raw_size, raw_sha256: the
+        # contract's order. raw_* are what a consumer checks when a server
+        # inflated the .gz in transit and the published bytes never arrived.
+        core_entries.append(
+            {
+                "name": name,
+                "path": path,
+                "encoding": "gzip",
+                "size": len(packed),
+                "sha256": hashlib.sha256(packed).hexdigest(),
+                "raw_size": len(raw),
+                "raw_sha256": hashlib.sha256(raw).hexdigest(),
+            }
+        )
     files[INDEX] = embed.render(
         template_path,
         {
@@ -173,7 +230,7 @@ def build(
     manifest = {
         "format": FORMAT,
         "package": PACKAGE,
-        "version": version or package_version(),
+        "version": version,
         "editor": _entry(EDITOR, editor),
         "glue": _entry(GLUE, glue),
         "cores": core_entries,
@@ -215,7 +272,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--out", required=True, help="output folder (flat)")
     parser.add_argument("--zip", help="also write the folder as this flat zip")
-    parser.add_argument("--version", help="version for manifest.json (default: pyproject.toml's)")
+    parser.add_argument(
+        "--deps",
+        help="componentize.py's staged deps/, for the wheel version (default: <work>/../deps)",
+    )
     parser.add_argument("--template", default=str(DEFAULT_TEMPLATE), help="index.html template")
     args = parser.parse_args(argv)
 
@@ -227,7 +287,7 @@ def main(argv: list[str] | None = None) -> int:
         work_dir,
         Path(args.editor_bundle),
         Path(args.out),
-        version=args.version,
+        deps_dir=Path(args.deps) if args.deps else None,
         template_path=Path(args.template),
         zip_path=Path(args.zip) if args.zip else None,
     )
