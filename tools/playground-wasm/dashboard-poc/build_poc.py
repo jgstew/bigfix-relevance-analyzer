@@ -9,12 +9,15 @@ Writes two targets from one template and one ES5 core (see README.md):
   as in jgstew/bigfix-content). Client relevance (local qna, FastQuery) and
   session relevance; no analyzer, since the console renders dashboards in its
   IE11 engine, which has no WebAssembly.
-* ``relevance-debugger-webreport.html``: the fragment to paste into a Web
-  Reports custom report. Session relevance, plus the analyzer, which it
-  fetches after loading (``--analyzer-url``, repeatable, tried in order:
-  by default the split analyzer's manifest at jgstew.com, then the
-  single-file playground page) and caches in the browser. Web Reports
-  regenerates a custom report on every load, so the report itself stays small.
+* ``relevance-debugger-webreport.beswrpt``: the Web Report as the
+  ``<BESWebReport>`` XML a BigFix site's server files carry, which Web Reports
+  picks up on its own; and ``relevance-debugger-webreport.html``, the same
+  report as a bare fragment to paste into a Web Reports custom report.
+  Session relevance, plus the analyzer, which it fetches after loading
+  (``--analyzer-url``, repeatable, tried in order: by default the split
+  analyzer's manifest at jgstew.com, then the single-file playground page)
+  and caches in the browser. Web Reports regenerates a custom report on
+  every load, so the report itself stays small.
 * ``relevance-debugger-<target>-page.html``: each target as a whole page for a
   plain browser, and with ``--fake-hosts`` also ``-fake.html`` pages that load
   fake_host.js, a pretend console or Web Reports, and take the analyzer from
@@ -101,6 +104,26 @@ def _ojo(title: str, head: str, body: str) -> str:
     )
 
 
+# The <BESWebReport> fields of the .beswrpt.
+WEBREPORT_NAME = "Relevance Debugger"
+WEBREPORT_SOURCE = "JGStew"
+
+
+def _beswrpt(fragment: str) -> str:
+    """The Web Report ``fragment`` as a .beswrpt: ``<BESWebReport>`` XML with the
+    report in ``<Data>``, its CDATA opening and closing on lines of their own."""
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        "<BESWebReport>\n"
+        f"\t<Name>{WEBREPORT_NAME}</Name>\n"
+        "\t<Description></Description>\n"
+        "\t<Type>CustomReport</Type>\n"
+        f"\t<Source>{WEBREPORT_SOURCE}</Source>\n"
+        f"\t<Data>{_cdata(chr(10) + fragment + chr(9))}</Data>\n"
+        "</BESWebReport>\n"
+    )
+
+
 def _page(title: str, head: str, body: str, extra_head: str = "") -> str:
     return (
         f"<!doctype html>\n<html>\n<head>\n<title>{title}</title>\n{extra_head}{head}</head>\n"
@@ -168,6 +191,7 @@ def build(
             outputs[f"{NAME}-console.ojo"] = _ojo(title, head, body)
         else:
             outputs[f"{NAME}-webreport.html"] = head + body
+            outputs[f"{NAME}-webreport.beswrpt"] = _beswrpt(head + body)
         if fake_hosts:
             fake_head, fake_body = _render(target, built, fake_analyzer_urls)
             fake = (HERE / "fake_host.js").read_text(encoding="utf-8")
@@ -184,6 +208,11 @@ def build(
             root = ET.parse(out_dir / f"{NAME}-console.ojo").getroot()
             if root.findtext("Wizard/Page/HTML") != body:
                 raise SystemExit(f"{NAME}-console.ojo does not round-trip its HTML")
+        else:
+            # Likewise the .beswrpt, with the report intact in <Data>.
+            root = ET.parse(out_dir / f"{NAME}-webreport.beswrpt").getroot()
+            if root.findtext("Data") != "\n" + head + body + "\t":
+                raise SystemExit(f"{NAME}-webreport.beswrpt does not round-trip its report")
 
 
 def main(argv: list[str] | None = None) -> int:
