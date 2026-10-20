@@ -12,7 +12,8 @@
 // repository root (split files and fetch() do not work from file://).
 
 import assert from "node:assert/strict";
-import { cpSync, createReadStream, existsSync, rmSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { cpSync, createReadStream, existsSync, readFileSync, rmSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { dirname, extname, join, normalize, sep } from "node:path";
 import { after, before, describe, test } from "node:test";
@@ -93,6 +94,32 @@ const fact = (page, name) =>
 
 const analyzerSettled = (page) =>
   page.waitForFunction(() => /^analyzer: (loaded|unavailable)/m.test(document.getElementById("diagText").value), null, { timeout: 60_000 });
+
+const WEB_REPORT = "relevance-debugger-webreport-fake.html";
+const analyzerRequests = (requests) => requests.filter((r) => r.includes("/analyzer/") || r.endsWith(PLAYGROUND));
+const gets = (requests, file) => requests.filter((r) => r === `GET /${OUT}/analyzer/${file}`).length;
+
+// Server overrides that publish a variant of the split set: its glue.mjs
+// changed by `edit`, and a manifest naming that glue (so it still verifies).
+function variantSet(edit) {
+  const dir = join(ROOT, OUT, "analyzer");
+  const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8"));
+  const glue = Buffer.from(edit(readFileSync(join(dir, "glue.mjs"), "utf8")));
+  manifest.glue = { ...manifest.glue, size: glue.length, sha256: createHash("sha256").update(glue).digest("hex") };
+  const send = (type, body) => (req, res) => res.writeHead(200, { "Content-Type": type }).end(req.method === "HEAD" ? undefined : body);
+  return new Map([
+    [`/${MANIFEST}`, send("application/json", JSON.stringify(manifest, null, 2) + "\n")],
+    [`/${OUT}/analyzer/glue.mjs`, send("text/javascript", glue)],
+  ]);
+}
+
+// A good first load in `context`, leaving the set cached.
+async function cacheGoodSet(context) {
+  const { page } = await open(context, WEB_REPORT);
+  await analyzerSettled(page);
+  await page.locator(".cm-editor").waitFor();
+  await page.close();
+}
 
 describe("Web Report", () => {
   test("Evaluate works before the analyzer, which then downloads and caches", async () => {
@@ -178,6 +205,81 @@ describe("Web Report", () => {
       await context.close();
     } finally {
       overrides = new Map();
+    }
+  });
+
+  test("a set that does not start: one retry, then unavailable without downloading again, until Reload", async () => {
+    const context = await browser.newContext();
+    try {
+      await cacheGoodSet(context);
+      // A new release whose glue throws while something about this browser
+      // is wrong (globalThis.__analyzerFixed unset).
+      overrides = variantSet((glue) => `if (!globalThis.__analyzerFixed) throw new Error("broken on purpose");\n${glue}`);
+      const broken = await open(context, WEB_REPORT);
+      await analyzerSettled(broken.page);
+      assert.match(await broken.page.locator("#analysis").textContent(), /unavailable: it does not start in this browser .*broken on purpose/);
+      const log = await broken.page.locator("#log").inputValue();
+      assert.match(log, /did not start \(.*broken on purpose\); downloading it again/, log);
+      // The first try reused the unchanged cores; the retry downloaded the whole set.
+      assert.equal(gets(broken.requests, "glue.mjs"), 2, broken.requests.join("\n"));
+      assert.equal(gets(broken.requests, "analyzer.core.wasm.gz"), 1, broken.requests.join("\n"));
+      await broken.page.click("#evaluate");
+      await broken.page.waitForFunction(() => /1 answer/.test(document.getElementById("wrResult").textContent));
+      await broken.page.close();
+
+      // Reopened: the record stops it before any download or start.
+      const again = await open(context, WEB_REPORT);
+      await analyzerSettled(again.page);
+      assert.deepEqual(analyzerRequests(again.requests), [`GET /${MANIFEST}`]);
+      assert.match(await again.page.locator("#analysis").textContent(), /does not start in this browser .*broken on purpose/);
+
+      // The cause goes away (the manifest stays the same): only Reload helps.
+      await again.page.evaluate(() => (globalThis.__analyzerFixed = true));
+      await again.page.click("summary");
+      await again.page.click("#reloadAnalyzer");
+      await again.page.waitForFunction(() => /^analyzer: loaded/m.test(document.getElementById("diagText").value), null, { timeout: 60_000 });
+      await again.page.locator(".cm-editor").waitFor();
+      assert.match(await again.page.locator("#log").inputValue(), /forgot .*manifest\.json/);
+      assert.equal(gets(again.requests, "analyzer.core.wasm.gz"), 1, "Reload downloads the set afresh");
+      assert.equal(await again.page.locator("#reloadAnalyzer").isDisabled(), false);
+    } finally {
+      overrides = new Map();
+      await context.close();
+    }
+  });
+
+  test("Reload with the analyzer running replaces it, keeping the text", async () => {
+    const context = await browser.newContext();
+    try {
+      const { page, errors } = await open(context, WEB_REPORT);
+      await analyzerSettled(page);
+      await page.locator(".cm-content").click();
+      await page.keyboard.press("ControlOrMeta+a");
+      await page.keyboard.type("number of bes computers");
+      await page.click("summary");
+      await page.click("#reloadAnalyzer");
+      await page.waitForFunction(() => /^analyzer: loaded/m.test(document.getElementById("diagText").value) && document.querySelectorAll(".cm-editor").length === 1, null, { timeout: 60_000 });
+      assert.equal(await page.locator(".cm-editor").count(), 1);
+      assert.match(await page.locator(".cm-content").textContent(), /number of bes computers/);
+      assert.deepEqual(errors, []);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("a new manifest downloads only the files that changed", async () => {
+    const context = await browser.newContext();
+    try {
+      await cacheGoodSet(context);
+      overrides = variantSet((glue) => `${glue}\n// rebuilt\n`);
+      const { page, requests } = await open(context, WEB_REPORT);
+      await analyzerSettled(page);
+      await page.locator(".cm-editor").waitFor();
+      assert.deepEqual(analyzerRequests(requests).sort(), [`GET /${MANIFEST}`, `GET /${OUT}/analyzer/glue.mjs`].sort());
+      assert.match(await fact(page, "analyzer source"), /downloaded 1 file \([\d.]+ MB\), reused \d+ in/);
+    } finally {
+      overrides = new Map();
+      await context.close();
     }
   });
 
