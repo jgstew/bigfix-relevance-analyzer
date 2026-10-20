@@ -32,8 +32,10 @@ deployment (see [What we measured](#what-we-measured)):
 - **Web Reports regenerates a custom report on every load**, so the report
   cannot be cached. With the analyzer embedded (12 MiB), the server took 19.4 s
   before sending the first byte, against 0.6 s of download. So the report
-  carries only the core, and fetches the analyzer from the published
-  playground page after it is usable, keeping it in the browser.
+  carries only the core, and fetches the analyzer after it is usable, keeping
+  it in the browser: from the split analyzer at
+  `https://www.jgstew.com/files/analyzer/` ([MANIFEST.md](MANIFEST.md)), or,
+  until that is published, from the single-file playground page.
 
 ## Using it
 
@@ -67,19 +69,28 @@ Client relevance runs on:
 2. In Web Reports, create a custom report and paste the file's contents as its
    HTML.
 3. **Evaluate** works as soon as the page shows, in a plain text box. The
-   analyzer follows: the first time, the browser downloads the playground page
-   (~12 MB) from
-   `https://www.jgstew.com/files/bigfix-relevance-analyzer-playground.html`;
-   after that it comes from the browser's own storage. Then the editor
-   replaces the text box, underlines problems as you type, and the analysis
-   panel and dialect note catch up half a second after you stop typing.
-   Evaluate runs the statement as session relevance.
+   analyzer follows: the first time, the browser downloads it (~12 MB); after
+   that it comes from the browser's own storage, and each load only checks
+   whether it changed. Then the editor replaces the text box, underlines
+   problems as you type, and the analysis panel and dialect note catch up half
+   a second after you stop typing. Evaluate runs the statement as session
+   relevance.
 
 Where the analyzer comes from is a list of URLs, tried in order
-(`--analyzer-url`, repeatable; see [Building](#building)). Any page with the
-playground's layout works, for example a copy on an internal web server for
-sites without internet access. If none loads, the analysis panel says why, and
-session relevance still works.
+(`--analyzer-url`, repeatable; see [Building](#building)). The default:
+
+1. `https://www.jgstew.com/files/analyzer/manifest.json`: the split analyzer
+   ([MANIFEST.md](MANIFEST.md)). Each load fetches only this small file; the
+   rest downloads again only when it changes.
+2. `https://www.jgstew.com/files/bigfix-relevance-analyzer-playground.html`:
+   the single-file playground page, which stays in place (no longer updated)
+   while reports move to the manifest. Each load sends a HEAD request and
+   downloads again only when its `Last-Modified` changes.
+
+A URL ending in `.json` is taken as a manifest, anything else as a
+single-file page; relative URLs resolve against the report. A copy of either
+on an internal web server works for sites without internet access. If none
+loads, the analysis panel says why, and session relevance still works.
 
 ### Log and diagnostics
 
@@ -97,7 +108,8 @@ reports.
 ```
 template.html -+- core.js              ES5 only; UI and every evaluation path, both targets
                +- analyzer_loader.html Web Report only: <script type="module"> that
-               |                       fetches, caches and starts the analyzer
+               |  |                    caches (IndexedDB) and starts the analyzer
+               |  +- loader.mjs        where the analyzer comes from: manifest or page
                +- build_poc.py         fills the template once per target
 ```
 
@@ -106,25 +118,32 @@ template.html -+- core.js              ES5 only; UI and every evaluation path, b
   `webreport`, set by the builder) picks the UI and the evaluation path;
   elements marked `data-only="console"` or `data-only="webreport"` are removed
   from the other target at load.
-- **The analyzer loader** starts after the page's load event. It fetches the
-  playground page and cuts out three pieces, each found by text that appears
-  exactly once there: the editor bundle (after `Publishes
-  window.playgroundEditor.`), the gzipped core wasm modules (`const CORES_GZIP
-  = `), and the component glue jco generated for those cores (between the end
-  of `async function boot()` and `// window.__wasmProblem was already
-  handled`). Taking all three from one page keeps the glue and cores matched.
-  It checks each piece and fails loudly if the playground's layout changes.
-- **The pieces are cached in IndexedDB**, keyed by URL. Each load sends a HEAD
-  request and downloads again only when `Last-Modified` changed (a header
-  browsers expose cross-site); offline, the cached copy is used as is. GitHub
-  Pages sends `access-control-allow-origin: *`, which makes the cross-site
-  fetch possible.
+- **The analyzer loader** starts after the page's load event and gets three
+  pieces: the editor bundle, the component glue jco generated, and the gzipped
+  core wasm modules that glue loads. `loader.mjs` holds the logic, with
+  `fetch`, the cache and `crypto.subtle` passed in so Node tests can drive it.
+  - From a **manifest** ([MANIFEST.md](MANIFEST.md)): it fetches
+    `manifest.json` (`cache: "no-cache"`) and, unless its text is identical
+    to the cached one, every file it names. It checks each file's size, and
+    its sha256 where `crypto.subtle` exists (not on plain-http Web Reports),
+    and that the cores are exactly the ones the glue loads. A mismatch rejects
+    the whole set, so files from two versions never mix.
+  - From the **single-file page**: it cuts the three pieces out, each found by
+    text that appears exactly once there (after `Publishes
+    window.playgroundEditor.`, at `const CORES_GZIP = `, and between the end
+    of `async function boot()` and `// window.__wasmProblem was already
+    handled`), failing loudly if that layout changes.
+- **The pieces are cached in IndexedDB**, keyed by source, and used as is when
+  the source is unreachable. GitHub Pages sends
+  `access-control-allow-origin: *`, which makes the cross-site fetches
+  possible.
 - **Starting the analyzer** works like the playground's boot (see
   `../componentize-py/build-playground/template.html`): the editor bundle runs
   as a function, the glue as a module from a `blob:` URL, with its
   `import.meta.url` (which it uses only to name the cores) replaced by a
   placeholder base that a `fetch` intercept answers from the cached cores,
-  inflated by `DecompressionStream`. Then `analyze()` feeds the analysis panel
+  inflated by `DecompressionStream` (or served as is, if a server already
+  decompressed them in transit). Then `analyze()` feeds the analysis panel
   and `handle()` is the editor's language server. It calls
   `rdbg.onAnalyzer(...)` when ready, or `rdbg.onAnalyzerFailed(reason)`. IE
   skips module scripts entirely.
@@ -159,7 +178,8 @@ python3 tools/playground-wasm/dashboard-poc/build_poc.py --fake-hosts
 ```
 
 `--analyzer-url URL` (repeatable) sets where the Web Report gets the
-analyzer, tried in order; the default is the published playground page.
+analyzer, tried in order; the default is the published manifest, then the
+single-file playground page.
 Outputs, in `playground/dashboard-poc/` (gitignored):
 
 | File | What it is |
@@ -167,26 +187,36 @@ Outputs, in `playground/dashboard-poc/` (gitignored):
 | `relevance-debugger-console.ojo` | The console dashboard. |
 | `relevance-debugger-webreport.html` | The Web Report fragment to paste. |
 | `relevance-debugger-<target>-page.html` | Each target as a whole page, for a plain browser. |
-| `relevance-debugger-<target>-fake.html` | With `--fake-hosts`: the same, running against `fake_host.js`, a pretend console or Web Reports. Its Web Report takes the analyzer from the local playground build, `playground/bigfix-relevance-analyzer-component-playground.html` (`--fake-analyzer-url`). |
+| `relevance-debugger-<target>-fake.html` | With `--fake-hosts`: the same, running against `fake_host.js`, a pretend console or Web Reports. Its Web Report takes the analyzer from `analyzer/manifest.json` next to it (a split set `test_reports.mjs` makes), then the local playground build, `playground/bigfix-relevance-analyzer-component-playground.html` (`--fake-analyzer-url`). |
 
 The builder fails if a placeholder is left over, if the page has characters
 XML cannot carry, if it contains `<?relevance` (Web Reports would evaluate
 it), if a script contains `</script` before its end, or if the `.ojo` does
 not parse back to the same HTML.
 
-### Checking a change
+### Tests
 
-```bash
-npx --yes acorn@8.14.0 --ecma5 --silent tools/playground-wasm/dashboard-poc/core.js
-```
+From `tools/playground-wasm/dashboard-poc/`, after `npm ci`:
 
-This catches anything in `core.js` that IE11 cannot parse. Then open the
-`-fake.html` pages from a local web server (for example
-`python3 -m http.server` at the repository root) and try both targets. The
-fakes mimic the measured behavior: native values from `Relevance()`, one
-string from the wrapper, errors for client inspectors in Web Reports, and a
-FastQuery where one target fails and one never answers. `window.__fake`
-records what the page sent.
+| Command | What it checks |
+|---|---|
+| `npm run test:es5` | `core.js` parses as ES5, so nothing in it can stop the script in IE11. |
+| `npm run test:unit` | `test_loader.mjs` and `test_manifest.mjs` (`node --test`, no browser): extraction from the single-file page, the manifest contract, both caches, checksums, fallbacks. |
+| `npm run test:browser` | `test_reports.mjs` (Playwright): the built `-fake.html` pages in Chromium. Needs `build_poc.py --fake-hosts` and the local component playground build first. |
+
+The browser tests serve the repository root over HTTP and make a split set
+from the local playground (`split_fixture.mjs`), standing in for the real one
+until it is published. They cover: Evaluate before the analyzer arrives, a
+first load then a cached reload that fetches only the manifest, falling back
+to the single-file page, an unreachable analyzer, folded diagnostics,
+FastQuery's backoff and live rows, and a new Evaluate abandoning a running
+FastQuery. The fakes mimic the measured behavior: native values from
+`Relevance()`, one string from the wrapper, errors for client inspectors in
+Web Reports, and a FastQuery where one target fails and one never answers.
+`window.__fake` records what the page sent.
+
+CI runs all three in `.github/workflows/wasm-html.yaml`'s `dashboard-poc`
+job, against the component playground that workflow builds.
 
 ## What we measured
 
@@ -221,11 +251,11 @@ From a real BigFix console and Web Reports, October 2026:
 - **qna needs a BigFix client on the console machine**, and the relevance is
   flattened to one line (qna reads one query per line). The temp file is
   written as ANSI, so non-ASCII text in relevance may not survive.
-- **The Web Report depends on the playground page's layout** and, for the
-  first load of each analyzer version, on internet access from the browser.
-  It runs code fetched from that URL inside the user's Web Reports session.
-  Explicit start/end markers in the playground template, or a dedicated
-  analyzer file published next to it, would make the extraction sturdier.
+- **The Web Report needs internet access** from the browser for the first
+  load of each analyzer version, and runs code fetched from jgstew.com inside
+  the user's Web Reports session. The fallback to the single-file page also
+  depends on that page's layout; once every report uses the manifest, the old
+  page can become a redirect and the fallback can go.
 - **Not yet carried over from the debugger:** the answer tally (answers by
   how many computers gave them), the per-level breakdown, Fix all, and export.
 - **Not in CI yet:** the ES5 parse check, Playwright runs against the fake

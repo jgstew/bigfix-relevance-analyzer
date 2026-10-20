@@ -5,10 +5,10 @@
 //   python3 tools/playground-wasm/dashboard-poc/build_poc.py --fake-hosts
 //   node tools/playground-wasm/dashboard-poc/test_reports.mjs
 //
-// The Web Report's analyzer comes from the local playground build,
-// playground/bigfix-relevance-analyzer-component-playground.html, served with
-// the pages over HTTP from the repository root (split files and fetch() do
-// not work from file://).
+// The fake Web Report takes the analyzer from a split set (MANIFEST.md) that
+// split_fixture.mjs makes from the local playground build, falling back to
+// that single-file page itself. Everything is served over HTTP from the
+// repository root (split files and fetch() do not work from file://).
 
 import assert from "node:assert/strict";
 import { createReadStream, existsSync, statSync } from "node:fs";
@@ -18,10 +18,13 @@ import { after, before, describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
+import { writeSplitSet } from "./split_fixture.mjs";
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = normalize(join(HERE, "../../.."));
 const OUT = "playground/dashboard-poc";
 const PLAYGROUND = "playground/bigfix-relevance-analyzer-component-playground.html";
+const MANIFEST = `${OUT}/analyzer/manifest.json`;
 
 for (const needed of [`${OUT}/relevance-debugger-webreport-fake.html`, `${OUT}/relevance-debugger-console-fake.html`, PLAYGROUND]) {
   if (!existsSync(join(ROOT, needed))) {
@@ -59,6 +62,7 @@ function serve(req, res, path) {
 let browser;
 let base;
 before(async () => {
+  writeSplitSet(join(ROOT, PLAYGROUND), join(ROOT, OUT, "analyzer"));
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   base = `http://127.0.0.1:${server.address().port}`;
   browser = await chromium.launch();
@@ -89,7 +93,7 @@ const analyzerSettled = (page) =>
 describe("Web Report", () => {
   test("Evaluate works before the analyzer, which then downloads and caches", async () => {
     // Hold the analyzer's download, as a slow link would.
-    overrides = new Map([[`/${PLAYGROUND}`, (req, res, serveIt) => setTimeout(serveIt, req.method === "GET" ? 2000 : 0)]]);
+    overrides = new Map([[`/${MANIFEST}`, (req, res, serveIt) => setTimeout(serveIt, 2000)]]);
     const context = await browser.newContext();
     const { page, errors, requests } = await open(context, "relevance-debugger-webreport-fake.html");
     await page.click("#evaluate");
@@ -100,9 +104,10 @@ describe("Web Report", () => {
 
     await analyzerSettled(page);
     assert.match(await fact(page, "analyzer"), /loaded \(bigfix_relevance_analyzer [\d.]+, downloaded/);
-    assert.match(await fact(page, "analyzer source"), /component-playground\.html \(downloaded/);
+    assert.match(await fact(page, "analyzer source"), /analyzer\/manifest\.json \(analyzer 0\.0\.0-fixture, downloaded \d+ files/, await page.locator("#log").inputValue());
     await page.locator(".cm-editor").waitFor();
-    assert.ok(requests.includes(`GET /${PLAYGROUND}`));
+    assert.ok(requests.includes(`GET /${OUT}/analyzer/glue.mjs`));
+    assert.ok(!requests.some((r) => r.endsWith(PLAYGROUND)), "the single-file page should not be needed");
 
     // The analysis follows the text, without Evaluate.
     await page.locator(".cm-content").click();
@@ -112,17 +117,34 @@ describe("Web Report", () => {
     assert.match(await page.locator("#dialectNote").textContent(), /looks like client relevance/);
     assert.deepEqual(errors, []);
 
-    // Reopened: from the cache, with only the HEAD check.
+    // Reopened: from the cache, fetching only the manifest.
     const again = await open(context, "relevance-debugger-webreport-fake.html");
     await analyzerSettled(again.page);
-    assert.match(await fact(again.page, "analyzer source"), /\(cached,/);
-    assert.ok(!again.requests.includes(`GET /${PLAYGROUND}`), again.requests.join("\n"));
-    assert.ok(again.requests.includes(`HEAD /${PLAYGROUND}`));
+    assert.match(await fact(again.page, "analyzer source"), /\(analyzer 0\.0\.0-fixture, cached\)/);
+    const analyzerRequests = again.requests.filter((r) => r.includes("/analyzer/") || r.endsWith(PLAYGROUND));
+    assert.deepEqual(analyzerRequests, [`GET /${MANIFEST}`]);
+    await again.page.locator(".cm-editor").waitFor();
     await context.close();
   });
 
+  test("no manifest: falls back to the single-file playground page", async () => {
+    overrides = new Map([[`/${MANIFEST}`, (req, res) => res.writeHead(404).end("gone")]]);
+    try {
+      const context = await browser.newContext();
+      const { page } = await open(context, "relevance-debugger-webreport-fake.html");
+      await analyzerSettled(page);
+      assert.match(await fact(page, "analyzer source"), /component-playground\.html \(downloaded/);
+      await page.locator(".cm-editor").waitFor();
+      assert.match(await page.locator("#log").inputValue(), /manifest\.json failed: HTTP 404/);
+      await context.close();
+    } finally {
+      overrides = new Map();
+    }
+  });
+
   test("an unreachable analyzer leaves session relevance working", async () => {
-    overrides = new Map([[`/${PLAYGROUND}`, (req, res) => res.writeHead(404).end("gone")]]);
+    const gone = (req, res) => res.writeHead(404).end("gone");
+    overrides = new Map([[`/${MANIFEST}`, gone], [`/${PLAYGROUND}`, gone]]);
     try {
       const context = await browser.newContext();
       const { page } = await open(context, "relevance-debugger-webreport-fake.html");

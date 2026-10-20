@@ -4,18 +4,20 @@
 
   The report itself stays small: Web Reports regenerates a custom report on
   every load and spent ~19 s on one with the analyzer embedded (README.md).
-  Instead, once the page is usable, this fetches the published componentize-
-  py playground page (RDBG_BUILD.analyzerUrls, tried in order), cuts out the
-  three pieces it needs, and keeps them in IndexedDB:
+  Instead, once the page is usable, this fetches the analyzer from the first
+  of RDBG_BUILD.analyzerUrls that works: the split analyzer's manifest.json
+  (MANIFEST.md), or the single-file playground page, from which it cuts out
+  the same three pieces. Either way it keeps them in IndexedDB:
 
   * the editor bundle (window.playgroundEditor);
   * CORES_GZIP, the gzipped core wasm modules;
   * the component glue jco generated for exactly those cores.
 
-  All three come from one page, so they always match. The cache is keyed by
-  URL and re-checked with a HEAD request's Last-Modified header (CORS-
-  safelisted), so an unchanged playground costs no download and an updated one
-  arrives as a set. Offline, the cached copy is used as is.
+  All three come from one manifest or one page, so they always match. Each
+  load re-checks the source cheaply (the manifest's text, or the page's
+  Last-Modified from a HEAD request), so an unchanged analyzer costs no
+  download and an updated one arrives as a set. Offline, the cached copy is
+  used as is.
 
   Fetching, extracting and caching live in loader.mjs (inlined at
   %%LOADER_MJS%% by build_poc.py, and unit-tested by test_loader.mjs); this
@@ -64,13 +66,6 @@ const cachePut = (url, value) => cacheOp("readwrite", (s) => s.put(value, url));
 
 // ---- running the pieces ----------------------------------------------------
 
-function bytesFromBase64(b64) {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
 async function start(pieces) {
   // The editor bundle is a self-contained IIFE.
   new Function(pieces.editor)();
@@ -81,8 +76,11 @@ async function start(pieces) {
     const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const name = href.split("/").pop();
     if (href.startsWith(CORE_BASE) && Object.hasOwn(pieces.cores, name)) {
-      const inflating = new Response(bytesFromBase64(pieces.cores[name])).body.pipeThrough(new DecompressionStream("gzip"));
-      return new Response(inflating, { status: 200, headers: { "Content-Type": "application/wasm" } });
+      const bytes = pieces.cores[name];
+      // Gzipped as published, or plain wasm if a server inflated it in transit.
+      const gzipped = bytes[0] === 0x1f && bytes[1] === 0x8b;
+      const body = gzipped ? new Response(bytes).body.pipeThrough(new DecompressionStream("gzip")) : bytes;
+      return new Response(body, { status: 200, headers: { "Content-Type": "application/wasm" } });
     }
     return realFetch(input, init);
   };
@@ -156,7 +154,16 @@ function renderAnalysis(payload) {
 async function boot() {
   const urls = (window.RDBG_BUILD && window.RDBG_BUILD.analyzerUrls) || [];
   const started = performance.now();
-  const env = { fetch: window.fetch.bind(window), cacheGet, cachePut, log: LOG, now: () => performance.now() };
+  const env = {
+    fetch: window.fetch.bind(window),
+    cacheGet,
+    cachePut,
+    log: LOG,
+    now: () => performance.now(),
+    // Missing on plain http (an insecure context): then only sizes are checked.
+    subtle: globalThis.crypto && globalThis.crypto.subtle,
+    baseUrl: document.baseURI,
+  };
   const { pieces, how, source } = await loadPieces(urls, env);
   window.rdbg.fact("analyzer source", source);
   const component = await start(pieces);

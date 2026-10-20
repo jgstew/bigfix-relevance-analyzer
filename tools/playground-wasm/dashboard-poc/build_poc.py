@@ -45,9 +45,20 @@ TARGETS = {
 }
 # fake_host.js's mode for each target's -fake.html page.
 FAKE_MODES = {"console": "console", "webreport": "webreports"}
-PLAYGROUND_URL = "https://www.jgstew.com/files/bigfix-relevance-analyzer-playground.html"
-# Relative to the output directory: the playground build sits one level up.
-LOCAL_PLAYGROUND = "../bigfix-relevance-analyzer-component-playground.html"
+# Where the Web Report gets the analyzer, tried in order: the split analyzer
+# (MANIFEST.md), then the single-file playground page, which stays in place
+# (no longer updated) until every report has moved to the manifest.
+ANALYZER_URLS = [
+    "https://www.jgstew.com/files/analyzer/manifest.json",
+    "https://www.jgstew.com/files/bigfix-relevance-analyzer-playground.html",
+]
+# For the -fake.html pages, relative to the output directory: the split set
+# test_reports.mjs writes there (split_fixture.mjs), then the local
+# single-file playground build one level up.
+FAKE_ANALYZER_URLS = [
+    "analyzer/manifest.json",
+    "../bigfix-relevance-analyzer-component-playground.html",
+]
 _PLACEHOLDER_RE = re.compile(r"%%[A-Z0-9_]+%%")
 # XML 1.0 forbids these even inside CDATA.
 _XML_BAD_CHARS = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f]")
@@ -145,7 +156,7 @@ def _render(target: str, built: str, analyzer_urls: list[str]) -> tuple[str, str
 
 
 def build(
-    out_dir: Path, analyzer_urls: list[str], fake_hosts: bool, fake_analyzer_url: str
+    out_dir: Path, analyzer_urls: list[str], fake_hosts: bool, fake_analyzer_urls: list[str]
 ) -> None:
     built = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%MZ")
     for target, (title, _sample, _with_analyzer) in TARGETS.items():
@@ -156,7 +167,7 @@ def build(
         else:
             outputs[f"{NAME}-webreport.html"] = head + body
         if fake_hosts:
-            fake_head, fake_body = _render(target, built, [fake_analyzer_url])
+            fake_head, fake_body = _render(target, built, fake_analyzer_urls)
             fake = (HERE / "fake_host.js").read_text(encoding="utf-8")
             extra = (
                 f'<script>window.FAKE_HOST = "{FAKE_MODES[target]}";</script>\n'
@@ -180,7 +191,10 @@ def main(argv: list[str] | None = None) -> int:
         "--analyzer-url",
         action="append",
         dest="analyzer_urls",
-        help=f"where the Web Report gets the analyzer, tried in order (default {PLAYGROUND_URL})",
+        help=(
+            "where the Web Report gets the analyzer, tried in order: a manifest.json "
+            f"or a single-file playground page (default {' then '.join(ANALYZER_URLS)})"
+        ),
     )
     parser.add_argument(
         "--fake-hosts",
@@ -189,11 +203,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--fake-analyzer-url",
-        default=LOCAL_PLAYGROUND,
-        help=f"where the -fake.html Web Report gets the analyzer (default {LOCAL_PLAYGROUND})",
+        action="append",
+        dest="fake_analyzer_urls",
+        help=(
+            "where the -fake.html Web Report gets the analyzer, tried in order "
+            f"(default {' then '.join(FAKE_ANALYZER_URLS)})"
+        ),
     )
     args = parser.parse_args(argv)
-    build(args.out, args.analyzer_urls or [PLAYGROUND_URL], args.fake_hosts, args.fake_analyzer_url)
+    build(
+        args.out,
+        args.analyzer_urls or ANALYZER_URLS,
+        args.fake_hosts,
+        args.fake_analyzer_urls or FAKE_ANALYZER_URLS,
+    )
     return 0
 
 
