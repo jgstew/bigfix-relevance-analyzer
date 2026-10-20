@@ -5,56 +5,18 @@
 //   node --test tools/playground-wasm/dashboard-poc/
 
 import assert from "node:assert/strict";
-import { createHash, webcrypto } from "node:crypto";
+import { createHash } from "node:crypto";
 import { describe, test } from "node:test";
 import { gzipSync } from "node:zlib";
 
 import { randomBytes } from "node:crypto";
 
 import { loadPieces, parseManifest, sha256Hex } from "./loader.mjs";
-import { memoryEnv, playgroundPage } from "./fixtures.mjs";
+import { DIR, MANIFEST, WASM_MAGIC, memoryEnv, playgroundPage, secureEnv, splitSet } from "./fixtures.mjs";
 
-const DIR = "https://example.test/files/analyzer/";
-const MANIFEST = `${DIR}manifest.json`;
 const PAGE = "https://example.test/playground.html";
-
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
-const WASM_MAGIC = [0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
-
-// A published split set: {routes, manifest, cores (name -> raw wasm bytes)}.
-function splitSet({ version = "1.38.1", coreNames = ["analyzer.core.wasm", "analyzer.core2.wasm"], tweak = (m) => m } = {}) {
-  const editor = "(()=>{window.playgroundEditor={mount(){}}})();";
-  const glue = coreNames.map((n) => `kt(new URL("./${n}",import.meta.url));`).join("") + "globalThis.__component={};";
-  const routes = {};
-  const cores = {};
-  const entries = coreNames.map((name, i) => {
-    const raw = new Uint8Array([...WASM_MAGIC, i, version.length]);
-    cores[name] = raw;
-    const gz = gzipSync(raw, { level: 9 });
-    const path = `${name}.gz`;
-    routes[DIR + path] = { body: gz };
-    return { name, path, encoding: "gzip", size: gz.length, sha256: sha256(gz), raw_size: raw.length, raw_sha256: sha256(raw) };
-  });
-  routes[`${DIR}editor.js`] = { body: editor };
-  routes[`${DIR}glue.mjs`] = { body: glue };
-  const manifest = tweak({
-    format: 1,
-    package: "bigfix-relevance-analyzer",
-    version,
-    editor: { path: "editor.js", size: Buffer.byteLength(editor), sha256: sha256(editor) },
-    glue: { path: "glue.mjs", size: Buffer.byteLength(glue), sha256: sha256(glue) },
-    cores: entries,
-  });
-  routes[MANIFEST] = { body: JSON.stringify(manifest, null, 2) };
-  return { routes, manifest, cores, editor, glue };
-}
-
-// memoryEnv with crypto.subtle, as in a secure browser context.
-function env(routes, store) {
-  const made = memoryEnv(routes, store);
-  made.env.subtle = webcrypto.subtle;
-  return made;
-}
+const env = secureEnv;
 
 const fileGets = (calls) => calls.filter((c) => c.startsWith("GET ") && !c.endsWith("manifest.json"));
 
@@ -122,9 +84,12 @@ describe("loadPieces (split analyzer manifest)", () => {
   });
 
   test("a new manifest replaces the whole set", async () => {
+    // Every file differs here; test_resilience.mjs covers reusing the ones
+    // that do not.
     const store = new Map();
     await loadPieces([MANIFEST], env(splitSet({ version: "1.38.1" }).routes, store).env);
-    const second = env(splitSet({ version: "1.39.0" }).routes, store);
+    const seeds = { editor: 1, glue: 1, "analyzer.core.wasm": 1, "analyzer.core2.wasm": 1 };
+    const second = env(splitSet({ version: "1.39.0", seeds }).routes, store);
     const got = await loadPieces([MANIFEST], second.env);
     assert.match(got.how, /^downloaded/);
     assert.equal(fileGets(second.calls).length, 4);
@@ -195,7 +160,7 @@ describe("loadPieces (split analyzer manifest)", () => {
   test("a newer manifest whose files fail keeps the cached set", async () => {
     const store = new Map();
     await loadPieces([MANIFEST], env(splitSet({ version: "1.38.1" }).routes, store).env);
-    const newer = splitSet({ version: "1.39.0" });
+    const newer = splitSet({ version: "1.39.0", seeds: { glue: 1 } }); // a changed glue, so it is fetched
     newer.routes[`${DIR}glue.mjs`] = { body: "gone", status: 503 };
     const second = env(newer.routes, store);
     const got = await loadPieces([MANIFEST, PAGE], second.env);

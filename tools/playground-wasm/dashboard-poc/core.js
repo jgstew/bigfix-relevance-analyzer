@@ -37,6 +37,11 @@
   var analyzer = null; // set by rdbg.onAnalyzer
   var analyzerNote = "not loaded yet";
   var editor = null; // {getText} once the analyzer mounts CodeMirror
+  var analyzerReload = null; // set by rdbg.setAnalyzerReload (webreport loader)
+  // True from the start of a load (or Reload) until onAnalyzer or
+  // onAnalyzerFailed; Reload the analyzer is disabled meanwhile.
+  var analyzerPending = false;
+  var loadAttempt = 0; // which load the 5-minute watchdog is for
   // The evaluation in progress, {cancelled, cancels: [fn]}. Each run's
   // callbacks hold their own one, so an abandoned run's late replies are
   // dropped rather than landing in the next run's results.
@@ -917,6 +922,51 @@
     log(ok ? "diagnostics copied" : "select the diagnostics text and copy it by hand");
   }
 
+  // Reload the analyzer (troubleshooting, webreport only): the loader forgets
+  // its cached copy and any "does not start here" record, then loads it
+  // again, without reloading the page. The editor's text goes back to the
+  // plain text box meanwhile, so Evaluate keeps working on it.
+  function reloadAnalyzer() {
+    if (!analyzerReload) {
+      log("the analyzer cannot be reloaded: its loader did not run in this browser");
+      return;
+    }
+    if (editor) {
+      $("rel").value = editor.getText();
+      $("rel").style.display = "";
+    }
+    analyzer = null;
+    editor = null;
+    analyzerLoading("reloading");
+    fact("analyzer", analyzerNote);
+    describeHost();
+    log("reloading the analyzer");
+    analyzerReload();
+  }
+
+  // A load (or Reload) of the analyzer begins: note it, disable Reload until
+  // it settles, and give up on it after 5 minutes if it never does.
+  function analyzerLoading(note) {
+    analyzerNote = note;
+    analyzerPending = true;
+    setReloadEnabled(false);
+    loadAttempt += 1;
+    var mine = loadAttempt;
+    setTimeout(function () {
+      if (analyzerPending && loadAttempt === mine) window.rdbg.onAnalyzerFailed("did not load within 5 minutes");
+    }, 300000);
+  }
+
+  function analyzerSettled() {
+    analyzerPending = false;
+    setReloadEnabled(true);
+  }
+
+  function setReloadEnabled(on) {
+    var button = $("reloadAnalyzer");
+    if (button) button.disabled = !on;
+  }
+
   // ---- page setup ------------------------------------------------------------
 
   // Drop the other target's parts (data-only="console" / "webreport").
@@ -966,16 +1016,23 @@
         editor = api.editor;
         $("rel").style.display = "none";
       }
+      analyzerSettled();
       analyzerNote = "loaded" + (info ? " (" + info + ")" : "");
       fact("analyzer", analyzerNote);
       describeHost();
       log("analyzer " + analyzerNote);
     },
     onAnalyzerFailed: function (reason) {
+      analyzerSettled();
       analyzerNote = "unavailable: " + reason;
       fact("analyzer", analyzerNote);
       describeHost();
       log("analyzer " + analyzerNote);
+    },
+    // reload(): forget the cached analyzer and load it again; it ends in
+    // onAnalyzer or onAnalyzerFailed.
+    setAnalyzerReload: function (reload) {
+      analyzerReload = reload;
     },
     initialText: function () {
       return $("rel").value;
@@ -1023,10 +1080,7 @@
   } else if (document.documentMode) {
     analyzerNote = "unavailable: this browser cannot run it (IE)";
   } else {
-    analyzerNote = LOADING_NOTE;
-    setTimeout(function () {
-      if (!analyzer && analyzerNote === LOADING_NOTE) window.rdbg.onAnalyzerFailed("did not load within 5 minutes");
-    }, 300000);
+    analyzerLoading(LOADING_NOTE);
   }
   fact("analyzer", analyzerNote);
   describeHost();
@@ -1046,6 +1100,7 @@
   $("evaluate").onclick = evaluate;
   if ($("cancel")) $("cancel").onclick = cancel;
   $("copyDiag").onclick = copyDiagnostics;
+  if ($("reloadAnalyzer")) $("reloadAnalyzer").onclick = reloadAnalyzer;
   // Ctrl+Enter in the plain textarea (the analyzer's editor has its own).
   $("rel").onkeydown = function (e) {
     e = e || window.event;

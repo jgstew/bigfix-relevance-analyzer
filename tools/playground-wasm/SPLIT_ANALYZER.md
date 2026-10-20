@@ -145,9 +145,34 @@ indent and a trailing newline.
    `version()`, `handle(message) -> JSON array string` (the language server),
    and `exitCode()`.
 
+9. A consumer that keeps its own cache may reuse a cached file instead of
+   downloading it when a new manifest arrives, if the file's entry in the
+   manifest it was cached under has the same `sha256` as its entry in the new
+   manifest (and, for a core cached as inflated wasm, the same `raw_sha256`).
+   Rehash reused bytes against the new manifest where that is cheap
+   (`crypto.subtle`). Where only a JS SHA-256 is available, a consumer may
+   instead trust them after checking their size, because they were checked
+   against that same hash when they downloaded: this is an explicit
+   exception to rule 5, for bytes from the consumer's own cache only. Rules
+   4 and 6 still apply to the new set as a whole. Producers need nothing for this: an
+   unchanged core keeps its bytes because it is gzipped with level 9 and
+   mtime 0.
+
+How the Web Reports loader does it: it follows rules 1 to 3 and 6 to 9, with
+two differences. Rule 4: it refuses a set that fails, but does not re-read
+the manifest; it keeps the older cached set if it has one, or tries its next
+configured source. Rule 5: everything it downloads is checked by size and
+sha256, but without `crypto.subtle` (plain http) it does not hash its own
+cached bytes again: an unchanged cached set is used as is, and reused files
+are checked by size only (rule 9's exception). It also has a
+consumer-side safety net that the contract does not need: a set that checks
+out but does not start is downloaded once more, then recorded against that
+manifest's text so it is not downloaded again in that browser (see
+`dashboard-poc/README.md`).
+
 How `index.html` does it: it uses the browser's HTTP cache as its only cache
 and persists nothing itself. It fetches everything with `no-cache`, so a
-reload costs one 304 per file. It follows rules 1 and 3 to 8; rule 2 does not
+reload costs one 304 per file. It follows rules 1 and 3 to 8; rules 2 and 9 do not
 apply, since it keeps no cache of its own. For rule 7 it uses the inline module
 script. It uses `crypto.subtle` where it exists and its own JS SHA-256
 elsewhere. If the set is refused, it shows the reason in place of the

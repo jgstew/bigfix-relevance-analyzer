@@ -3,7 +3,8 @@
 // with a fake fetch and cache. build_poc.py inlines this file into
 // analyzer_loader.html's module script, which supplies the real ones:
 //
-//   env = { fetch, cacheGet(key), cachePut(key, value), log(text), now(),
+//   env = { fetch, cacheGet(key), cachePut(key, value), cacheDelete(key),
+//           log(text), now(),
 //           subtle,    (crypto.subtle; missing in insecure contexts)
 //           baseUrl }  (what relative URLs resolve against: the page)
 //
@@ -71,29 +72,48 @@ export async function fromPage(url, env) {
   }
   // Unreachable: the cached copy is all there is. A server that refuses HEAD
   // or sends no Last-Modified cannot say whether it changed, so download.
+  await refuseIfRecorded(key, unreachable ? cached.lastModified ?? null : lastModified, env);
   if (cached && (unreachable || (lastModified !== null && cached.lastModified === lastModified))) {
-    return { pieces: cached, how: "cached" };
+    return { pieces: cached, how: "cached", key, fresh: false };
   }
   const started = env.now();
-  const res = await env.fetch(url, { cache: "no-store" });
+  // HEAD gave no Last-Modified, so it cannot say whether a page recorded as
+  // not starting changed: ask the GET, so the same page costs a 304, not a
+  // download. The header makes a cross-origin request preflighted; if that
+  // fails, download as before (the check after the download still applies).
+  const record = !unreachable && lastModified === null ? await env.cacheGet(recordKey(key)) : undefined;
+  let res;
+  if (record && record.id) {
+    try {
+      res = await env.fetch(url, { cache: "no-store", headers: { "If-Modified-Since": record.id } });
+    } catch (err) {
+      env.log(`analyzer: ${url} refused a conditional request (${err.message || err}); downloading it`);
+    }
+    if (res && res.status === 304) throw doesNotStart(record);
+  }
+  if (!res) res = await env.fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const html = await res.text();
   const found = extract(html);
   const cores = {};
   for (const [name, b64] of Object.entries(found.cores)) cores[name] = bytesFromBase64(b64);
   const pieces = { ...found, cores, lastModified: res.headers.get("Last-Modified") || lastModified };
+  // A server that answers HEAD without Last-Modified but sends it here: the
+  // record is only checkable now.
+  if (pieces.lastModified !== lastModified) await refuseIfRecorded(key, pieces.lastModified, env);
   const mb = (html.length / 1048576).toFixed(1);
   try {
     await env.cachePut(key, pieces);
   } catch (err) {
     env.log(`analyzer: could not cache it (${err}); it will download again next time`);
   }
-  return { pieces, how: `downloaded ${mb} MB in ${Math.round(env.now() - started)} ms` };
+  return { pieces, how: `downloaded ${mb} MB in ${Math.round(env.now() - started)} ms`, key, fresh: true };
 }
 
 // The first of `urls` that works; `source` names it for the diagnostics. A URL
 // ending in .json is a split analyzer's manifest, anything else the
-// single-file playground page.
+// single-file playground page. Also `key` (its cache key) and `fresh` (every
+// file was just downloaded, none came from the cache), for loadAndStart().
 export async function loadPieces(urls, env) {
   const problems = [];
   for (const url of urls) {
@@ -105,6 +125,9 @@ export async function loadPieces(urls, env) {
       const got = await fromPage(url, env);
       return { ...got, source: `${url} (${got.how}, Last-Modified ${got.pieces.lastModified || "unknown"})` };
     } catch (err) {
+      // Recorded as not starting here: stop, rather than download and fail
+      // again from the next source.
+      if (err.doesNotStart) throw err;
       problems.push(`${url}: ${err.message || err}`);
       env.log(`analyzer: ${url} failed: ${err.message || err}`);
     }
@@ -268,37 +291,48 @@ export async function fromManifest(configured, env) {
   } catch (err) {
     if (!cached) throw err;
     env.log(`analyzer: ${url} unreachable (${err.message || err}); using the cached set`);
-    return { pieces: cached, how: "cached" };
+    await refuseIfRecorded(key, manifestId(cached.manifestText), env);
+    return { pieces: cached, how: "cached", key, fresh: false };
   }
+  await refuseIfRecorded(key, manifestId(text), env);
   if (cached && cached.manifestText === text) {
     // The set was fully verified when it downloaded. Checking it again
     // guards against another page on the origin rewriting the cache; that
     // costs ~5 ms with crypto.subtle, but ~150 ms of JavaScript hashing on
     // every load without it (plain http), so there the set is trusted.
-    if (!env.subtle) return { pieces: cached, how: "cached" };
+    if (!env.subtle) return { pieces: cached, how: "cached", key, fresh: false };
     try {
       await verifyCached(cached, env);
-      return { pieces: cached, how: "cached" };
+      return { pieces: cached, how: "cached", key, fresh: false };
     } catch (err) {
       env.log(`analyzer: the cached set from ${url} does not match its manifest (${err.message}); downloading it again`);
       cached = undefined;
     }
   }
   try {
-    return await downloadSet(url, key, text, env);
+    // The cached set is the older manifest's: its unchanged files are reused.
+    return await downloadSet(url, key, text, env, cached);
   } catch (err) {
     if (!cached) throw err;
     env.log(`analyzer: the newer manifest at ${url} failed (${err.message}); keeping the cached set`);
-    return { pieces: cached, how: `cached (the newer manifest failed: ${err.message})` };
+    await refuseIfRecorded(key, manifestId(cached.manifestText), env, `the newer manifest failed: ${err.message}`);
+    return { pieces: cached, how: `cached (the newer manifest failed: ${err.message})`, key, fresh: false };
   }
 }
 
-async function downloadSet(url, key, text, env) {
+// Every file `text` names, checked, then cached as one set. With `previous`
+// (the set cached under the older manifest), a file whose cached copy already
+// is what the new manifest names is reused instead of downloaded (most cores
+// do not change between releases). The new set is still checked and cached
+// whole, so it never mixes versions.
+async function downloadSet(url, key, text, env, previous) {
   const manifest = parseManifest(text);
   const started = env.now();
   const files = [manifest.editor, manifest.glue, ...manifest.cores];
+  const reused = previous ? await reusable(manifest, previous, env) : files.map(() => null);
   const bytes = await Promise.all(
-    files.map(async (file) => {
+    files.map(async (file, i) => {
+      if (reused[i]) return reused[i];
       let res;
       try {
         res = await env.fetch(new URL(file.path, url).href, { cache: "no-cache" });
@@ -309,7 +343,7 @@ async function downloadSet(url, key, text, env) {
       return new Uint8Array(await res.arrayBuffer());
     }),
   );
-  for (let i = 0; i < files.length; i++) await verify(files[i], bytes[i], env);
+  for (let i = 0; i < files.length; i++) if (!reused[i]) await verify(files[i], bytes[i], env);
   const decode = (b) => new TextDecoder().decode(b);
   const editor = decode(bytes[0]);
   const glue = decode(bytes[1]);
@@ -329,9 +363,144 @@ async function downloadSet(url, key, text, env) {
   } catch (err) {
     env.log(`analyzer: could not cache it (${err}); it will download again next time`);
   }
-  const mb = (bytes.reduce((n, b) => n + b.length, 0) / 1048576).toFixed(1);
+  const fetched = bytes.filter((b, i) => !reused[i]);
+  const reuseCount = files.length - fetched.length;
+  const mb = (fetched.reduce((n, b) => n + b.length, 0) / 1048576).toFixed(1);
+  const what = `downloaded ${fetched.length} file${fetched.length === 1 ? "" : "s"} (${mb} MB)${reuseCount ? `, reused ${reuseCount}` : ""}`;
   const how = env.subtle ? "checked sizes and sha256" : "checked sizes and sha256 (in JavaScript: no crypto.subtle here)";
-  return { pieces, how: `downloaded ${files.length} files (${mb} MB) in ${Math.round(env.now() - started)} ms, ${how}` };
+  return { pieces, how: `${what} in ${Math.round(env.now() - started)} ms, ${how}`, key, fresh: reuseCount === 0 };
+}
+
+// For each file of `manifest` (editor, glue, cores, as downloadSet orders
+// them), the cached bytes from `previous` that can stand in for a download,
+// or null. Only a file whose entry in the older manifest has the same sha256
+// is a candidate: its bytes were checked against that hash when they
+// downloaded. With crypto.subtle they are hashed again against the new
+// manifest (cheap), so a cache another page rewrote is caught. Without it
+// (plain http) they are trusted, as a cached set is on reopening there.
+async function reusable(manifest, previous, env) {
+  let old;
+  try {
+    old = parseManifest(previous.manifestText);
+  } catch {
+    return [manifest.editor, manifest.glue, ...manifest.cores].map(() => null);
+  }
+  const encode = (text) => (typeof text === "string" ? new TextEncoder().encode(text) : undefined);
+  const oldCores = new Map(old.cores.map((c) => [c.name, c]));
+  const candidates = [
+    [manifest.editor, old.editor, encode(previous.editor)],
+    [manifest.glue, old.glue, encode(previous.glue)],
+    ...manifest.cores.map((c) => [c, oldCores.get(c.name), previous.cores && previous.cores[c.name]]),
+  ];
+  return Promise.all(
+    candidates.map(async ([file, before, bytes]) => {
+      if (!before || !(bytes instanceof Uint8Array) || before.sha256 !== file.sha256) return null;
+      const inflated = file.encoding === "gzip" && !isGzip(bytes) && isWasm(bytes);
+      if (inflated && (!file.raw_sha256 || before.raw_sha256 !== file.raw_sha256)) return null;
+      if (!env.subtle) return bytes.length === (inflated ? file.raw_size : file.size) ? bytes : null;
+      try {
+        await verify(file, bytes, env);
+        return bytes;
+      } catch (err) {
+        env.log(`analyzer: ${file.path}: the cached copy does not match the new manifest (${err.message}); downloading it`);
+        return null;
+      }
+    }),
+  );
+}
+
+// ---- a set that does not start -------------------------------------------
+
+// What identifies a source's current set: the sha256 of its manifest's text,
+// or the single-file page's Last-Modified (null if the server sends none).
+const manifestId = (text) => sha256Hex(new TextEncoder().encode(text));
+const setId = (got) => (got.key.startsWith("manifest:") ? manifestId(got.pieces.manifestText) : got.pieces.lastModified ?? null);
+const recordKey = (key) => `nostart:${key}`;
+// The id of the last set loadAndStart() downloaded again because its cached
+// copy did not start: each set gets that retry once per browser.
+const retriedKey = (key) => `retried:${key}`;
+
+function doesNotStart(record, also) {
+  const err = new Error(
+    `it does not start in this browser (${record.what}; tried ${record.time}): ${record.error}. ` +
+      (also ? `Also, ${also}. ` : "") +
+      "Reload the analyzer under Log and diagnostics to try again",
+  );
+  err.doesNotStart = true;
+  return err;
+}
+
+// Throws if the set `id` names, from the source cached under `key`, is
+// recorded as not starting in this browser: then nothing is downloaded or run
+// until the source changes (a new release) or the record is forgotten.
+// `also`: anything else the message should say.
+async function refuseIfRecorded(key, id, env, also) {
+  const record = await env.cacheGet(recordKey(key));
+  if (record && record.id === id) throw doesNotStart(record, also);
+}
+
+async function startOrRecord(got, start, env) {
+  try {
+    return { ...got, started: await start(got.pieces) };
+  } catch (err) {
+    const record = { id: setId(got), error: String(err.message || err), time: new Date().toISOString(), what: got.source };
+    env.log(`analyzer: ${got.source} did not start (${record.error}); not trying this set again in this browser`);
+    try {
+      await env.cachePut(recordKey(got.key), record);
+    } catch (putErr) {
+      env.log(`analyzer: could not record that (${putErr}); it will be tried again next time`);
+    }
+    throw doesNotStart(record);
+  }
+}
+
+// loadPieces(), then start(pieces) (the page's: it runs the analyzer), with a
+// safety net for a set that downloads and checks out but does not start. A
+// cached set gets one more chance, once per set and browser: it is dropped
+// and downloaded afresh. A set that does not start after that (or that was
+// downloaded fresh in the first place) is recorded against its manifest (or
+// page Last-Modified), so later loads stop before downloading it; a new
+// release is tried again. At worst, one extra download per release per
+// browser (for a set partly reused from the cache: that partial download,
+// then one full one).
+// Network and checksum failures are loadPieces' and never land here.
+export async function loadAndStart(urls, env, start) {
+  const got = await loadPieces(urls, env);
+  if (got.fresh) return startOrRecord(got, start, env);
+  const id = setId(got);
+  const retried = await env.cacheGet(retriedKey(got.key));
+  // Already retried for this set (it started then, but not now): an
+  // intermittent failure must not cost a download on every load.
+  if (retried && retried.id === id) return startOrRecord(got, start, env);
+  try {
+    return { ...got, started: await start(got.pieces) };
+  } catch (err) {
+    env.log(`analyzer: the cached set from ${got.source} did not start (${err.message || err}); downloading it again`);
+    try {
+      await env.cachePut(retriedKey(got.key), { id, time: new Date().toISOString() });
+      await env.cacheDelete(got.key);
+    } catch (cacheErr) {
+      env.log(`analyzer: could not update the cache (${cacheErr})`);
+    }
+  }
+  return startOrRecord(await loadPieces(urls, env), start, env);
+}
+
+// For "Reload the analyzer": drops the cached sets and "does not start"
+// records of `urls`, so the next loadAndStart() starts from scratch. Returns
+// the cache keys it removed.
+export async function forgetAnalyzer(urls, env) {
+  const removed = [];
+  for (const url of urls) {
+    const key = isManifestUrl(url) ? `manifest:${new URL(url, env.baseUrl).href}` : `page:${url}`;
+    for (const k of [key, recordKey(key), retriedKey(key)]) {
+      if ((await env.cacheGet(k)) === undefined) continue;
+      await env.cacheDelete(k);
+      removed.push(k);
+    }
+  }
+  env.log(`analyzer: forgot ${removed.length ? removed.join(", ") : "nothing (none of it was cached)"}`);
+  return removed;
 }
 
 export function bytesFromBase64(b64) {
