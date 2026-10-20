@@ -338,11 +338,120 @@
     return out;
   }
 
+  // wbemErrNotFound as JScript's e.number shows it (signed), compared unsigned.
+  var WBEM_NOT_FOUND = 0x80041002;
+  // How often the WMI path asks WMI about its process: each lookup is a
+  // synchronous COM call on the console's UI thread.
+  var WMI_CHECK_MS = 1000;
+
+  function notFound(e) {
+    return !!e && typeof e.number === "number" && e.number >>> 0 === WBEM_NOT_FOUND;
+  }
+
+  // A started cmd.exe as {pid, running(), mayKill(), terminate()}.
+  //
+  // WScript.Shell.Exec always opens a console window for a console program,
+  // and Run(line, 0) hides it but gives no process to wait for or end, so
+  // the process is created through WMI with SW_HIDE, keeping its id. Throws
+  // if WMI is blocked or refuses before a process exists; the caller then
+  // falls back to Exec. Once Create reports a process, this never throws,
+  // so a second qna is never started on the same files.
+  //
+  // WMI gives a pid, not a handle, and Windows reuses pids, so the process
+  // is known by its pid and CreationDate. cmd.exe creates doneFile after qna
+  // exits (see evalLocal), which is how the run normally ends; WMI is only
+  // asked, about once a second, whether the process died without it.
+  function startHidden(fso, line, doneFile, dir) {
+    var svc = new window.ActiveXObject("WbemScripting.SWbemLocator").ConnectServer(".", "root\\cimv2");
+    var startup = svc.Get("Win32_ProcessStartup").SpawnInstance_();
+    startup.ShowWindow = 0; // SW_HIDE
+    var cls = svc.Get("Win32_Process");
+    var inParams = cls.Methods_.Item("Create").InParameters.SpawnInstance_();
+    inParams.CommandLine = line;
+    // Every path on the line is absolute; a set folder just avoids WMI's own.
+    inParams.CurrentDirectory = dir;
+    inParams.ProcessStartupInformation = startup;
+    var out = cls.ExecMethod_("Create", inParams);
+    // ReturnValue is a uint32 that need not arrive as the number 0.
+    var code = Number(out.ReturnValue);
+    var pid = Number(out.ProcessId) || 0;
+    if (code !== 0 && !(pid > 0)) throw new Error("Win32_Process.Create returned " + out.ReturnValue);
+    if (code !== 0) log("qna: Win32_Process.Create returned " + out.ReturnValue + " with pid " + pid + "; using that process");
+
+    var key = "Win32_Process.Handle='" + pid + "'";
+    var created = null; // its CreationDate; null if WMI could not say
+    var gone = !(pid > 0);
+    var lookupFailed = false;
+    // The process as a WMI object if it is still ours, "gone" if it exited
+    // (or its pid now belongs to another process), or null if WMI failed.
+    // Only the first lookup, right after Create, may learn the identity.
+    function identify(first) {
+      if (gone) return "gone";
+      try {
+        var p = svc.Get(key);
+        if (first) created = String(p.CreationDate);
+        else if (created === null) return null;
+        else if (String(p.CreationDate) !== created) gone = true;
+        return gone ? "gone" : p;
+      } catch (e) {
+        if (notFound(e)) {
+          gone = true;
+          return "gone";
+        }
+        if (!lookupFailed) log("qna: could not check on pid " + pid + ": " + errText(e));
+        lookupFailed = true;
+        return null;
+      }
+    }
+    // Right away, so a reused pid later cannot pass as this process.
+    identify(true);
+    var lastCheck = now();
+    return {
+      pid: pid,
+      running: function () {
+        if (fso.FileExists(doneFile)) return false;
+        if (now() - lastCheck < WMI_CHECK_MS) return true;
+        lastCheck = now();
+        // While WMI fails, keep waiting for doneFile; the timeout still ends it.
+        return created === null && !gone ? true : identify(false) !== "gone";
+      },
+      // A process whose identity WMI cannot confirm is still taken as ours
+      // while doneFile is missing: a reused pid needs this one to have
+      // exited, and a normal exit leaves doneFile.
+      mayKill: function () {
+        if (fso.FileExists(doneFile)) return false;
+        return created === null ? !gone : identify(false) !== "gone";
+      },
+      // Ends cmd.exe only (qna.exe, its child, keeps running), and only if
+      // WMI confirms it is ours; for when taskkill cannot run.
+      terminate: function () {
+        var p = identify(false);
+        if (p && p !== "gone") p.Terminate();
+      },
+    };
+  }
+
+  function startExec(shell, line) {
+    var exec = shell.Exec(line);
+    return {
+      pid: exec.ProcessID,
+      running: function () {
+        return exec.Status === 0;
+      },
+      mayKill: function () {
+        return exec.Status === 0;
+      },
+      terminate: function () {
+        exec.Terminate();
+      },
+    };
+  }
+
   // The relevance goes into a temp file and reaches qna on stdin, never on a
   // command line, so cmd metacharacters in it are harmless. Output goes to a
   // file too, so a large answer cannot fill the pipe and stall qna.
   function evalLocal(ctx, query, timeoutMs, done) {
-    var fso, shell, exec, inFile, outFile;
+    var fso, shell, proc, inFile, outFile, doneFile;
     try {
       fso = new window.ActiveXObject("Scripting.FileSystemObject");
       shell = new window.ActiveXObject("WScript.Shell");
@@ -361,6 +470,7 @@
     var base = fso.GetSpecialFolder(2).Path + "\\" + fso.GetTempName();
     inFile = base + ".qna";
     outFile = base + ".out";
+    doneFile = base + ".done";
     var f = null;
     try {
       f = fso.CreateTextFile(inFile, true, false);
@@ -376,22 +486,40 @@
       done("could not write the relevance for qna (characters outside this computer's code page?): " + errText(e));
       return;
     }
+    var qnaCmd = '"' + qna + '" -t -showtypes < "' + inFile + '" > "' + outFile + '" 2>&1';
+    var line = 'cmd.exe /c "' + qnaCmd + '"';
     try {
-      exec = shell.Exec('cmd.exe /c ""' + qna + '" -t -showtypes < "' + inFile + '" > "' + outFile + '" 2>&1"');
+      // cmd.exe strips the outer quotes; doneFile appears once qna has
+      // exited and its output file is closed.
+      proc = startHidden(fso, 'cmd.exe /c "' + qnaCmd + ' & type nul > "' + doneFile + '""', doneFile, fso.GetSpecialFolder(2).Path);
+      fact("qna launch", "WMI hidden (pid " + proc.pid + ")");
     } catch (e) {
-      cleanup();
-      done("could not start qna: " + errText(e));
-      return;
+      log("qna: WMI unavailable: " + errText(e) + "; using WScript.Shell.Exec, which shows a console window");
+      try {
+        proc = startExec(shell, line);
+      } catch (e2) {
+        fact("qna launch", "failed (WMI unavailable: " + errText(e) + "; Exec: " + errText(e2) + ")");
+        cleanup();
+        done("could not start qna: " + errText(e2));
+        return;
+      }
+      fact("qna launch", "Exec (WMI unavailable: " + errText(e) + ")");
     }
     var started = now();
-    // Terminate() would end only cmd.exe and leave qna.exe running (and its
-    // temp files open), so end the whole tree, then clean up.
+    // Ending only cmd.exe would leave qna.exe running (and its temp files
+    // open), so end the whole tree, hidden, then clean up.
     function stop() {
+      if (!proc.mayKill()) {
+        log("qna: pid " + proc.pid + " has already exited; nothing to end");
+        cleanup();
+        return;
+      }
       try {
-        shell.Run("taskkill /F /T /PID " + exec.ProcessID, 0, true);
+        shell.Run("taskkill /F /T /PID " + proc.pid, 0, true);
       } catch (e) {
+        log("qna: taskkill failed (" + errText(e) + "); ending cmd.exe only");
         try {
-          exec.Terminate();
+          proc.terminate();
         } catch (e2) {}
       }
       cleanup();
@@ -403,11 +531,14 @@
       try {
         fso.DeleteFile(outFile, true);
       } catch (e) {}
+      try {
+        if (fso.FileExists(doneFile)) fso.DeleteFile(doneFile, true);
+      } catch (e) {}
     }
     ctx.cancels.push(stop);
     function poll() {
       if (ctx.cancelled) return;
-      if (exec.Status === 0) {
+      if (proc.running()) {
         if (now() - started > timeoutMs) {
           stop();
           done("qna did not finish within " + timeoutMs / 1000 + " s");
