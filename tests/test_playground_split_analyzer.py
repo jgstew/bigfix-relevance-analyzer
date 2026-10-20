@@ -28,7 +28,9 @@ WORKFLOW = REPO_ROOT / ".github" / "workflows" / "wasm-html.yaml"
 RELEASE = REPO_ROOT / ".github" / "workflows" / "tag_and_release.yaml"
 BROWSER_TEST = REPO_ROOT / "tools" / "playground-wasm" / "componentize-py" / "browser-test"
 
-ZIP_NAME = "bigfix-relevance-analyzer-analyzer.zip"
+ZIP_NAME = "bigfix-relevance-analyzer-web.zip"
+# What releases up to 1.39.0 called it; nothing should build or name it now.
+OLD_ZIP_NAME = "bigfix-relevance-analyzer-analyzer.zip"
 CORE_FILES = {f"{name}.gz" for name in FAKE_CORES}
 SET_FILES = {"manifest.json", "index.html", "editor.js", "glue.mjs", *CORE_FILES}
 
@@ -350,7 +352,7 @@ def test_the_workflow_builds_and_browser_tests_the_set() -> None:
 def test_the_release_attaches_the_zip_and_checksums_it() -> None:
     text = RELEASE.read_text(encoding="utf-8")
     finalize = text[text.index("  finalize:") : text.index("  marketplace:")]
-    assert "name: bigfix-relevance-analyzer-analyzer" in finalize
+    assert "name: bigfix-relevance-analyzer-web" in finalize
     assert f"assets/{ZIP_NAME}" in finalize
     # SHA256SUMS.txt is computed over every file in assets/, after the copy.
     assert finalize.index(f"assets/{ZIP_NAME}") < finalize.index("sha256sum ./*")
@@ -363,3 +365,12 @@ def test_the_browser_test_lives_beside_the_single_file_one() -> None:
     for shared in ("../../common/cases.mjs", "../../common/editor_checks.mjs"):
         assert shared in text, shared
     assert "../../common/lsp_script.mjs" in text
+
+
+def test_nothing_builds_or_downloads_the_old_zip_name() -> None:
+    """The asset was renamed to bigfix-relevance-analyzer-web.zip after 1.39.0:
+    no workflow or build script may still produce or fetch the old name."""
+    for path in (WORKFLOW, RELEASE, BUILD_DIR / "build_split.py"):
+        text = path.read_text(encoding="utf-8")
+        assert OLD_ZIP_NAME not in text, path
+        assert "name: bigfix-relevance-analyzer-analyzer" not in text, path
