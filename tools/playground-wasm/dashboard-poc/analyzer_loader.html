@@ -1,0 +1,219 @@
+<!--
+  The Web Report's analyzer loader, injected at template.html's %%ANALYZER%%
+  (the console build has none). A module script, so an IE engine skips it.
+
+  The report itself stays small: Web Reports regenerates a custom report on
+  every load and spent ~19 s on one with the analyzer embedded (README.md).
+  Instead, once the page is usable, this fetches the analyzer from the first
+  of RDBG_BUILD.analyzerUrls that works: the split analyzer's manifest.json
+  (../SPLIT_ANALYZER.md), or the single-file playground page, from which it cuts out
+  the same three pieces. Either way it keeps them in IndexedDB:
+
+  * the editor bundle (window.playgroundEditor);
+  * CORES_GZIP, the gzipped core wasm modules;
+  * the component glue jco generated for exactly those cores.
+
+  All three come from one manifest or one page, so they always match. Each
+  load re-checks the source cheaply (the manifest's text, or the page's
+  Last-Modified from a HEAD request), so an unchanged analyzer costs no
+  download and an updated one arrives as a set. Offline, the cached copy is
+  used as is.
+
+  Fetching, extracting and caching live in loader.mjs (inlined at
+  %%LOADER_MJS%% by build_poc.py, and unit-tested by test_loader.mjs); this
+  file supplies the browser's fetch and IndexedDB, starts the analyzer and
+  draws the analysis panel.
+-->
+<script type="module">
+// loader.mjs: extract(), fromPage(), fromManifest(), loadPieces(), dialectChoice().
+%%LOADER_MJS%%
+
+const LOG = (text) => window.rdbg.log(text);
+const DB_NAME = "relevance-debugger";
+const STORE = "analyzer";
+// Stands in for the glue's import.meta.url, which a blob: module cannot use as
+// a base. Never fetched: the fetch intercept below answers every core by name.
+const CORE_BASE = "https://relevance-debugger.invalid/";
+// How long after the last edit the analysis panel catches up.
+const ANALYZE_DELAY_MS = 500;
+
+// ---- IndexedDB -----------------------------------------------------------------
+
+function openDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function cacheOp(mode, fn) {
+  const db = await openDb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const req = fn(db.transaction(STORE, mode).objectStore(STORE));
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+const cacheGet = (url) => cacheOp("readonly", (s) => s.get(url)).catch(() => undefined);
+const cachePut = (url, value) => cacheOp("readwrite", (s) => s.put(value, url));
+
+// ---- running the pieces ----------------------------------------------------
+
+async function start(pieces) {
+  // The editor bundle is a self-contained IIFE.
+  new Function(pieces.editor)();
+
+  // The glue fetches each core by URL; hand back the stored bytes instead.
+  const realFetch = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const name = href.split("/").pop();
+    if (href.startsWith(CORE_BASE) && Object.hasOwn(pieces.cores, name)) {
+      const bytes = pieces.cores[name];
+      // Gzipped as published, or plain wasm if a server inflated it in transit.
+      const gzipped = bytes[0] === 0x1f && bytes[1] === 0x8b;
+      const body = gzipped ? new Response(bytes).body.pipeThrough(new DecompressionStream("gzip")) : bytes;
+      return new Response(body, { status: 200, headers: { "Content-Type": "application/wasm" } });
+    }
+    return realFetch(input, init);
+  };
+
+  const glue = pieces.glue.split("import.meta.url").join(JSON.stringify(CORE_BASE));
+  const blobUrl = URL.createObjectURL(new Blob([glue], { type: "text/javascript" }));
+  try {
+    await import(blobUrl);
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
+  const component = globalThis.__component;
+  if (!component) throw new Error("the glue never set globalThis.__component");
+  await component.$init;
+  return component;
+}
+
+// ---- the analysis panel -------------------------------------------------------
+
+function el(tag, text, cls) {
+  const node = document.createElement(tag);
+  if (text !== undefined) node.textContent = text;
+  if (cls) node.className = cls;
+  return node;
+}
+
+function renderAnalysis(payload) {
+  const out = document.getElementById("analysis");
+  out.replaceChildren();
+  out.className = "";
+  const choice = dialectChoice(payload);
+  const types = payload.types;
+  const typeText = !types ? "n/a"
+    : Array.isArray(types.types) ? `${types.types.join(", ")} (${types.plurality})`
+    : `unknown (${types.plurality})`;
+  const badges = el("p");
+  for (const [label, ok] of [
+    [`dialect: ${choice.dialects.join(" + ")}`, true],
+    [`parse: ${payload.parse.ok ? "ok" : "error"}`, payload.parse.ok],
+    [`type: ${typeText}`, types?.ok === true],
+    [`cost: ${payload.complexity.evaluation_cost}`, true],
+  ]) {
+    badges.appendChild(el("span", label, `badge ${ok ? "ok" : "error"}`));
+  }
+  out.appendChild(badges);
+  out.appendChild(el("p", `Dialect: ${choice.why}.`, "hint"));
+  if (!payload.parse.ok) {
+    const e = payload.parse.error;
+    out.appendChild(el("p", `Parse error: ${e.message} (line ${e.line}, column ${e.column})`, "error"));
+  }
+  const diagnostics = types?.diagnostics ?? [];
+  if (diagnostics.length) {
+    const table = el("table");
+    const head = el("tr");
+    for (const h of ["at", "code", "message"]) head.appendChild(el("th", h));
+    table.appendChild(head);
+    for (const d of diagnostics) {
+      const tr = el("tr");
+      for (const v of [`${d.line}:${d.column}`, d.code, d.message]) tr.appendChild(el("td", v));
+      table.appendChild(tr);
+    }
+    out.appendChild(table);
+  }
+  if (payload.unknown_references?.length) {
+    out.appendChild(el("p", `Unknown inspectors: ${payload.unknown_references.join(", ")}`, "hint"));
+  }
+}
+
+// ---- boot --------------------------------------------------------------------
+
+async function boot() {
+  const urls = (window.RDBG_BUILD && window.RDBG_BUILD.analyzerUrls) || [];
+  const started = performance.now();
+  const env = {
+    fetch: window.fetch.bind(window),
+    cacheGet,
+    cachePut,
+    log: LOG,
+    now: () => performance.now(),
+    // Missing on plain http (an insecure context): then only sizes are checked.
+    subtle: globalThis.crypto && globalThis.crypto.subtle,
+    baseUrl: document.baseURI,
+  };
+  const { pieces, how, source } = await loadPieces(urls, env);
+  window.rdbg.fact("analyzer source", source);
+  const component = await start(pieces);
+
+  const host = document.getElementById("editorHost");
+  const editor = window.playgroundEditor.mount(host, {
+    doc: window.rdbg.initialText(),
+    onRun: () => window.rdbg.evaluate(),
+  });
+  editor.connect(component.handle);
+
+  // One analysis per distinct text: it renders the panel and the dialect
+  // note, and Evaluate reuses it instead of analyzing again.
+  let last = { text: null, payload: null };
+  const analyze = (text) => {
+    if (text !== last.text) {
+      last = { text, payload: JSON.parse(component.analyze(text)) };
+      renderAnalysis(last.payload);
+      window.rdbg.showDialect(dialectChoice(last.payload));
+    }
+    return last.payload;
+  };
+  window.rdbg.onAnalyzer(
+    { editor, analyze, dialect: (text) => dialectChoice(analyze(text)) },
+    `bigfix_relevance_analyzer ${component.version()}, ${how}, ready in ${Math.round(performance.now() - started)} ms`,
+  );
+
+  // Analysis is cheap, so it follows the text: half a second after the last
+  // change, whatever made it (typing, paste, a completion, a quick fix). The
+  // editor bundle exposes no change hook, so watch its DOM.
+  let pending = null;
+  new MutationObserver(() => {
+    clearTimeout(pending);
+    pending = setTimeout(() => analyze(editor.getText().trim()), ANALYZE_DELAY_MS);
+  }).observe(editor.view.contentDOM, { childList: true, characterData: true, subtree: true });
+  analyze(editor.getText().trim());
+}
+
+const problem =
+  typeof WebAssembly !== "object" ? "this browser has no WebAssembly"
+  : typeof DecompressionStream !== "function" ? "this browser has no DecompressionStream"
+  : null;
+if (problem) {
+  window.rdbg.onAnalyzerFailed(problem);
+} else {
+  // After the page is usable: Evaluate works while this loads.
+  const go = () => boot().catch((err) => {
+    window.rdbg.onAnalyzerFailed(`could not load it: ${err.message || err}`);
+  });
+  if (document.readyState === "complete") go();
+  else window.addEventListener("load", go, { once: true });
+}
+</script>
