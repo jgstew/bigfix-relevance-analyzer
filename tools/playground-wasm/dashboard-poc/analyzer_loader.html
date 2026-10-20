@@ -1,0 +1,303 @@
+<!--
+  The Web Report's analyzer loader, injected at template.html's %%ANALYZER%%
+  (the console build has none). A module script, so an IE engine skips it.
+
+  The report itself stays small: Web Reports regenerates a custom report on
+  every load and spent ~19 s on one with the analyzer embedded (README.md).
+  Instead, once the page is usable, this fetches the published componentize-
+  py playground page (RDBG_BUILD.analyzerUrls, tried in order), cuts out the
+  three pieces it needs, and keeps them in IndexedDB:
+
+  * the editor bundle (window.playgroundEditor);
+  * CORES_GZIP, the gzipped core wasm modules;
+  * the component glue jco generated for exactly those cores.
+
+  All three come from one page, so they always match. The cache is keyed by
+  URL and re-checked with a HEAD request's Last-Modified header (CORS-
+  safelisted), so an unchanged playground costs no download and an updated one
+  arrives as a set. Offline, the cached copy is used as is.
+
+  The pieces are found by text that appears once in the playground page (see
+  ../componentize-py/build-playground/template.html and
+  ../common/shared_script.html); extract() checks each one and fails loudly if
+  that layout changes.
+-->
+<script type="module">
+const LOG = (text) => window.rdbg.log(text);
+const DB_NAME = "relevance-debugger";
+const STORE = "analyzer";
+// Stands in for the glue's import.meta.url, which a blob: module cannot use as
+// a base. Never fetched: the fetch intercept below answers every core by name.
+const CORE_BASE = "https://relevance-debugger.invalid/";
+// How long after the last edit the analysis panel catches up.
+const ANALYZE_DELAY_MS = 500;
+
+// ---- the three pieces --------------------------------------------------------
+
+function between(text, start, end, what) {
+  const i = text.indexOf(start);
+  if (i < 0 || text.indexOf(start, i + 1) >= 0) throw new Error(`${what}: expected exactly one "${start}"`);
+  const from = i + start.length;
+  const to = text.indexOf(end, from);
+  if (to < 0) throw new Error(`${what}: no "${end}" after "${start}"`);
+  return text.slice(from, to);
+}
+
+function extract(html) {
+  const editor = between(html, "Publishes window.playgroundEditor.\n", "\n<\/script>", "editor bundle");
+  const coresLiteral = between(html, "const CORES_GZIP = ", ";\n", "core modules");
+  // The glue sits between the end of boot() and the template's closing code.
+  const afterBoot = between(html, "async function boot()", "// window.__wasmProblem was already handled", "component glue");
+  const glue = afterBoot.slice(afterBoot.indexOf("\n}\n") + 3);
+  const cores = JSON.parse(coresLiteral);
+  const names = Object.keys(cores);
+  if (!editor.includes("playgroundEditor")) throw new Error("editor bundle: no playgroundEditor");
+  if (!glue.includes("__component")) throw new Error("component glue: no globalThis.__component");
+  if (!names.length || !names.every((n) => /^analyzer\.core\d*\.wasm$/.test(n))) {
+    throw new Error(`core modules: unexpected names ${names.join(", ")}`);
+  }
+  for (const name of names) {
+    if (!glue.includes(`"./${name}"`)) throw new Error(`component glue does not load ${name}`);
+  }
+  return { editor, cores, glue };
+}
+
+// ---- IndexedDB -----------------------------------------------------------------
+
+function openDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function cacheOp(mode, fn) {
+  const db = await openDb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const req = fn(db.transaction(STORE, mode).objectStore(STORE));
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+const cacheGet = (url) => cacheOp("readonly", (s) => s.get(url)).catch(() => undefined);
+const cachePut = (url, value) => cacheOp("readwrite", (s) => s.put(value, url));
+
+// ---- fetching --------------------------------------------------------------------
+
+// The pieces from `url`: the cached copy while the page's Last-Modified is
+// unchanged (or cannot be checked), else a fresh download.
+async function fromSource(url) {
+  const cached = await cacheGet(url);
+  let lastModified = null;
+  try {
+    const head = await fetch(url, { method: "HEAD", cache: "no-store" });
+    if (head.ok) lastModified = head.headers.get("Last-Modified");
+  } catch (err) {
+    if (!cached) throw err;
+    LOG(`analyzer: ${url} unreachable (${err}); using the cached copy`);
+  }
+  if (cached && (lastModified === null || cached.lastModified === lastModified)) {
+    return { pieces: cached, how: "cached" };
+  }
+  const started = performance.now();
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const html = await res.text();
+  const pieces = { ...extract(html), lastModified: res.headers.get("Last-Modified") || lastModified };
+  const mb = (html.length / 1048576).toFixed(1);
+  try {
+    await cachePut(url, pieces);
+  } catch (err) {
+    LOG(`analyzer: could not cache it (${err}); it will download again next time`);
+  }
+  return { pieces, how: `downloaded ${mb} MB in ${Math.round(performance.now() - started)} ms` };
+}
+
+async function loadPieces(urls) {
+  const problems = [];
+  for (const url of urls) {
+    try {
+      const got = await fromSource(url);
+      window.rdbg.fact("analyzer source", `${url} (${got.how}, Last-Modified ${got.pieces.lastModified || "unknown"})`);
+      return got;
+    } catch (err) {
+      problems.push(`${url}: ${err.message || err}`);
+      LOG(`analyzer: ${url} failed: ${err.message || err}`);
+    }
+  }
+  throw new Error(problems.join("; ") || "no analyzer URL configured");
+}
+
+// ---- running the pieces ----------------------------------------------------
+
+function bytesFromBase64(b64) {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function start(pieces) {
+  // The editor bundle is a self-contained IIFE.
+  new Function(pieces.editor)();
+
+  // The glue fetches each core by URL; hand back the stored bytes instead.
+  const realFetch = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const name = href.split("/").pop();
+    if (href.startsWith(CORE_BASE) && Object.hasOwn(pieces.cores, name)) {
+      const inflating = new Response(bytesFromBase64(pieces.cores[name])).body.pipeThrough(new DecompressionStream("gzip"));
+      return new Response(inflating, { status: 200, headers: { "Content-Type": "application/wasm" } });
+    }
+    return realFetch(input, init);
+  };
+
+  const glue = pieces.glue.split("import.meta.url").join(JSON.stringify(CORE_BASE));
+  const blobUrl = URL.createObjectURL(new Blob([glue], { type: "text/javascript" }));
+  try {
+    await import(blobUrl);
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
+  const component = globalThis.__component;
+  if (!component) throw new Error("the glue never set globalThis.__component");
+  await component.$init;
+  return component;
+}
+
+// ---- the analysis panel -------------------------------------------------------
+
+// The analyzer's payload "dialect" -> what it means here. A stand-in for the
+// debugger's dialect_fit (not in the component yet): resolved wins, "both"
+// and "uncertain" mean either, else the text classifier.
+function dialectChoice(payload) {
+  const d = payload.dialect;
+  if (d.resolved === "client" || d.resolved === "session") {
+    return { dialects: [d.resolved], why: `the analyzer resolved it as ${d.resolved}` };
+  }
+  if (d.resolved === "both") {
+    return { dialects: ["session", "client"], why: "the analyzer says it is valid in either dialect" };
+  }
+  if (d.resolved === "uncertain") {
+    return { dialects: ["session", "client"], why: "it mixes client and session references" };
+  }
+  if (d.classified === "client" || d.classified === "session") {
+    return { dialects: [d.classified], why: `the analyzer's text classifier says ${d.classified}` };
+  }
+  return { dialects: ["session", "client"], why: "the analyzer could not tell" };
+}
+
+function el(tag, text, cls) {
+  const node = document.createElement(tag);
+  if (text !== undefined) node.textContent = text;
+  if (cls) node.className = cls;
+  return node;
+}
+
+function renderAnalysis(payload) {
+  const out = document.getElementById("analysis");
+  out.replaceChildren();
+  out.className = "";
+  const choice = dialectChoice(payload);
+  const types = payload.types;
+  const typeText = !types ? "n/a"
+    : Array.isArray(types.types) ? `${types.types.join(", ")} (${types.plurality})`
+    : `unknown (${types.plurality})`;
+  const badges = el("p");
+  for (const [label, ok] of [
+    [`dialect: ${choice.dialects.join(" + ")}`, true],
+    [`parse: ${payload.parse.ok ? "ok" : "error"}`, payload.parse.ok],
+    [`type: ${typeText}`, types?.ok === true],
+    [`cost: ${payload.complexity.evaluation_cost}`, true],
+  ]) {
+    badges.appendChild(el("span", label, `badge ${ok ? "ok" : "error"}`));
+  }
+  out.appendChild(badges);
+  out.appendChild(el("p", `Dialect: ${choice.why}.`, "hint"));
+  if (!payload.parse.ok) {
+    const e = payload.parse.error;
+    out.appendChild(el("p", `Parse error: ${e.message} (line ${e.line}, column ${e.column})`, "error"));
+  }
+  const diagnostics = types?.diagnostics ?? [];
+  if (diagnostics.length) {
+    const table = el("table");
+    const head = el("tr");
+    for (const h of ["at", "code", "message"]) head.appendChild(el("th", h));
+    table.appendChild(head);
+    for (const d of diagnostics) {
+      const tr = el("tr");
+      for (const v of [`${d.line}:${d.column}`, d.code, d.message]) tr.appendChild(el("td", v));
+      table.appendChild(tr);
+    }
+    out.appendChild(table);
+  }
+  if (payload.unknown_references?.length) {
+    out.appendChild(el("p", `Unknown inspectors: ${payload.unknown_references.join(", ")}`, "hint"));
+  }
+}
+
+// ---- boot --------------------------------------------------------------------
+
+async function boot() {
+  const urls = (window.RDBG_BUILD && window.RDBG_BUILD.analyzerUrls) || [];
+  const started = performance.now();
+  const { pieces, how } = await loadPieces(urls);
+  const component = await start(pieces);
+
+  const host = document.getElementById("editorHost");
+  const editor = window.playgroundEditor.mount(host, {
+    doc: window.rdbg.initialText(),
+    onRun: () => window.rdbg.evaluate(),
+  });
+  editor.connect(component.handle);
+
+  // One analysis per distinct text: it renders the panel and the dialect
+  // note, and Evaluate reuses it instead of analyzing again.
+  let last = { text: null, payload: null };
+  const analyze = (text) => {
+    if (text !== last.text) {
+      last = { text, payload: JSON.parse(component.analyze(text)) };
+      renderAnalysis(last.payload);
+      window.rdbg.showDialect(dialectChoice(last.payload));
+    }
+    return last.payload;
+  };
+  window.rdbg.onAnalyzer(
+    { editor, analyze, dialect: (text) => dialectChoice(analyze(text)) },
+    `bigfix_relevance_analyzer ${component.version()}, ${how}, ready in ${Math.round(performance.now() - started)} ms`,
+  );
+
+  // Analysis is cheap, so it follows the text: half a second after the last
+  // change, whatever made it (typing, paste, a completion, a quick fix). The
+  // editor bundle exposes no change hook, so watch its DOM.
+  let pending = null;
+  new MutationObserver(() => {
+    clearTimeout(pending);
+    pending = setTimeout(() => analyze(editor.getText().trim()), ANALYZE_DELAY_MS);
+  }).observe(editor.view.contentDOM, { childList: true, characterData: true, subtree: true });
+  analyze(editor.getText().trim());
+}
+
+const problem =
+  typeof WebAssembly !== "object" ? "this browser has no WebAssembly"
+  : typeof DecompressionStream !== "function" ? "this browser has no DecompressionStream"
+  : null;
+if (problem) {
+  window.rdbg.onAnalyzerFailed(problem);
+} else {
+  // After the page is usable: Evaluate works while this loads.
+  const go = () => boot().catch((err) => {
+    window.rdbg.onAnalyzerFailed(`could not load it: ${err.message || err}`);
+  });
+  if (document.readyState === "complete") go();
+  else window.addEventListener("load", go, { once: true });
+}
+</script>

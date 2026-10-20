@@ -21,6 +21,8 @@
   var SESSION_TARGETS = "ids of bes computers whose (last report time of it > now - 1 * hour)";
   var DELIM = "<~rdbg~>";
   var MAX_SHOWN = 200;
+  // The Web Report fetches the analyzer after the page loads (analyzer_loader.html).
+  var LOADING_NOTE = "loading (the first time downloads about 12 MB; after that it is cached in this browser)";
   // FastQuery polling backs off while waiting: the first check comes
   // POLL_FIRST_MS after the last, each gap grows by POLL_GROWTH up to
   // POLL_MAX_MS, and the last check lands on the timeout. Answers that have
@@ -124,6 +126,50 @@
       return out;
     }
     return [String(value)];
+  }
+
+  // ---- load timings ----------------------------------------------------------
+
+  // Milliseconds since the browser started the page request, or null where
+  // the Navigation Timing API is missing (it exists in IE11).
+  function sinceStart() {
+    try {
+      var t = window.performance.timing;
+      return t.navigationStart ? now() - t.navigationStart : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function seconds(ms) {
+    return ms === null || ms === undefined || ms < 0 ? "?" : (ms / 1000).toFixed(2) + " s";
+  }
+
+  // Where the time goes before the page is usable: the server (request to
+  // first byte: for a Web Report, its server-side processing), the download,
+  // then the browser parsing it. Recorded once the load event has finished.
+  function loadTimings() {
+    var t;
+    try {
+      t = window.performance.timing;
+    } catch (e) {
+      return;
+    }
+    if (!t || !t.navigationStart) {
+      fact("load timings", "not available in this browser");
+      return;
+    }
+    var start = t.navigationStart;
+    fact("time to first byte (server)", seconds(t.responseStart - (t.requestStart || start)));
+    fact("download", seconds(t.responseEnd - t.responseStart));
+    fact("DOM ready", seconds(t.domContentLoadedEventStart - start) + " after the request started");
+    fact("page load", seconds(t.loadEventStart - start) + " after the request started");
+    try {
+      var nav = window.performance.getEntriesByType("navigation")[0];
+      if (nav && nav.transferSize) {
+        fact("transferred", Math.round(nav.transferSize / 1024) + " KB (" + Math.round(nav.decodedBodySize / 1024) + " KB decoded)");
+      }
+    } catch (e) {}
   }
 
   function hasGlobal(name) {
@@ -602,27 +648,31 @@
     finishRun(ctx, "Cancelled.");
   }
 
+  // Web Reports: what the analyzer's dialect call means here. Session
+  // relevance runs whatever it says; the note only sets expectations.
+  function showDialect(choice) {
+    var note = "";
+    if (choice.dialects.length === 1 && choice.dialects[0] === "client") {
+      note = "This looks like client relevance (" + choice.why + "), which Web Reports cannot evaluate. Evaluate tries it as session relevance anyway, in case that is wrong.";
+    } else if (choice.dialects.length > 1) {
+      note = "Evaluate runs it as session relevance: " + choice.why + ".";
+    }
+    if ($("dialectNote")) setText("dialectNote", note);
+  }
+
   // Web Reports: analysis, then session relevance, always. Client relevance
   // cannot run here, but the dialect call can be wrong and a session error
   // comes back at once, so it is tried anyway after saying so.
   function evaluateWebReport() {
     var query = getQuery();
     if (!query) return;
-    var note = "";
     if (analyzer) {
       try {
-        analyzer.analyze(query);
-        var choice = analyzer.dialect(query);
-        if (choice.dialects.length === 1 && choice.dialects[0] === "client") {
-          note = "This looks like client relevance (" + choice.why + "), which Web Reports cannot evaluate. Trying it as session relevance anyway, in case that is wrong.";
-        } else if (choice.dialects.length > 1) {
-          note = "Evaluating as session relevance: " + choice.why + ".";
-        }
+        analyzer.analyze(query); // shows the dialect note too
       } catch (e) {
         log("analysis failed: " + errText(e));
       }
     }
-    setText("dialectNote", note);
     var out = $("wrResult");
     if (!host.session) {
       setText("wrResult", "Session relevance can only be evaluated in Web Reports.", "hint");
@@ -858,6 +908,7 @@
   window.rdbg = {
     // api: {dialect(text) -> {dialects, why}, analyze(text), editor: {getText}}
     onAnalyzer: function (api, info) {
+      fact("analyzer ready", seconds(sinceStart()) + " after the request started");
       analyzer = api;
       if (api.editor) {
         editor = api.editor;
@@ -878,6 +929,7 @@
       return $("rel").value;
     },
     evaluate: evaluate,
+    showDialect: showDialect,
     log: log,
     fact: fact,
   };
@@ -890,6 +942,7 @@
   keepTarget();
   polyfillDetails();
 
+  fact("core ready (Evaluate usable)", seconds(sinceStart()) + " after the request started");
   host = detectHost();
   fact("build", target + ", built " + (build.built || "?"));
   fact("userAgent", navigator.userAgent);
@@ -904,6 +957,8 @@
   // Measured once the whole page has parsed, not just up to this script.
   var measure = function () {
     fact("page size (chars)", document.documentElement.outerHTML.length);
+    // loadEventStart is only set once the load handlers are running.
+    setTimeout(loadTimings, 0);
   };
   if (window.addEventListener) window.addEventListener("load", measure, false);
   else window.attachEvent("onload", measure);
@@ -913,10 +968,10 @@
   } else if (document.documentMode) {
     analyzerNote = "unavailable: this browser cannot run it (IE)";
   } else {
-    analyzerNote = "loading";
+    analyzerNote = LOADING_NOTE;
     setTimeout(function () {
-      if (!analyzer && analyzerNote === "loading") window.rdbg.onAnalyzerFailed("did not load within 120 s");
-    }, 120000);
+      if (!analyzer && analyzerNote === LOADING_NOTE) window.rdbg.onAnalyzerFailed("did not load within 5 minutes");
+    }, 300000);
   }
   fact("analyzer", analyzerNote);
   describeHost();
