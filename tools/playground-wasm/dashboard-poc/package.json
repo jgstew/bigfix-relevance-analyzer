@@ -1,0 +1,12 @@
+{
+  "name": "relevance-debugger-dashboard-poc-test",
+  "private": true,
+  "description": "Tests for the relevance debugger dashboard proof of concept: node --test for loader.mjs, Playwright for the built pages. Not part of any published artifact.",
+  "type": "module",
+  "dependencies": {
+    "playwright": "1.63.0"
+  },
+  "engines": {
+    "npm": ">=11.10.0"
+  }
+}

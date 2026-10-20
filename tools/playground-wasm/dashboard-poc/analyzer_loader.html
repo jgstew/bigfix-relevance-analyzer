@@ -17,12 +17,15 @@
   safelisted), so an unchanged playground costs no download and an updated one
   arrives as a set. Offline, the cached copy is used as is.
 
-  The pieces are found by text that appears once in the playground page (see
-  ../componentize-py/build-playground/template.html and
-  ../common/shared_script.html); extract() checks each one and fails loudly if
-  that layout changes.
+  Fetching, extracting and caching live in loader.mjs (inlined at
+  %%LOADER_MJS%% by build_poc.py, and unit-tested by test_loader.mjs); this
+  file supplies the browser's fetch and IndexedDB, starts the analyzer and
+  draws the analysis panel.
 -->
 <script type="module">
+// loader.mjs: extract(), fromSource(), loadPieces(), dialectChoice().
+%%LOADER_MJS%%
+
 const LOG = (text) => window.rdbg.log(text);
 const DB_NAME = "relevance-debugger";
 const STORE = "analyzer";
@@ -31,36 +34,6 @@ const STORE = "analyzer";
 const CORE_BASE = "https://relevance-debugger.invalid/";
 // How long after the last edit the analysis panel catches up.
 const ANALYZE_DELAY_MS = 500;
-
-// ---- the three pieces --------------------------------------------------------
-
-function between(text, start, end, what) {
-  const i = text.indexOf(start);
-  if (i < 0 || text.indexOf(start, i + 1) >= 0) throw new Error(`${what}: expected exactly one "${start}"`);
-  const from = i + start.length;
-  const to = text.indexOf(end, from);
-  if (to < 0) throw new Error(`${what}: no "${end}" after "${start}"`);
-  return text.slice(from, to);
-}
-
-function extract(html) {
-  const editor = between(html, "Publishes window.playgroundEditor.\n", "\n<\/script>", "editor bundle");
-  const coresLiteral = between(html, "const CORES_GZIP = ", ";\n", "core modules");
-  // The glue sits between the end of boot() and the template's closing code.
-  const afterBoot = between(html, "async function boot()", "// window.__wasmProblem was already handled", "component glue");
-  const glue = afterBoot.slice(afterBoot.indexOf("\n}\n") + 3);
-  const cores = JSON.parse(coresLiteral);
-  const names = Object.keys(cores);
-  if (!editor.includes("playgroundEditor")) throw new Error("editor bundle: no playgroundEditor");
-  if (!glue.includes("__component")) throw new Error("component glue: no globalThis.__component");
-  if (!names.length || !names.every((n) => /^analyzer\.core\d*\.wasm$/.test(n))) {
-    throw new Error(`core modules: unexpected names ${names.join(", ")}`);
-  }
-  for (const name of names) {
-    if (!glue.includes(`"./${name}"`)) throw new Error(`component glue does not load ${name}`);
-  }
-  return { editor, cores, glue };
-}
 
 // ---- IndexedDB -----------------------------------------------------------------
 
@@ -88,52 +61,6 @@ async function cacheOp(mode, fn) {
 
 const cacheGet = (url) => cacheOp("readonly", (s) => s.get(url)).catch(() => undefined);
 const cachePut = (url, value) => cacheOp("readwrite", (s) => s.put(value, url));
-
-// ---- fetching --------------------------------------------------------------------
-
-// The pieces from `url`: the cached copy while the page's Last-Modified is
-// unchanged (or cannot be checked), else a fresh download.
-async function fromSource(url) {
-  const cached = await cacheGet(url);
-  let lastModified = null;
-  try {
-    const head = await fetch(url, { method: "HEAD", cache: "no-store" });
-    if (head.ok) lastModified = head.headers.get("Last-Modified");
-  } catch (err) {
-    if (!cached) throw err;
-    LOG(`analyzer: ${url} unreachable (${err}); using the cached copy`);
-  }
-  if (cached && (lastModified === null || cached.lastModified === lastModified)) {
-    return { pieces: cached, how: "cached" };
-  }
-  const started = performance.now();
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const html = await res.text();
-  const pieces = { ...extract(html), lastModified: res.headers.get("Last-Modified") || lastModified };
-  const mb = (html.length / 1048576).toFixed(1);
-  try {
-    await cachePut(url, pieces);
-  } catch (err) {
-    LOG(`analyzer: could not cache it (${err}); it will download again next time`);
-  }
-  return { pieces, how: `downloaded ${mb} MB in ${Math.round(performance.now() - started)} ms` };
-}
-
-async function loadPieces(urls) {
-  const problems = [];
-  for (const url of urls) {
-    try {
-      const got = await fromSource(url);
-      window.rdbg.fact("analyzer source", `${url} (${got.how}, Last-Modified ${got.pieces.lastModified || "unknown"})`);
-      return got;
-    } catch (err) {
-      problems.push(`${url}: ${err.message || err}`);
-      LOG(`analyzer: ${url} failed: ${err.message || err}`);
-    }
-  }
-  throw new Error(problems.join("; ") || "no analyzer URL configured");
-}
 
 // ---- running the pieces ----------------------------------------------------
 
@@ -174,26 +101,6 @@ async function start(pieces) {
 }
 
 // ---- the analysis panel -------------------------------------------------------
-
-// The analyzer's payload "dialect" -> what it means here. A stand-in for the
-// debugger's dialect_fit (not in the component yet): resolved wins, "both"
-// and "uncertain" mean either, else the text classifier.
-function dialectChoice(payload) {
-  const d = payload.dialect;
-  if (d.resolved === "client" || d.resolved === "session") {
-    return { dialects: [d.resolved], why: `the analyzer resolved it as ${d.resolved}` };
-  }
-  if (d.resolved === "both") {
-    return { dialects: ["session", "client"], why: "the analyzer says it is valid in either dialect" };
-  }
-  if (d.resolved === "uncertain") {
-    return { dialects: ["session", "client"], why: "it mixes client and session references" };
-  }
-  if (d.classified === "client" || d.classified === "session") {
-    return { dialects: [d.classified], why: `the analyzer's text classifier says ${d.classified}` };
-  }
-  return { dialects: ["session", "client"], why: "the analyzer could not tell" };
-}
 
 function el(tag, text, cls) {
   const node = document.createElement(tag);
@@ -249,7 +156,9 @@ function renderAnalysis(payload) {
 async function boot() {
   const urls = (window.RDBG_BUILD && window.RDBG_BUILD.analyzerUrls) || [];
   const started = performance.now();
-  const { pieces, how } = await loadPieces(urls);
+  const env = { fetch: window.fetch.bind(window), cacheGet, cachePut, log: LOG, now: () => performance.now() };
+  const { pieces, how, source } = await loadPieces(urls, env);
+  window.rdbg.fact("analyzer source", source);
   const component = await start(pieces);
 
   const host = document.getElementById("editorHost");

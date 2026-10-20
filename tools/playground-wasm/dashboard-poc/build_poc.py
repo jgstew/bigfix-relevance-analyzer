@@ -105,11 +105,20 @@ def _render(target: str, built: str, analyzer_urls: list[str]) -> tuple[str, str
     _title, sample, with_analyzer = TARGETS[target]
     loader = ""
     if with_analyzer:
-        loader = _strip_leading_comment((HERE / "analyzer_loader.html").read_text(encoding="utf-8"))
-        # Each <script> element's own closing tag only: one inside the code
-        # (even in a string) would end the element early.
-        if loader.lower().count("</script") != loader.lower().count("<script"):
-            raise SystemExit("analyzer_loader.html has '</script' inside a script")
+        loader_mjs = (HERE / "loader.mjs").read_text(encoding="utf-8")
+        if "</script" in loader_mjs.lower():
+            raise SystemExit("loader.mjs contains '</script' and cannot be inlined")
+        loader = _fill(
+            _strip_leading_comment((HERE / "analyzer_loader.html").read_text(encoding="utf-8")),
+            {"%%LOADER_MJS%%": loader_mjs},
+        )
+        # One module script whose only closing tag is its last line: one
+        # inside the code (even in a string) would end the element early.
+        code = loader.strip()
+        if not code.startswith('<script type="module">') or not code.endswith("</script>"):
+            raise SystemExit("analyzer_loader.html must be one <script type=module> element")
+        if "</script" in code[: -len("</script>")].lower():
+            raise SystemExit("analyzer_loader.html has '</script' inside its script")
     build_info = {"target": target, "built": built, "analyzer": with_analyzer}
     if with_analyzer:
         build_info["analyzerUrls"] = analyzer_urls
