@@ -182,13 +182,15 @@ playground, with Analyze left disabled. It also refuses to boot if
 ## How a release publishes it
 
 `wasm-html.yaml` builds the folder into `playground/analyzer/`, and also builds
-the same files as one flat zip, `bigfix-relevance-analyzer-analyzer.zip`, with
+the same files as one flat zip, `bigfix-relevance-analyzer-web.zip`, with
 no directory inside it, fixed timestamps and `manifest.json` last. The zip is
-uploaded as the artifact `bigfix-relevance-analyzer-analyzer`.
+uploaded as the artifact `bigfix-relevance-analyzer-web`. Releases up to
+1.39.0 named it `bigfix-relevance-analyzer-analyzer.zip`; the site's
+publishing script accepts both.
 `tag_and_release.yaml` attaches the zip to the GitHub release, and the zip is
 listed in the release's `SHA256SUMS.txt` like every other asset. Each line
 there is `<sha256>  ./<asset>` (two spaces, then the asset name with a `./`
-prefix), for example `<sha256>  ./bigfix-relevance-analyzer-analyzer.zip`.
+prefix), for example `<sha256>  ./bigfix-relevance-analyzer-web.zip`.
 
 The site side is jgstew/jgstew.github.io#17, which is open and not merged yet.
 Until it is merged, nothing publishes the set to `files/analyzer/`. A site
@@ -196,7 +198,7 @@ update workflow verifies it and unpacks it like this:
 
 ```bash
 sha256sum -c --ignore-missing SHA256SUMS.txt
-unzip -o bigfix-relevance-analyzer-analyzer.zip -d files/analyzer/
+unzip -o bigfix-relevance-analyzer-web.zip -d files/analyzer/
 ```
 
 It then removes any file in `files/analyzer/` that the zip does not contain.

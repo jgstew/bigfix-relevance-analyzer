@@ -296,7 +296,7 @@ jobs:
       # flat zip, built by the same playground job.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: bigfix-relevance-analyzer-analyzer
+          name: bigfix-relevance-analyzer-web
           path: playground
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -313,8 +313,8 @@ jobs:
           cp dist/*.whl dist/*.tar.gz assets/
           cp playground/bigfix-relevance-analyzer-component-playground.html \
              assets/bigfix-relevance-analyzer-playground.html
-          cp playground/bigfix-relevance-analyzer-analyzer.zip \
-             assets/bigfix-relevance-analyzer-analyzer.zip
+          cp playground/bigfix-relevance-analyzer-web.zip \
+             assets/bigfix-relevance-analyzer-web.zip
           cp vsix/bigfix-relevance-developer.vsix assets/
           ls -l assets
 

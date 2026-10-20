@@ -394,12 +394,12 @@ jobs:
             --work dist/componentize/web \
             --editor-bundle dist/playground-editor.js \
             --out playground/analyzer \
-            --zip playground/bigfix-relevance-analyzer-analyzer.zip
+            --zip playground/bigfix-relevance-analyzer-web.zip
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: bigfix-relevance-analyzer-analyzer
-          path: playground/bigfix-relevance-analyzer-analyzer.zip
+          name: bigfix-relevance-analyzer-web
+          path: playground/bigfix-relevance-analyzer-web.zip
           if-no-files-found: error
 
       # Everything from here tests the built page in a real browser, which is
@@ -470,11 +470,11 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: bigfix-relevance-analyzer-analyzer
+          name: bigfix-relevance-analyzer-web
           path: split
 
       - name: unpack the split analyzer set
-        run: unzip -q split/bigfix-relevance-analyzer-analyzer.zip -d split/analyzer
+        run: unzip -q split/bigfix-relevance-analyzer-web.zip -d split/analyzer
 
       - name: npm ci
         working-directory: tools/playground-wasm/dashboard-poc
