@@ -161,7 +161,9 @@ the same files as one flat zip, `bigfix-relevance-analyzer-analyzer.zip`, with
 no directory inside it, fixed timestamps and `manifest.json` last. The zip is
 uploaded as the artifact `bigfix-relevance-analyzer-analyzer`.
 `tag_and_release.yaml` attaches the zip to the GitHub release, and the zip is
-listed in the release's `SHA256SUMS.txt` like every other asset.
+listed in the release's `SHA256SUMS.txt` like every other asset. Each line
+there is `<sha256>  ./<asset>` (two spaces, then the asset name with a `./`
+prefix), for example `<sha256>  ./bigfix-relevance-analyzer-analyzer.zip`.
 
 The site side is jgstew/jgstew.github.io#17, which is open and not merged yet.
 Until it is merged, nothing publishes the set to `files/analyzer/`. A site

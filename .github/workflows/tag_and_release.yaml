@@ -318,9 +318,10 @@ jobs:
           cp vsix/bigfix-relevance-developer.vsix assets/
           ls -l assets
 
-      # `sha256sum -c SHA256SUMS.txt`-verifiable, with no directory prefix, so
-      # it checks out wherever the assets are downloaded to. Written outside
-      # assets/ first so the file can never end up listing itself.
+      # `sha256sum -c SHA256SUMS.txt`-verifiable. Each line is
+      # "<hash>  ./<asset>", relative to the directory holding the assets, so
+      # it checks out wherever they are downloaded to. Written outside assets/
+      # first so the file can never end up listing itself.
       - name: Compute SHA-256 checksums
         run: |
           (cd assets && sha256sum ./*) > "${RUNNER_TEMP}/SHA256SUMS.txt"
