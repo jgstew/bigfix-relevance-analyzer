@@ -160,7 +160,7 @@ describe("loadPieces (split analyzer manifest)", () => {
   test("a newer manifest whose files fail keeps the cached set", async () => {
     const store = new Map();
     await loadPieces([MANIFEST], env(splitSet({ version: "1.38.1" }).routes, store).env);
-    const newer = splitSet({ version: "1.39.0" });
+    const newer = splitSet({ version: "1.39.0", seeds: { glue: 1 } }); // a changed glue, so it is fetched
     newer.routes[`${DIR}glue.mjs`] = { body: "gone", status: 503 };
     const second = env(newer.routes, store);
     const got = await loadPieces([MANIFEST, PAGE], second.env);
