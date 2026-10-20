@@ -170,6 +170,45 @@ describe("loadAndStart: a set that verifies but does not start", () => {
     assert.ok(![...store.keys()].some((k) => k.startsWith("nostart:")));
   });
 
+  test("a cached set is retried once per manifest: failing again on a later load records it", async () => {
+    // Review of #187, finding 2: an intermittent start failure must not
+    // download the whole set again on every load where it happens.
+    const set = splitSet();
+    const store = await cachedAfter(set);
+    const first = secureEnv(set.routes, store);
+    await loadAndStart([MANIFEST], first.env, starter((pieces, n) => n === 1).start);
+    assert.equal(fileGets(first.calls).length, 4, "the one retry");
+    const later = secureEnv(set.routes, store);
+    const { start, runs } = starter(() => true);
+    await assert.rejects(loadAndStart([MANIFEST], later.env, start), (err) => err.doesNotStart && /boom/.test(err.message));
+    assert.equal(runs.length, 1);
+    assert.deepEqual(fileGets(later.calls), [], "no second retry for the same manifest");
+    assert.ok(store.has(RECORD_KEY));
+    // A new release gets its own retry.
+    const newer = splitSet({ version: "1.39.0", seeds: { glue: 2 } });
+    await loadAndStart([MANIFEST], secureEnv(newer.routes, store).env, starter().start);
+    const third = secureEnv(newer.routes, store);
+    await loadAndStart([MANIFEST], third.env, starter((pieces, n) => n === 1).start);
+    assert.equal(fileGets(third.calls).length, 4);
+  });
+
+  test("a recorded older set with a newer manifest that fails to download says both", async () => {
+    // Review of #187, finding 4: the newer set's own failure is the news.
+    const store = new Map();
+    await assert.rejects(loadAndStart([MANIFEST], secureEnv(splitSet().routes, store).env, starter(() => true).start));
+    const newer = splitSet({ version: "1.39.0", seeds: { glue: 2 } });
+    newer.routes[`${DIR}glue.mjs`] = { body: "gone", status: 503 };
+    const { env } = secureEnv(newer.routes, store);
+    const { start, runs } = starter();
+    await assert.rejects(loadAndStart([MANIFEST], env, start), (err) => {
+      assert.equal(err.doesNotStart, true);
+      assert.match(err.message, /does not start in this browser.*boom/);
+      assert.match(err.message, /the newer manifest failed: glue\.mjs: HTTP 503/);
+      return true;
+    });
+    assert.equal(runs.length, 0);
+  });
+
   test("records are per source: one that does not start leaves another alone", async () => {
     const set = splitSet();
     const store = new Map();
@@ -190,6 +229,32 @@ describe("loadAndStart: a set that verifies but does not start", () => {
     assert.deepEqual(again.calls, [`HEAD ${PAGE}`]);
     assert.equal(runs.length, 0);
     const tuesday = { [PAGE]: { body: playgroundPage(), lastModified: TUESDAY } };
+    const got = await loadAndStart([PAGE], secureEnv(tuesday, store).env, starter().start);
+    assert.deepEqual(got.started, { started: TUESDAY });
+  });
+
+  test("the single-file page with no Last-Modified on HEAD: a recorded page is not downloaded again", async () => {
+    // Review of #187, finding 3: HEAD cannot say whether it changed, so the
+    // GET asks with If-Modified-Since the recorded Last-Modified; 304 means
+    // the same page, still recorded.
+    const store = new Map();
+    const routes = { [PAGE]: { body: playgroundPage(), lastModified: MONDAY, headLastModified: false } };
+    await assert.rejects(loadAndStart([PAGE], secureEnv(routes, store).env, starter(() => true).start), /does not start/);
+    assert.equal(store.get(`nostart:page:${PAGE}`).id, MONDAY);
+    const again = secureEnv(routes, store);
+    const sent = [];
+    const fetch = again.env.fetch;
+    again.env.fetch = async (url, init = {}) => {
+      const res = await fetch(url, init);
+      sent.push(`${init.method || "GET"} ${new Headers(init.headers).get("If-Modified-Since") || "-"} ${res.status}`);
+      return res;
+    };
+    const { start, runs } = starter();
+    await assert.rejects(loadAndStart([PAGE], again.env, start), (err) => err.doesNotStart && /boom/.test(err.message));
+    assert.deepEqual(sent, ["HEAD - 200", `GET ${MONDAY} 304`]);
+    assert.equal(runs.length, 0);
+    // A changed page answers 200 and is tried.
+    const tuesday = { [PAGE]: { body: playgroundPage(), lastModified: TUESDAY, headLastModified: false } };
     const got = await loadAndStart([PAGE], secureEnv(tuesday, store).env, starter().start);
     assert.deepEqual(got.started, { started: TUESDAY });
   });

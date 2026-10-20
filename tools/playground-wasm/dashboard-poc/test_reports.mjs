@@ -78,8 +78,9 @@ after(async () => {
 });
 
 // A page with its console errors and requests recorded.
-async function open(context, file) {
+async function open(context, file, setup = async () => {}) {
   const page = await context.newPage();
+  await setup(page);
   const errors = [];
   const requests = [];
   page.on("pageerror", (err) => errors.push(String(err)));
@@ -263,6 +264,66 @@ describe("Web Report", () => {
       assert.match(await page.locator(".cm-content").textContent(), /number of bes computers/);
       assert.deepEqual(errors, []);
     } finally {
+      await context.close();
+    }
+  });
+
+  test("Reload while the analyzer is still loading does not start a second one", async () => {
+    // Review of #187, finding 1: two boots at once mounted two editors,
+    // downloaded the set twice, and could record a false "does not start".
+    overrides = new Map([[`/${MANIFEST}`, (req, res, serveIt) => setTimeout(serveIt, 3000)]]);
+    const context = await browser.newContext();
+    try {
+      const { page, requests, errors } = await open(context, WEB_REPORT);
+      await page.click("summary");
+      assert.equal(await page.locator("#reloadAnalyzer").isDisabled(), true, "Reload waits for the load to settle");
+      // A click that gets through anyway (say, after the 5-minute watchdog
+      // gave up on a load still running) must not start a second boot.
+      await page.evaluate(() => document.getElementById("reloadAnalyzer").onclick());
+      overrides = new Map();
+      await page.waitForFunction(() => /^analyzer: loaded/m.test(document.getElementById("diagText").value), null, { timeout: 60_000 });
+      await page.waitForTimeout(4000); // room for a second boot to finish
+      assert.equal(await page.locator(".cm-editor").count(), 1);
+      assert.equal(gets(requests, "glue.mjs"), 1, requests.join("\n"));
+      const log = await page.locator("#log").inputValue();
+      assert.equal(log.match(/analyzer loaded/g).length, 1, log);
+      const keys = await page.evaluate(
+        () =>
+          new Promise((resolve, reject) => {
+            const req = indexedDB.open("relevance-debugger", 1);
+            req.onsuccess = () => {
+              const all = req.result.transaction("analyzer").objectStore("analyzer").getAllKeys();
+              all.onsuccess = () => resolve(all.result.map(String));
+              all.onerror = () => reject(all.error);
+            };
+            req.onerror = () => reject(req.error);
+          }),
+      );
+      assert.ok(!keys.some((k) => k.startsWith("nostart:")), keys.join("\n"));
+      assert.equal(await page.locator("#reloadAnalyzer").isDisabled(), false);
+      assert.deepEqual(errors, []);
+    } finally {
+      overrides = new Map();
+      await context.close();
+    }
+  });
+
+  test("a Reload that never finishes gives up after 5 minutes, like the first load", async () => {
+    // Review of #187, finding 5: the watchdog only covered the first load.
+    const context = await browser.newContext();
+    try {
+      const { page } = await open(context, WEB_REPORT, (p) => p.clock.install());
+      await analyzerSettled(page);
+      await page.locator(".cm-editor").waitFor();
+      overrides = new Map([[`/${MANIFEST}`, () => {}]]); // never answers
+      await page.click("summary");
+      await page.click("#reloadAnalyzer");
+      await page.waitForFunction(() => /^analyzer: reloading/m.test(document.getElementById("diagText").value));
+      await page.clock.fastForward("05:01");
+      await page.waitForFunction(() => /^analyzer: unavailable: did not load within 5 minutes/m.test(document.getElementById("diagText").value), null, { timeout: 10_000 });
+      assert.equal(await page.locator("#reloadAnalyzer").isDisabled(), false);
+    } finally {
+      overrides = new Map();
       await context.close();
     }
   });

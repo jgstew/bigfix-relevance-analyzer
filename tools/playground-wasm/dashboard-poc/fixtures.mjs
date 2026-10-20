@@ -30,9 +30,10 @@ export function playgroundPage({ cores = { "analyzer.core.wasm": "AAAA", "analyz
   ].join("\n");
 }
 
-// A fake fetch over `routes` (url -> {body, status, headStatus, lastModified}
-// or "offline"),
-// recording every call as "METHOD url".
+// A fake fetch over `routes` (url -> {body, status, headStatus, lastModified,
+// headLastModified (false: HEAD answers without it)} or "offline"),
+// recording every call as "METHOD url". A GET whose If-Modified-Since equals
+// the route's lastModified gets 304 with no body.
 export function fakeFetch(routes) {
   const calls = [];
   const fetch = async (url, init = {}) => {
@@ -41,7 +42,11 @@ export function fakeFetch(routes) {
     const route = routes[url];
     if (route === undefined || route === "offline") throw new TypeError("Failed to fetch");
     const headers = new Headers();
-    if (route.lastModified) headers.set("Last-Modified", route.lastModified);
+    if (route.lastModified && !(method === "HEAD" && route.headLastModified === false)) {
+      headers.set("Last-Modified", route.lastModified);
+    }
+    const since = new Headers(init.headers).get("If-Modified-Since");
+    if (method === "GET" && since && since === route.lastModified) return new Response(null, { status: 304, headers });
     const status = (method === "HEAD" && route.headStatus) || route.status || 200;
     return new Response(method === "HEAD" ? null : route.body, { status, headers });
   };
