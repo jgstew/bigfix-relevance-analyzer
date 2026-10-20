@@ -338,11 +338,60 @@
     return out;
   }
 
+  // A started cmd.exe as {pid, running(), terminate?()}.
+  //
+  // WScript.Shell.Exec always opens a console window for a console program,
+  // and Run(line, 0) hides it but gives no process to wait for or end, so
+  // the process is created through WMI with SW_HIDE, keeping its id. Throws
+  // if WMI is blocked or refuses; the caller then falls back to Exec.
+  function startHidden(line, dir) {
+    var svc = new window.ActiveXObject("WbemScripting.SWbemLocator").ConnectServer(".", "root\\cimv2");
+    var startup = svc.Get("Win32_ProcessStartup").SpawnInstance_();
+    startup.ShowWindow = 0; // SW_HIDE
+    var cls = svc.Get("Win32_Process");
+    var inParams = cls.Methods_.Item("Create").InParameters.SpawnInstance_();
+    inParams.CommandLine = line;
+    // Every path on the line is absolute; a set folder just avoids WMI's own.
+    inParams.CurrentDirectory = dir;
+    inParams.ProcessStartupInformation = startup;
+    var out = cls.ExecMethod_("Create", inParams);
+    if (out.ReturnValue !== 0) throw new Error("Win32_Process.Create returned " + out.ReturnValue);
+    var pid = out.ProcessId;
+    var queryFailed = false;
+    return {
+      pid: pid,
+      // cmd.exe exits once qna, running inside it, has.
+      running: function () {
+        try {
+          return svc.ExecQuery("SELECT ProcessId FROM Win32_Process WHERE ProcessId=" + pid).Count > 0;
+        } catch (e) {
+          // Keep waiting: the timeout still ends it.
+          if (!queryFailed) log("qna: could not check on pid " + pid + ": " + errText(e));
+          queryFailed = true;
+          return true;
+        }
+      },
+    };
+  }
+
+  function startExec(shell, line) {
+    var exec = shell.Exec(line);
+    return {
+      pid: exec.ProcessID,
+      running: function () {
+        return exec.Status === 0;
+      },
+      terminate: function () {
+        exec.Terminate();
+      },
+    };
+  }
+
   // The relevance goes into a temp file and reaches qna on stdin, never on a
   // command line, so cmd metacharacters in it are harmless. Output goes to a
   // file too, so a large answer cannot fill the pipe and stall qna.
   function evalLocal(ctx, query, timeoutMs, done) {
-    var fso, shell, exec, inFile, outFile;
+    var fso, shell, proc, inFile, outFile;
     try {
       fso = new window.ActiveXObject("Scripting.FileSystemObject");
       shell = new window.ActiveXObject("WScript.Shell");
@@ -376,22 +425,31 @@
       done("could not write the relevance for qna (characters outside this computer's code page?): " + errText(e));
       return;
     }
+    var line = 'cmd.exe /c ""' + qna + '" -t -showtypes < "' + inFile + '" > "' + outFile + '" 2>&1"';
     try {
-      exec = shell.Exec('cmd.exe /c ""' + qna + '" -t -showtypes < "' + inFile + '" > "' + outFile + '" 2>&1"');
+      proc = startHidden(line, fso.GetSpecialFolder(2).Path);
+      fact("qna launch", "WMI hidden (pid " + proc.pid + ")");
     } catch (e) {
-      cleanup();
-      done("could not start qna: " + errText(e));
-      return;
+      log("qna: WMI unavailable: " + errText(e) + "; using WScript.Shell.Exec, which shows a console window");
+      try {
+        proc = startExec(shell, line);
+      } catch (e2) {
+        fact("qna launch", "failed (WMI unavailable: " + errText(e) + "; Exec: " + errText(e2) + ")");
+        cleanup();
+        done("could not start qna: " + errText(e2));
+        return;
+      }
+      fact("qna launch", "Exec (WMI unavailable: " + errText(e) + ")");
     }
     var started = now();
-    // Terminate() would end only cmd.exe and leave qna.exe running (and its
-    // temp files open), so end the whole tree, then clean up.
+    // Ending only cmd.exe would leave qna.exe running (and its temp files
+    // open), so end the whole tree, hidden, then clean up.
     function stop() {
       try {
-        shell.Run("taskkill /F /T /PID " + exec.ProcessID, 0, true);
+        shell.Run("taskkill /F /T /PID " + proc.pid, 0, true);
       } catch (e) {
         try {
-          exec.Terminate();
+          if (proc.terminate) proc.terminate();
         } catch (e2) {}
       }
       cleanup();
@@ -407,7 +465,7 @@
     ctx.cancels.push(stop);
     function poll() {
       if (ctx.cancelled) return;
-      if (exec.Status === 0) {
+      if (proc.running()) {
         if (now() - started > timeoutMs) {
           stop();
           done("qna did not finish within " + timeoutMs / 1000 + " s");
