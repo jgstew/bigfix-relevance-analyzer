@@ -1,0 +1,162 @@
+<!--
+  The relevance debugger as a BigFix console dashboard and a Web Report, from
+  one page. Built by build_poc.py; edit this, not the output. See README.md.
+
+  build_poc.py builds two targets from it:
+  * console: client relevance (local qna, FastQuery) and session relevance.
+    The console renders dashboards in its IE11 engine, so no analyzer.
+  * webreport: the analyzer plus session relevance. Web Reports runs in the
+    user's own browser but can never evaluate client relevance.
+  Elements marked data-only="console" or data-only="webreport" are removed at
+  load by core.js on the other target.
+
+  Two script layers:
+  * core.js, a classic script in ES5 only, so it parses in IE11. It owns the
+    UI and every evaluation path.
+  * the analyzer (webreport only): the playground's componentize-py component
+    and CodeMirror editor in <script type="module">.
+
+  %%HEAD%% and %%BODY%% mark where build_poc.py splits the page into an .ojo's
+  <Head> and <HTML> sections. The styles avoid what IE11 lacks (CSS
+  variables, gap, grid).
+-->
+%%HEAD%%
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta charset="utf-8" />
+<style>
+  #rdbg { font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Arial, sans-serif; font-size: 13px; line-height: 1.45; color: #1f2328; background: #fff; padding: 14px 18px 24px 18px; max-width: 1200px; }
+  #rdbg * { box-sizing: border-box; }
+  #rdbg .header { border-bottom: 1px solid #d0d7de; padding-bottom: 10px; margin-bottom: 14px; }
+  #rdbg h1 { font-size: 20px; font-weight: 600; margin: 0; color: #0b3d91; }
+  #rdbg h1 .tag { font-size: 11px; font-weight: 600; color: #57606a; border: 1px solid #d0d7de; border-radius: 10px; padding: 1px 8px; margin-left: 8px; vertical-align: middle; }
+  #rdbg .subtitle { color: #57606a; margin: 2px 0 0 0; }
+  #rdbg h2 { font-size: 14px; font-weight: 600; margin: 0 0 8px 0; }
+  #rdbg .panel { border: 1px solid #d0d7de; border-radius: 6px; padding: 12px 14px; margin: 0 0 14px 0; background: #fff; }
+  #rdbg .hint { color: #57606a; }
+  #rdbg .error { color: #b42318; }
+  #rdbg .ok { color: #1a7f37; }
+  #rdbg .notice { border-left: 3px solid #bf8700; background: #fff8e5; padding: 6px 10px; margin: 8px 0 0 0; }
+  #rdbg .notice.info { border-left-color: #0969da; background: #f0f6ff; }
+  #rdbg .notice:empty { display: none; }
+  #rdbg label { white-space: nowrap; }
+  #rdbg textarea, #rdbg input[type=text], #rdbg input[type=number], #rdbg select { font-family: inherit; font-size: 13px; border: 1px solid #afb8c1; border-radius: 4px; padding: 3px 6px; background: #fff; color: #1f2328; }
+  #rdbg textarea.query { width: 100%; height: 110px; font-family: Consolas, "SF Mono", Menlo, monospace; padding: 6px 8px; resize: vertical; }
+  #rdbg #editorHost .cm-editor { border: 1px solid #afb8c1; border-radius: 4px; min-height: 110px; font-size: 13px; }
+  #rdbg #editorHost .cm-editor.cm-focused { outline: 2px solid #0969da; outline-offset: -1px; }
+  #rdbg input[type=number] { width: 58px; }
+  #rdbg #ids { width: 200px; }
+  #rdbg .row { margin: 10px 0 0 0; }
+  #rdbg .row label { margin-right: 16px; display: inline-block; margin-bottom: 4px; }
+  #rdbg .row .why { margin-left: 4px; }
+  #rdbg .targets { margin: 10px 0 0 0; padding: 8px 10px; background: #f6f8fa; border-radius: 4px; }
+  #rdbg .targets .title { font-weight: 600; margin-right: 12px; }
+  #rdbg .actions { margin: 12px 0 0 0; }
+  #rdbg button { font-family: inherit; font-size: 13px; padding: 5px 16px; border-radius: 4px; border: 1px solid #afb8c1; background: #f6f8fa; color: #1f2328; cursor: pointer; margin-right: 8px; }
+  #rdbg button:hover { background: #eef1f4; }
+  #rdbg button.primary { background: #0b5cd5; border-color: #0a4fb7; color: #fff; font-weight: 600; }
+  #rdbg button.primary:hover { background: #0a4fb7; }
+  #rdbg button[disabled] { opacity: 0.5; cursor: default; }
+  #rdbg button.small { padding: 2px 10px; font-size: 12px; }
+  #rdbg #status { color: #57606a; }
+  #rdbg table { border-collapse: collapse; width: 100%; }
+  #rdbg th, #rdbg td { border-bottom: 1px solid #d8dee4; padding: 5px 8px; text-align: left; vertical-align: top; }
+  #rdbg th { background: #f6f8fa; font-weight: 600; border-top: 1px solid #d8dee4; }
+  #rdbg tbody tr:hover td { background: #f6f8fa; }
+  #rdbg td.answer, #rdbg ol.answers { font-family: Consolas, "SF Mono", Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+  #rdbg td.error { color: #b42318; }
+  #rdbg td.empty { color: #57606a; font-style: italic; text-align: center; padding: 14px; }
+  #rdbg ol.answers { margin: 6px 0 0 0; padding-left: 36px; }
+  #rdbg ol.answers li { padding: 1px 0; }
+  #rdbg .summary { font-weight: 600; margin: 0; }
+  #rdbg .errbox { border: 1px solid #f1aeb5; background: #fff1f0; color: #8c1d18; border-radius: 4px; padding: 8px 10px; margin: 6px 0 0 0; font-family: Consolas, "SF Mono", Menlo, monospace; white-space: pre-wrap; }
+  #rdbg .badge { display: inline-block; border-radius: 10px; padding: 1px 9px; margin: 0 6px 4px 0; font-size: 12px; border: 1px solid #d0d7de; background: #f6f8fa; }
+  #rdbg .badge.ok { border-color: #a6dbb4; background: #edf9f0; color: #1a7f37; }
+  #rdbg .badge.error { border-color: #f1aeb5; background: #fff1f0; color: #b42318; }
+  #rdbg details { margin: 0 0 14px 0; border: 1px solid #d0d7de; border-radius: 6px; padding: 8px 14px; }
+  #rdbg summary { cursor: pointer; font-weight: 600; color: #57606a; display: block; }
+  #rdbg.no-details summary:before { content: "\25B8\00a0\00a0"; }
+  #rdbg.no-details details[open] summary:before { content: "\25BE\00a0\00a0"; }
+  #rdbg details h3 { font-size: 13px; margin: 12px 0 4px 0; }
+  #rdbg #log, #rdbg #diagText { width: 100%; font-family: Consolas, "SF Mono", Menlo, monospace; font-size: 12px; background: #f6f8fa; }
+  #rdbg #log { height: 130px; }
+  #rdbg #diagText { height: 190px; }
+  #rdbg .footer { color: #8c959f; font-size: 11px; margin-top: 8px; }
+</style>
+%%BODY%%
+<div id="rdbg">
+  <div class="header">
+    <h1>Relevance Debugger<span class="tag">proof of concept</span></h1>
+    <p class="subtitle" data-only="console">Evaluate client relevance on this computer and with FastQuery, and session relevance on this deployment.</p>
+    <p class="subtitle" data-only="webreport">Check relevance with the analyzer and evaluate it as session relevance. Client relevance can be analyzed here, not evaluated.</p>
+    <p id="hostNotice" class="notice"></p>
+  </div>
+
+  <div class="panel">
+    <div id="editorHost" data-only="webreport"></div>
+    <textarea id="rel" class="query" spellcheck="false" aria-label="Relevance statement">%%SAMPLE%%</textarea>
+
+    <div data-only="console">
+      <div class="row">
+        <label>Run as
+          <select id="dialect">
+            <option value="auto" selected="selected">Auto</option>
+            <option value="session">Session relevance</option>
+            <option value="client">Client relevance</option>
+            <option value="both">Both</option>
+          </select>
+        </label>
+        <span id="dialectWhy" class="hint why"></span>
+      </div>
+      <div class="targets">
+        <span class="title">Client targets</span>
+        <label><input type="checkbox" id="useLocal" checked="checked" /> This computer (qna)</label>
+        <label><input type="checkbox" id="useFast" checked="checked" /> FastQuery:
+          <input type="number" id="fastCount" value="5" min="1" max="100" /> random computers that reported in the last hour</label>
+        <label>or computer IDs <input type="text" id="ids" placeholder="e.g. 1234, 5678" /></label>
+        <label>timeout <input type="number" id="timeoutSec" value="60" min="5" max="600" /> s</label>
+        <div id="clientWhy" class="hint"></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="evaluate" class="primary">Evaluate</button>
+      <button id="cancel" disabled="disabled" data-only="console">Cancel</button>
+      <span id="status"></span>
+    </div>
+    <p id="dialectNote" class="notice info" data-only="webreport"></p>
+  </div>
+
+  <div class="panel" data-only="webreport">
+    <h2>Analysis</h2>
+    <div id="analysis" class="hint">The analyzer is loading&hellip;</div>
+  </div>
+
+  <div class="panel">
+    <h2>Results</h2>
+    <div data-only="webreport">
+      <div id="wrResult" class="hint">Evaluate to see the answers.</div>
+    </div>
+    <table id="results" data-only="console">
+      <thead><tr><th>Dialect</th><th>Source</th><th>Computer</th><th>Answers</th><th>Error</th><th>Details</th></tr></thead>
+      <tbody><tr><td class="empty" colspan="6">Evaluate to see the answers.</td></tr></tbody>
+    </table>
+  </div>
+
+  <details>
+    <summary>Log and diagnostics</summary>
+    <h3>Log</h3>
+    <textarea id="log" readonly="readonly"></textarea>
+    <h3>Diagnostics <button id="copyDiag" class="small">Copy</button></h3>
+    <p class="hint">What this page found about where it is running. Include it when reporting a problem.</p>
+    <textarea id="diagText" readonly="readonly"></textarea>
+  </details>
+  <p id="footer" class="footer"></p>
+</div>
+
+<script>
+window.RDBG_BUILD = %%BUILD_JSON%%;
+</script>
+<script>
+%%CORE_JS%%
+</script>
+%%ANALYZER%%

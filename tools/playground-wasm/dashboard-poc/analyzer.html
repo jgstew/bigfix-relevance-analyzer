@@ -1,0 +1,145 @@
+<!--
+  The analyzer layer, injected at template.html's %%ANALYZER%% (left out of the
+  lite build). Module scripts only: an IE engine skips them entirely. The boot
+  is the componentize-py playground's (../componentize-py/build-playground/
+  template.html); keep the two in step.
+-->
+<script type="module">
+// Pre-flight, separate from the multi-MiB module below so a failure is
+// reported even if that module cannot even evaluate.
+const problem =
+  typeof WebAssembly !== "object" ? "no WebAssembly"
+  : typeof DecompressionStream !== "function" ? "no DecompressionStream"
+  : null;
+window.__rdbgSkip = problem;
+if (problem) window.rdbg.onAnalyzerFailed(problem);
+</script>
+<script type="module" id="rdbg-analyzer">
+if (!window.__rdbgSkip) {
+  // ../editor-bundle/build.mjs: publishes window.playgroundEditor.
+  %%EDITOR_JS%%
+}
+
+const CORES_GZIP = %%CORES_GZIP_JSON%%;
+
+function bytesFromBase64(b64) {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+// jco's glue fetches each core module by URL; hand back the embedded bytes.
+const realFetch = window.fetch.bind(window);
+window.fetch = async (input, init) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const name = url.split("/").pop();
+  if (Object.hasOwn(CORES_GZIP, name)) {
+    const inflating = new Response(bytesFromBase64(CORES_GZIP[name])).body.pipeThrough(
+      new DecompressionStream("gzip"),
+    );
+    return new Response(inflating, { status: 200, headers: { "Content-Type": "application/wasm" } });
+  }
+  return realFetch(input, init);
+};
+
+%%BUNDLE_JS%%
+
+// The analyzer's payload "dialect" -> what Evaluate runs. A stand-in for the
+// debugger's dialect_fit (not in the component yet): resolved wins, "both"
+// and "uncertain" run both dialects, else the text classifier.
+function dialectChoice(payload) {
+  const d = payload.dialect;
+  if (d.resolved === "client" || d.resolved === "session") {
+    return { dialects: [d.resolved], why: `the analyzer resolved it as ${d.resolved}` };
+  }
+  if (d.resolved === "both") {
+    return { dialects: ["session", "client"], why: "the analyzer says it is valid in either dialect" };
+  }
+  if (d.resolved === "uncertain") {
+    return { dialects: ["session", "client"], why: "it mixes client and session references" };
+  }
+  if (d.classified === "client" || d.classified === "session") {
+    return { dialects: [d.classified], why: `the analyzer's text classifier says ${d.classified}` };
+  }
+  return { dialects: ["session", "client"], why: "the analyzer could not tell, so both run" };
+}
+
+function el(tag, text, cls) {
+  const node = document.createElement(tag);
+  if (text !== undefined) node.textContent = text;
+  if (cls) node.className = cls;
+  return node;
+}
+
+function renderAnalysis(payload) {
+  const out = document.getElementById("analysis");
+  out.replaceChildren();
+  out.className = "";
+  const choice = dialectChoice(payload);
+  const types = payload.types;
+  const typeText = !types ? "n/a"
+    : Array.isArray(types.types) ? `${types.types.join(", ")} (${types.plurality})`
+    : `unknown (${types.plurality})`;
+  const badges = el("p");
+  for (const [label, ok] of [
+    [`dialect: ${choice.dialects.join(" + ")}`, true],
+    [`parse: ${payload.parse.ok ? "ok" : "error"}`, payload.parse.ok],
+    [`type: ${typeText}`, types?.ok === true],
+    [`cost: ${payload.complexity.evaluation_cost}`, true],
+  ]) {
+    badges.appendChild(el("span", label, `badge ${ok ? "ok" : "error"}`));
+  }
+  out.appendChild(badges);
+  out.appendChild(el("p", `Dialect: ${choice.why}.`, "hint"));
+  if (!payload.parse.ok) {
+    const e = payload.parse.error;
+    out.appendChild(el("p", `Parse error: ${e.message} (line ${e.line}, column ${e.column})`, "error"));
+  }
+  const diagnostics = types?.diagnostics ?? [];
+  if (diagnostics.length) {
+    const table = el("table");
+    const head = el("tr");
+    for (const h of ["at", "code", "message"]) head.appendChild(el("th", h));
+    table.appendChild(head);
+    for (const d of diagnostics) {
+      const tr = el("tr");
+      for (const v of [`${d.line}:${d.column}`, d.code, d.message]) tr.appendChild(el("td", v));
+      table.appendChild(tr);
+    }
+    out.appendChild(table);
+  }
+  if (payload.unknown_references?.length) {
+    out.appendChild(el("p", `Unknown inspectors: ${payload.unknown_references.join(", ")}`, "hint"));
+  }
+}
+
+async function boot() {
+  const started = performance.now();
+  const component = globalThis.__component;
+  if (!component) throw new Error("the bundled component never reached globalThis.__component");
+  await component.$init;
+
+  const host = document.getElementById("editorHost");
+  const editor = window.playgroundEditor.mount(host, {
+    doc: window.rdbg.initialText(),
+    onRun: () => window.rdbg.evaluate(),
+  });
+  editor.connect(component.handle);
+
+  const analyze = (text) => {
+    const payload = JSON.parse(component.analyze(text));
+    renderAnalysis(payload);
+    return payload;
+  };
+  window.rdbg.onAnalyzer(
+    { editor, analyze, dialect: (text) => dialectChoice(JSON.parse(component.analyze(text))) },
+    `bigfix_relevance_analyzer ${component.version()}, ${Math.round(performance.now() - started)} ms`,
+  );
+  analyze(editor.getText());
+}
+
+if (!window.__rdbgSkip) {
+  boot().catch((err) => window.rdbg.onAnalyzerFailed(`boot failed: ${err}`));
+}
+</script>
