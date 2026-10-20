@@ -124,10 +124,14 @@ template.html -+- core.js              ES5 only; UI and every evaluation path, b
   `fetch`, the cache and `crypto.subtle` passed in so Node tests can drive it.
   - From a **manifest** ([MANIFEST.md](MANIFEST.md)): it fetches
     `manifest.json` (`cache: "no-cache"`) and, unless its text is identical
-    to the cached one, every file it names. It checks each file's size, and
-    its sha256 where `crypto.subtle` exists (not on plain-http Web Reports),
-    and that the cores are exactly the ones the glue loads. A mismatch rejects
-    the whole set, so files from two versions never mix.
+    to the cached one, every file it names. It checks each file's size and
+    sha256 (or, for a core a server decompressed in transit, `raw_size` and
+    `raw_sha256`), and that the cores are exactly the ones the glue loads. A mismatch rejects
+    the whole set, so files from two versions never mix. Every file's sha256
+    is checked before it is used or cached; without `crypto.subtle` (plain
+    http) a JavaScript SHA-256 does it, ~150 ms for the 9 MB set on an Apple
+    M1 Pro against ~5 ms with `crypto.subtle`. So a cached set is checked
+    again on each load only where `crypto.subtle` exists.
   - From the **single-file page**: it cuts the three pieces out, each found by
     text that appears exactly once there (after `Publishes
     window.playgroundEditor.`, at `const CORES_GZIP = `, and between the end

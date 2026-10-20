@@ -223,6 +223,20 @@ describe("loadPieces (split analyzer manifest)", () => {
     assert.ok(second.logs.some((l) => /cached set .*does not match/.test(l)), second.logs.join("\n"));
   });
 
+  test("without crypto.subtle a cached set is not hashed again on each load", async () => {
+    // It was fully verified when it downloaded; re-hashing ~9 MB in
+    // JavaScript would cost ~150 ms on every load (README.md).
+    const set = splitSet();
+    const store = new Map();
+    await loadPieces([MANIFEST], memoryEnv(set.routes, store).env);
+    const [key] = store.keys();
+    store.get(key).glue = "globalThis.__component={changed:1};";
+    const second = memoryEnv(set.routes, store);
+    const got = await loadPieces([MANIFEST], second.env);
+    assert.equal(got.how, "cached");
+    assert.deepEqual(second.calls, [`GET ${MANIFEST}`]);
+  });
+
   test("manifest unreachable with a cached set: uses it", async () => {
     const set = splitSet();
     const store = new Map();

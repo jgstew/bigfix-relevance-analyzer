@@ -76,8 +76,11 @@ All paths are bare file names relative to `manifest.json`: no `/`, no `..`.
   Tell by the bytes: gzip starts `1f 8b`, wasm starts `00 61 73 6d`. Check a
   core that arrived inflated against `raw_size` and `raw_sha256`; without
   them it cannot be verified, so refuse it.
-- Re-verify a cached set against its manifest before running it: browser
-  storage is shared with every page on the origin.
+- Re-verify a cached set against its manifest before running it where
+  `crypto.subtle` exists (about 5 ms): browser storage is shared with every
+  page on the origin. Without it the Web Report trusts a set it verified when
+  it downloaded, since hashing ~9 MB in JavaScript would cost ~150 ms on
+  every load.
 - If a newer manifest's set fails to download or verify, keep using the
   cached set rather than nothing.
 

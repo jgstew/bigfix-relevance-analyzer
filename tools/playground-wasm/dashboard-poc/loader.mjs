@@ -238,7 +238,8 @@ async function verify(file, bytes, env) {
 }
 
 // Every piece of a cached set, checked against its own manifest again before
-// it runs: storage is shared with every page on the origin.
+// it runs, where crypto.subtle makes that cheap: storage is shared with every
+// page on the origin.
 async function verifyCached(pieces, env) {
   const manifest = parseManifest(pieces.manifestText);
   const encode = (text) => new TextEncoder().encode(text);
@@ -270,6 +271,11 @@ export async function fromManifest(configured, env) {
     return { pieces: cached, how: "cached" };
   }
   if (cached && cached.manifestText === text) {
+    // The set was fully verified when it downloaded. Checking it again
+    // guards against another page on the origin rewriting the cache; that
+    // costs ~5 ms with crypto.subtle, but ~150 ms of JavaScript hashing on
+    // every load without it (plain http), so there the set is trusted.
+    if (!env.subtle) return { pieces: cached, how: "cached" };
     try {
       await verifyCached(cached, env);
       return { pieces: cached, how: "cached" };
