@@ -63,8 +63,9 @@ indent and a trailing newline.
   It must not guess.
 - `package` is always `"bigfix-relevance-analyzer"`.
 - `version` is the package version (`pyproject.toml`), which is also what the
-  component's `version()` export returns. The reference page refuses to boot if
-  the two disagree.
+  component's `version()` export returns. Comparing the two is optional for a
+  consumer. The reference page does compare them and refuses to boot if they
+  disagree.
 - `editor` and `glue` each have `path`, `size` and `sha256`, in that order.
 - `cores` has one entry per core module, sorted by `name`. Each entry has
   `name`, `path`, `encoding`, `size` and `sha256`, in that order. `name` is the
@@ -107,15 +108,20 @@ indent and a trailing newline.
    apart by magic bytes: gzip starts `1f 8b`, wasm starts `00 61 73 6d`.
    Anything else is refused. An already-inflated core cannot be checked against
    the manifest, because its published bytes never arrived.
-7. Run the glue so that `import.meta.url` resolves the core names. The glue
+7. Run the glue so that its core URLs reach your fetch intercept. The glue
    builds each core's URL as `new URL("./<name>", import.meta.url)` and fetches
    it. Serve those fetches from the verified bytes through a `window.fetch`
    intercept keyed on the last path segment: inflate gzip with
    `DecompressionStream("gzip")` and answer with `Content-Type:
-   application/wasm`, so `WebAssembly.compileStreaming` accepts it. A blob: URL
-   cannot resolve `./<name>`, so `index.html` runs the glue as an inline
-   `<script type="module">`, which gives it the document's URL, as in the
-   single-file page.
+   application/wasm`, so `WebAssembly.compileStreaming` accepts it. Either of
+   these is valid:
+   - Run the glue text as an inline `<script type="module">`, so
+     `import.meta.url` is the document's URL and `./<name>` resolves normally.
+     `index.html` does this, as the single-file page does.
+   - Run it from a blob: URL after replacing `import.meta.url` in the text
+     with a placeholder base URL that the intercept answers by core name. A
+     blob: URL alone cannot resolve `./<name>`, so the replacement is required
+     in this case. The Web Reports loader does this.
 8. After the glue runs, `globalThis.__component` holds `$init` (a promise:
    await it before calling anything), `analyze(text) -> JSON string`,
    `version()`, `handle(message) -> JSON array string` (the language server),
