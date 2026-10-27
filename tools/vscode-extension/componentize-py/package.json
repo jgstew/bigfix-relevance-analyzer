@@ -142,12 +142,12 @@
     }
   },
   "dependencies": {
-    "@bytecodealliance/preview2-shim": "0.28.0",
+    "@bytecodealliance/preview2-shim": "0.30.0",
     "vscode-jsonrpc": "9.0.3",
     "vscode-languageclient": "10.1.2"
   },
   "devDependencies": {
-    "@bytecodealliance/jco": "1.37.0",
+    "@bytecodealliance/jco": "1.39.0",
     "@vscode/vsce": "4.0.0",
     "vscode-oniguruma": "2.0.1",
     "vscode-textmate": "9.3.2"
