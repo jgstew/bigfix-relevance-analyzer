@@ -386,6 +386,29 @@ def test_fix_paths_reports_every_file(tmp_path: Path) -> None:
     assert [finding.code for finding in result.findings] == ["file-error"]
 
 
+def test_fix_paths_walks_a_directory_argument(tmp_path: Path) -> None:
+    (tmp_path / "sub").mkdir()
+    fixable = write(tmp_path / "sub", task(f"<Relevance>{SETTING}</Relevance>"), "a.bes")
+    (tmp_path / "notes.txt").write_text("not relevance")
+    result = fix_paths([tmp_path], LintConfig())
+    assert result.changed == (fixable,)
+    assert result.findings == ()
+
+
+def test_fix_paths_reports_where_a_directory_walk_stopped(tmp_path: Path) -> None:
+    (tmp_path / "a" / "b").mkdir(parents=True)
+    write(tmp_path / "a" / "b", task(f"<Relevance>{SETTING}</Relevance>"))
+    result = fix_paths([tmp_path], LintConfig(), max_depth=1)
+    assert result.changed == ()
+    assert [finding.code for finding in result.findings] == ["max-depth-exceeded"]
+
+
+def test_plan_fix_on_a_directory_is_a_file_error(tmp_path: Path) -> None:
+    plan = plan_fix(tmp_path, LintConfig())
+    assert not plan.changed
+    assert [finding.code for finding in plan.findings] == ["file-error"]
+
+
 def test_fix_paths_to_dict_shape(tmp_path: Path) -> None:
     path = write(tmp_path, task(f"<Relevance>{SETTING}</Relevance>"))
     payload = fix_paths_to_dict([path], LintConfig())

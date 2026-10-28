@@ -157,17 +157,67 @@ def test_no_paths_walks_the_current_directory(
     assert "broken.rel:1: error [parse-error]" in out
 
 
-def test_explicit_dot_is_not_walked(
+def test_explicit_dot_is_walked_like_no_paths(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
     write(tmp_path, "broken.rel", BROKEN)
 
-    # An explicit "." is a literal path argument, not a walk root: extract_relevance_from_file(".")
-    # matches no recognized suffix, so this finds nothing -- same as any other explicit path.
-    assert main(["."]) == 0
+    assert main(["."]) == 1
+    captured = capsys.readouterr()
+    assert "broken.rel:1: error [parse-error]" in captured.out
+    assert "in 1 directory" in captured.err
+
+
+def test_a_directory_argument_is_never_a_clean_pass(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Regression: `bigfix-relevance-lint some/dir` printed `0 error(s), 0
+    warning(s) in 1 file(s)` and exited 0 over a directory of broken files."""
+    (tmp_path / "sub").mkdir()
+    broken = write(tmp_path / "sub", "broken.rel", BROKEN)
+
+    assert main([str(tmp_path)]) == 1
+    captured = capsys.readouterr()
+    assert f"{broken}:1: error [parse-error]" in captured.out
+    assert captured.err.strip().endswith("in 1 directory")
+
+
+def test_an_examples_directory_reports_what_listing_its_files_does(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Regression for the reported repro, over the real example fixtures."""
+    directory = Path(__file__).parent / "examples/client_relevance/tasks"
+    files = sorted(str(path) for path in directory.iterdir())
+
+    main(files)
+    listed = capsys.readouterr().out
+    assert "warning [" in listed
+    main([str(directory)])
+    assert capsys.readouterr().out == listed
+
+
+def test_scope_counts_files_and_directories_apart(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    clean = write(tmp_path, "clean.rel", CLIENT)
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+
+    assert main(["--json", str(clean), str(tmp_path / "a"), str(tmp_path / "b")]) == 0
+    assert json.loads(capsys.readouterr().out)["scope"] == "1 file(s) and 2 directories"
+
+
+def test_max_depth_is_wired_through_for_a_directory_argument(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "d" / "d").mkdir(parents=True)
+    (tmp_path / "d" / "d" / "broken.rel").write_text(BROKEN)
+
+    assert main(["--max-depth=1", str(tmp_path)]) == 1
     out = capsys.readouterr().out
-    assert out == ""
+    assert "max-depth-exceeded" in out
+    assert "parse-error" not in out
 
 
 def test_max_depth_is_wired_through_on_the_walk_branch(
@@ -574,6 +624,39 @@ def test_fix_with_no_paths_walks_the_current_directory(
     assert main(["--fix"]) == 1
     assert path.read_text() == SETTING_TASK.replace("setting ", "settings ")
     assert "fixed [plural-preferred]" in capsys.readouterr().out
+
+
+def test_fix_walks_a_directory_argument(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    (tmp_path / "sub").mkdir()
+    path = tmp_path / "sub" / "t.bes"
+    path.write_text(SETTING_TASK)
+    assert main(["--fix", str(tmp_path)]) == 1
+    assert path.read_text() == SETTING_TASK.replace("setting ", "settings ")
+    captured = capsys.readouterr()
+    assert "fixed [plural-preferred]" in captured.out
+    assert "1 fix(es) applied in 1 file(s)" in captured.err
+
+
+def test_fix_diff_walks_a_directory_argument(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = write(tmp_path, "t.bes", SETTING_TASK)
+    assert main(["--fix", "--diff", str(tmp_path)]) == 1
+    assert path.read_text() == SETTING_TASK
+    captured = capsys.readouterr()
+    assert captured.out.startswith(f"--- {path}\n+++ {path}\n")
+    assert "1 fix(es) would be applied in 1 file(s)" in captured.err
+
+
+def test_fix_diff_reports_where_a_directory_walk_stopped(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "d" / "d").mkdir(parents=True)
+    (tmp_path / "d" / "d" / "t.bes").write_text(SETTING_TASK)
+    assert main(["--fix", "--diff", "--max-depth=1", str(tmp_path)]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "max-depth-exceeded" in captured.err
 
 
 def test_relevance_text_argument_is_linted_directly(capsys: pytest.CaptureFixture[str]) -> None:

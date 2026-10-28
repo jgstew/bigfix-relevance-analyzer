@@ -780,20 +780,47 @@ def fix_file(path: str | bytes | os.PathLike[str], config: LintConfig) -> FileFi
     return write_fix(plan_fix(path, config))
 
 
-def fix_paths(paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfig) -> FixResult:
+def fix_paths(
+    paths: Iterable[str | bytes | os.PathLike[str]],
+    config: LintConfig,
+    *,
+    max_depth: int = DEFAULT_MAX_DEPTH,
+) -> FixResult:
     """:func:`fix_file` over many paths, in order.
 
-    Each path is taken literally, as :func:`~bigfix_relevance_analyzer.lint.lint_paths`
-    takes it; :func:`fix_directory` is the one that walks.
+    A directory is walked as :func:`fix_directory` walks it, to ``max_depth``;
+    every other path is taken literally -- the same split
+    :func:`~bigfix_relevance_analyzer.lint.lint_paths` makes.
     """
-    return _combine([write_fix(plan) for plan in _plan_paths(paths, config)])
+    plans, depth = _plan_paths(paths, config, max_depth=max_depth)
+    combined = _combine([write_fix(plan) for plan in plans])
+    return FixResult(
+        combined.applied, combined.unapplied, depth + combined.findings, combined.changed
+    )
 
 
 def _plan_paths(
-    paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfig
-) -> Iterator[FixPlan]:
-    """:func:`plan_fix` over many paths, in order, one at a time."""
-    return (plan_fix(path, config) for path in paths)
+    paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfig, *, max_depth: int
+) -> tuple[Iterator[FixPlan], tuple[Finding, ...]]:
+    """:func:`plan_fix` over many paths, in order, one at a time, with every
+    directory among them walked -- and the depth findings for wherever a walk
+    stopped, as :func:`_plan_directory` returns them.
+
+    The walks run up front, since they only list names; the files are still
+    read one plan at a time.
+    """
+    files: list[tuple[Path, bool]] = []
+    depth: list[Finding] = []
+    for path in paths:
+        file_path = _as_path(path)
+        if file_path.is_dir():
+            walked, exceeded = _walk_files(file_path, max_depth)
+            files.extend((walked_path, False) for walked_path in walked)
+            depth.extend(_depth_findings(file_path, exceeded, max_depth, config))
+        else:
+            files.append((file_path, True))
+    plans = (_plan_path(file_path, config, explicit=explicit) for file_path, explicit in files)
+    return plans, tuple(depth)
 
 
 def _plan_directory(
@@ -836,7 +863,10 @@ def _combine(results: Sequence[FileFixResult]) -> FixResult:
 
 
 def fix_paths_to_dict(
-    paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfig
+    paths: Iterable[str | bytes | os.PathLike[str]],
+    config: LintConfig,
+    *,
+    max_depth: int = DEFAULT_MAX_DEPTH,
 ) -> dict[str, Any]:
     """:func:`fix_paths` as JSON-serializable plain data -- see :meth:`FixResult.to_dict`."""
-    return fix_paths(paths, config).to_dict()
+    return fix_paths(paths, config, max_depth=max_depth).to_dict()

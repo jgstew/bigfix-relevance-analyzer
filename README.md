@@ -637,10 +637,10 @@ print on stderr, and exits as `--fix` would - `1` if anything would change.
 
 Called with **no path arguments at all**, either entry point walks the current
 directory instead of erroring - `bigfix-relevance-lint` on its own, or
-`--check` with nothing after it. This is only for the argument-less case: an
-*explicit* path, including `.`, is never expanded - it's taken literally, the
-same as any other path, so `bigfix-relevance-lint .` finds nothing rather than
-walking (a directory argument is a no-op). A *file* named explicitly whose
+`--check` with nothing after it. A directory given as a path argument, `.`
+included, is walked the same way, with `--fix` and `--fix --diff` too. (Before
+1.39.2 a directory argument was skipped, so `bigfix-relevance-lint some/dir`
+reported a clean pass over files it never read.) A *file* named explicitly whose
 suffix no extractor reads is a `file-error`, not a silent pass; the walk skips
 such files quietly. The walk skips `.git`, `__pycache__`, `node_modules`, `dist`, `build`,
 `venv`, `env`, and any other dot-prefixed directory - a fixed list rather than
@@ -656,7 +656,8 @@ to a clean, fully-scanned run:
 ```bash
 bigfix-relevance-lint                    # walk .
 bigfix-relevance-lint --max-depth=10     # walk ., 10 levels deep
-bigfix-relevance-lint .                  # NOT a walk -- one literal path, "."
+bigfix-relevance-lint .                  # the same walk of .
+bigfix-relevance-lint tasks/ a.bes      # walk tasks/, then lint a.bes
 ```
 
 Not a rule at any of the three entry points: `RelevanceAnalysis.missing_platforms`
