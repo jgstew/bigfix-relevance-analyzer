@@ -116,6 +116,9 @@ jobs:
     needs: version
     if: needs.version.outputs.release_needed == 'true'
     uses: ./.github/workflows/pre-commit.yaml # zizmor: ignore[self-repository]
+    with:
+      # a release-time advisory is not this release's to fix; see the input
+      skip-hooks: uv-audit
 
   release:
     name: Tag and Release

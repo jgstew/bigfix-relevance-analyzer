@@ -69,6 +69,20 @@ function waitFor(uri, ready) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** `uris` as they are at HEAD, through VS Code's own git extension: the URIs a
+ * diff view's old side and a file opened at a revision have (issue #134). */
+async function atHead(uris) {
+  const extension = vscode.extensions.getExtension("vscode.git");
+  if (!extension) throw new Error("the built-in git extension is not loaded");
+  const api = (await extension.activate()).getAPI(1);
+  const until = Date.now() + TIMEOUT_MS;
+  while (!api.repositories.length) {
+    if (Date.now() > until) throw new Error(`git found no repository in the workspace within ${TIMEOUT_MS} ms`);
+    await sleep(100);
+  }
+  return uris.map((uri) => api.toGitUri(uri, "HEAD"));
+}
+
 /** The language of the open document at `uri`: a switch replaces the document. */
 const languageOf = (uri) =>
   vscode.workspace.textDocuments.find((document) => document.uri.toString() === uri.toString())?.languageId;
@@ -185,6 +199,55 @@ async function lint() {
     });
     await vscode.window.showTextDocument(untitled);
     untitledFound = await waitFor(untitled.uri, (found) => found.length > 0);
+  }
+
+  // A file switched to the language by hand is still linted (issue #134):
+  // narrowing the selector to files and unsaved buffers keeps that case.
+  let switchedFound;
+  if (language) {
+    const notes = await vscode.workspace.openTextDocument(vscode.Uri.file(path.join(folder, "notes.txt")));
+    await vscode.languages.setTextDocumentLanguage(notes, language);
+    await vscode.window.showTextDocument(notes);
+    switchedFound = await waitFor(notes.uri, (found) => found.some((d) => codeOf(d) === "error-token"));
+  }
+
+  // ...but relevance in no other scheme is (issue #134): not a made-up one,
+  // nor git's, the old side of a diff view. Not a timer, as for BES below:
+  // control.rel is opened after them, and the client sends and the server
+  // answers in order, so once it has its diagnostics, these would have had
+  // theirs too had they been sent, however slow the machine.
+  const otherSchemes = {};
+  const unopened = [];
+  const provider = vscode.workspace.registerTextDocumentContentProvider("smoke-vfs", {
+    provideTextDocumentContent: () => 'exists file "unterminated\n',
+  });
+  try {
+    const unsent = await atHead([broken, bes]);
+    if (language) unsent.push(vscode.Uri.parse("smoke-vfs:/q.rel"));
+    const opened = [];
+    for (const uri of unsent) {
+      const document = await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(document, { preview: false });
+      opened.push(document);
+    }
+    const control = vscode.Uri.file(path.join(folder, "control.rel"));
+    await vscode.window.showTextDocument(control);
+    await waitFor(control, (found) => found.length > 0);
+    for (const document of opened) {
+      const name = `${document.uri.scheme}: ${path.basename(document.uri.path)} (${document.languageId})`;
+      otherSchemes[name] = summary(ours(document.uri));
+      // No diagnostics proves nothing about an empty or plain-text copy: each
+      // must hold the broken statement, in the language its file gets.
+      if (!document.getText().includes("unterminated")) {
+        unopened.push(`${name}: its text is ${JSON.stringify(document.getText())}`);
+      }
+      const expected = document.uri.path.endsWith(".bes") ? process.env.SMOKE_BES_LANGUAGE : language;
+      if (expected && document.languageId !== expected) {
+        unopened.push(`${name}: expected languageId ${expected}`);
+      }
+    }
+  } finally {
+    provider.dispose();
   }
 
   // Unsaved BES XML (issue #120): a buffer created in the language, and the
@@ -340,6 +403,8 @@ async function lint() {
     "fixable.rel text after the fix": fixedText,
     "complete.rel completions": completionLabels.slice(0, 5),
     ...(untitledFound ? { [`untitled (${language})`]: summary(untitledFound) } : {}),
+    ...(switchedFound ? { [`notes.txt (switched to ${language})`]: summary(switchedFound) } : {}),
+    "other schemes": otherSchemes,
     ...(untitledBesFound
       ? {
           [`untitled (${besLanguage})`]: summary(untitledBesFound),
@@ -386,6 +451,16 @@ async function lint() {
     const ok =
       "is" in expected ? found === expected.is : languages.has(found) && found !== expected.not;
     if (!ok) throw new Error(`untitled tab, ${name}: expected ${JSON.stringify(expected)}, got ${found}`);
+  }
+  if (switchedFound && !switchedFound.some((d) => codeOf(d) === "error-token")) {
+    throw new Error(`notes.txt: expected an error-token once switched, got ${JSON.stringify(summary(switchedFound))}`);
+  }
+  if (unopened.length) throw new Error(`other schemes, not opened as intended: ${unopened.join("; ")}`);
+  for (const [name, found] of Object.entries(otherSchemes)) {
+    if (found.length) throw new Error(`${name}: expected no diagnostics, got ${JSON.stringify(found)}`);
+  }
+  if (language && !Object.keys(otherSchemes).some((name) => name.startsWith(`smoke-vfs: q.rel (${language})`))) {
+    throw new Error(`smoke-vfs:/q.rel: expected it opened in ${language}, got ${JSON.stringify(Object.keys(otherSchemes))}`);
   }
   if (otherSchemeBesFound?.length) {
     throw new Error(`smoke-vfs:/task.bes: expected no diagnostics, got ${JSON.stringify(summary(otherSchemeBesFound))}`);

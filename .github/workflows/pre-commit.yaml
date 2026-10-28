@@ -10,6 +10,15 @@ on:
   # so .github/workflows/tag_and_release.yaml can gate a release on this exact
   # job rather than polling for other checks to go green
   workflow_call:
+    inputs:
+      # comma-separated hook ids to skip on top of no-commit-to-branch. The
+      # release passes `uv-audit`: a live advisory published after the PR
+      # passed must not fail the release, and its fixed version is often still
+      # inside the 7-day dependency cooldown (PR #200). PRs and pushes to main
+      # still run it.
+      skip-hooks:
+        type: string
+        default: ""
 
 # read-only by default; the cross-repo checkout uses secrets.CROSSREPO_PAT
 permissions:
@@ -36,8 +45,10 @@ jobs:
     # public repo; this is read-only per the `permissions:` block above and
     # never touches git credentials (actions/checkout above already sets
     # persist-credentials: false).
+    #
+    # `inputs` is empty outside a workflow_call, so only a caller adds to SKIP.
     env:
-      SKIP: no-commit-to-branch
+      SKIP: ${{ inputs.skip-hooks && format('no-commit-to-branch,{0}', inputs.skip-hooks) || 'no-commit-to-branch' }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -1,4 +1,108 @@
 {
+ "client_relevance/properties/global_property_alert_hard_drive_free_space.bes": [
+  {
+   "title": "Apply 4 safe fixes to this statement",
+   "kind": "quickfix",
+   "preferred": true,
+   "edits": [
+    [
+     [
+      2,
+      192
+     ],
+     [
+      2,
+      192
+     ],
+     "s"
+    ],
+    [
+     [
+      2,
+      220
+     ],
+     [
+      2,
+      220
+     ],
+     "s"
+    ],
+    [
+     [
+      2,
+      242
+     ],
+     [
+      2,
+      242
+     ],
+     "s"
+    ],
+    [
+     [
+      2,
+      271
+     ],
+     [
+      2,
+      271
+     ],
+     "s"
+    ]
+   ]
+  },
+  {
+   "title": "Fix all safe issues in this file",
+   "kind": "source.fixAll.bigfix-relevance",
+   "preferred": false,
+   "edits": [
+    [
+     [
+      2,
+      192
+     ],
+     [
+      2,
+      192
+     ],
+     "s"
+    ],
+    [
+     [
+      2,
+      220
+     ],
+     [
+      2,
+      220
+     ],
+     "s"
+    ],
+    [
+     [
+      2,
+      242
+     ],
+     [
+      2,
+      242
+     ],
+     "s"
+    ],
+    [
+     [
+      2,
+      271
+     ],
+     [
+      2,
+      271
+     ],
+     "s"
+    ]
+   ]
+  }
+ ],
  "client_relevance/tasks/task_power_management_sleep_when_idle.bes": [
   {
    "title": "Apply 2 safe fixes to this statement",

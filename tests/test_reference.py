@@ -282,7 +282,12 @@ def test_every_extraction_context_is_documented_somewhere() -> None:
     phrases: dict[str, tuple[str, ...]] = {
         "relevance": ("<relevance>",),
         "success-criteria": ("<successcriteria>",),
-        "analysis-property": ("analysis properties", "analysis property"),
+        "analysis-property": (
+            "analysis properties",
+            "analysis property",
+            "analysis and global properties",
+        ),
+        "global-property": ("global properties", "global property"),
         "actionscript-substitution": ("actionscript",),
         "actionscript-condition": ("elseif",),
         "relevance-pi": ("<?relevance ?>",),

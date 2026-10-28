@@ -279,7 +279,7 @@ def test_session_relevance_reports_its_own_contexts(session_env: TypeEnvironment
     """Session is an axis too. The dumps name three server-side surfaces, and a
     session-only inspector is defined in the ones that sampled it -- an empty
     set said nothing at all."""
-    expected = {source for source in inspectors.lookup(SESSION_ONLY)[0].sources}
+    expected = {*inspectors.lookup(SESSION_ONLY)[0].sources}
     assert expected <= ALL_SESSION_CONTEXTS
     value = resolve_property(SESSION_ONLY, None, session_env)
     assert set(value.platforms) == expected
@@ -378,8 +378,9 @@ def test_the_corpus_takes_the_non_unique_risk_deliberately(env: TypeEnvironment)
     (...) of registry` is back on the shape rule: a direct `exists` answers
     `False` today, but the singular errors once the `exists` is dropped. The
     rest are `singular-spelling-mid-chain` -- `files ... of folder "..." of
-    parent folder of client` and `exists node "..." of service plane ...`,
-    singular spellings a plural is built from.
+    parent folder of client`, `exists node "..." of service plane ...` and
+    the global property's `exists name of it` (#121), singular spellings a
+    plural is built from.
     """
     risks = {(name, line, code) for name, line, code, _ in _corpus_diagnostics(env)}
     assert risks == {
@@ -394,6 +395,7 @@ def test_the_corpus_takes_the_non_unique_risk_deliberately(env: TypeEnvironment)
         ("fixlet_description_relevance_via_javascript.bes", 119, "singular-spelling-mid-chain"),
         ("task_power_management_sleep_when_idle.bes", 12, "filtered-singular-spelling"),
         ("task_power_management_sleep_when_idle.bes", 12, "singular-spelling-mid-chain"),
+        ("global_property_alert_hard_drive_free_space.bes", 3, "singular-spelling-mid-chain"),
     }
 
 

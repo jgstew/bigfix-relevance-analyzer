@@ -153,7 +153,7 @@ checked as you type too, before it has a name.
 
 | Files | What is checked |
 |---|---|
-| `.bes`, `.bes.xml` | Every relevance element, success criteria, analysis properties, and `{...}` substitutions in action scripts |
+| `.bes`, `.bes.xml` | Every relevance element, success criteria, analysis and global properties, and `{...}` substitutions in action scripts |
 | `.ojo`, `.besrpt`, `.beswrpt`, `.webreport`, `.html`, `.htm` | `<?Relevance ...?>` blocks and relevance passed to JavaScript `Relevance(...)` calls |
 | `.rel` | The whole file, as one client or session relevance statement |
 | `.bsr` | The whole file, as one session relevance statement |
@@ -198,6 +198,8 @@ exists file "C:\Windows\notepad.exe"
 - A file is checked when its name ends in one of the file types above, or,
   when it ends in none of them, its language is set to BigFix Relevance or
   BigFix BES XML. Other files are left alone.
+- Only files on disk and new, unsaved files are checked: not the old side of
+  a diff, a file opened at a past revision, Remote Repositories or Live Share.
 - The checker starts the first time you open a file with relevance to check,
   so it uses no memory in windows without any. Markdown and HTML files count
   only once they contain relevance, as described above.

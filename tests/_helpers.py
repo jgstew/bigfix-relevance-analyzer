@@ -48,6 +48,14 @@ BES_BROKEN = (
 """A task with :data:`BROKEN` on line 3 and the fixable :data:`SETTING` on line 4
 (LSP lines, 0-based): what a fixlet pasted into an unsaved tab looks like."""
 
+GLOBAL_PROPERTY_BROKEN = (
+    '<?xml version="1.0" encoding="UTF-8"?>\n<BES>\n'
+    f'<Property Name="x" EvaluationPeriod="PT6H"><![CDATA[{BROKEN}]]></Property>\n'
+    "</BES>\n"
+)
+"""A global retrieved property (#121), a `<Property>` directly under `<BES>`,
+holding :data:`BROKEN` on line 3."""
+
 BES_EXAMPLE = REPO_ROOT / "tests/examples/mixed_context/task_with_client_and_session_relevance.bes"
 """A real document with both a client and a session site. Anchored on this file
 rather than the working directory, so the suite also runs from inside ``tests/``."""

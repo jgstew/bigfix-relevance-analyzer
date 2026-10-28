@@ -25,6 +25,8 @@ client_relevance/
     fixlets/            Fixlet .bes files (applicability + description)
     tasks/               Task .bes files
     analyses/            Analysis .bes files (relevance + Property relevance)
+    properties/          Global retrieved property .bes files (a <Property>
+                          directly under <BES>)
     baselines/           Baseline .bes files (top-level + per-component relevance)
     computer_groups/     Manual and automatic computer group .bes files
                           (SearchComponentRelevance)
@@ -91,6 +93,8 @@ and JS mechanism are otherwise untouched.
 | `client_relevance/tasks/task_time_based_relevance.bes` | `fixlet/Check Disk Usage - Linux.bes` |
 | `client_relevance/analyses/analysis_relevance_simple_property.bes` | `analyses/SSH Config - Linux Unix.bes` |
 | `client_relevance/analyses/analysis_relevance_complex_property.bes` | `analyses/Hardware Information (Universal) - SMBIOS.bes` |
+| `client_relevance/properties/global_property_alert_hard_drive_free_space.bes` | `properties/Alert__Hard Drive - Less Than 10 Percent Free.bes` (at `5da097d`) |
+| `client_relevance/properties/global_property_serial_number_universal.bes` | `properties/Serial Number - Universal.bes` (at `5da097d`) |
 | `client_relevance/baselines/baseline_relevance_with_components.bes` | `baselines/Docker - Stop & Delete all containers - Linux.bes` |
 | `client_relevance/computer_groups/computer_group_manual_relevance.bes` | `groups/Linux Docker Hosts.bes` |
 | `client_relevance/computer_groups/computer_group_automatic_relevance.bes` | `AutomaticComputerGroups/VM - AWS.bes` |

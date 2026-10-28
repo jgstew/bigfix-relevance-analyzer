@@ -16,13 +16,13 @@ written in.
 | --- | --- |
 | Fixlet, Task, Analysis, Baseline | `<Relevance>` elements (applicability) |
 | Baseline components | per-component `<Relevance>` |
-| Analysis properties | each property's relevance |
+| Analysis and global properties | each property's relevance |
 | Success criteria | `<SuccessCriteria>` |
 | Automatic computer groups | `SearchComponentRelevance` |
 | Action script | `{...}` substitutions inside ActionScript |
 | ClientUI dashboards | static `<?Relevance ?>` in an HTML file under the client's `__UISupport` folder |
 | Plain files | a `.rel` file whose whole content is one expression |
-| Documentation | a fenced code block in a Markdown file, where the block is the whole expression |
+| Documentation | a fenced Markdown code block, where the block is the whole expression |
 
 The ClientUI case is the one that surprises people: HTML holding relevance is
 *almost* always session relevance, and a ClientUI dashboard is the exception.

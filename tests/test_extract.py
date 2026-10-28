@@ -789,10 +789,88 @@ def test_bes_xml_extracts_analysis_property() -> None:
     assert sites[0].dialect is Dialect.CLIENT
 
 
-def test_bes_xml_property_outside_analysis_is_not_a_relevance_site() -> None:
-    """`<Property>` is only an analysis property inside an Analysis."""
-    xml = "<BES>\n<Fixlet>\n<MIMEField><Property>x</Property></MIMEField>\n</Fixlet>\n</BES>"
-    assert extract_relevance_from_bes_xml(xml) == []
+GLOBAL_PROPERTY_XML = (
+    '<?xml version="1.0" encoding="UTF-8"?>\n<BES>\n'
+    '<Property Name="x" EvaluationPeriod="PT6H">{body}</Property>\n'
+    "</BES>\n"
+)
+"""A global retrieved property (#121): a `<Property>` directly under `<BES>`."""
+
+
+def _expat_and_lxml(data: bytes) -> list[list[RelevanceSite]]:
+    """``data``'s sites from expat and, when lxml is installed, from lxml too."""
+    found = [extract_relevance_from_bes_xml(data)]
+    try:
+        from lxml import etree as lxml_etree
+    except ImportError:
+        return found
+    from bigfix_relevance_analyzer.extract import extract_relevance_from_lxml_tree
+
+    found.append(extract_relevance_from_lxml_tree(lxml_etree.fromstring(data).getroottree()))
+    return found
+
+
+@pytest.mark.parametrize(
+    "body",
+    ["<![CDATA[name of operating system]]>", "name of operating system"],
+    ids=["cdata", "plain"],
+)
+def test_bes_xml_extracts_a_global_property(body: str) -> None:
+    """A global retrieved property holds client relevance, like an analysis
+    property: `BES.xsd` gives `BES/Property` and `Analysis/Property` the same
+    `Property` type (#121)."""
+    data = GLOBAL_PROPERTY_XML.format(body=body).encode()
+    for sites in _expat_and_lxml(data):
+        (site,) = sites
+        assert (site.kind, site.line, site.dialect) == ("global-property", 3, Dialect.CLIENT)
+        assert site.text == "name of operating system"
+        assert site.context == 'BES/Property[Name="x"]'
+
+
+def test_bes_xml_global_property_entities_arrive_decoded() -> None:
+    data = GLOBAL_PROPERTY_XML.format(body="1 &lt; 2 &amp; true").encode()
+    for sites in _expat_and_lxml(data):
+        assert texts(sites) == ["1 < 2 & true"]
+
+
+def test_bes_xml_global_and_analysis_properties_are_each_extracted_once() -> None:
+    xml = (
+        "<BES>\n"
+        '<Property Name="g">name of operating system</Property>\n'
+        '<Analysis>\n<Property Name="a" ID="1">version of client</Property>\n</Analysis>\n'
+        "</BES>"
+    )
+    for sites in _expat_and_lxml(xml.encode()):
+        assert kinds_lines(sites) == [("global-property", 2), ("analysis-property", 4)]
+        assert texts(sites) == ["name of operating system", "version of client"]
+
+
+def test_bes_xml_whose_property_is_a_property_name_not_relevance() -> None:
+    """`.../Whose/Property` in action settings is an `xs:string`, a property
+    *name*: the one `<Property>` in `BES.xsd` that is not relevance."""
+    xml = (
+        "<BES>\n<Fixlet>\n<DefaultAction><Settings><Whose>"
+        "<Property>Computer Name</Property><Value>x</Value>"
+        "</Whose></Settings></DefaultAction>\n</Fixlet>\n</BES>"
+    )
+    for sites in _expat_and_lxml(xml.encode()):
+        assert sites == []
+
+
+def test_bes_xml_property_nested_below_an_analysis_child_is_not_read() -> None:
+    """Only a `<Property>` whose *parent* is `<BES>` or `<Analysis>` is
+    relevance. The schema has none deeper under an Analysis; reading one only
+    because an Analysis is somewhere above it was the old, looser rule."""
+    xml = "<BES><Analysis><Whose><Property>x</Property></Whose></Analysis></BES>"
+    for sites in _expat_and_lxml(xml.encode()):
+        assert sites == []
+
+
+def test_bes_xml_root_property_is_not_read_and_does_not_raise() -> None:
+    """A `<Property>` with no parent at all: the document root (expat) or the
+    element handed to the lxml adapter. Not schema-valid, but user input."""
+    for sites in _expat_and_lxml(b'<Property Name="x">exists file "a"</Property>'):
+        assert sites == []
 
 
 @pytest.mark.parametrize(
@@ -1559,3 +1637,67 @@ def test_the_private_site_builders_agree_on_the_column_default() -> None:
         parameters = inspect.signature(helper).parameters
         assert "columns" not in parameters, helper.__name__
         assert parameters["column_offset"].default == 0, helper.__name__
+
+
+# ---------------------------------------------------------------------------
+# A leading UTF-8 byte order mark marks the encoding; it is not text (#107)
+# ---------------------------------------------------------------------------
+
+UTF8_BOM = b"\xef\xbb\xbf"
+BOM_CHAR = UTF8_BOM.decode()
+"""U+FEFF, built from the bytes: the ASCII hooks would rewrite it written out."""
+
+
+def _comparable(sites: list[RelevanceSite]) -> list[tuple[object, ...]]:
+    """What a reader of the sites sees: everything but the byte offsets, which
+    a BOM rightly moves by its three bytes."""
+    return [
+        (site.kind, site.text, site.line, site.column, site.dialect, site.context) for site in sites
+    ]
+
+
+@pytest.mark.parametrize(
+    ("name", "data"),
+    [
+        ("a.rel", b"exists bogusname"),
+        ("a.rel", b"exists bogusname\r\nand true\r\n"),
+        ("a.bsr", b"names of bes computers"),
+        ("a.md", b"```relevance\nexists bogusname\n```\n"),
+        ("a.md", b"# Title\n\n```relevance\nexists bogusname\n```\n"),
+        ("a.ojo", b"<p><?Relevance names of bogus things ?></p>"),
+        (
+            "a.bes",
+            (
+                b'<?xml version="1.0" encoding="UTF-8"?>\n'
+                b"<BES><Task><Relevance>exists bogusname</Relevance></Task></BES>"
+            ),
+        ),
+    ],
+    ids=["rel", "rel-crlf", "bsr", "md-fence-on-line-1", "md-fence-later", "ojo", "bes"],
+)
+def test_a_leading_bom_changes_no_site(name: str, data: bytes) -> None:
+    without, _ = _extract_data(Path(name), data)
+    with_bom, _ = _extract_data(Path(name), UTF8_BOM + data)
+    assert without
+    assert _comparable(with_bom) == _comparable(without)
+
+
+def test_a_crlf_file_with_a_bom_reads_like_the_lf_file_without_one() -> None:
+    lf, _ = _extract_data(Path("a.rel"), b"exists bogusname\n")
+    crlf, _ = _extract_data(Path("a.rel"), UTF8_BOM + b"exists bogusname\r\n")
+    assert _comparable(crlf) == _comparable(lf)
+
+
+@pytest.mark.parametrize(
+    ("name", "data", "kept"),
+    [
+        ("a.rel", b'exists file "' + UTF8_BOM + b'"', f'exists file "{BOM_CHAR}"'),
+        ("a.md", b"x\n" + UTF8_BOM + b"```relevance\nexists file\n```\n", None),
+        ("a.rel", UTF8_BOM + UTF8_BOM + b"exists file", f"{BOM_CHAR}exists file"),
+    ],
+    ids=["inside-a-string", "before-a-later-fence", "a-second-bom"],
+)
+def test_only_one_leading_bom_is_dropped(name: str, data: bytes, kept: str | None) -> None:
+    """A U+FEFF anywhere but the very start is a character the author wrote."""
+    sites, _ = _extract_data(Path(name), data)
+    assert texts(sites) == ([] if kept is None else [kept])

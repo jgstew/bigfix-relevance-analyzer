@@ -17,7 +17,14 @@ from pathlib import Path
 
 import pytest
 from _corpus import corpus_files
-from _helpers import BES_EXAMPLE, BROKEN, CLIENT, MIXED_DIALECT, UNKNOWN_INSPECTOR
+from _helpers import (
+    BES_EXAMPLE,
+    BROKEN,
+    CLIENT,
+    GLOBAL_PROPERTY_BROKEN,
+    MIXED_DIALECT,
+    UNKNOWN_INSPECTOR,
+)
 
 from bigfix_relevance_analyzer.analyzer import analyze
 from bigfix_relevance_analyzer.dialect import Dialect
@@ -867,6 +874,46 @@ def test_lint_paths_aggregates_across_files(tmp_path: Path) -> None:
     findings = lint_paths([clean, broken], LintConfig())
     assert codes(findings) == {"parse-error", "error-token"}
     assert all(f.path == broken for f in findings)
+
+
+def test_lint_paths_reports_a_broken_global_property(tmp_path: Path) -> None:
+    """A global retrieved property is linted like an analysis property (#121)."""
+    path = tmp_path / "global_property.bes"
+    path.write_text(GLOBAL_PROPERTY_BROKEN)
+    findings = lint_paths([path], LintConfig())
+    assert codes(findings) == {"parse-error", "error-token"}
+    assert {f.line for f in findings} == {3}
+
+
+@pytest.mark.parametrize(
+    ("name", "data"),
+    [
+        ("a.rel", b"exists bogusname"),
+        ("a.bsr", b"names of bes computers"),
+        ("a.md", b"```relevance\nexists bogusname\n```\n"),
+    ],
+    ids=["rel", "bsr", "md-fence-on-line-1"],
+)
+def test_a_leading_bom_changes_no_finding(tmp_path: Path, name: str, data: bytes) -> None:
+    """#107: the BOM used to glue onto the first word (`.rel`, `.bsr`: a false
+    `unknown-inspector`) or hide a line-1 fence (`.md`: nothing reported)."""
+    plain = tmp_path / "plain" / name
+    bom = tmp_path / "bom" / name
+    for path, content in ((plain, data), (bom, b"\xef\xbb\xbf" + data)):
+        path.parent.mkdir()
+        path.write_bytes(content)
+
+    def seen(path: Path) -> list[tuple[object, ...]]:
+        return [
+            (f.code, f.severity, f.message, f.line, f.site.column if f.site else None)
+            for f in lint_file(path, LintConfig())
+        ]
+
+    assert seen(bom) == seen(plain)
+    if name == "a.bsr":
+        assert seen(bom) == []
+    else:
+        assert seen(bom), "the statement must be linted, not skipped"
 
 
 def test_a_path_that_does_not_exist_is_reported_as_an_error(tmp_path: Path) -> None:

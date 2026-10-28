@@ -278,6 +278,29 @@ print("ok")
     )
 
 
+def test_a_bom_needs_no_codec_beyond_utf8() -> None:
+    """#107 drops a leading BOM without the ``utf-8-sig`` codec, which a WASM
+    host may not have been built with (see the test above). A client that
+    leaves the BOM in its text gets the same finding as one that strips it."""
+    run_fresh_python(
+        """
+import sys
+sys.modules["encodings.utf_8_sig"] = None
+from bigfix_relevance_analyzer.lsp.server import Server
+server = Server()
+server.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
+for uri, text in (("file:///w/a.rel", "\\ufeffexists bogusname"),
+                  ("file:///w/b.rel", "exists bogusname")):
+    (reply,) = server.handle({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {
+        "textDocument": {"uri": uri, "languageId": "x", "version": 1, "text": text}}})
+    (found,) = reply["params"]["diagnostics"]
+    assert found["code"] == "unknown-inspector", found
+    assert "`bogusname`" in found["message"], found
+print("ok")
+"""
+    )
+
+
 def test_a_warning_is_severity_two() -> None:
     found = diagnostics(did_open(started(), "u.rel", UNKNOWN_INSPECTOR), "u.rel")
     assert [(d["code"], d["severity"]) for d in found] == [("unknown-inspector", 2)]

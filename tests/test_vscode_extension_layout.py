@@ -1170,11 +1170,40 @@ def test_the_embedded_block_continues_past_a_fence_of_the_other_character() -> N
         assert not keep_going.match(own), rule["begin"]
 
 
-def test_the_extension_sends_relevance_buffers_whatever_their_scheme() -> None:
-    """A document selector by language, not only by file pattern, is what makes
-    VS Code send an unsaved `untitled:` buffer to the server."""
+def test_the_extension_sends_relevance_buffers_only_as_files_or_unsaved() -> None:
+    """Issue #134. A selector by language, not only by file pattern, is what
+    makes VS Code send an unsaved `untitled:` buffer to the server -- and that
+    is its only reason. Any other scheme also lints a diff view's old side
+    (`git:`, measured in VS Code 1.140.0: 2 diagnostics on each broken `.rel`
+    and `.bsr`), as a bare selector did for BES until #120."""
     text = (PRIMARY / "extension.js").read_text("utf-8")
-    assert "{ language: LANGUAGE_ID }" in text
+    assert '{ language: LANGUAGE_ID, scheme: "file" }' in text
+    assert '{ language: LANGUAGE_ID, scheme: "untitled" }' in text
+    assert "{ language: LANGUAGE_ID }" not in text
+
+
+def test_every_language_the_extension_selects_is_scoped_to_files_or_unsaved() -> None:
+    """Issue #134: a language added to the selector later cannot be added
+    bare. Every entry that selects by language names a scheme, and the only
+    schemes are `file` and `untitled`."""
+    text = (PRIMARY / "extension.js").read_text("utf-8")
+    (selector,) = re.findall(r"^const DOCUMENT_SELECTOR = \[\n(.*?)^\];", text, re.M | re.S)
+    entries = re.findall(r"\{[^{}]*\}", selector)
+    by_language = [entry for entry in entries if "language:" in entry]
+    assert len(by_language) >= 2, selector
+    assert [entry for entry in by_language if "scheme:" not in entry] == []
+    assert set(re.findall(r'scheme: "([^"]+)"', selector)) == {"file", "untitled"}
+
+
+def test_the_smoke_test_checks_relevance_in_other_schemes_gets_nothing() -> None:
+    """Issue #134: the smoke test opens a `.rel` from a made-up scheme and from
+    git, and a file switched to the language, so none can be dropped quietly."""
+    suite = (COMMON_SMOKE / "suite.js").read_text("utf-8")
+    run = (COMMON_SMOKE / "run.mjs").read_text("utf-8")
+    assert "smoke-vfs:/q.rel" in suite
+    assert "toGitUri" in suite
+    assert "notes.txt" in suite and "notes.txt" in run
+    assert '"init"' in run
 
 
 def test_the_server_falls_back_on_the_bes_language_the_extension_contributes() -> None:

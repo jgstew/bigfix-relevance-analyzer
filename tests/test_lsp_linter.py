@@ -22,6 +22,7 @@ from _helpers import (
     BES_EXAMPLE,
     BROKEN,
     CLIENT,
+    GLOBAL_PROPERTY_BROKEN,
     UNKNOWN_INSPECTOR,
     diagnostic_text,
     lsp_lines,
@@ -523,3 +524,12 @@ def test_diagnostics_stay_in_finding_order_then_span_order() -> None:
     for finding in findings:
         expected.extend([finding.code] * max(len(finding.spans), 1))
     assert codes == expected
+
+
+def test_a_global_property_buffer_is_linted_like_the_saved_file(tmp_path: Path) -> None:
+    """The editor reads a global retrieved property too (#121)."""
+    found = DocumentLinter().diagnostics("file:///w/global_property.bes", GLOBAL_PROPERTY_BROKEN)
+    assert {d["code"] for d in found} == {"parse-error", "error-token"}
+    assert as_lint(found) == lint_expected(
+        write(tmp_path, "global_property.bes", GLOBAL_PROPERTY_BROKEN)
+    )

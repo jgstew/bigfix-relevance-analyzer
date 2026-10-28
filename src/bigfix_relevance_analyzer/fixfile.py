@@ -70,9 +70,9 @@ from typing import Any, Final
 from bigfix_relevance_analyzer._serialize import _as_path, _path
 from bigfix_relevance_analyzer.autofix import _SAFE_TEXT, AutofixResult, _edit_pieces
 from bigfix_relevance_analyzer.extract import (
+    _UTF8_BOM,
     RelevanceSite,
     SourceMap,
-    _decode_text,
     _extract_data,
     _ExtractionProblem,
 )
@@ -279,7 +279,6 @@ def _site_anchor(site: RelevanceSite) -> SiteAnchor:
 
 
 _BYTE_LINE_BREAK: Final = re.compile(rb"\r\n|\r|\n")
-_UTF8_BOM: Final = b"\xef\xbb\xbf"
 
 
 class _ByteLines:
@@ -288,8 +287,8 @@ class _ByteLines:
     Built once per file and shared by its sites, and only split if one asks.
     Lines break where :func:`~bigfix_relevance_analyzer.extract._decode_text`
     folds line endings, so line N here is a site's line N. Line 1 starts where
-    that decoding starts: after a leading byte order mark if it drops one
-    (#107), or at the mark if it keeps it as a character the columns count.
+    that decoding starts: after a leading byte order mark, which it drops
+    (#107).
     """
 
     def __init__(self, data: bytes) -> None:
@@ -299,8 +298,7 @@ class _ByteLines:
 
     def _split(self) -> list[tuple[int, int]]:
         if self._bounds is None:
-            dropped = self.data.startswith(_UTF8_BOM) and not _decode_text(_UTF8_BOM)
-            start = len(_UTF8_BOM) if dropped else 0
+            start = len(_UTF8_BOM) if self.data.startswith(_UTF8_BOM) else 0
             self._bounds = []
             for match in _BYTE_LINE_BREAK.finditer(self.data, start):
                 self._bounds.append((start, match.start()))

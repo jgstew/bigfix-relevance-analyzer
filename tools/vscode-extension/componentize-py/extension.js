@@ -47,14 +47,15 @@ const SERVER = path.join(__dirname, "server.js");
 const COMPONENT = path.join(__dirname, "dist", "component", "lsp.js");
 
 // Files by suffix, plus buffers by language, which is what brings an unsaved
-// `untitled:` buffer to the server; it then lints it by its languageId.
-// BES XML buffers are sent only as files or unsaved buffers: any other scheme
-// would also lint the `git:` side of every `.bes` diff view. Relevance buffers
-// are still sent whatever their scheme, which has the same cost for `.rel` and
-// `.bsr` diffs; whether to scope them too, and to which schemes, is #134.
+// `untitled:` buffer to the server; it then lints it by its languageId. Both
+// languages are sent only as files or unsaved buffers (#120, #134), like every
+// file pattern: any other scheme would also lint the `git:` side of a diff
+// view, or a file opened at a past revision. Remote Repositories and Live
+// Share documents are not checked either, for any file type.
 const DOCUMENT_SELECTOR = [
   ...documentPatterns.map((pattern) => ({ scheme: "file", pattern })),
-  { language: LANGUAGE_ID },
+  { language: LANGUAGE_ID, scheme: "file" },
+  { language: LANGUAGE_ID, scheme: "untitled" },
   ...(BES_LANGUAGE_ID
     ? [
         { language: BES_LANGUAGE_ID, scheme: "file" },

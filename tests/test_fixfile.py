@@ -77,6 +77,17 @@ def fixed_once(
 # -- acceptance --------------------------------------------------------------------
 
 
+def test_a_global_property_is_fixed_in_place(tmp_path: Path) -> None:
+    """#121: a global retrieved property is a site, so its fixes are written
+    too -- into the CDATA, leaving the `<Property>` tag and attributes alone."""
+    data = (
+        '<?xml version="1.0" encoding="UTF-8"?>\r\n<BES>\r\n'
+        f'\t<Property Name="x" EvaluationPeriod="PT6H"><![CDATA[{SETTING}]]></Property>\r\n'
+        "</BES>\r\n"
+    ).encode()
+    assert fixed_once(tmp_path, data) == data.replace(b"setting ", b"settings ")
+
+
 def test_the_singular_spelling_is_rewritten_and_nothing_else(tmp_path: Path) -> None:
     data = task(f"<Relevance>{SETTING}</Relevance>")
     path = write(tmp_path, data)
@@ -681,7 +692,7 @@ def test_planning_a_text_file_never_reads_it_again(
 
 
 def test_every_example_fix_is_applied_and_idempotent(tmp_path: Path) -> None:
-    """Real content: tests/examples holds 5 fixable sites. Every one goes in,
+    """Real content: tests/examples holds 6 fixable sites. Every one goes in,
     with nothing but new text inserted, and a second run has nothing to do."""
     from _corpus import corpus_files
 
@@ -697,7 +708,7 @@ def test_every_example_fix_is_applied_and_idempotent(tmp_path: Path) -> None:
             applied += len(plan.applied)
             write_fix(plan)
             assert not plan_fix(target, LintConfig()).changed
-    assert applied == 5
+    assert applied == 6
 
 
 # -- site anchors: telling equal sites apart across extractions (#115, #113) --------

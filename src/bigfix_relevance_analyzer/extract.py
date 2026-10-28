@@ -65,6 +65,7 @@ SiteKind = Literal[
     "relevance",
     "success-criteria",
     "analysis-property",
+    "global-property",
     "actionscript-substitution",
     "actionscript-condition",
     "relevance-pi",
@@ -1098,14 +1099,22 @@ def _sites_for_element(
         return _body_site(element, kind="success-criteria", context=context)
 
     if tag == "Property":
-        # `<Property>` is an analysis property only inside an Analysis; it
-        # means something else elsewhere (e.g. inside a MIMEField).
-        if "Analysis" not in element.path[:-1]:
+        # BES.xsd gives `<Property>` the relevance-holding `Property` type in
+        # two places: directly under `<BES>` (a global retrieved property) and
+        # directly under `<Analysis>`. Its one other use, `.../Whose/Property` in
+        # action settings, is a property *name*. So the parent decides; a
+        # slice, because a root `<Property>` has no parent to index.
+        parent = element.path[-2:-1]
+        if parent == ("BES",):
+            kind: SiteKind = "global-property"
+        elif parent == ("Analysis",):
+            kind = "analysis-property"
+        else:
             return []
         name = element.attrib.get("Name")
         return _body_site(
             element,
-            kind="analysis-property",
+            kind=kind,
             context=f'{context}[Name="{name}"]' if name else context,
         )
 
@@ -1314,9 +1323,9 @@ def extract_relevance_from_bes_xml(data: str | bytes) -> list[RelevanceSite]:
     """Extract every relevance statement from a BES XML document.
 
     Covers `<Relevance>` bodies, `<SuccessCriteria Option="CustomRelevance">`,
-    analysis `<Property>` bodies, `{...}` substitutions in Windows-Shell
-    `<ActionScript>` bodies, and session relevance embedded in `<Description>`
-    HTML. Returns an empty list, having logged a warning, if the document
+    analysis and global retrieved `<Property>` bodies, `{...}` substitutions in
+    Windows-Shell `<ActionScript>` bodies, and session relevance embedded in
+    `<Description>` HTML. Returns an empty list, having logged a warning, if the document
     cannot be parsed.
     """
     return _extract_bes_xml(data)[0]
@@ -1547,12 +1556,26 @@ def _extract_text(
     return []
 
 
+_UTF8_BOM: Final = b"\xef\xbb\xbf"
+
+
 def _decode_text(data: bytes) -> str:
-    """``data`` as the text a text-mode read of the same file would give.
+    """``data`` as the text a text-mode read of the same file would give,
+    less a leading byte order mark.
 
     BES content is UTF-8 in practice, but a stray byte in a hand-edited file
     should not lose the rest of the relevance in it. Line endings are folded
     exactly as ``Path.read_text`` folds them -- this replaced that call, and
     the lines every finding reports depend on it.
+
+    One leading UTF-8 byte order mark is dropped, as an editor drops it: it
+    marks the encoding, it is not text (#107). By ``bytes.removeprefix``, not
+    the BOM-aware codec -- a WASM build has only the codecs its snapshot saw,
+    and this needs none beyond ``utf-8``.
     """
-    return data.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
+    return (
+        data.removeprefix(_UTF8_BOM)
+        .decode("utf-8", errors="replace")
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+    )
