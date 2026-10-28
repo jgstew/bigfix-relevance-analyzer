@@ -22,6 +22,7 @@ written in.
 | Fixlet, Task, Analysis, Baseline | `<Relevance>` elements (applicability) |
 | Baseline components | per-component `<Relevance>` |
 | Analysis properties | each property's relevance |
+| Global properties | a global retrieved property: a `<Property>` directly under `<BES>` |
 | Success criteria | `<SuccessCriteria>` |
 | Automatic computer groups | `SearchComponentRelevance` |
 | Action script | `{...}` substitutions inside ActionScript |

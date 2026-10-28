@@ -789,10 +789,88 @@ def test_bes_xml_extracts_analysis_property() -> None:
     assert sites[0].dialect is Dialect.CLIENT
 
 
-def test_bes_xml_property_outside_analysis_is_not_a_relevance_site() -> None:
-    """`<Property>` is only an analysis property inside an Analysis."""
-    xml = "<BES>\n<Fixlet>\n<MIMEField><Property>x</Property></MIMEField>\n</Fixlet>\n</BES>"
-    assert extract_relevance_from_bes_xml(xml) == []
+GLOBAL_PROPERTY_XML = (
+    '<?xml version="1.0" encoding="UTF-8"?>\n<BES>\n'
+    '<Property Name="x" EvaluationPeriod="PT6H">{body}</Property>\n'
+    "</BES>\n"
+)
+"""A global retrieved property (#121): a `<Property>` directly under `<BES>`."""
+
+
+def _expat_and_lxml(data: bytes) -> list[list[RelevanceSite]]:
+    """``data``'s sites from expat and, when lxml is installed, from lxml too."""
+    found = [extract_relevance_from_bes_xml(data)]
+    try:
+        from lxml import etree as lxml_etree
+    except ImportError:
+        return found
+    from bigfix_relevance_analyzer.extract import extract_relevance_from_lxml_tree
+
+    found.append(extract_relevance_from_lxml_tree(lxml_etree.fromstring(data).getroottree()))
+    return found
+
+
+@pytest.mark.parametrize(
+    "body",
+    ["<![CDATA[name of operating system]]>", "name of operating system"],
+    ids=["cdata", "plain"],
+)
+def test_bes_xml_extracts_a_global_property(body: str) -> None:
+    """A global retrieved property holds client relevance, like an analysis
+    property: `BES.xsd` gives `BES/Property` and `Analysis/Property` the same
+    `Property` type (#121)."""
+    data = GLOBAL_PROPERTY_XML.format(body=body).encode()
+    for sites in _expat_and_lxml(data):
+        (site,) = sites
+        assert (site.kind, site.line, site.dialect) == ("global-property", 3, Dialect.CLIENT)
+        assert site.text == "name of operating system"
+        assert site.context == 'BES/Property[Name="x"]'
+
+
+def test_bes_xml_global_property_entities_arrive_decoded() -> None:
+    data = GLOBAL_PROPERTY_XML.format(body="1 &lt; 2 &amp; true").encode()
+    for sites in _expat_and_lxml(data):
+        assert texts(sites) == ["1 < 2 & true"]
+
+
+def test_bes_xml_global_and_analysis_properties_are_each_extracted_once() -> None:
+    xml = (
+        "<BES>\n"
+        '<Property Name="g">name of operating system</Property>\n'
+        '<Analysis>\n<Property Name="a" ID="1">version of client</Property>\n</Analysis>\n'
+        "</BES>"
+    )
+    for sites in _expat_and_lxml(xml.encode()):
+        assert kinds_lines(sites) == [("global-property", 2), ("analysis-property", 4)]
+        assert texts(sites) == ["name of operating system", "version of client"]
+
+
+def test_bes_xml_whose_property_is_a_property_name_not_relevance() -> None:
+    """`.../Whose/Property` in action settings is an `xs:string`, a property
+    *name*: the one `<Property>` in `BES.xsd` that is not relevance."""
+    xml = (
+        "<BES>\n<Fixlet>\n<DefaultAction><Settings><Whose>"
+        "<Property>Computer Name</Property><Value>x</Value>"
+        "</Whose></Settings></DefaultAction>\n</Fixlet>\n</BES>"
+    )
+    for sites in _expat_and_lxml(xml.encode()):
+        assert sites == []
+
+
+def test_bes_xml_property_nested_below_an_analysis_child_is_not_read() -> None:
+    """Only a `<Property>` whose *parent* is `<BES>` or `<Analysis>` is
+    relevance. The schema has none deeper under an Analysis; reading one only
+    because an Analysis is somewhere above it was the old, looser rule."""
+    xml = "<BES><Analysis><Whose><Property>x</Property></Whose></Analysis></BES>"
+    for sites in _expat_and_lxml(xml.encode()):
+        assert sites == []
+
+
+def test_bes_xml_root_property_is_not_read_and_does_not_raise() -> None:
+    """A `<Property>` with no parent at all: the document root (expat) or the
+    element handed to the lxml adapter. Not schema-valid, but user input."""
+    for sites in _expat_and_lxml(b'<Property Name="x">exists file "a"</Property>'):
+        assert sites == []
 
 
 @pytest.mark.parametrize(

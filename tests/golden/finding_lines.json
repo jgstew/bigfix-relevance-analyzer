@@ -12,6 +12,13 @@
     "tests/examples/client_relevance/fixlets/fixlet_registry_and_active_directory_relevance.bes": [],
     "tests/examples/client_relevance/markdown_codeblocks/client_relevance_markdown_codeblock.md": [],
     "tests/examples/client_relevance/plain_text/client_relevance_plain_text.rel": [],
+    "tests/examples/client_relevance/properties/global_property_alert_hard_drive_free_space.bes": [
+      ["plural-preferred", 3, 3],
+      ["plural-preferred", 3, 3],
+      ["plural-preferred", 3, 3],
+      ["plural-preferred", 3, 3]
+    ],
+    "tests/examples/client_relevance/properties/global_property_serial_number_universal.bes": [],
     "tests/examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes": [
       ["plural-preferred", 12, 12],
       ["plural-preferred", 12, 12]
@@ -77,6 +84,13 @@
     "tests/examples/client_relevance/fixlets/fixlet_registry_and_active_directory_relevance.bes": [],
     "tests/examples/client_relevance/markdown_codeblocks/client_relevance_markdown_codeblock.md": [],
     "tests/examples/client_relevance/plain_text/client_relevance_plain_text.rel": [],
+    "tests/examples/client_relevance/properties/global_property_alert_hard_drive_free_space.bes": [
+      ["plural-preferred", 3, 3],
+      ["plural-preferred", 3, 3],
+      ["plural-preferred", 3, 3],
+      ["plural-preferred", 3, 3]
+    ],
+    "tests/examples/client_relevance/properties/global_property_serial_number_universal.bes": [],
     "tests/examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes": [
       ["plural-preferred", 12, 12],
       ["plural-preferred", 12, 12]

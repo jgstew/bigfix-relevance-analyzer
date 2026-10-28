@@ -375,8 +375,9 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "warning, because neither is a risk the author may have ruled out -- the "
                 "content cannot work. Positive evidence only, as everywhere else: an "
                 "undetermined type or plurality is not a finding, and neither is a value "
-                "some other rule already faulted. Analysis properties are deliberately "
-                "unlisted, being legitimately plural and of any renderable type.",
+                "some other rule already faulted. Analysis and global retrieved properties "
+                "are deliberately unlisted, being legitimately plural and of any "
+                "renderable type.",
             ),
             _rule(
                 "plural-substitution",
@@ -1036,10 +1037,10 @@ def _rule_for(check_code: str) -> str:
 # ActionScript substitution is deliberately absent: confirmed with real
 # actions (#68), it accepts any renderable type and joins a plural value
 # rather than rejecting it -- a risk `_plural_substitution` reports as a
-# warning, not a requirement this table could fail. An analysis
-# property may legitimately be plural and of any renderable type, a `.rel`
-# file or a markdown block is not a slot at all, and the remaining contexts
-# have not been confirmed -- an unlisted kind is judged on nothing.
+# warning, not a requirement this table could fail. An analysis or global
+# retrieved property may legitimately be plural and of any renderable type,
+# a `.rel` file or a markdown block is not a slot at all, and the remaining
+# contexts have not been confirmed -- an unlisted kind is judged on nothing.
 #
 # The required-type axis is always a set, even where exactly one name would
 # do: one representation for `_slot_mismatch` to check, rather than a

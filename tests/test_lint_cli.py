@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 
 import pytest
-from _helpers import BROKEN, CLIENT, UNKNOWN_INSPECTOR, write
+from _helpers import BROKEN, CLIENT, GLOBAL_PROPERTY_BROKEN, UNKNOWN_INSPECTOR, write
 
 from bigfix_relevance_analyzer._lint_cli import main
 from bigfix_relevance_analyzer.lint import RULES, rules
@@ -36,6 +36,18 @@ def test_broken_file_exits_one_and_prints_a_grep_able_line(
     assert main([str(broken)]) == 1
     out = capsys.readouterr().out
     assert f"{broken}:1: error [parse-error]" in out
+
+
+def test_a_broken_global_property_fails_the_run(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """#121: a `<Property>` directly under `<BES>` used to lint clean, unread."""
+    broken = write(tmp_path, "global_property.bes", GLOBAL_PROPERTY_BROKEN)
+
+    assert main([str(broken)]) == 1
+    out = capsys.readouterr().out
+    assert f"{broken}:3: error [parse-error]" in out
+    assert f"{broken}:3: error [error-token]" in out
 
 
 def test_warning_only_exits_zero_by_default(

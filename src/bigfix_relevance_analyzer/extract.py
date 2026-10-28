@@ -65,6 +65,7 @@ SiteKind = Literal[
     "relevance",
     "success-criteria",
     "analysis-property",
+    "global-property",
     "actionscript-substitution",
     "actionscript-condition",
     "relevance-pi",
@@ -1098,14 +1099,22 @@ def _sites_for_element(
         return _body_site(element, kind="success-criteria", context=context)
 
     if tag == "Property":
-        # `<Property>` is an analysis property only inside an Analysis; it
-        # means something else elsewhere (e.g. inside a MIMEField).
-        if "Analysis" not in element.path[:-1]:
+        # BES.xsd gives `<Property>` the relevance-holding `Property` type in
+        # two places: directly under `<BES>` (a global retrieved property) and
+        # directly under `<Analysis>`. Its one other use, `.../Whose/Property` in
+        # action settings, is a property *name*. So the parent decides; a
+        # slice, because a root `<Property>` has no parent to index.
+        parent = element.path[-2:-1]
+        if parent == ("BES",):
+            kind: SiteKind = "global-property"
+        elif parent == ("Analysis",):
+            kind = "analysis-property"
+        else:
             return []
         name = element.attrib.get("Name")
         return _body_site(
             element,
-            kind="analysis-property",
+            kind=kind,
             context=f'{context}[Name="{name}"]' if name else context,
         )
 
@@ -1314,9 +1323,9 @@ def extract_relevance_from_bes_xml(data: str | bytes) -> list[RelevanceSite]:
     """Extract every relevance statement from a BES XML document.
 
     Covers `<Relevance>` bodies, `<SuccessCriteria Option="CustomRelevance">`,
-    analysis `<Property>` bodies, `{...}` substitutions in Windows-Shell
-    `<ActionScript>` bodies, and session relevance embedded in `<Description>`
-    HTML. Returns an empty list, having logged a warning, if the document
+    analysis and global retrieved `<Property>` bodies, `{...}` substitutions in
+    Windows-Shell `<ActionScript>` bodies, and session relevance embedded in
+    `<Description>` HTML. Returns an empty list, having logged a warning, if the document
     cannot be parsed.
     """
     return _extract_bes_xml(data)[0]

@@ -25,6 +25,7 @@ UNCERTAIN = Dialect.UNCERTAIN
 
 REL = "relevance"
 PROP = "analysis-property"
+GPROP = "global-property"
 SUB = "actionscript-substitution"
 COND = "actionscript-condition"
 PI = "relevance-pi"
@@ -117,6 +118,16 @@ EXPECTED: dict[str, Expected] = {
     "client_relevance/analyses/analysis_relevance_complex_property.bes": Expected(
         sites=((REL, CLIENT, 6), (PROP, CLIENT, 14)),
         text_prefixes=("exists smbios", "unique values of"),
+    ),
+    # ---------------- client relevance: global properties ----------------
+    "client_relevance/properties/global_property_alert_hard_drive_free_space.bes": Expected(
+        sites=((GPROP, CLIENT, 3),),
+        text_prefixes=("exists ((free space of it)",),
+        note="A <Property> directly under <BES>: a global retrieved property (#121).",
+    ),
+    "client_relevance/properties/global_property_serial_number_universal.bes": Expected(
+        sites=((GPROP, CLIENT, 3),),
+        text_prefixes=("unique values of",),
     ),
     # ---------------- client relevance: baselines ----------------
     "client_relevance/baselines/baseline_relevance_with_components.bes": Expected(

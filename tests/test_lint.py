@@ -17,7 +17,14 @@ from pathlib import Path
 
 import pytest
 from _corpus import corpus_files
-from _helpers import BES_EXAMPLE, BROKEN, CLIENT, MIXED_DIALECT, UNKNOWN_INSPECTOR
+from _helpers import (
+    BES_EXAMPLE,
+    BROKEN,
+    CLIENT,
+    GLOBAL_PROPERTY_BROKEN,
+    MIXED_DIALECT,
+    UNKNOWN_INSPECTOR,
+)
 
 from bigfix_relevance_analyzer.analyzer import analyze
 from bigfix_relevance_analyzer.dialect import Dialect
@@ -867,6 +874,15 @@ def test_lint_paths_aggregates_across_files(tmp_path: Path) -> None:
     findings = lint_paths([clean, broken], LintConfig())
     assert codes(findings) == {"parse-error", "error-token"}
     assert all(f.path == broken for f in findings)
+
+
+def test_lint_paths_reports_a_broken_global_property(tmp_path: Path) -> None:
+    """A global retrieved property is linted like an analysis property (#121)."""
+    path = tmp_path / "global_property.bes"
+    path.write_text(GLOBAL_PROPERTY_BROKEN)
+    findings = lint_paths([path], LintConfig())
+    assert codes(findings) == {"parse-error", "error-token"}
+    assert {f.line for f in findings} == {3}
 
 
 def test_a_path_that_does_not_exist_is_reported_as_an_error(tmp_path: Path) -> None:
