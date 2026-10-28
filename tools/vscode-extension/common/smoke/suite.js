@@ -217,6 +217,7 @@ async function lint() {
   // answers in order, so once it has its diagnostics, these would have had
   // theirs too had they been sent, however slow the machine.
   const otherSchemes = {};
+  const unopened = [];
   const provider = vscode.workspace.registerTextDocumentContentProvider("smoke-vfs", {
     provideTextDocumentContent: () => 'exists file "unterminated\n',
   });
@@ -233,8 +234,17 @@ async function lint() {
     await vscode.window.showTextDocument(control);
     await waitFor(control, (found) => found.length > 0);
     for (const document of opened) {
-      otherSchemes[`${document.uri.scheme}: ${path.basename(document.uri.path)} (${document.languageId})`] =
-        summary(ours(document.uri));
+      const name = `${document.uri.scheme}: ${path.basename(document.uri.path)} (${document.languageId})`;
+      otherSchemes[name] = summary(ours(document.uri));
+      // No diagnostics proves nothing about an empty or plain-text copy: each
+      // must hold the broken statement, in the language its file gets.
+      if (!document.getText().includes("unterminated")) {
+        unopened.push(`${name}: its text is ${JSON.stringify(document.getText())}`);
+      }
+      const expected = document.uri.path.endsWith(".bes") ? process.env.SMOKE_BES_LANGUAGE : language;
+      if (expected && document.languageId !== expected) {
+        unopened.push(`${name}: expected languageId ${expected}`);
+      }
     }
   } finally {
     provider.dispose();
@@ -445,6 +455,7 @@ async function lint() {
   if (switchedFound && !switchedFound.some((d) => codeOf(d) === "error-token")) {
     throw new Error(`notes.txt: expected an error-token once switched, got ${JSON.stringify(summary(switchedFound))}`);
   }
+  if (unopened.length) throw new Error(`other schemes, not opened as intended: ${unopened.join("; ")}`);
   for (const [name, found] of Object.entries(otherSchemes)) {
     if (found.length) throw new Error(`${name}: expected no diagnostics, got ${JSON.stringify(found)}`);
   }

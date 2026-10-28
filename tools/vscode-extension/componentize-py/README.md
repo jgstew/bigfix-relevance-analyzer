@@ -153,7 +153,7 @@ checked as you type too, before it has a name.
 
 | Files | What is checked |
 |---|---|
-| `.bes`, `.bes.xml` | Every relevance element, success criteria, analysis properties, and `{...}` substitutions in action scripts |
+| `.bes`, `.bes.xml` | Every relevance element, success criteria, analysis and global properties, and `{...}` substitutions in action scripts |
 | `.ojo`, `.besrpt`, `.beswrpt`, `.webreport`, `.html`, `.htm` | `<?Relevance ...?>` blocks and relevance passed to JavaScript `Relevance(...)` calls |
 | `.rel` | The whole file, as one client or session relevance statement |
 | `.bsr` | The whole file, as one session relevance statement |

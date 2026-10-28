@@ -111,11 +111,18 @@ const scenarios = {
  * VS Code's git extension can open a file as it is at HEAD. Fails loudly: a
  * missing git must not pass for a scheme that was never tried. */
 function commit(workspace) {
-  const git = (...args) => execFileSync("git", args, { cwd: workspace, stdio: "pipe" });
+  // Not whatever repository a GIT_* variable points at (a hook sets them),
+  // and none of the runner's signing or hooks.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")));
+  const git = (...args) => execFileSync("git", args, { cwd: workspace, env, stdio: "pipe" });
   try {
     git("init", "-q");
     git("add", ".");
-    git("-c", "user.name=smoke", "-c", "user.email=smoke@localhost", "commit", "-qm", "smoke");
+    git(
+      ...["-c", "user.name=smoke", "-c", "user.email=smoke@localhost"],
+      ...["-c", "commit.gpgsign=false", "-c", "core.hooksPath="],
+      ...["commit", "-q", "--no-verify", "-m", "smoke"]
+    );
   } catch (error) {
     throw new Error(`the lint workspace needs git, to open a file as it is at HEAD: ${error.message}`);
   }

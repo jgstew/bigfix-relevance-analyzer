@@ -1560,7 +1560,8 @@ _UTF8_BOM: Final = b"\xef\xbb\xbf"
 
 
 def _decode_text(data: bytes) -> str:
-    """``data`` as the text a text-mode read of the same file would give.
+    """``data`` as the text a text-mode read of the same file would give,
+    less a leading byte order mark.
 
     BES content is UTF-8 in practice, but a stray byte in a hand-edited file
     should not lose the rest of the relevance in it. Line endings are folded
