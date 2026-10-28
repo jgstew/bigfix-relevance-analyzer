@@ -279,7 +279,7 @@ def test_session_relevance_reports_its_own_contexts(session_env: TypeEnvironment
     """Session is an axis too. The dumps name three server-side surfaces, and a
     session-only inspector is defined in the ones that sampled it -- an empty
     set said nothing at all."""
-    expected = {source for source in inspectors.lookup(SESSION_ONLY)[0].sources}
+    expected = {*inspectors.lookup(SESSION_ONLY)[0].sources}
     assert expected <= ALL_SESSION_CONTEXTS
     value = resolve_property(SESSION_ONLY, None, session_env)
     assert set(value.platforms) == expected
