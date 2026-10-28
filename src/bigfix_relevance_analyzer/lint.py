@@ -73,8 +73,8 @@ Every rule is listed in :data:`RULES`; all but two are always on. The main ones:
   does not exist, could not be read, or has a suffix no extractor reads.
   Always an error: it yields no sites, so left unreported it is
   indistinguishable from a clean file, and a typo'd path in a hook would pass
-  CI having linted nothing. An existing directory is
-  exempt -- a path is taken literally and only :func:`lint_directory` recurses.
+  CI having linted nothing. :func:`lint_paths` walks a directory instead (see
+  below); only :func:`lint_file`, which reads one file, reports one.
 - ``unterminated-substitution`` -- an ActionScript `{` with anything after it
   on its line and no `}` to close it there, which fails the action (issue 52).
   Always an error. Unlike every rule above, it is about the ActionScript
@@ -86,9 +86,10 @@ Every rule is listed in :data:`RULES`; all but two are always on. The main ones:
   closed (warning: the markdown is valid, but its relevance went unread), and a
   BES file that is not well-formed XML (error). Like the rule above, each
   means relevance that was never linted, so each finding has no site.
-- ``max-depth-exceeded`` -- only from :func:`lint_directory`: a directory tree
-  deeper than its ``max_depth`` was not fully walked. Always an error, because
-  a limit this generous (6 levels, by default) being hit at all is itself
+- ``max-depth-exceeded`` -- only from a walk (:func:`lint_directory`, or
+  :func:`lint_paths` given a directory): a directory tree deeper than its
+  ``max_depth`` was not fully walked. Always an error, because a limit this
+  generous (6 levels, by default) being hit at all is itself
   worth a human's attention, and a silently truncated walk would look
   identical to a clean, fully-scanned one.
 
@@ -103,11 +104,11 @@ and a repo's config disables rules by name. Adding, renaming or removing a code
 is therefore a minor-version event with a consumer to update, not a detail --
 that hook has a test that fails when a code here has no mapping there.
 
-:func:`lint_paths` and :func:`lint_file` never expand a directory argument --
-a path is taken literally, exactly like the extractor they wrap. Only
-:func:`lint_directory` recurses, and only when a caller asks it to (both CLIs
-reach for it solely when given zero path arguments, so an explicit ``.`` still
-behaves like any other literal path).
+:func:`lint_paths` walks a directory argument with :func:`lint_directory`, and
+takes every other path literally. It used to take a directory literally too,
+which linted nothing and reported a clean pass over files never read. Both
+CLIs walk ``.`` when given zero path arguments, so ``bigfix-relevance-lint``
+and ``bigfix-relevance-lint .`` agree.
 """
 
 from __future__ import annotations
@@ -588,9 +589,8 @@ RULES: Mapping[str, LintRule] = MappingProxyType(
                 "file unless it is reported -- so a misspelled path in a pre-commit hook would "
                 "otherwise pass CI having linted nothing. Always an error: the caller named "
                 "this file, so failing to read it is a fault in the run rather than an opinion "
-                "about content. An existing *directory* is not a file error; it is skipped, "
-                "because a path here is taken literally and only :func:`lint_directory` "
-                "recurses.",
+                "about content. A *directory* given to :func:`lint_paths` is walked instead; "
+                "only :func:`lint_file`, which reads exactly one file, reports one.",
             ),
             _rule(
                 "unterminated-substitution",
@@ -1537,9 +1537,9 @@ def lint_file(path: str | bytes | os.PathLike[str], config: LintConfig) -> tuple
     path, an unreadable one, and a file type
     :func:`~bigfix_relevance_analyzer.extract.extract_relevance_from_file` does
     not recognize. Each of those yields no sites, and none may look like a
-    clean file. The one path that stays silent is an existing directory: only
-    :func:`lint_directory` descends, so a directory argument is a no-op here by
-    design rather than a failure to read something.
+    clean file. A directory is reported too: this reads one file, and a
+    directory left silent here would pass having read nothing. To lint what is
+    inside one, use :func:`lint_paths` or :func:`lint_directory`.
     """
     return _lint_file(_as_path(path), config, explicit=True)
 
@@ -1574,7 +1574,8 @@ def _unlintable(
     `0 errors in 1 file` over a file nothing read would be a false pass (#16).
     """
     if file_path.is_dir():
-        return ()
+        # The walk lists only files, so a directory here was named explicitly.
+        return _file_error(file_path, "a directory, not a file; lint_paths walks one", config)
     if not file_path.exists():
         return _file_error(file_path, "no such file", config)
     if not _is_recognized(file_path):
@@ -1672,24 +1673,35 @@ def _analyze_site(site: RelevanceSite, config: LintConfig) -> RelevanceAnalysis:
 
 
 def lint_paths(
-    paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfig
+    paths: Iterable[str | bytes | os.PathLike[str]],
+    config: LintConfig,
+    *,
+    max_depth: int = DEFAULT_MAX_DEPTH,
 ) -> tuple[Finding, ...]:
     """:func:`lint_file` over many paths, in order, reporting ones that error out.
 
     A path that could not be read does not stop the run: it becomes a
     ``file-error`` finding and the remaining paths are linted as usual.
 
-    Each path is taken literally -- a directory here is not descended into; use
-    :func:`lint_directory` for that.
+    A directory is walked with :func:`lint_directory`, to ``max_depth``; every
+    other path is taken literally. A directory used to be taken literally too,
+    which linted nothing and read as a clean pass.
     """
     findings: list[Finding] = []
     for path in paths:
-        findings.extend(lint_file(path, config))
+        file_path = _as_path(path)
+        if file_path.is_dir():
+            findings.extend(lint_directory(file_path, config, max_depth=max_depth))
+        else:
+            findings.extend(_lint_file(file_path, config, explicit=True))
     return tuple(findings)
 
 
 def lint_paths_to_dict(
-    paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfig
+    paths: Iterable[str | bytes | os.PathLike[str]],
+    config: LintConfig,
+    *,
+    max_depth: int = DEFAULT_MAX_DEPTH,
 ) -> dict[str, Any]:
     """:func:`lint_paths` as JSON-serializable plain data, with the verdict.
 
@@ -1704,26 +1716,36 @@ def lint_paths_to_dict(
     it -- because that is the order a human reads a file in, and sorting by
     severity instead would scatter one file's findings across the report.
     """
-    return _findings_dict(lint_paths(paths, config))
+    return _findings_dict(lint_paths(paths, config, max_depth=max_depth))
 
 
-def _walk_files(root: Path, max_depth: int) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
+def _walk_files(
+    root: Path, max_depth: int
+) -> tuple[tuple[Path, ...], tuple[Path, ...], tuple[tuple[Path, str], ...]]:
     """Discover files under ``root`` up to ``max_depth`` levels deep.
 
-    Returns ``(files, exceeded)``: every file found (default-excluded directories
-    pruned), and every directory that was *not* descended into because doing so
-    would have gone past ``max_depth``. Sorted within each directory for a
-    deterministic order across runs and platforms. Does no linting itself --
-    that stays in :func:`lint_directory`, which turns ``exceeded`` into findings.
+    Returns ``(files, exceeded, unreadable)``: every file found
+    (default-excluded directories pruned), every directory that was *not*
+    descended into because doing so would have gone past ``max_depth``, and
+    every directory that could not be listed, with why. Sorted within each
+    directory for a deterministic order across runs and platforms. Does no
+    linting itself -- :func:`_walk` turns the last two into findings.
     """
     if root.is_file():
-        return (root,), ()
+        return (root,), (), ()
     if not root.is_dir():
-        return (), ()
+        return (), (), ()
 
     files: list[Path] = []
     exceeded: list[Path] = []
-    for dirpath, dirnames, filenames in os.walk(root):
+    unreadable: list[tuple[Path, str]] = []
+
+    def unlisted(error: OSError) -> None:
+        # Without this os.walk drops the directory silently, and what was in
+        # it reads as clean.
+        unreadable.append((Path(error.filename or root), error.strerror or str(error)))
+
+    for dirpath, dirnames, filenames in os.walk(root, onerror=unlisted):
         current = Path(dirpath)
         rel = current.relative_to(root)
         depth = 0 if rel == Path() else len(rel.parts)
@@ -1738,7 +1760,20 @@ def _walk_files(root: Path, max_depth: int) -> tuple[tuple[Path, ...], tuple[Pat
 
         files.extend(current / name for name in sorted(filenames))
 
-    return tuple(files), tuple(exceeded)
+    return tuple(files), tuple(exceeded), tuple(unreadable)
+
+
+def _walk(
+    root: Path, config: LintConfig, max_depth: int
+) -> tuple[tuple[Path, ...], tuple[Finding, ...]]:
+    """:func:`_walk_files`, with where it stopped or could not look as findings:
+    ``max-depth-exceeded`` per directory not descended into, and ``file-error``
+    per directory that could not be listed."""
+    files, exceeded, unreadable = _walk_files(root, max_depth)
+    findings = _depth_findings(root, exceeded, max_depth, config)
+    for directory, detail in unreadable:
+        findings += _file_error(directory, f"could not list the directory: {detail}", config)
+    return files, findings
 
 
 def lint_directory(
@@ -1749,19 +1784,16 @@ def lint_directory(
 ) -> tuple[Finding, ...]:
     """Walk ``root`` and :func:`lint_file` everything found under it.
 
-    The only entry point that recurses into a directory -- :func:`lint_paths`
-    and :func:`lint_file` take a path exactly as given. Both CLIs reach for this
-    solely when given zero path arguments, so passing a directory explicitly
-    keeps behaving like any other literal path; this is the "walk `.`" behind a
-    bare invocation, not a general directory-expansion feature.
+    :func:`lint_paths` calls this for each directory it is given, and both
+    CLIs call it on ``.`` when given zero path arguments.
 
     A branch deeper than ``max_depth`` is not silently dropped: each directory
     where descent stopped is reported as its own ``max-depth-exceeded`` finding,
     same as any other rule in this module, and everything below it is skipped.
+    A directory that cannot be listed is a ``file-error``, for the same reason.
     """
-    root_path = _as_path(root)
-    files, exceeded = _walk_files(root_path, max_depth)
-    findings = list(_depth_findings(root_path, exceeded, max_depth, config))
+    files, walk_findings = _walk(_as_path(root), config, max_depth)
+    findings = list(walk_findings)
     for file_path in files:
         findings.extend(_lint_file(file_path, config, explicit=False))
     return tuple(findings)

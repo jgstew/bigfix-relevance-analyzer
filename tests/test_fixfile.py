@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -384,6 +385,60 @@ def test_fix_paths_reports_every_file(tmp_path: Path) -> None:
     assert result.changed == (fixable,)
     assert [fix.path for fix in result.applied] == [fixable]
     assert [finding.code for finding in result.findings] == ["file-error"]
+
+
+def test_fix_paths_walks_a_directory_argument(tmp_path: Path) -> None:
+    (tmp_path / "sub").mkdir()
+    fixable = write(tmp_path / "sub", task(f"<Relevance>{SETTING}</Relevance>"), "a.bes")
+    (tmp_path / "notes.txt").write_text("not relevance")
+    result = fix_paths([tmp_path], LintConfig())
+    assert result.changed == (fixable,)
+    assert result.findings == ()
+
+
+def test_fix_paths_reports_where_a_directory_walk_stopped(tmp_path: Path) -> None:
+    (tmp_path / "a" / "b").mkdir(parents=True)
+    write(tmp_path / "a" / "b", task(f"<Relevance>{SETTING}</Relevance>"))
+    result = fix_paths([tmp_path], LintConfig(), max_depth=1)
+    assert result.changed == ()
+    assert [finding.code for finding in result.findings] == ["max-depth-exceeded"]
+
+
+def test_fix_paths_keeps_directory_findings_where_the_directory_was_named(tmp_path: Path) -> None:
+    """The same order lint_paths reports in: per path, as given."""
+    first = write(tmp_path, b"not xml", "first.bes")
+    (tmp_path / "deep" / "a").mkdir(parents=True)
+    write(tmp_path / "deep" / "a", task(f"<Relevance>{SETTING}</Relevance>"))
+    result = fix_paths([first, tmp_path / "deep"], LintConfig(), max_depth=0)
+    assert [finding.path for finding in result.findings] == [first, tmp_path / "deep" / "a"]
+    assert [finding.code for finding in result.findings][-1] == "max-depth-exceeded"
+
+
+@pytest.mark.skipif(not hasattr(os, "geteuid") or os.geteuid() == 0, reason="root reads anything")
+def test_fix_paths_reports_an_unreadable_directory(tmp_path: Path) -> None:
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    write(locked, task(f"<Relevance>{SETTING}</Relevance>"))
+    locked.chmod(0)
+    try:
+        result = fix_paths([tmp_path], LintConfig())
+    finally:
+        locked.chmod(0o755)
+    assert [(finding.code, finding.path) for finding in result.findings] == [("file-error", locked)]
+
+
+def test_fix_paths_to_dict_passes_max_depth_through(tmp_path: Path) -> None:
+    (tmp_path / "a" / "b").mkdir(parents=True)
+    write(tmp_path / "a" / "b", task(f"<Relevance>{SETTING}</Relevance>"))
+    payload = fix_paths_to_dict([tmp_path], LintConfig(), max_depth=1)
+    assert [finding["code"] for finding in payload["findings"]] == ["max-depth-exceeded"]
+    assert payload["changed"] == []
+
+
+def test_plan_fix_on_a_directory_is_a_file_error(tmp_path: Path) -> None:
+    plan = plan_fix(tmp_path, LintConfig())
+    assert not plan.changed
+    assert [finding.code for finding in plan.findings] == ["file-error"]
 
 
 def test_fix_paths_to_dict_shape(tmp_path: Path) -> None:

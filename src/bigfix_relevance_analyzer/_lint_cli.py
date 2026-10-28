@@ -38,9 +38,8 @@ carry no path, only a line relative to the text. ``--fix`` does not apply to
 such text: there is no file to rewrite.
 
 Called with no paths at all, this walks the current directory (see
-:func:`~bigfix_relevance_analyzer.lint.lint_directory`) instead of erroring --
-an *explicit* path, including ``.``, is never expanded this way; it is taken
-literally, the same as any other path argument.
+:func:`~bigfix_relevance_analyzer.lint.lint_directory`) instead of erroring,
+and a directory given as a path is walked the same way, ``.`` included.
 
 This is the console script (``[project.scripts]`` in ``pyproject.toml``)
 ``pre-commit-bigfix``'s hook entry calls; kept out of ``__main__.py`` because
@@ -53,6 +52,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import os
 import re
 import sys
 from collections.abc import Iterator
@@ -107,6 +107,9 @@ def _is_relevance_text(arg: str) -> bool:
     """
     if not any(char.isspace() for char in arg):
         return False
+    if arg.endswith(("/", os.sep)):
+        # Named as a directory; no relevance statement ends in an operator.
+        return False
     try:
         return not Path(arg).exists()
     except OSError:
@@ -136,8 +139,9 @@ def main(argv: list[str] | None = None, *, prog: str = "bigfix-relevance-lint") 
         "paths",
         nargs="*",
         help=(
-            "files to lint, or relevance statements (any argument with whitespace that "
-            "is not an existing path); omit entirely to walk the current directory"
+            "files or directories to lint (a directory is walked), or relevance statements "
+            "(any argument with whitespace that is not an existing path); omit entirely to "
+            "walk the current directory"
         ),
     )
     add_ceiling_args(
@@ -148,7 +152,8 @@ def main(argv: list[str] | None = None, *, prog: str = "bigfix-relevance-lint") 
             f"(default {DEFAULT_MAX_EVALUATION_COST:g})"
         ),
         max_depth_help=(
-            f"with no paths given, how many directory levels to walk (default {DEFAULT_MAX_DEPTH})"
+            "how many levels to walk below a directory given, or below . with no paths "
+            f"(default {DEFAULT_MAX_DEPTH})"
         ),
     )
     parser.add_argument(
@@ -230,7 +235,7 @@ def main(argv: list[str] | None = None, *, prog: str = "bigfix-relevance-lint") 
     fixes: FixResult | None = None
     if args.fix:
         fixes = (
-            fix_paths(paths, config)
+            fix_paths(paths, config, max_depth=args.max_depth)
             if paths
             else fix_directory(".", config, max_depth=args.max_depth)
         )
@@ -294,7 +299,7 @@ def _diff(paths: list[str], config: LintConfig, args: argparse.Namespace) -> int
     plans: Iterator[FixPlan]
     findings: tuple[Finding, ...] = ()
     if paths:
-        plans = _plan_paths(paths, config)
+        plans = _plan_paths(paths, config, max_depth=args.max_depth)
     else:
         plans, findings = _plan_directory(Path("."), config, max_depth=args.max_depth)
     unapplied: list[FileFix] = []
@@ -375,9 +380,14 @@ def _fix_line(fix: FileFix) -> str:
 
 
 def _scope(paths: list[str], texts: list[str]) -> str:
+    # A directory is counted as one, not by what the walk found in it, which
+    # the summary would otherwise have to walk again to know.
+    directories = sum(Path(path).is_dir() for path in paths)
     parts = []
-    if paths:
-        parts.append(f"{len(paths)} file(s)")
+    if len(paths) > directories:
+        parts.append(f"{len(paths) - directories} file(s)")
+    if directories:
+        parts.append(f"{directories} director{'y' if directories == 1 else 'ies'}")
     if texts:
         parts.append(f"{len(texts)} statement(s)")
     return " and ".join(parts) or "the current directory"

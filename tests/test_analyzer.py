@@ -514,15 +514,15 @@ def test_cli_check_with_no_paths_walks_the_current_directory(
     assert "broken.rel:1: error [parse-error]" in out
 
 
-def test_cli_check_explicit_dot_is_not_walked(
+def test_cli_check_walks_an_explicit_dot(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
     write(tmp_path, "broken.rel", BROKEN)
 
-    assert main(["--check", "."]) == 0
+    assert main(["--check", "."]) == 1
     out = capsys.readouterr().out
-    assert out == ""
+    assert "broken.rel:1: error [parse-error]" in out
 
 
 def test_cli_check_fails_on_a_path_that_does_not_exist(

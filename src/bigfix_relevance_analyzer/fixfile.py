@@ -82,13 +82,12 @@ from bigfix_relevance_analyzer.lint import (
     LintConfig,
     Severity,
     SiteJudge,
-    _depth_findings,
     _file_error,
     _findings_dict,
     _judge_site,
     _lint_extracted,
     _unlintable,
-    _walk_files,
+    _walk,
     lint_file,
 )
 
@@ -780,20 +779,41 @@ def fix_file(path: str | bytes | os.PathLike[str], config: LintConfig) -> FileFi
     return write_fix(plan_fix(path, config))
 
 
-def fix_paths(paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfig) -> FixResult:
+def fix_paths(
+    paths: Iterable[str | bytes | os.PathLike[str]],
+    config: LintConfig,
+    *,
+    max_depth: int = DEFAULT_MAX_DEPTH,
+) -> FixResult:
     """:func:`fix_file` over many paths, in order.
 
-    Each path is taken literally, as :func:`~bigfix_relevance_analyzer.lint.lint_paths`
-    takes it; :func:`fix_directory` is the one that walks.
+    A directory is walked as :func:`fix_directory` walks it, to ``max_depth``;
+    every other path is taken literally -- the same split
+    :func:`~bigfix_relevance_analyzer.lint.lint_paths` makes.
     """
-    return _combine([write_fix(plan) for plan in _plan_paths(paths, config)])
+    return _combine([write_fix(plan) for plan in _plan_paths(paths, config, max_depth=max_depth)])
 
 
 def _plan_paths(
-    paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfig
+    paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfig, *, max_depth: int
 ) -> Iterator[FixPlan]:
-    """:func:`plan_fix` over many paths, in order, one at a time."""
-    return (plan_fix(path, config) for path in paths)
+    """:func:`plan_fix` over many paths, in order, one at a time, with every
+    directory among them walked as :func:`_plan_directory` walks it.
+
+    A walk's own findings (where it stopped or could not look) ride on a plan
+    for the directory that changes nothing, so they come out where the
+    directory was named, as :func:`~bigfix_relevance_analyzer.lint.lint_paths`
+    reports them.
+    """
+    for path in paths:
+        file_path = _as_path(path)
+        if not file_path.is_dir():
+            yield plan_fix(file_path, config)
+            continue
+        plans, walk_findings = _plan_directory(file_path, config, max_depth=max_depth)
+        if walk_findings:
+            yield FixPlan(file_path, b"", b"", (), (), walk_findings, walk_findings, (), config)
+        yield from plans
 
 
 def _plan_directory(
@@ -802,12 +822,12 @@ def _plan_directory(
     """A plan per file under ``root``, walked as ``lint_directory`` walks it,
     one at a time, and the depth findings for wherever the walk stopped.
 
-    Shared by :func:`fix_directory` and ``--fix --diff``, so the dry run walks
-    exactly what the fix would.
+    Shared by :func:`fix_directory`, :func:`fix_paths` and ``--fix --diff``, so
+    the dry run walks exactly what the fix would.
     """
-    files, exceeded = _walk_files(root, max_depth)
+    files, walk_findings = _walk(root, config, max_depth)
     plans = (_plan_path(file_path, config, explicit=False) for file_path in files)
-    return plans, _depth_findings(root, exceeded, max_depth, config)
+    return plans, walk_findings
 
 
 def fix_directory(
@@ -836,7 +856,10 @@ def _combine(results: Sequence[FileFixResult]) -> FixResult:
 
 
 def fix_paths_to_dict(
-    paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfig
+    paths: Iterable[str | bytes | os.PathLike[str]],
+    config: LintConfig,
+    *,
+    max_depth: int = DEFAULT_MAX_DEPTH,
 ) -> dict[str, Any]:
     """:func:`fix_paths` as JSON-serializable plain data -- see :meth:`FixResult.to_dict`."""
-    return fix_paths(paths, config).to_dict()
+    return fix_paths(paths, config, max_depth=max_depth).to_dict()

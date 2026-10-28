@@ -23,6 +23,7 @@ from _helpers import (
     CLIENT,
     GLOBAL_PROPERTY_BROKEN,
     MIXED_DIALECT,
+    REPO_ROOT,
     UNKNOWN_INSPECTOR,
 )
 
@@ -1013,13 +1014,76 @@ def test_a_suffixless_fifo_names_its_real_problem(tmp_path: Path) -> None:
     assert "unrecognised file type" in findings[0].message
 
 
-def test_lint_paths_never_expands_a_directory_argument(tmp_path: Path) -> None:
-    # An explicit path, even a directory with lintable content inside it, is
-    # taken literally -- only lint_directory() recurses. This is deliberate,
-    # confirmed behavior, not a gap: see the module docstring.
-    (tmp_path / "broken.rel").write_text(BROKEN)
-    assert lint_paths([tmp_path], LintConfig()) == ()
-    assert lint_file(tmp_path, LintConfig()) == ()
+def test_lint_paths_walks_a_directory_argument(tmp_path: Path) -> None:
+    # A directory named explicitly used to be a silent no-op, so
+    # `bigfix-relevance-lint some/dir` reported a clean pass over files it never read.
+    (tmp_path / "sub").mkdir()
+    broken = tmp_path / "sub" / "broken.rel"
+    broken.write_text(BROKEN)
+    (tmp_path / "notes.txt").write_text("not relevance")
+
+    findings = lint_paths([tmp_path], LintConfig())
+    assert findings == lint_file(broken, LintConfig())
+    assert findings == lint_directory(tmp_path, LintConfig())
+    assert "file-error" not in codes(findings)  # the walk skips notes.txt quietly
+
+
+def test_lint_paths_walks_a_directory_in_order_among_files(tmp_path: Path) -> None:
+    first = tmp_path / "first.rel"
+    first.write_text(BROKEN)
+    (tmp_path / "dir").mkdir()
+    inner = tmp_path / "dir" / "inner.rel"
+    inner.write_text(BROKEN)
+
+    findings = lint_paths([inner.parent, first], LintConfig())
+    assert list(dict.fromkeys(finding.path for finding in findings)) == [inner, first]
+
+
+def test_lint_paths_reports_where_a_directory_walk_stopped(tmp_path: Path) -> None:
+    deep = tmp_path / "a" / "b"
+    deep.mkdir(parents=True)
+    (deep / "broken.rel").write_text(BROKEN)
+
+    findings = lint_paths([tmp_path], LintConfig(), max_depth=1)
+    assert codes(findings) == {"max-depth-exceeded"}
+    assert codes(lint_paths([tmp_path], LintConfig(), max_depth=2)) >= {"parse-error"}
+
+
+@pytest.mark.skipif(not hasattr(os, "geteuid") or os.geteuid() == 0, reason="root reads anything")
+@pytest.mark.parametrize("locked_name", ["", "sub"])
+def test_an_unreadable_directory_is_a_file_error_not_a_pass(
+    tmp_path: Path, locked_name: str
+) -> None:
+    """os.walk drops a directory it cannot list unless told; that read as clean."""
+    locked = tmp_path / locked_name
+    locked.mkdir(exist_ok=True)
+    (locked / "broken.rel").write_text(BROKEN)
+    locked.chmod(0)
+    try:
+        for findings in (
+            lint_paths([tmp_path], LintConfig()),
+            lint_directory(tmp_path, LintConfig()),
+        ):
+            assert codes(findings) == {"file-error"}
+            assert findings[0].path == locked
+    finally:
+        locked.chmod(0o755)
+
+
+def test_lint_file_on_a_directory_is_a_file_error_not_a_pass(tmp_path: Path) -> None:
+    findings = lint_file(tmp_path, LintConfig())
+    assert codes(findings) == {"file-error"}
+    assert "directory" in findings[0].message
+
+
+def test_lint_paths_over_an_examples_directory_matches_listing_its_files() -> None:
+    """Regression: the reported repro, over real fixtures. Before the fix the
+    directory gave no findings while its two `.bes` files gave four warnings."""
+    directory = REPO_ROOT / "tests/examples/client_relevance/tasks"
+    files = sorted(directory.iterdir())
+    listed = lint_paths(files, LintConfig())
+    assert listed, "the fixtures are expected to raise findings; pick others if not"
+    assert lint_paths([directory], LintConfig()) == listed
 
 
 # ---------------------------------------------------------------------------

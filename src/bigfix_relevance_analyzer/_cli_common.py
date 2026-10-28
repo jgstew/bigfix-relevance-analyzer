@@ -171,11 +171,8 @@ def config_from_args(
 def lint_targets(
     paths: Sequence[str | os.PathLike[str]], config: LintConfig, *, max_depth: int
 ) -> tuple[Finding, ...]:
-    """Lint ``paths`` literally, or walk the current directory when there are none.
-
-    An *explicit* path, including ``.``, is never expanded -- see
-    :func:`~bigfix_relevance_analyzer.lint.lint_directory`.
-    """
+    """Lint ``paths``, walking any directory among them, or walk the current
+    directory when there are none -- each walk to ``max_depth``."""
     if paths:
-        return lint_paths(paths, config)
+        return lint_paths(paths, config, max_depth=max_depth)
     return lint_directory(".", config, max_depth=max_depth)

@@ -117,7 +117,7 @@ class Observation(NamedTuple):
 def statements(repo: Path) -> dict[str, Dialect | None]:
     """Every distinct statement in ``repo``, with its dialect when definite."""
     found: dict[str, Dialect | None] = {}
-    files, _exceeded = _walk_files(repo, MAX_DEPTH)
+    files, _exceeded, _unreadable = _walk_files(repo, MAX_DEPTH)
     for path in files:
         if not _is_recognized(path):
             continue
