@@ -1556,6 +1556,9 @@ def _extract_text(
     return []
 
 
+_UTF8_BOM: Final = b"\xef\xbb\xbf"
+
+
 def _decode_text(data: bytes) -> str:
     """``data`` as the text a text-mode read of the same file would give.
 
@@ -1563,5 +1566,15 @@ def _decode_text(data: bytes) -> str:
     should not lose the rest of the relevance in it. Line endings are folded
     exactly as ``Path.read_text`` folds them -- this replaced that call, and
     the lines every finding reports depend on it.
+
+    One leading UTF-8 byte order mark is dropped, as an editor drops it: it
+    marks the encoding, it is not text (#107). By ``bytes.removeprefix``, not
+    the BOM-aware codec -- a WASM build has only the codecs its snapshot saw,
+    and this needs none beyond ``utf-8``.
     """
-    return data.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
+    return (
+        data.removeprefix(_UTF8_BOM)
+        .decode("utf-8", errors="replace")
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+    )

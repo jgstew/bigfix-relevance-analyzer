@@ -885,6 +885,37 @@ def test_lint_paths_reports_a_broken_global_property(tmp_path: Path) -> None:
     assert {f.line for f in findings} == {3}
 
 
+@pytest.mark.parametrize(
+    ("name", "data"),
+    [
+        ("a.rel", b"exists bogusname"),
+        ("a.bsr", b"names of bes computers"),
+        ("a.md", b"```relevance\nexists bogusname\n```\n"),
+    ],
+    ids=["rel", "bsr", "md-fence-on-line-1"],
+)
+def test_a_leading_bom_changes_no_finding(tmp_path: Path, name: str, data: bytes) -> None:
+    """#107: the BOM used to glue onto the first word (`.rel`, `.bsr`: a false
+    `unknown-inspector`) or hide a line-1 fence (`.md`: nothing reported)."""
+    plain = tmp_path / "plain" / name
+    bom = tmp_path / "bom" / name
+    for path, content in ((plain, data), (bom, b"\xef\xbb\xbf" + data)):
+        path.parent.mkdir()
+        path.write_bytes(content)
+
+    def seen(path: Path) -> list[tuple[object, ...]]:
+        return [
+            (f.code, f.severity, f.message, f.line, f.site.column if f.site else None)
+            for f in lint_file(path, LintConfig())
+        ]
+
+    assert seen(bom) == seen(plain)
+    if name == "a.bsr":
+        assert seen(bom) == []
+    else:
+        assert seen(bom), "the statement must be linted, not skipped"
+
+
 def test_a_path_that_does_not_exist_is_reported_as_an_error(tmp_path: Path) -> None:
     """A missing path is a finding, not a silent pass.
 

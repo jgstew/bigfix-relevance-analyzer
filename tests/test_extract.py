@@ -1637,3 +1637,67 @@ def test_the_private_site_builders_agree_on_the_column_default() -> None:
         parameters = inspect.signature(helper).parameters
         assert "columns" not in parameters, helper.__name__
         assert parameters["column_offset"].default == 0, helper.__name__
+
+
+# ---------------------------------------------------------------------------
+# A leading UTF-8 byte order mark marks the encoding; it is not text (#107)
+# ---------------------------------------------------------------------------
+
+UTF8_BOM = b"\xef\xbb\xbf"
+BOM_CHAR = UTF8_BOM.decode()
+"""U+FEFF, built from the bytes: the ASCII hooks would rewrite it written out."""
+
+
+def _comparable(sites: list[RelevanceSite]) -> list[tuple[object, ...]]:
+    """What a reader of the sites sees: everything but the byte offsets, which
+    a BOM rightly moves by its three bytes."""
+    return [
+        (site.kind, site.text, site.line, site.column, site.dialect, site.context) for site in sites
+    ]
+
+
+@pytest.mark.parametrize(
+    ("name", "data"),
+    [
+        ("a.rel", b"exists bogusname"),
+        ("a.rel", b"exists bogusname\r\nand true\r\n"),
+        ("a.bsr", b"names of bes computers"),
+        ("a.md", b"```relevance\nexists bogusname\n```\n"),
+        ("a.md", b"# Title\n\n```relevance\nexists bogusname\n```\n"),
+        ("a.ojo", b"<p><?Relevance names of bogus things ?></p>"),
+        (
+            "a.bes",
+            (
+                b'<?xml version="1.0" encoding="UTF-8"?>\n'
+                b"<BES><Task><Relevance>exists bogusname</Relevance></Task></BES>"
+            ),
+        ),
+    ],
+    ids=["rel", "rel-crlf", "bsr", "md-fence-on-line-1", "md-fence-later", "ojo", "bes"],
+)
+def test_a_leading_bom_changes_no_site(name: str, data: bytes) -> None:
+    without, _ = _extract_data(Path(name), data)
+    with_bom, _ = _extract_data(Path(name), UTF8_BOM + data)
+    assert without
+    assert _comparable(with_bom) == _comparable(without)
+
+
+def test_a_crlf_file_with_a_bom_reads_like_the_lf_file_without_one() -> None:
+    lf, _ = _extract_data(Path("a.rel"), b"exists bogusname\n")
+    crlf, _ = _extract_data(Path("a.rel"), UTF8_BOM + b"exists bogusname\r\n")
+    assert _comparable(crlf) == _comparable(lf)
+
+
+@pytest.mark.parametrize(
+    ("name", "data", "kept"),
+    [
+        ("a.rel", b'exists file "' + UTF8_BOM + b'"', f'exists file "{BOM_CHAR}"'),
+        ("a.md", b"x\n" + UTF8_BOM + b"```relevance\nexists file\n```\n", None),
+        ("a.rel", UTF8_BOM + UTF8_BOM + b"exists file", f"{BOM_CHAR}exists file"),
+    ],
+    ids=["inside-a-string", "before-a-later-fence", "a-second-bom"],
+)
+def test_only_one_leading_bom_is_dropped(name: str, data: bytes, kept: str | None) -> None:
+    """A U+FEFF anywhere but the very start is a character the author wrote."""
+    sites, _ = _extract_data(Path(name), data)
+    assert texts(sites) == ([] if kept is None else [kept])
