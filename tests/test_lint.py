@@ -1049,6 +1049,27 @@ def test_lint_paths_reports_where_a_directory_walk_stopped(tmp_path: Path) -> No
     assert codes(lint_paths([tmp_path], LintConfig(), max_depth=2)) >= {"parse-error"}
 
 
+@pytest.mark.skipif(not hasattr(os, "geteuid") or os.geteuid() == 0, reason="root reads anything")
+@pytest.mark.parametrize("locked_name", ["", "sub"])
+def test_an_unreadable_directory_is_a_file_error_not_a_pass(
+    tmp_path: Path, locked_name: str
+) -> None:
+    """os.walk drops a directory it cannot list unless told; that read as clean."""
+    locked = tmp_path / locked_name
+    locked.mkdir(exist_ok=True)
+    (locked / "broken.rel").write_text(BROKEN)
+    locked.chmod(0)
+    try:
+        for findings in (
+            lint_paths([tmp_path], LintConfig()),
+            lint_directory(tmp_path, LintConfig()),
+        ):
+            assert codes(findings) == {"file-error"}
+            assert findings[0].path == locked
+    finally:
+        locked.chmod(0o755)
+
+
 def test_lint_file_on_a_directory_is_a_file_error_not_a_pass(tmp_path: Path) -> None:
     findings = lint_file(tmp_path, LintConfig())
     assert codes(findings) == {"file-error"}

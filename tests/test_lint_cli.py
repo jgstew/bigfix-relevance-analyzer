@@ -626,6 +626,37 @@ def test_fix_with_no_paths_walks_the_current_directory(
     assert "fixed [plural-preferred]" in capsys.readouterr().out
 
 
+def test_a_missing_directory_with_a_space_is_a_file_error_not_relevance(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A trailing separator means a directory; no relevance statement ends in `/`."""
+    assert main([f"{tmp_path}/no such dir/"]) == 1
+    captured = capsys.readouterr()
+    assert "[file-error]" in captured.out
+    assert "statement" not in captured.err
+
+
+def test_relevance_text_and_a_directory_together(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    write(tmp_path, "broken.rel", BROKEN)
+    assert main(["names of (files", str(tmp_path)]) == 1
+    captured = capsys.readouterr()
+    assert "broken.rel:1: error [parse-error]" in captured.out
+    assert "in 1 directory and 1 statement(s)" in captured.err
+
+
+def test_fix_passes_max_depth_through_for_a_directory_argument(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "d" / "d").mkdir(parents=True)
+    path = tmp_path / "d" / "d" / "t.bes"
+    path.write_text(SETTING_TASK)
+    assert main(["--fix", "--max-depth=1", str(tmp_path)]) == 1
+    assert path.read_text() == SETTING_TASK
+    assert "max-depth-exceeded" in capsys.readouterr().out
+
+
 def test_fix_walks_a_directory_argument(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     (tmp_path / "sub").mkdir()
     path = tmp_path / "sub" / "t.bes"

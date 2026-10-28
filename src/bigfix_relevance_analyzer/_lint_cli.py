@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import os
 import re
 import sys
 from collections.abc import Iterator
@@ -106,6 +107,9 @@ def _is_relevance_text(arg: str) -> bool:
     """
     if not any(char.isspace() for char in arg):
         return False
+    if arg.endswith(("/", os.sep)):
+        # Named as a directory; no relevance statement ends in an operator.
+        return False
     try:
         return not Path(arg).exists()
     except OSError:
@@ -135,8 +139,9 @@ def main(argv: list[str] | None = None, *, prog: str = "bigfix-relevance-lint") 
         "paths",
         nargs="*",
         help=(
-            "files to lint, or relevance statements (any argument with whitespace that "
-            "is not an existing path); omit entirely to walk the current directory"
+            "files or directories to lint (a directory is walked), or relevance statements "
+            "(any argument with whitespace that is not an existing path); omit entirely to "
+            "walk the current directory"
         ),
     )
     add_ceiling_args(
@@ -292,9 +297,9 @@ def _diff(paths: list[str], config: LintConfig, args: argparse.Namespace) -> int
     is ``--fix``'s, with "would change" for "changed".
     """
     plans: Iterator[FixPlan]
-    findings: tuple[Finding, ...]
+    findings: tuple[Finding, ...] = ()
     if paths:
-        plans, findings = _plan_paths(paths, config, max_depth=args.max_depth)
+        plans = _plan_paths(paths, config, max_depth=args.max_depth)
     else:
         plans, findings = _plan_directory(Path("."), config, max_depth=args.max_depth)
     unapplied: list[FileFix] = []

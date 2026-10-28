@@ -82,13 +82,12 @@ from bigfix_relevance_analyzer.lint import (
     LintConfig,
     Severity,
     SiteJudge,
-    _depth_findings,
     _file_error,
     _findings_dict,
     _judge_site,
     _lint_extracted,
     _unlintable,
-    _walk_files,
+    _walk,
     lint_file,
 )
 
@@ -792,35 +791,29 @@ def fix_paths(
     every other path is taken literally -- the same split
     :func:`~bigfix_relevance_analyzer.lint.lint_paths` makes.
     """
-    plans, depth = _plan_paths(paths, config, max_depth=max_depth)
-    combined = _combine([write_fix(plan) for plan in plans])
-    return FixResult(
-        combined.applied, combined.unapplied, depth + combined.findings, combined.changed
-    )
+    return _combine([write_fix(plan) for plan in _plan_paths(paths, config, max_depth=max_depth)])
 
 
 def _plan_paths(
     paths: Iterable[str | bytes | os.PathLike[str]], config: LintConfig, *, max_depth: int
-) -> tuple[Iterator[FixPlan], tuple[Finding, ...]]:
+) -> Iterator[FixPlan]:
     """:func:`plan_fix` over many paths, in order, one at a time, with every
-    directory among them walked -- and the depth findings for wherever a walk
-    stopped, as :func:`_plan_directory` returns them.
+    directory among them walked as :func:`_plan_directory` walks it.
 
-    The walks run up front, since they only list names; the files are still
-    read one plan at a time.
+    A walk's own findings (where it stopped or could not look) ride on a plan
+    for the directory that changes nothing, so they come out where the
+    directory was named, as :func:`~bigfix_relevance_analyzer.lint.lint_paths`
+    reports them.
     """
-    files: list[tuple[Path, bool]] = []
-    depth: list[Finding] = []
     for path in paths:
         file_path = _as_path(path)
-        if file_path.is_dir():
-            walked, exceeded = _walk_files(file_path, max_depth)
-            files.extend((walked_path, False) for walked_path in walked)
-            depth.extend(_depth_findings(file_path, exceeded, max_depth, config))
-        else:
-            files.append((file_path, True))
-    plans = (_plan_path(file_path, config, explicit=explicit) for file_path, explicit in files)
-    return plans, tuple(depth)
+        if not file_path.is_dir():
+            yield plan_fix(file_path, config)
+            continue
+        plans, walk_findings = _plan_directory(file_path, config, max_depth=max_depth)
+        if walk_findings:
+            yield FixPlan(file_path, b"", b"", (), (), walk_findings, walk_findings, (), config)
+        yield from plans
 
 
 def _plan_directory(
@@ -829,12 +822,12 @@ def _plan_directory(
     """A plan per file under ``root``, walked as ``lint_directory`` walks it,
     one at a time, and the depth findings for wherever the walk stopped.
 
-    Shared by :func:`fix_directory` and ``--fix --diff``, so the dry run walks
-    exactly what the fix would.
+    Shared by :func:`fix_directory`, :func:`fix_paths` and ``--fix --diff``, so
+    the dry run walks exactly what the fix would.
     """
-    files, exceeded = _walk_files(root, max_depth)
+    files, walk_findings = _walk(root, config, max_depth)
     plans = (_plan_path(file_path, config, explicit=False) for file_path in files)
-    return plans, _depth_findings(root, exceeded, max_depth, config)
+    return plans, walk_findings
 
 
 def fix_directory(

@@ -1719,23 +1719,33 @@ def lint_paths_to_dict(
     return _findings_dict(lint_paths(paths, config, max_depth=max_depth))
 
 
-def _walk_files(root: Path, max_depth: int) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
+def _walk_files(
+    root: Path, max_depth: int
+) -> tuple[tuple[Path, ...], tuple[Path, ...], tuple[tuple[Path, str], ...]]:
     """Discover files under ``root`` up to ``max_depth`` levels deep.
 
-    Returns ``(files, exceeded)``: every file found (default-excluded directories
-    pruned), and every directory that was *not* descended into because doing so
-    would have gone past ``max_depth``. Sorted within each directory for a
-    deterministic order across runs and platforms. Does no linting itself --
-    that stays in :func:`lint_directory`, which turns ``exceeded`` into findings.
+    Returns ``(files, exceeded, unreadable)``: every file found
+    (default-excluded directories pruned), every directory that was *not*
+    descended into because doing so would have gone past ``max_depth``, and
+    every directory that could not be listed, with why. Sorted within each
+    directory for a deterministic order across runs and platforms. Does no
+    linting itself -- :func:`_walk` turns the last two into findings.
     """
     if root.is_file():
-        return (root,), ()
+        return (root,), (), ()
     if not root.is_dir():
-        return (), ()
+        return (), (), ()
 
     files: list[Path] = []
     exceeded: list[Path] = []
-    for dirpath, dirnames, filenames in os.walk(root):
+    unreadable: list[tuple[Path, str]] = []
+
+    def unlisted(error: OSError) -> None:
+        # Without this os.walk drops the directory silently, and what was in
+        # it reads as clean.
+        unreadable.append((Path(error.filename or root), error.strerror or str(error)))
+
+    for dirpath, dirnames, filenames in os.walk(root, onerror=unlisted):
         current = Path(dirpath)
         rel = current.relative_to(root)
         depth = 0 if rel == Path() else len(rel.parts)
@@ -1750,7 +1760,20 @@ def _walk_files(root: Path, max_depth: int) -> tuple[tuple[Path, ...], tuple[Pat
 
         files.extend(current / name for name in sorted(filenames))
 
-    return tuple(files), tuple(exceeded)
+    return tuple(files), tuple(exceeded), tuple(unreadable)
+
+
+def _walk(
+    root: Path, config: LintConfig, max_depth: int
+) -> tuple[tuple[Path, ...], tuple[Finding, ...]]:
+    """:func:`_walk_files`, with where it stopped or could not look as findings:
+    ``max-depth-exceeded`` per directory not descended into, and ``file-error``
+    per directory that could not be listed."""
+    files, exceeded, unreadable = _walk_files(root, max_depth)
+    findings = _depth_findings(root, exceeded, max_depth, config)
+    for directory, detail in unreadable:
+        findings += _file_error(directory, f"could not list the directory: {detail}", config)
+    return files, findings
 
 
 def lint_directory(
@@ -1767,10 +1790,10 @@ def lint_directory(
     A branch deeper than ``max_depth`` is not silently dropped: each directory
     where descent stopped is reported as its own ``max-depth-exceeded`` finding,
     same as any other rule in this module, and everything below it is skipped.
+    A directory that cannot be listed is a ``file-error``, for the same reason.
     """
-    root_path = _as_path(root)
-    files, exceeded = _walk_files(root_path, max_depth)
-    findings = list(_depth_findings(root_path, exceeded, max_depth, config))
+    files, walk_findings = _walk(_as_path(root), config, max_depth)
+    findings = list(walk_findings)
     for file_path in files:
         findings.extend(_lint_file(file_path, config, explicit=False))
     return tuple(findings)
