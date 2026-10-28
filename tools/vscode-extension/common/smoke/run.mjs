@@ -23,7 +23,9 @@
 //         language). The .bes opens in the BES language when the extension
 //         contributes one, and then unsaved BES buffers are checked too:
 //         one created in the language, one switched to it, and one in
-//         another scheme that must get nothing.
+//         another scheme that must get nothing. The workspace is a git
+//         repository, so the `git:` copy of a file, a diff view's old side,
+//         can be opened too, and must get nothing either (issue #134).
 //   idle  only for an extension contributing that language (the primary
 //         one): Markdown and HTML with no relevance in them must leave its
 //         language server unstarted, and then a relevance-fenced Markdown file
@@ -37,6 +39,7 @@
 // tests the working tree rather than whatever is on PATH. The componentize-py/
 // extension needs its component built first; see its build-component/.
 
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -87,6 +90,11 @@ const scenarios = {
     "task.bes":
       '<?xml version="1.0" encoding="UTF-8"?>\n<BES><Task><Title>t</Title>\n' +
       '<Relevance>exists file "unterminated</Relevance>\n</Task></BES>\n',
+    // Not a recognized name: linted only once switched to the language by hand.
+    "notes.txt": 'exists file "unterminated\n',
+    // Opened after documents that must get nothing: once it has diagnostics,
+    // they would have had theirs too, had they been sent (see suite.js).
+    "control.rel": 'exists file "unterminated\n',
   },
   ...(UNTITLED_LANGUAGE
     ? {
@@ -98,6 +106,20 @@ const scenarios = {
       }
     : {}),
 };
+
+/** Make `workspace` a git repository with everything in it committed, so
+ * VS Code's git extension can open a file as it is at HEAD. Fails loudly: a
+ * missing git must not pass for a scheme that was never tried. */
+function commit(workspace) {
+  const git = (...args) => execFileSync("git", args, { cwd: workspace, stdio: "pipe" });
+  try {
+    git("init", "-q");
+    git("add", ".");
+    git("-c", "user.name=smoke", "-c", "user.email=smoke@localhost", "commit", "-qm", "smoke");
+  } catch (error) {
+    throw new Error(`the lint workspace needs git, to open a file as it is at HEAD: ${error.message}`);
+  }
+}
 
 /** Launch VS Code on a fresh workspace holding `files`; true when the suite passes. */
 async function launch(scenario, files) {
@@ -112,6 +134,7 @@ async function launch(scenario, files) {
       settings[`${PREFIX}.server.args`] = server.slice(1);
     }
     writeFileSync(join(workspace, ".vscode", "settings.json"), JSON.stringify(settings));
+    if (scenario === "lint") commit(workspace);
     const result = join(scratch, "result.json");
 
     const started = Date.now();
