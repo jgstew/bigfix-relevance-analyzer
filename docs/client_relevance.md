@@ -197,15 +197,28 @@ event-log scan is. Nothing here should be read as "avoid the registry" - it is
 the cheapest way to answer most Windows applicability questions, and content
 that uses it heavily is content doing the right thing.
 
-That includes preferring it to the disk. Where the registry already records
-what a statement wants -- an installed product's version in its
-`CurrentVersion\Uninstall` entry, say -- read `value "DisplayVersion"` rather
-than opening the executable for `version of file`. The registry answer comes
-from memory; the file read is I/O, on every endpoint the relevance reaches.
-Read the file only when the registry lacks the fact, or when the question is
-specifically whether the registry is stale (an `Uninstall` entry left behind
-by a product that is gone). This is a performance rule of thumb, not a
-measured finding.
+That can include preferring it to the disk, for a question the registry
+answers correctly, such as which product is installed, or its version for
+inventory or reporting. That is an unmeasured rule of thumb. The expectation
+is that a registry value read is cheaper than opening an executable for
+`version of file`, but both may be served from OS caches, and nobody has timed
+it.
+
+It does **not** extend to applicability gates on a vulnerable binary. There,
+the file version is the fact that matters, and `DisplayVersion` is a different
+fact:
+
+- **The vendor writes it.** It often carries a marketing or product version
+  rather than the binary's file version. An in-place patch may never update
+  it, and an `Uninstall` entry can outlive the product.
+- **It is a string.** `value "DisplayVersion" of key ... < "2.10"` is a
+  lexicographic compare, the silent trap in
+  [`universal_relevance.md`](universal_relevance.md#typing-one-side-coerces-the-other---and-untyped-is-a-string-compare).
+  Compare it `as version`, and with `pad of` on both sides when the component
+  counts may differ.
+
+Gating a patch on the file's own `version of file` is the established pattern
+for a reason. Do not trade it for the registry to save a read.
 
 What still has a cost is *how many* reads a statement asks for.
 `keys "Uninstall" of key "HKLM\SOFTWARE\..." of registry` is a lookup by name:

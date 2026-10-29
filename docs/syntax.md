@@ -181,24 +181,27 @@ This is the idiomatic way to give a default for something that may not exist:
 
 **Chain it, and end on a literal.** `a | b | "None"` tries `a`, then `b`, then
 settles on the literal. That is the idiomatic replacement for an `if exists
-... then ... else` null check, which also needs a `whose (exists ...)` filter
-to keep its `else` from erroring:
+... then ... else` null check:
 
 ```client_relevance
 unique values of (friendly name of it | description of it | "None") of active devices
 ```
 
-The `if` form says the same thing twice and still has to drop something. On a
-Windows client with 64 active devices, `(if exists friendly name of it then
-friendly name of it else description of it) of active devices` raised
-`Singular expression refers to nonexistent object.` until a `whose (exists
-friendly name of it or exists description of it)` filter was added -- which
-then silently dropped the 2 devices that had neither. The `|` chain needs no
-filter and keeps those 2 as `None`, so they are still counted; see
+An `if` form can give the same answer, but only by naming each property twice
+and nesting one `if` per fallback: `if exists friendly name of it then friendly
+name of it else if exists description of it then description of it else
+"None"`. The common shortcut goes wrong. On a Windows client with 64 active
+devices, `(if exists friendly name of it then friendly name of it else
+description of it) of active devices` raised `Singular expression refers to
+nonexistent object.`, and the usual repair, a `whose (exists friendly name of
+it or exists description of it)` filter, silently dropped the 2 devices that
+had neither. The `|` chain needs no filter and keeps those 2 as `None`, so they
+are still counted; see
 [`universal_relevance.md`](universal_relevance.md#count-per-value-with-multiplicity-of-it-it-of-unique-values)
 for the counting idiom that shows them. The literal at the end is what makes
-that work: without it, an item whose last link errors is still dropped. The
-chain is confirmed on both engines, with transcripts in
+that work: without it, an item whose last link errors raises `nonexistent
+object` and the whole statement errors, on both engines. The transcripts are
+in
 [`universal_relevance.md`](universal_relevance.md#the-empty-case-a-singular-that-finds-nothing-and-what-rescues-it).
 
 `if`/`then`/`else` is still the right tool for *branching* -- choosing a

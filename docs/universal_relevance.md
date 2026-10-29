@@ -562,39 +562,55 @@ Three constructs meet this error, and they treat it differently:
   | "fallback"`). Either way, the fallback is unused: `|` rescues an error
   that arrives *instead of* a value, not one that arrives after the first.
 
-- **`|` chains, and settles on the first link that does not error.**
-  Confirmed on the session engine, via `bigfix-remote-session-relevance`
-  against a BigFix Explorer connection (`jgstew-explorer`) and a SaaS root
-  server (`james-saas`), 2026-10-28; both answered the same:
-
-  ```
-  Q: (("abc" whose (length of it = 999)) | ("def" whose (length of it = 999)) | "None")
-  A: None
-  Q: (("abc" whose (length of it = 999)) | "def" | "None")
-  A: def
-  ```
-
-  and on a Windows client (a Hyper-V VM, via `bigfix-remote-client-relevance`
-  over SSH, 2026-10-28), over 64 active devices; answers are summarised:
-
-  ```
-  Q: number of active devices
-  A: 64
-  Q: unique values of (friendly name of it | description of it | "None") of active devices
-  A: ... 59 values, one of them None
-  ```
-
-  The 59 are the 58 names that an `if exists ... whose (exists ...)` version
-  of the same question returned, plus `None` for the devices it had dropped.
-  Ending on a literal is what keeps every item; see
-  [`syntax.md`](syntax.md#-is-error-fallback-not-or) for the idiom.
-
 The practice that falls out of all three: **stay plural for as long as the
 chain runs, and collapse once at the end** -- with `unique value of` where a
 singular is actually required, since it dedups before asserting. The two
 places a mid-chain singular is right rather than a habit are exactly the two
 rescues above: the left side of a `|` (required, and the error is the
 trigger) and directly under an `exists` (the predicate-testing idiom).
+
+**`|` chains, and settles on the first link that does not error.**
+Confirmed on the session engine, via `bigfix-remote-session-relevance`
+against a BigFix Explorer connection (`jgstew-explorer`) and a SaaS root
+server (`james-saas`), 2026-10-28; both answered the same:
+
+```
+Q: (("abc" whose (length of it = 999)) | ("def" whose (length of it = 999)) | "None")
+A: None
+Q: (("abc" whose (length of it = 999)) | "def" | "None")
+A: def
+```
+
+and on a Windows client (a Hyper-V VM, via `bigfix-remote-client-relevance`
+over SSH, 2026-10-28), over 64 active devices, against the `if` forms of
+the same question:
+
+```
+Q: number of active devices
+A: 64
+Q: number of unique values of (friendly name of it | description of it | "None") of active devices
+A: 59
+Q: number of unique values of (if exists friendly name of it then friendly name of it else description of it) of active devices
+E: Singular expression refers to nonexistent object.
+Q: number of active devices whose (exists friendly name of it or exists description of it)
+A: 62
+Q: number of unique values of (if exists friendly name of it then friendly name of it else description of it) of active devices whose (exists friendly name of it or exists description of it)
+A: 58
+Q: number of unique values of (if exists friendly name of it then friendly name of it else if exists description of it then description of it else "None") of active devices
+A: 59
+```
+
+The filtered `if` loses the 2 devices with neither value, and `None` with
+them. The nested `if` gets them back, at the cost of naming each property
+twice. Without the closing literal, the chain does not drop those 2. It
+errors:
+
+```
+Q: number of (friendly name of it | description of it) of active devices
+E: Singular expression refers to nonexistent object.
+```
+
+See [`syntax.md`](syntax.md#-is-error-fallback-not-or) for the idiom.
 
 ## Count per value with `(multiplicity of it, it) of unique values`
 
@@ -604,34 +620,75 @@ item that fell through into one `None`. `multiplicity of` a unique value is
 how many times it occurred, so pairing the two gives a per-value count in one
 statement. Both engines, 2026-10-28.
 
-Client (Windows, 64 active devices); the counts sum to 64:
+`unique values of` always answers in sorted value order, never by count. For
+strings the sort is case-sensitive, with capitals first: `Microsoft RRAS ...`
+sorts before `Microsoft Radio ...`. To find the largest groups, read the
+counts; the order will not show them.
+
+Client (Windows, 64 active devices); the counts sum to 64. Lines are elided,
+but the ones shown are in the order the engine printed them:
 
 ```
 Q: (multiplicity of it, it) of unique values of (friendly name of it | description of it | "None") of active devices
-A: 4, Volume
-A: 2, Intel(R) Core(TM) i7-4790S CPU @ 3.20GHz
-A: 2, None
 A: 1, ACPI Module Device
-A: ... 55 more at 1
+A: 1, ACPI x64-based PC
+A: ...
+A: 2, Intel(R) Core(TM) i7-4790S CPU @ 3.20GHz
+A: ...
+A: 1, Microsoft RRAS Root Enumerator
+A: 1, Microsoft Radio Device Enumeration Bus
+A: ...
+A: 2, None
+A: ...
+A: 4, Volume
+A: 1, Volume Manager
+A: ...
+A: 1, WAN Miniport (SSTP)
 ```
 
-Session (`jgstew-explorer`, 35 computers), with the default doing real work:
+59 lines in all: 4 at 2 or more (`Volume` 4; `Intel ...` 2; `None` 2), 55 at 1.
+
+Session (`jgstew-explorer`, 35 computers), with the default doing real work
+(elided, engine order):
 
 ```
 Q: (multiplicity of it, it) of unique values of (((operating system of it) whose (it starts with "Win11")) | "None") of bes computers
 A: 17, None
 A: 1, Win11 10.0.22000.1335 (21H2)
+A: ...
 A: 2, Win11 10.0.22579.100 (22H2)
-A: ... 18 Win11 computers in all
+A: ...
+A: 2, Win11 10.0.26300.9711 (26H2)
 Q: number of bes computers whose (not (operating system of it starts with "Win11"))
 A: 17
-Q: sum of multiplicities of unique values of (operating system of it | "None") of bes computers
-A: 35
 ```
 
-The `sum of multiplicities` line is the check worth keeping: it should equal
-`number of <the objects>`. If it is short, the `|` chain is missing its
-literal and some items are being dropped rather than defaulted.
+16 lines in all: `None` at 17, and 15 Win11 builds covering 18 computers.
+
+**Check with `sum of multiplicities`, and expect an error, not a short count.**
+The sum should equal `number of <the objects>`. Drop the literal and nothing
+is quietly dropped: the item with no value raises `nonexistent object`, and the
+whole statement errors, on both engines:
+
+```
+Q: sum of multiplicities of unique values of (((operating system of it) whose (it starts with "Win11")) | "None") of bes computers      (session)
+A: 35
+Q: sum of multiplicities of unique values of ((operating system of it) whose (it starts with "Win11")) of bes computers      (session)
+E: Singular expression refers to nonexistent object.
+
+Q: sum of multiplicities of unique values of (friendly name of it | description of it | "None") of active devices      (client)
+A: 64
+Q: sum of multiplicities of unique values of (friendly name of it | description of it) of active devices      (client)
+E: Singular expression refers to nonexistent object.
+```
+
+To keep only the items that have a value, filter with the plural spelling
+instead of ending on a literal. It flattens the missing ones to nothing:
+
+```
+Q: sum of multiplicities of unique values of (operating systems whose (it starts with "Win11") of it) of bes computers      (session)
+A: 18
+```
 
 ## Runtime error wording is shared - a recorded non-finding
 
