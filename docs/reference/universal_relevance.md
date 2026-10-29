@@ -126,12 +126,13 @@ world reference. Dropping `of it` is the fix as often as fixing the name is.
 ## Errors are values, and some constructs absorb them
 
 `exists (1/0)` is `False` and `number of (1/0)` is `0`, so a count of zero and
-an error are indistinguishable from the outside - no tool can separate them,
-because the engine does not.
+an error are indistinguishable - the engine does not separate them.
 
 `not` does not absorb: `not (1/0 = 1)` errors. A collection reports per
 element, so `(7; 1/0)` answers `7` *and* errors. For a deliberate default, use
-the error-fallback operator `|`.
+the error-fallback operator `|`, chained and ending on a literal:
+`(a of it | b of it | "None")`. Per-value counts: `(multiplicity of it, it) of
+unique values of (...)`.
 
 All of that is about an error raised *during* evaluation. An undefined name is
 absorbed by none of it, only by an untaken `if` branch - see the last section.

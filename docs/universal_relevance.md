@@ -562,12 +562,76 @@ Three constructs meet this error, and they treat it differently:
   | "fallback"`). Either way, the fallback is unused: `|` rescues an error
   that arrives *instead of* a value, not one that arrives after the first.
 
+- **`|` chains, and settles on the first link that does not error.**
+  Confirmed on the session engine, via `bigfix-remote-session-relevance`
+  against a BigFix Explorer connection (`jgstew-explorer`) and a SaaS root
+  server (`james-saas`), 2026-10-28; both answered the same:
+
+  ```
+  Q: (("abc" whose (length of it = 999)) | ("def" whose (length of it = 999)) | "None")
+  A: None
+  Q: (("abc" whose (length of it = 999)) | "def" | "None")
+  A: def
+  ```
+
+  and on a Windows client (a Hyper-V VM, via `bigfix-remote-client-relevance`
+  over SSH, 2026-10-28), over 64 active devices; answers are summarised:
+
+  ```
+  Q: number of active devices
+  A: 64
+  Q: unique values of (friendly name of it | description of it | "None") of active devices
+  A: ... 59 values, one of them None
+  ```
+
+  The 59 are the 58 names that an `if exists ... whose (exists ...)` version
+  of the same question returned, plus `None` for the devices it had dropped.
+  Ending on a literal is what keeps every item; see
+  [`syntax.md`](syntax.md#-is-error-fallback-not-or) for the idiom.
+
 The practice that falls out of all three: **stay plural for as long as the
 chain runs, and collapse once at the end** -- with `unique value of` where a
 singular is actually required, since it dedups before asserting. The two
 places a mid-chain singular is right rather than a habit are exactly the two
 rescues above: the left side of a `|` (required, and the error is the
 trigger) and directly under an `exists` (the predicate-testing idiom).
+
+## Count per value with `(multiplicity of it, it) of unique values`
+
+`unique values of` dedups, which hides how many items shared each value -- and
+when the values come from a `|` chain ending on a default, it merges every
+item that fell through into one `None`. `multiplicity of` a unique value is
+how many times it occurred, so pairing the two gives a per-value count in one
+statement. Both engines, 2026-10-28.
+
+Client (Windows, 64 active devices); the counts sum to 64:
+
+```
+Q: (multiplicity of it, it) of unique values of (friendly name of it | description of it | "None") of active devices
+A: 4, Volume
+A: 2, Intel(R) Core(TM) i7-4790S CPU @ 3.20GHz
+A: 2, None
+A: 1, ACPI Module Device
+A: ... 55 more at 1
+```
+
+Session (`jgstew-explorer`, 35 computers), with the default doing real work:
+
+```
+Q: (multiplicity of it, it) of unique values of (((operating system of it) whose (it starts with "Win11")) | "None") of bes computers
+A: 17, None
+A: 1, Win11 10.0.22000.1335 (21H2)
+A: 2, Win11 10.0.22579.100 (22H2)
+A: ... 18 Win11 computers in all
+Q: number of bes computers whose (not (operating system of it starts with "Win11"))
+A: 17
+Q: sum of multiplicities of unique values of (operating system of it | "None") of bes computers
+A: 35
+```
+
+The `sum of multiplicities` line is the check worth keeping: it should equal
+`number of <the objects>`. If it is short, the `|` chain is missing its
+literal and some items are being dropped rather than defaulted.
 
 ## Runtime error wording is shared - a recorded non-finding
 

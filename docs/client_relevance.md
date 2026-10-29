@@ -197,6 +197,16 @@ event-log scan is. Nothing here should be read as "avoid the registry" - it is
 the cheapest way to answer most Windows applicability questions, and content
 that uses it heavily is content doing the right thing.
 
+That includes preferring it to the disk. Where the registry already records
+what a statement wants -- an installed product's version in its
+`CurrentVersion\Uninstall` entry, say -- read `value "DisplayVersion"` rather
+than opening the executable for `version of file`. The registry answer comes
+from memory; the file read is I/O, on every endpoint the relevance reaches.
+Read the file only when the registry lacks the fact, or when the question is
+specifically whether the registry is stale (an `Uninstall` entry left behind
+by a product that is gone). This is a performance rule of thumb, not a
+measured finding.
+
 What still has a cost is *how many* reads a statement asks for.
 `keys "Uninstall" of key "HKLM\SOFTWARE\..." of registry` is a lookup by name:
 one key, bounded, and how essentially all shipped Windows content reads the
