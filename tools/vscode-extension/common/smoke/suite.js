@@ -152,7 +152,7 @@ async function lint() {
   const bes = vscode.Uri.file(path.join(folder, "task.bes"));
   const besEditor = await vscode.window.showTextDocument(bes);
   const besFound = await waitFor(bes, (found) => found.length > 0);
-  // ...and so is a BES template (#122), which VS Code names by its last suffix.
+  // ...and so is a BES template (#122), which VS Code matches by its longest suffix.
   const template = vscode.Uri.file(path.join(folder, "task.bes.mustache"));
   const templateEditor = await vscode.window.showTextDocument(template);
   const templateFound = await waitFor(template, (found) => found.length > 0);

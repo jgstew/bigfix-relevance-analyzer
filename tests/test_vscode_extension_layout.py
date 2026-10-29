@@ -816,6 +816,26 @@ def test_bes_templates_open_as_bes_xml_and_are_linted() -> None:
                 extension.name,
                 suffix,
             )
+    # The reverse too: a BES pattern with no language behind it would be linted
+    # but open as plain text, the disagreement #122 removed.
+    for extension in EXTENSIONS:
+        patterns = json.loads((extension / "document-patterns.json").read_text("utf-8"))
+        bes_patterns = {
+            pattern.removeprefix("**/*")
+            for pattern in patterns
+            if _is_bes_xml(Path(pattern.replace("**/*", "x")))
+        }
+        assert bes_patterns == set(extensions), extension.name
+
+
+def test_every_crlf_bes_name_is_frozen_in_git() -> None:
+    """`.editorconfig` holds these names to CRLF; `.gitattributes` must keep git
+    from turning them into LF (`core.autocrlf=input`), or CI fails the rule."""
+    editorconfig = (REPO_ROOT / ".editorconfig").read_text("utf-8")
+    (names,) = re.findall(r"^\[\*\.\{(bes[^}]*)\}\]$", editorconfig, re.MULTILINE)
+    attributes = (REPO_ROOT / ".gitattributes").read_text("utf-8").splitlines()
+    for name in names.split(","):
+        assert f"*.{name} -text diff" in attributes, name
 
 
 def test_raw_actionscript_files_are_highlighted_but_not_linted() -> None:
