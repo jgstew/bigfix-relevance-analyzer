@@ -128,8 +128,8 @@ class InspectorKind(enum.Enum):
 # property) would hash all twelve fields per lookup and pin every row alive for
 # the life of the process, which is the opposite of the intent.
 #
-# `functools.cache` rather than a plain dict for the same reason the thirteen
-# other caches in this module use it: `cache_info()` makes the laziness
+# `functools.cache` rather than a plain dict for the same reason the other
+# caches in this module use it: `cache_info()` makes the laziness
 # observable, which is how `test_the_search_index_is_not_built_at_import`
 # proves nothing warms at import.
 
@@ -1271,9 +1271,34 @@ def suggest(name: str, *, dialect: Dialect | None = None, limit: int = 3) -> tup
 
     Names rather than :class:`SearchResult`s: a message wants a few strings, and
     a caller that wants the rows has :func:`search` and :func:`lookup`.
+
+    Remembered per process (#158), keyed on the normalized name: an editor lints
+    on every keystroke, each edit misses lint's analysis cache, and the fuzzy
+    search here was ~35 ms per unknown name -- nearly all of an edit's cost.
+    """
+    return _suggest(_normalize_query(name), dialect, limit)
+
+
+_SUGGEST_CACHE_SIZE: Final = 1024
+"""How many distinct ``(name, dialect, limit)`` questions :func:`suggest` remembers.
+
+Bounded for :data:`_LOOKUP_CACHE_SIZE`'s reason: the names are unknown ones
+from parsed relevance, so untrusted content could otherwise grow the cache
+without limit. An entry is a few short strings; an editor session sees a
+handful of distinct misspellings, and a corpus lint a few hundred.
+"""
+
+
+@functools.lru_cache(maxsize=_SUGGEST_CACHE_SIZE)
+def _suggest(normalized: str, dialect: Dialect | None, limit: int) -> tuple[str, ...]:
+    """:func:`suggest` for an already normalized name.
+
+    Keying on the normalized name is safe because :func:`search` normalizes its
+    query the same way first, so every spelling of one name gets one answer.
+    The tables it searches are static per process, so an answer never goes stale.
     """
     return tuple(
         result.name
-        for result in search(name, dialect=dialect, limit=limit + 1)
-        if result.name != _normalize_query(name)
+        for result in search(normalized, dialect=dialect, limit=limit + 1)
+        if result.name != normalized
     )[:limit]

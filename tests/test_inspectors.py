@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Sequence
+from typing import Any
 
 import pytest
 from _corpus import parsed_corpus_sites
@@ -21,6 +22,7 @@ from bigfix_relevance_analyzer.inspectors import (
     Inspector,
     InspectorKind,
     MatchKind,
+    SearchResult,
     WrittenForm,
     _parse_property,
     _producers_index,
@@ -699,6 +701,73 @@ def test_suggest_offers_leads_without_echoing_the_input() -> None:
     assert suggest("xyzzy") == ()
 
 
+@pytest.fixture
+def search_calls(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Every query :func:`suggest` sends to :func:`search`, from a cold cache."""
+    from bigfix_relevance_analyzer import inspectors
+
+    calls: list[str] = []
+    real_search = inspectors.search
+
+    def counting_search(query: str, **kwargs: Any) -> tuple[SearchResult, ...]:
+        calls.append(query)
+        return real_search(query, **kwargs)
+
+    monkeypatch.setattr(inspectors, "search", counting_search)
+    inspectors._suggest.cache_clear()
+    return calls
+
+
+def test_suggest_remembers_a_name_however_it_is_written(search_calls: list[str]) -> None:
+    """The fuzzy search behind a lead is ~35 ms; an editor asks again on every edit (#158).
+
+    The key is the normalized name, because `Oprating  System` and
+    `oprating system` are the same question -- :func:`search` normalizes the
+    query the same way, so the answer cannot differ.
+    """
+    first = suggest("oprating system")
+    assert len(search_calls) == 1
+    assert suggest("Oprating  System") == first
+    assert suggest(" oprating system ") == first
+    assert len(search_calls) == 1
+
+
+def test_the_suggest_cache_keys_on_dialect_and_limit(search_calls: list[str]) -> None:
+    """A different dialect or limit is a different answer, so a different entry."""
+    suggest("oprating system")
+    suggest("oprating system", dialect=Dialect.SESSION)
+    suggest("oprating system", dialect=Dialect.CLIENT)
+    suggest("oprating system", limit=1)
+    assert len(search_calls) == 4
+    # And each is remembered on its own.
+    suggest("oprating system", dialect=Dialect.SESSION)
+    suggest("oprating system", limit=1)
+    assert len(search_calls) == 4
+
+
+def test_a_cached_suggestion_is_the_uncached_answer(search_calls: list[str]) -> None:
+    """Caching changes the cost, never the leads -- including the no-echo rule."""
+    from bigfix_relevance_analyzer import inspectors
+
+    for name in ("oprating system", "Registry", "file", "xyzzy", "flies"):
+        for dialect in (None, Dialect.CLIENT, Dialect.SESSION):
+            uncached = tuple(
+                result.name
+                for result in inspectors.search(name, dialect=dialect, limit=4)
+                if result.name != " ".join(name.lower().split())
+            )[:3]
+            assert suggest(name, dialect=dialect) == uncached
+            assert suggest(name, dialect=dialect) == uncached
+
+
+def test_the_suggest_cache_is_bounded() -> None:
+    """Names reaching :func:`suggest` come from parsed relevance, so bound it like `lookup`."""
+    from bigfix_relevance_analyzer import inspectors
+
+    assert inspectors._suggest.cache_info().maxsize == inspectors._SUGGEST_CACHE_SIZE
+    assert inspectors._SUGGEST_CACHE_SIZE is not None
+
+
 def test_a_search_result_serializes_to_plain_json() -> None:
     """The same conventions the rest of the package's payloads follow."""
     payload = search("keys")[0].to_dict()
@@ -775,6 +844,7 @@ def test_the_search_index_is_not_built_at_import() -> None:
         "assert inspectors._dialects_for.cache_info().currsize == 0, 'dialects memo warm'\n"
         "assert inspectors._contexts_for.cache_info().currsize == 0, 'contexts memo warm'\n"
         "assert inspectors.lookup.cache_info().currsize == 0, 'lookup cache warm'\n"
+        "assert inspectors._suggest.cache_info().currsize == 0, 'suggest cache warm'\n"
         "from bigfix_relevance_analyzer import typecheck\n"
         "assert typecheck._visible_rows.cache_info().currsize == 0, 'visible-rows memo warm'\n"
         "inspectors.search('sha')\n"

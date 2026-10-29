@@ -14,6 +14,7 @@ import os
 import re
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from _corpus import corpus_files
@@ -1526,6 +1527,38 @@ def test_a_name_with_no_plausible_correction_gets_no_suggestions() -> None:
     unknown = next(f for f in findings if f.code == "unknown-inspector")
     assert unknown.suggestions == ()
     assert "did you mean" not in unknown.message
+
+
+def test_an_edit_does_not_search_again_for_names_already_seen(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The leads are remembered across lint calls, not only within one (#158).
+
+    An editor lints on every keystroke, and each edit is new text, so the
+    analysis cache misses -- but the unknown names usually have not changed.
+    Searching again for them was ~35 ms per name per edit, nearly all of an
+    edit's cost. Written differently (case, spacing) is still the same name.
+    """
+    from bigfix_relevance_analyzer import inspectors
+
+    calls: list[str] = []
+    real_search = inspectors.search
+
+    def counting_search(query: str, **kwargs: Any) -> tuple[inspectors.SearchResult, ...]:
+        calls.append(query)
+        return real_search(query, **kwargs)
+
+    monkeypatch.setattr(inspectors, "search", counting_search)
+    first = lint_text("wnidows of oprating system", config=LintConfig(suggest=True))
+    calls.clear()
+    second = lint_text('Wnidows  of Oprating  System = "x"', config=LintConfig(suggest=True))
+
+    leads = [f.suggestions for f in first if f.code == "unknown-inspector"]
+    assert leads and all(leads), "the misspellings should get leads"
+    assert calls == [], "the second edit searched again for names already seen"
+    assert [f.suggestions for f in first if f.code == "unknown-inspector"] == [
+        f.suggestions for f in second if f.code == "unknown-inspector"
+    ]
 
 
 # ---------------------------------------------------------------------------
