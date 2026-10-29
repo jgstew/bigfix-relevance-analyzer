@@ -1284,8 +1284,8 @@ _SUGGEST_CACHE_SIZE: Final = 1024
 
 Bounded for :data:`_LOOKUP_CACHE_SIZE`'s reason: the names are unknown ones
 from parsed relevance, so untrusted content could otherwise grow the cache
-without limit. An entry is a few short strings; an editor session sees a
-handful of distinct misspellings, and a corpus lint a few hundred.
+without limit. An entry is a few short strings, and an editor session sees
+only a handful of distinct misspellings, so 1024 leaves wide headroom.
 """
 
 

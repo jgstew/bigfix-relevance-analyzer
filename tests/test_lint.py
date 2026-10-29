@@ -1549,6 +1549,8 @@ def test_an_edit_does_not_search_again_for_names_already_seen(
         return real_search(query, **kwargs)
 
     monkeypatch.setattr(inspectors, "search", counting_search)
+    # Cold, so the dialect check below cannot be answered by an earlier test.
+    inspectors._suggest.cache_clear()
     first = lint_text("wnidows of oprating system", config=LintConfig(suggest=True))
     calls.clear()
     second = lint_text('Wnidows  of Oprating  System = "x"', config=LintConfig(suggest=True))
@@ -1556,6 +1558,13 @@ def test_an_edit_does_not_search_again_for_names_already_seen(
     leads = [f.suggestions for f in first if f.code == "unknown-inspector"]
     assert leads and all(leads), "the misspellings should get leads"
     assert calls == [], "the second edit searched again for names already seen"
+
+    # Another dialect is another question, so it searches on its own.
+    lint_text(
+        'Wnidows  of Oprating  System = "x"',
+        config=LintConfig(suggest=True, dialect=Dialect.SESSION),
+    )
+    assert calls, "a session lint reused the client-dialect leads"
     assert [f.suggestions for f in first if f.code == "unknown-inspector"] == [
         f.suggestions for f in second if f.code == "unknown-inspector"
     ]

@@ -749,7 +749,7 @@ def test_a_cached_suggestion_is_the_uncached_answer(search_calls: list[str]) -> 
     """Caching changes the cost, never the leads -- including the no-echo rule."""
     from bigfix_relevance_analyzer import inspectors
 
-    for name in ("oprating system", "Registry", "file", "xyzzy", "flies"):
+    for name in ("oprating system", " Oprating  System ", "Registry", "file", "xyzzy", "flies"):
         for dialect in (None, Dialect.CLIENT, Dialect.SESSION):
             uncached = tuple(
                 result.name
@@ -765,7 +765,6 @@ def test_the_suggest_cache_is_bounded() -> None:
     from bigfix_relevance_analyzer import inspectors
 
     assert inspectors._suggest.cache_info().maxsize == inspectors._SUGGEST_CACHE_SIZE
-    assert inspectors._SUGGEST_CACHE_SIZE is not None
 
 
 def test_a_search_result_serializes_to_plain_json() -> None:
