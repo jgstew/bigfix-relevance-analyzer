@@ -457,6 +457,27 @@ test("every .bes in the repository's tests tokenizes and closes every rule", asy
   }
 });
 
+// Real templates (#122): Mustache placeholders and sections are plain text to
+// the BES grammar, so nothing they hold may open a rule that outlives </BES>.
+for (const name of ["meltdown-spectre-detection.bes.mustache", "bios-update.bes.template"]) {
+  test(`the real template ${name} tokenizes and closes every rule`, async () => {
+    const text = readFileSync(join(HERE, "fixtures/templates", name), "utf8").replace(/\r\n?/g, "\n");
+    const t = await tokenize("text.xml.bigfix-bes", text);
+    assert.equal(t.state.depth, 1);
+    assertPlainXml(t, "</BES>");
+    assertPlainXml(t, "<Title>");
+  });
+}
+
+test("a Mustache section between relevance elements stays XML", async () => {
+  const text = readFileSync(join(HERE, "fixtures/templates/bios-update.bes.template"), "utf8").replace(/\r\n?/g, "\n");
+  const t = await tokenize("text.xml.bigfix-bes", text);
+  assertPlainXml(t, "{{#bios_version_minimum}}");
+  assertPlainXml(t, "{{/bios_version_minimum}}");
+  assert.ok(has(scopesOf(t, "Check Vendor", "structures"), REL_BODY));
+  assert.ok(has(scopesOf(t, "minimum BIOS dependency", "structures"), REL_BODY));
+});
+
 test("a large action tokenizes quickly", async () => {
   // About 1 MiB, the size past which the server stops linting a file.
   const body = Array.from({ length: 16000 }, (_, i) =>

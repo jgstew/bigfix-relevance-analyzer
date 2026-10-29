@@ -1,5 +1,7 @@
 [
   "**/*.bes",
+  "**/*.bes.mustache",
+  "**/*.bes.template",
   "**/*.bes.xml",
   "**/*.besrpt",
   "**/*.beswrpt",

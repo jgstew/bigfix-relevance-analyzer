@@ -90,6 +90,10 @@ const scenarios = {
     "task.bes":
       '<?xml version="1.0" encoding="UTF-8"?>\n<BES><Task><Title>t</Title>\n' +
       '<Relevance>exists file "unterminated</Relevance>\n</Task></BES>\n',
+    // A BES template (#122): the CLI lints it as BES XML, so the editor does too.
+    "task.bes.mustache":
+      '<?xml version="1.0" encoding="UTF-8"?>\n<BES><Task><Title>{{title}}</Title>\n' +
+      '<Relevance>exists file "unterminated</Relevance>\n</Task></BES>\n',
     // Not a recognized name: linted only once switched to the language by hand.
     "notes.txt": 'exists file "unterminated\n',
     // Opened after documents that must get nothing: once it has diagnostics,

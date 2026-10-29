@@ -793,6 +793,31 @@ def test_the_bes_language_takes_exactly_the_files_the_extractor_reads_as_bes_xml
     assert ".bes.xml" in extensions
 
 
+BES_TEMPLATE_SUFFIXES = (".bes.mustache", ".bes.template")
+"""Template names for BES XML found in real content (#122). The extractor reads
+any `.bes` in the suffix chain as BES XML, so the CLI and the hook lint them;
+VS Code matches only a name's end, so each needs naming here."""
+
+
+def test_bes_templates_open_as_bes_xml_and_are_linted() -> None:
+    """A `.bes.mustache` or `.bes.template` is colored and linted in the editor,
+    as the CLI and the pre-commit hook already lint it (#122)."""
+    from bigfix_relevance_analyzer.extract import _is_bes_xml
+
+    extensions = _language(PRIMARY, BES_ID)["extensions"]
+    for suffix in BES_TEMPLATE_SUFFIXES:
+        assert _is_bes_xml(Path(f"x{suffix}")), suffix
+        assert suffix in extensions, suffix
+        for extension in EXTENSIONS:
+            patterns: list[str] = json.loads(
+                (extension / "document-patterns.json").read_text("utf-8")
+            )
+            assert any(fnmatch(f"dir/x{suffix}", pattern) for pattern in patterns), (
+                extension.name,
+                suffix,
+            )
+
+
 def test_raw_actionscript_files_are_highlighted_but_not_linted() -> None:
     """`.actionscript` (the console's own `parent:file = <*.ActionScript>`;
     never `.as`, which is Adobe's). Linting raw ActionScript is a separate

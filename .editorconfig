@@ -11,7 +11,7 @@ insert_final_newline = true
 [*.py]
 indent_size = 4
 
-[*.{bes,bes.mustache}]
+[*.{bes,bes.mustache,bes.template}]
 # bes files are XML, but the `actionscript` tag text must use crlf
 end_of_line = crlf
 indent_style = tab
