@@ -179,6 +179,45 @@ This is the idiomatic way to give a default for something that may not exist:
 (name of it | "unknown") of bes computers
 ```
 
+**Chain it, and end on a literal.** `a | b | "None"` tries `a`, then `b`, then
+settles on the literal. That is the idiomatic replacement for an `if exists
+... then ... else` null check:
+
+```client_relevance
+unique values of (friendly name of it | description of it | "None") of active devices
+```
+
+An `if` form can give the same answer, but only by naming each property twice
+and nesting one `if` per fallback: `if exists friendly name of it then friendly
+name of it else if exists description of it then description of it else
+"None"`. The common shortcut goes wrong. On a Windows client with 64 active
+devices, `(if exists friendly name of it then friendly name of it else
+description of it) of active devices` raised `Singular expression refers to
+nonexistent object.`, and the usual repair, a `whose (exists friendly name of
+it or exists description of it)` filter, silently dropped the 2 devices that
+had neither. The `|` chain needs no filter and keeps those 2 as `None`, so they
+are still counted; see
+[`universal_relevance.md`](universal_relevance.md#count-per-value-with-multiplicity-of-it-it-of-unique-values)
+for the counting idiom that shows them. The literal at the end is what makes
+that work: without it, an item whose last link errors raises `nonexistent
+object` and the whole statement errors, on both engines. The transcripts are
+in
+[`universal_relevance.md`](universal_relevance.md#the-empty-case-a-singular-that-finds-nothing-and-what-rescues-it).
+
+`if`/`then`/`else` is still the right tool for *branching* -- choosing a
+different value or different logic on a condition (a version compare, a
+platform test) -- and it is the only construct that absorbs an undefined name,
+in its untaken branch (below). It is the wrong tool for "this, or that if it
+is missing", which is what `|` means.
+
+**Group a property before filtering it.** `whose` attaches to the nearest
+object on its left, so `operating system of it whose (it starts with "Win11")`
+filters `it` -- the computer -- not the operating system, and on session
+relevance fails with `The operator "starts with" is not defined.` Write
+`((operating system of it) whose (it starts with "Win11")) | "None"`. This
+comes up constantly inside `|` chains, because the singular filtered form is
+exactly what trips the fallback.
+
 **Both operands must be singular.** A plural spelling on either side is
 refused before evaluation, on both engines:
 
