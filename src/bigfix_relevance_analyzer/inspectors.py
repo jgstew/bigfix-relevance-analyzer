@@ -182,6 +182,17 @@ def _dialects_of(rows: Iterable[Inspector]) -> frozenset[Dialect]:
     return frozenset(dialect for entry in rows for dialect in entry.dialects)
 
 
+@functools.cache
+def _dialects_of_name(name: str) -> frozenset[Dialect]:
+    """:func:`_dialects_of` every row :func:`lookup` finds for ``name``, once.
+
+    A common name has hundreds of rows (``name`` is one per object type), and
+    analysis asks this of every reference in every statement. Only ever called
+    for a name with rows, so the cache is bounded by the tables, not the input.
+    """
+    return _dialects_of(lookup(name))
+
+
 def _return_types_of(rows: Iterable[Inspector]) -> tuple[str, ...]:
     """Every distinct type ``rows`` evaluate to, sorted."""
     return tuple(sorted({entry.return_type for entry in rows}))

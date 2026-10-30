@@ -5,9 +5,11 @@ that every part is reached, that the dialect and platform selection reaches the
 parts that depend on it, and that broken input degrades instead of raising.
 """
 
+import copy
 import json
+import pickle
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -21,6 +23,7 @@ from bigfix_relevance_analyzer.binding import Binder
 from bigfix_relevance_analyzer.complexity import evaluation_cost_rules
 from bigfix_relevance_analyzer.dialect import Dialect
 from bigfix_relevance_analyzer.lint import LintConfig, lint_analysis
+from bigfix_relevance_analyzer.nodes import Node
 from bigfix_relevance_analyzer.typecheck import Plurality
 
 SESSION = "names of bes computers"
@@ -184,6 +187,178 @@ def test_resolved_dialect_is_both_for_pure_core_syntax(text: str) -> None:
     # test_resolved_dialect_is_both_when_every_reference_supports_both.
     assert report.dialect_assumed
     assert report.dialect is Dialect.CLIENT
+
+
+# ---------------------------------------------------------------------------
+# resolved_dialect follows the form a name is written in, not the name (#141)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # `operating system of <bes computer>` is session; bare, it is client only.
+        "name of operating system",
+        "version of operating system",
+        "name of operating system as lowercase",
+        "operating system",
+        "names of operating systems",
+        # Parenthesized: still no direct object.
+        "name of (operating system)",
+        "(name of it) of operating system",
+        # The other client globals session has only with a direct object.
+        "hostname",
+        "names of sites",
+        "root server",
+        "device type",
+        "exists actions",
+        "names of users",
+        "exit code of action",
+        # Indexed: session has `parameter <string>` only `of <bes action>`.
+        'parameter "x"',
+        'parameter "x" of action',
+        'name of site "BES Support"',
+        # Already client from `files` and `folder`; must stay so.
+        'files whose (name of it = name of operating system) of folder "/etc"',
+        # An unknown name is no evidence; the known one decides (#141 option C1).
+        "nme of operating system",
+    ],
+    ids=repr,
+)
+def test_resolved_dialect_is_client_for_a_bare_client_global(text: str) -> None:
+    assert analyze(text).resolved_dialect is Dialect.CLIENT
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "names of bes computers",
+        # A direct object keeps `operating system` the session property.
+        'number of bes computers whose (operating system of it contains "Win")',
+        "names of operating systems of bes computers",
+    ],
+    ids=repr,
+)
+def test_resolved_dialect_stays_session_with_a_direct_object(text: str) -> None:
+    assert analyze(text).resolved_dialect is Dialect.SESSION
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "now",
+        "(1;2)",
+        '"abc" as uppercase',
+        "exists true",
+        "current date",
+        "exists properties",
+        "names of it of properties",
+    ],
+    ids=repr,
+)
+def test_resolved_dialect_stays_both_where_each_form_is_in_both(text: str) -> None:
+    assert analyze(text).resolved_dialect is Dialect.BOTH
+
+
+def test_resolved_dialect_form_narrowing_never_invents_a_contradiction() -> None:
+    """UNCERTAIN comes from names alone; narrowing only ever picks within BOTH."""
+    report = analyze("names of bes computers whose (name of it = computer name)")
+
+    assert report.resolved_dialect is Dialect.UNCERTAIN
+
+
+def test_resolved_dialect_stays_both_when_no_form_fits_either_dialect() -> None:
+    """Narrowing never narrows to nothing: a statement no dialect accepts is not
+    evidence for one, so it keeps the name-level answer."""
+    report = analyze("name of now")
+
+    assert report.resolved_dialect is Dialect.BOTH
+
+
+def test_a_bare_client_global_is_a_finding_not_an_assumption() -> None:
+    report = analyze("name of operating system")
+
+    assert report.classified_dialect is None
+    assert not report.dialect_assumed
+    assert report.to_dict()["dialect"]["resolved"] == "client"
+    assert report.to_dict()["dialect"]["assumed"] is False
+
+
+@pytest.mark.parametrize(
+    ("dialect", "platform"),
+    [(None, "windows"), (None, "macos"), (Dialect.SESSION, None), (Dialect.CLIENT, "debian")],
+)
+def test_resolved_dialect_does_not_depend_on_the_environment(
+    dialect: Dialect | None, platform: str | None
+) -> None:
+    """The answer is about the statement: neither a forced dialect nor a platform,
+    whose own narrowing also records empty resolutions, may move it."""
+    assert analyze("name of operating system", dialect, platform).resolved_dialect is Dialect.CLIENT
+    assert analyze("now", dialect, platform).resolved_dialect is Dialect.BOTH
+    # Session's `modules` here is the world's, by the fallback; client's matches
+    # the client-only `modules of <grub bootable image>`, whose `name` does not
+    # exist. Checking one dialect says nothing about what the other resolves.
+    nil_whose = analyze("nil whose (exists name of modules)", dialect, platform)
+    assert nil_whose.resolved_dialect is Dialect.SESSION
+
+
+def test_resolved_dialect_narrows_on_types_as_well_as_forms() -> None:
+    """Both dialects have a bare `current analysis`, but in client it is a
+    `fixlet`, which has no `name`: only session types it, so it is SESSION.
+    Per the inspector tables, not checked against an engine."""
+    assert analyze("name of current analysis").resolved_dialect is Dialect.SESSION
+
+
+@pytest.mark.parametrize("text", ["name of operating system", "now", "names of bes computers"])
+@pytest.mark.parametrize(
+    "copy_of",
+    [lambda a: pickle.loads(pickle.dumps(a)), copy.deepcopy],
+    ids=["pickle", "deepcopy"],
+)
+def test_an_analysis_survives_a_copy_with_its_resolved_dialect(
+    copy_of: Callable[[RelevanceAnalysis], RelevanceAnalysis], text: str
+) -> None:
+    """An analysis can be returned from a worker pool. The narrowing must not
+    depend on `id()`-keyed state, which means nothing on the far side."""
+    report = analyze(text)
+
+    assert copy_of(report).resolved_dialect is report.resolved_dialect
+
+
+def test_form_narrowing_checks_again_only_when_names_say_both(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The second dialect's check is the cost of the fix; only BOTH pays it."""
+    from bigfix_relevance_analyzer import typecheck
+
+    calls = 0
+
+    def counting(
+        node: Node, environment: typecheck.TypeEnvironment, *, source: str | None = None
+    ) -> typecheck.CheckResult:
+        nonlocal calls
+        calls += 1
+        return typecheck.check(node, environment, source=source)
+
+    monkeypatch.setattr("bigfix_relevance_analyzer.analyzer.check", counting)
+    # Names settle it, nothing parses or resolves, or there are no references
+    # (BOTH whatever the checks say): one check at most.
+    for text in [
+        'files of folder "/etc"',
+        "names of bes computers",
+        "1 +",
+        "nme",
+        '"abc" as uppercase',
+        "(1;2)",
+    ]:
+        calls = 0
+        analyze(text)
+        assert calls <= 1, text
+    # Names say BOTH: only the other dialect's own check can say whether it fits.
+    for text in ["name of operating system", "name of current analysis", "now"]:
+        calls = 0
+        analyze(text)
+        assert calls == 2, text
 
 
 def test_forced_dialect_overrides_classification() -> None:

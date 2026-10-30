@@ -31,7 +31,9 @@ error tokens positioned, and the complexity metrics, which are lexical.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 from bigfix_relevance_analyzer import inspectors
@@ -136,6 +138,8 @@ class ReferenceReport:
         know about the name, which cannot depend on the environment the lookup
         already filtered by, or the answer would just restate the environment.
         """
+        if self.matches and self.matches is inspectors.lookup(self.phrase):
+            return inspectors._dialects_of_name(self.phrase)  # the usual case, cached
         return inspectors._dialects_of(self.matches)
 
     @property
@@ -198,6 +202,15 @@ class RelevanceAnalysis:
     cost_rules: tuple[CostRule, ...]
     """The heavy-inspector rules this statement matched, in table order."""
 
+    _form_dialect: Dialect | None = field(default=None, repr=False, compare=False)
+    """The one dialect the forms written leave, when the names alone say
+    :attr:`~bigfix_relevance_analyzer.dialect.Dialect.BOTH`; else ``None``.
+
+    Worked out by :func:`analyze` while the tree it checked is alive, because
+    the checks it reads are keyed by ``id()`` (#141). Stored as the answer, so
+    an analysis returned from a worker pool keeps it.
+    """
+
     @property
     def dialect(self) -> Dialect:
         """The dialect analysis actually ran as."""
@@ -223,6 +236,23 @@ class RelevanceAnalysis:
         cannot apply without a parse tree. An unknown name (no match at all)
         contributes no evidence either way.
 
+        Names alone are not the whole answer, because one name can be two
+        inspectors: ``operating system of <bes computer>`` is session, while
+        ``operating system`` with no direct object is client only. So when the
+        names say BOTH, the statement is checked as each dialect and the forms
+        it is actually written in decide, with the types they produce: a
+        dialect is ruled out when a known reference resolves to no row in it.
+        That is usually the form (no direct object), but can be a type only one
+        dialect's tables give a property: ``name of current analysis`` is
+        SESSION, because client's ``current analysis`` is a ``fixlet``, which
+        has no ``name``. ``name of operating system`` is
+        therefore CLIENT, and so is ``nme of operating system``, its unknown
+        name proving nothing. If that rules out one dialect, the other is the
+        answer; if it rules out neither, or both, the answer stays BOTH --
+        never an empty or contradictory one, which only names can establish.
+        The checks run with no platform, so neither the dialect analysis ran
+        as nor a ``platform`` argument changes this answer.
+
         :attr:`~bigfix_relevance_analyzer.dialect.Dialect.CLIENT` or
         :attr:`~bigfix_relevance_analyzer.dialect.Dialect.SESSION` means every
         resolved reference supports that dialect and not both dialects at
@@ -240,25 +270,17 @@ class RelevanceAnalysis:
         as either. ``None`` means nothing parsed, or the statement has at
         least one reference and none of them resolved to a known name.
         """
+        named = self._named_dialect
+        if named is Dialect.BOTH and self._form_dialect is not None:
+            return self._form_dialect
+        return named
+
+    @property
+    def _named_dialect(self) -> Dialect | None:
+        """:attr:`resolved_dialect` from the names alone, before their forms narrow it."""
         if self.node is None:
             return None
-        if not self.references:
-            return Dialect.BOTH  # only core syntax used -- no inspectors to disagree
-        supported: frozenset[Dialect] | None = None
-        for reference in self.references:
-            found = reference.dialects
-            if not found:
-                continue  # an unknown name, or one with no dialect at all
-            supported = found if supported is None else supported & found
-        if supported is None:
-            return None
-        if supported == {Dialect.CLIENT, Dialect.SESSION}:
-            return Dialect.BOTH
-        if supported == {Dialect.CLIENT}:
-            return Dialect.CLIENT
-        if supported == {Dialect.SESSION}:
-            return Dialect.SESSION
-        return Dialect.UNCERTAIN  # empty intersection: genuinely contradictory
+        return _dialect_of_names(self.references)
 
     def references_only_in(self, dialect: Dialect) -> tuple[str, ...]:
         """Names whose every known row is defined in ``dialect`` and no other.
@@ -526,6 +548,43 @@ class RelevanceAnalysis:
         return report
 
 
+def _dialect_of_names(references: tuple[ReferenceReport, ...]) -> Dialect | None:
+    """The dialects every known name is defined in, as one :class:`Dialect`.
+
+    See :attr:`RelevanceAnalysis.resolved_dialect`, which this is the first
+    half of.
+    """
+    if not references:
+        return Dialect.BOTH  # only core syntax used -- no inspectors to disagree
+    supported: frozenset[Dialect] | None = None
+    for reference in references:
+        found = reference.dialects
+        if not found:
+            continue  # an unknown name, or one with no dialect at all
+        supported = found if supported is None else supported & found
+    if supported is None:
+        return None
+    if supported == {Dialect.CLIENT, Dialect.SESSION}:
+        return Dialect.BOTH
+    if supported == {Dialect.CLIENT}:
+        return Dialect.CLIENT
+    if supported == {Dialect.SESSION}:
+        return Dialect.SESSION
+    return Dialect.UNCERTAIN  # empty intersection: genuinely contradictory
+
+
+def _rules_out(checked: CheckResult, references: tuple[ReferenceReport, ...]) -> bool:
+    """Whether some known reference resolved to no row at all in ``checked``.
+
+    Absent is not empty: a reference the walk never reached proves nothing.
+    """
+    return any(
+        not checked.resolutions[key]
+        for reference in references
+        if reference.known and (key := id(reference.reference)) in checked.resolutions
+    )
+
+
 def analyze_to_dict(
     text: str,
     dialect: Dialect | None = None,
@@ -567,6 +626,26 @@ def analyze(
 
     Never raises for bad relevance: see the module docstring.
     """
+    return _analyze(text, dialect, platform, probe_kind=probe_kind)[0]
+
+
+def _analyze(
+    text: str,
+    dialect: Dialect | None = None,
+    platform: str | None = None,
+    *,
+    probe_kind: ProbeKind = ProbeKind.COUNT,
+    all_checks: bool = False,
+) -> tuple[RelevanceAnalysis, Mapping[Dialect, CheckResult]]:
+    """:func:`analyze`, plus the checks it ran as each dialect with no platform.
+
+    The checks are filled when the names say BOTH and there is a reference,
+    and empty otherwise. ``all_checks`` fills them whenever the names say BOTH,
+    references or not, which is what
+    :func:`~bigfix_relevance_analyzer.dialect.dialect_fit` needs: it reuses
+    them rather than checking twice more. They stay out of the analysis itself
+    because their ``id()`` keys mean nothing once it is copied.
+    """
     classified = classify_relevance_dialect(text)
     effective = dialect or classified or Dialect.CLIENT
     environment = TypeEnvironment.create(effective, platform)
@@ -582,6 +661,8 @@ def analyze(
     it_bindings: tuple[ItBinding, ...] = ()
     levels: tuple[Level, ...] = ()
     checked: CheckResult | None = None
+    dialect_checks: Mapping[Dialect, CheckResult] = MappingProxyType({})
+    form_dialect: Dialect | None = None
     if node is not None:
         checked = check(node, environment, source=text)
         references = tuple(
@@ -596,9 +677,26 @@ def analyze(
         )
         it_bindings = resolve_it_bindings(node)
         levels = breakdown_probes(text, node, kind=probe_kind)
+        # No references is BOTH whatever the checks say; only dialect_fit,
+        # which wants each dialect's verdict, checks those again.
+        if _dialect_of_names(references) is Dialect.BOTH and (all_checks or references):
+            # One name can be two inspectors (#141); which rows each reference
+            # resolves to in each dialect decides. No platform, so platform
+            # narrowing cannot rule a dialect out: reuse the check above only
+            # when it already ran that way.
+            dialect_checks = MappingProxyType(
+                {
+                    each: checked
+                    if each is effective and platform is None
+                    else check(node, TypeEnvironment.create(each, None), source=text)
+                    for each in (Dialect.CLIENT, Dialect.SESSION)
+                }
+            )
+            fits = [d for d, c in dialect_checks.items() if not _rules_out(c, references)]
+            form_dialect = fits[0] if len(fits) == 1 else None
 
     complexity = _analyze_lexed(lexed.code, effective)
-    return RelevanceAnalysis(
+    analysis = RelevanceAnalysis(
         text=text,
         classified_dialect=classified,
         requested_dialect=dialect,
@@ -617,7 +715,9 @@ def analyze(
         cost_rules=tuple(
             rule for rule in cost_rules_for(effective) if rule.label in complexity.costly_inspectors
         ),
+        _form_dialect=form_dialect,
     )
+    return analysis, dialect_checks
 
 
 def client_platforms(analysis: RelevanceAnalysis) -> tuple[str, ...]:

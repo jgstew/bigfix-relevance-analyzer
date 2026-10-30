@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bigfix-relevance-analyzer"
-version = "1.42.0"
+version = "1.43.0"
 description = "A python module for working with BigFix Relevance generically. Extract, Analyze, etc."
 readme = "README.md"
 license = "MIT"
@@ -76,12 +76,16 @@ packages = ["src/bigfix_relevance_analyzer"]
 # Delay dependency resolution by 7 days so newly-published (possibly broken
 # or compromised) releases aren't picked up immediately.
 exclude-newer = "7 days"
-# One deliberate, permanent exception, narrowed to a single name so the policy
-# above still covers everything else: `bigfix-remote-client-relevance` is this
-# project's own multi-client qna oracle (see `docs/qna.md`), so it is exempt
-# from the cooldown. "0 days" means no delay; unlike a fixed date it never
-# goes stale and hides newer releases.
-exclude-newer-package = { bigfix-remote-client-relevance = "0 days" }
+# One deliberate, permanent exception, by name so the policy above still
+# covers everything else, their own dependencies included: the author's own
+# `bigfix*` libraries from github.com/jgstew are exempt, because they carry
+# fixes this project wants as soon as they ship. Today that is the multi-client
+# qna oracle `bigfix-remote-client-relevance` (see `docs/qna.md`) and the
+# `bigfix-remote-session-relevance` it requires. "0 days" means no delay;
+# unlike a fixed date it never goes stale and hides newer releases.
+# .github/dependabot.yml exempts the same names, and
+# tests/test_dependency_cooldown.py holds the two to one list.
+exclude-newer-package = { bigfix-remote-client-relevance = "0 days", bigfix-remote-session-relevance = "0 days" }
 required-version = ">=0.12"
 
 [tool.ruff]

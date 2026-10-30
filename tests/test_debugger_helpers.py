@@ -10,7 +10,14 @@ contract its NiceGUI and iOS apps were built against.
 
 from __future__ import annotations
 
+import json
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any
+
 import pytest
+from _corpus import EXAMPLES, corpus_cases, extracted_sites
+from _helpers import golden_text
 
 from bigfix_relevance_analyzer import (
     CountSummary,
@@ -23,7 +30,7 @@ from bigfix_relevance_analyzer import (
     dialect_fit,
     summarize_count_results,
 )
-from bigfix_relevance_analyzer.typecheck import RelevanceValue
+from bigfix_relevance_analyzer.typecheck import CheckResult, RelevanceValue
 
 
 def platforms_of(text: str) -> tuple[str, ...]:
@@ -209,10 +216,10 @@ def test_summarize_count_results_reads_rows_as_interpret_count_results_does() ->
 
 # --- dialect_fit does not change resolved_dialect ----------------------------------
 #
-# dialect_fit works around #141 instead of fixing it. These pin what
-# resolved_dialect and classified_dialect say today for the statements above, so
-# a change here is visible. When #141 lands, the BOTH rows for client-only
-# statements become CLIENT, and dialect_fit's "type-check" branch can simplify.
+# These pin what resolved_dialect and classified_dialect say for the statements
+# above, so a change here is visible. Since #141, a client global written bare
+# (`name of operating system`) resolves CLIENT, while dialect_fit keeps calling
+# it "type-check": the name alone is in both dialects.
 
 
 @pytest.mark.parametrize(
@@ -220,12 +227,12 @@ def test_summarize_count_results_reads_rows_as_interpret_count_results_does() ->
     [
         ('names of files of folder "/etc"', C, None),
         ("names of bes computers", S, S),
-        ("name of operating system", Dialect.BOTH, None),  # #141: should be CLIENT
-        ("version of operating system", Dialect.BOTH, None),  # #141: should be CLIENT
+        ("name of operating system", C, None),  # #141
+        ("version of operating system", C, None),  # #141
         ("now", Dialect.BOTH, None),
         ('(1, "a")', Dialect.BOTH, None),
         ("names of bes computers whose (name of it = computer name)", Dialect.UNCERTAIN, S),
-        ("nme of operating system", Dialect.BOTH, None),
+        ("nme of operating system", C, None),  # #141: the known name decides
         ("names of bes computerz", Dialect.BOTH, S),
         ("names of (bes computers", None, S),
         ("name of (operating system", None, None),
@@ -248,3 +255,72 @@ def test_dialect_fit_is_never_empty_and_only_names_client_or_session() -> None:
         fit = dialect_fit(text)
         assert fit.dialects
         assert fit.dialects <= {C, S}
+
+
+# --- dialect_fit over the corpora ---------------------------------------------------
+#
+# The debugger dispatches on both `dialects` and `basis`, so #141 fixing
+# resolved_dialect must not move either for any real statement. Pinned from
+# 1.42.0, before that fix: every statement in both corpora, valid or not.
+
+DIALECT_FIT_GOLDEN = Path(__file__).parent / "golden" / "dialect_fit_corpus.json"
+
+
+def corpus_statements() -> list[tuple[str, str]]:
+    """``(id, text)`` for every corpus statement; ids are unique, as in parity.py."""
+    rows = [(case.id, case.source) for case in corpus_cases()]
+    ordinals: dict[Path, int] = {}
+    for path, site in extracted_sites():
+        index = ordinals[path] = ordinals.get(path, -1) + 1
+        rows.append((f"{path.relative_to(EXAMPLES).as_posix()}#{index}@L{site.line}", site.text))
+    return rows
+
+
+def test_dialect_fit_is_unchanged_over_the_corpora() -> None:
+    fits = {}
+    for statement_id, text in corpus_statements():
+        fit = dialect_fit(text)
+        fits[statement_id] = {
+            "text": text,
+            "dialects": sorted(d.value for d in fit.dialects),
+            "basis": fit.basis,
+            "client_only": list(fit.client_only),
+            "session_only": list(fit.session_only),
+        }
+    actual = json.dumps(fits, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+
+    assert len(fits) == len(corpus_statements())  # ids are unique
+    assert actual == golden_text(DIALECT_FIT_GOLDEN, actual)
+
+
+@pytest.mark.parametrize(
+    ("text", "analyses"),
+    [
+        # Names say BOTH: one analysis runs both dialects' checks.
+        ("name of operating system", 1),
+        ("now", 1),
+        ('(1, "a")', 1),
+        # Names settle it: no type check is asked for.
+        ("names of bes computers", 1),
+    ],
+    ids=repr,
+)
+def test_dialect_fit_reuses_the_checks_analysis_already_ran(
+    monkeypatch: pytest.MonkeyPatch, text: str, analyses: int
+) -> None:
+    from bigfix_relevance_analyzer import analyzer
+
+    calls = 0
+    real = analyzer._analyze
+
+    def counting(
+        text: str, dialect: Dialect | None = None, platform: str | None = None, **kwargs: Any
+    ) -> tuple[analyzer.RelevanceAnalysis, Mapping[Dialect, CheckResult]]:
+        nonlocal calls
+        calls += 1
+        return real(text, dialect, platform, **kwargs)
+
+    monkeypatch.setattr(analyzer, "_analyze", counting)
+    dialect_fit(text)
+
+    assert calls == analyses
