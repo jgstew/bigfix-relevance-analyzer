@@ -509,8 +509,9 @@ def summarize_count_results(rows: Sequence[str]) -> CountSummary:
     """Aggregate :func:`interpret_count_results` over every context object.
 
     A level with some contexts not evaluable and others counted reports the
-    counted total; it is ``not-evaluable`` only when no context was. The total
-    is ``empty-or-error`` when it is zero, for the reason that outcome exists.
+    counted total; it is ``not-evaluable`` only when no context was. The outcome
+    is ``empty-or-error`` when that total is zero, for the reason that outcome
+    exists.
     Raises :class:`ValueError` for a row that is not a count, as
     :func:`interpret_count_results` does.
     """

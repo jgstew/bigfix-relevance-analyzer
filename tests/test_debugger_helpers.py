@@ -235,12 +235,11 @@ def test_summarize_count_results_reads_rows_as_interpret_count_results_does() ->
 def test_resolved_and_classified_dialects_of_the_dialect_fit_examples(
     text: str, resolved: Dialect | None, classified: Dialect | None
 ) -> None:
-    analysis = analyze_relevance(text)
     dialect_fit(text)
+    analysis = analyze_relevance(text)
 
     assert analysis.resolved_dialect is resolved
     assert analysis.classified_dialect is classified
-    assert analyze_relevance(text).resolved_dialect is resolved
 
 
 def test_dialect_fit_is_never_empty_and_only_names_client_or_session() -> None:

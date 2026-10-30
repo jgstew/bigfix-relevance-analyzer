@@ -190,9 +190,11 @@ class RelevanceValue:
 
         :attr:`platforms` also carries session environments
         (``"session:rest_api"``, ...), which no endpoint can match; this is the
-        set a front end shows as "runs on".
+        set a front end shows as "runs on". Intersected with the dumps' client
+        platforms rather than filtered on the prefix, so the two definitions
+        of "client platform" cannot drift.
         """
-        return tuple(sorted(p for p in self.platforms if not p.startswith("session:")))
+        return tuple(sorted(self.platforms & _client_platforms()))
 
     def describe(self) -> str:
         """Plurality and types for display.
@@ -200,6 +202,10 @@ class RelevanceValue:
         ``"singular string"``, ``"plural integer | string"`` (types sorted),
         ``"plural (unknown type)"`` when the plurality is known but no type is,
         or ``"unknown"`` when neither is.
+
+        A tuple shows its element types, as the debugger's apps always have:
+        ``(1, "a")`` is ``"singular integer | string"``, not its
+        :attr:`tuple_types` spelling.
         """
         plurality = self.plurality.value
         if not self.types:
