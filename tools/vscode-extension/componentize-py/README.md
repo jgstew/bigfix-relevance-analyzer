@@ -102,8 +102,9 @@ arithmetic operators (including `is not equal to` and `does not contain`),
 
 ### ActionScript and BES files
 
-`.bes` and `.bes.xml` files are colored as XML, with the code inside colored as
-the language it is:
+`.bes` and `.bes.xml` files, and BES templates named `.bes.mustache` or
+`.bes.template`, are colored as XML, with the code inside colored as the
+language it is:
 
 - **ActionScript** in action scripts: commands, `if`/`elseif`/`else`/`endif`,
   `//` comments, strings, URLs, and the relevance inside each `{...}`
@@ -122,7 +123,12 @@ support for them. To have another XML extension handle them instead, map them
 back to XML in your settings (you lose the ActionScript and relevance colors):
 
 ```json
-"files.associations": { "*.bes": "xml", "*.bes.xml": "xml" }
+"files.associations": {
+  "*.bes": "xml",
+  "*.bes.mustache": "xml",
+  "*.bes.template": "xml",
+  "*.bes.xml": "xml"
+}
 ```
 
 Paste a fixlet into a new, unsaved tab, or type one, and the tab is switched to
@@ -154,6 +160,7 @@ checked as you type too, before it has a name.
 | Files | What is checked |
 |---|---|
 | `.bes`, `.bes.xml` | Every relevance element, success criteria, analysis and global properties, and `{...}` substitutions in action scripts |
+| `.bes.mustache`, `.bes.template` | BES templates, checked as `.bes` files are. A placeholder such as `{{version}}` is plain text, so relevance holding one is checked as written |
 | `.ojo`, `.besrpt`, `.beswrpt`, `.webreport`, `.html`, `.htm` | `<?Relevance ...?>` blocks and relevance passed to JavaScript `Relevance(...)` calls |
 | `.rel` | The whole file, as one client or session relevance statement |
 | `.bsr` | The whole file, as one session relevance statement |

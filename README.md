@@ -335,7 +335,7 @@ described under [Which dialect a statement is in](#which-dialect-a-statement-is-
 
 | File type | What is extracted |
 | --- | --- |
-| `.bes`, `.bes.xml` | `<Relevance>`, `<SuccessCriteria Option="CustomRelevance">`, analysis and global retrieved `<Property>` bodies, `{...}` substitutions in Windows-Shell `<ActionScript>`, and session relevance in `<Description>` HTML |
+| `.bes`, `.bes.xml`, and any name with `.bes` in its suffixes, such as the templates `.bes.mustache` and `.bes.template` | `<Relevance>`, `<SuccessCriteria Option="CustomRelevance">`, analysis and global retrieved `<Property>` bodies, `{...}` substitutions in Windows-Shell `<ActionScript>`, and session relevance in `<Description>` HTML |
 | `.ojo`, `.besrpt`, `.beswrpt`, `.webreport` | `<?Relevance ?>` substitutions and JavaScript `Relevance(...)` / `EvaluateRelevance(...)` calls |
 | `.html`, `.htm` | the same, read as a ClientUI dashboard (see below) |
 | `.bsr`, `.rel` | the whole file as one statement |

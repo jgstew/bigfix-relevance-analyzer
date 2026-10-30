@@ -152,6 +152,10 @@ async function lint() {
   const bes = vscode.Uri.file(path.join(folder, "task.bes"));
   const besEditor = await vscode.window.showTextDocument(bes);
   const besFound = await waitFor(bes, (found) => found.length > 0);
+  // ...and so is a BES template (#122), which VS Code matches by its longest suffix.
+  const template = vscode.Uri.file(path.join(folder, "task.bes.mustache"));
+  const templateEditor = await vscode.window.showTextDocument(template);
+  const templateFound = await waitFor(template, (found) => found.length > 0);
 
   // Quick fixes (issue #113): the lightbulb's fix, applied the way VS Code
   // applies it, clears the diagnostic it was for.
@@ -398,6 +402,8 @@ async function lint() {
     ],
     "task.bes": summary(besFound),
     "task.bes languageId": besEditor.document.languageId,
+    "task.bes.mustache": summary(templateFound),
+    "task.bes.mustache languageId": templateEditor.document.languageId,
     "fixable.rel actions": titles,
     "fixable.rel after the fix": summary(fixedFound),
     "fixable.rel text after the fix": fixedText,
@@ -433,6 +439,14 @@ async function lint() {
   }
   if (besLanguage && besEditor.document.languageId !== besLanguage) {
     throw new Error(`task.bes: expected languageId ${besLanguage}, got ${besEditor.document.languageId}`);
+  }
+  if (!templateFound.some((d) => codeOf(d) === "error-token" && d.range.start.line === 2)) {
+    throw new Error(`task.bes.mustache: expected error-token on line 3, got ${JSON.stringify(summary(templateFound))}`);
+  }
+  if (besLanguage && templateEditor.document.languageId !== besLanguage) {
+    throw new Error(
+      `task.bes.mustache: expected languageId ${besLanguage}, got ${templateEditor.document.languageId}`
+    );
   }
   // The untitled BES buffers: the unterminated string precisely, as in task.bes.
   for (const [name, found] of [["untitled BES", untitledBesFound], ["switched BES", switchedBesFound]]) {

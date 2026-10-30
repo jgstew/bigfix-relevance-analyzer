@@ -74,6 +74,8 @@
         ],
         "extensions": [
           ".bes",
+          ".bes.mustache",
+          ".bes.template",
           ".bes.xml"
         ],
         "configuration": "./language-configuration-bes.json"
