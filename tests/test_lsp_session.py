@@ -180,6 +180,22 @@ def test_hover_describes_the_inspector(session: StatementSession) -> None:
     assert result["range"] == span((0, 8), (0, 24))
 
 
+def test_semantic_tokens_come_through_in_utf16_columns(session: StatementSession) -> None:
+    """What a CodeMirror host would colour with: CodeMirror counts UTF-16
+    units too, so the columns after a non-BMP character need no conversion."""
+    grin = chr(0x1F600)
+    result = session.request("textDocument/semanticTokens/full", {}, f'"{grin}" = starts of it')
+    # (delta line, delta start, length, type, modifiers) per token: the
+    # string, `=`, `starts` (a name here), `of`, `it`.
+    assert result["data"] == [
+        *(0, 0, 4, 4, 0),
+        *(0, 5, 1, 1, 0),
+        *(0, 2, 6, 2, 0),
+        *(0, 7, 2, 0, 0),
+        *(0, 3, 2, 0, 0),
+    ]
+
+
 def test_hover_on_nothing_is_none(session: StatementSession) -> None:
     assert session.request("textDocument/hover", {"position": at(0, 4)}, "name of x") is None
 

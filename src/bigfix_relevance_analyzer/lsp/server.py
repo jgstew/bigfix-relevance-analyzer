@@ -20,13 +20,13 @@ linter, not porting any of it.
 
 What is served
 --------------
-Diagnostics, hover, completion and quick fixes. A document is linted on open, change and
-save, and its diagnostics are published as ``textDocument/publishDiagnostics``;
-closing it publishes an empty list. Sync is full-document only: relevance
-statements are short, and incrementality pays off per *site* (the linter's
-cache), not per keystroke within one. A document whose suffix no extractor
-reads gets an empty list rather than silence, so nothing stale is left behind
-if it was renamed.
+Diagnostics, hover, completion, quick fixes and semantic tokens. A document is
+linted on open, change and save, and its diagnostics are published as
+``textDocument/publishDiagnostics``; closing it publishes an empty list. Sync
+is full-document only: relevance statements are short, and incrementality pays
+off per *site* (the linter's cache), not per keystroke within one. A document
+whose suffix no extractor reads gets an empty list rather than silence, so
+nothing stale is left behind if it was renamed.
 
 ``textDocument/hover`` answers from the stored text of an open document, with
 a null result for a document that is not open or a position with nothing to
@@ -47,6 +47,14 @@ advertised only to a client that takes literals (``codeActionLiteralSupport``);
 there is no ``Command`` fallback. The edit is versioned (``documentChanges``,
 with the document's version) when the client supports that, so it refuses an
 edit made for text that has since changed; otherwise it is plain ``changes``.
+
+``textDocument/semanticTokens/full`` answers with the linter's semantic
+tokens, relatively encoded as LSP's ``data`` quintuples. The legend is
+:data:`SEMANTIC_TOKEN_TYPES`: only LSP's standard token types, so every
+client's theme colours them with no configuration, and no modifiers. A
+document that is not open has none. Only ``full`` is advertised: neither
+deltas nor ranges, since a whole document's tokens cost about what one parse of
+its sites does, and the linter keeps those per statement.
 """
 
 from __future__ import annotations
@@ -61,14 +69,22 @@ from bigfix_relevance_analyzer.lsp.linter import (
     COMPLETION_LIMIT,
     FIX_ALL_KIND,
     QUICKFIX_KIND,
+    SEMANTIC_KINDS,
     SOURCE,
     DocumentLinter,
+    SemanticToken,
     lsp_range,
 )
 
 logger = logging.getLogger(__name__)
 
 Message = dict[str, Any]
+
+SEMANTIC_TOKEN_TYPES: tuple[str, ...] = tuple(kind.value for kind in SEMANTIC_KINDS)
+"""The semantic token legend's ``tokenTypes``: a token's type is its index here.
+Each is the LSP standard type of the same name."""
+
+_TOKEN_TYPE_INDEX = {kind: at for at, kind in enumerate(SEMANTIC_KINDS)}
 
 
 class ErrorCode(enum.IntEnum):
@@ -178,6 +194,8 @@ class Server:
             return [self._completion(id_, params)]
         if method == "textDocument/codeAction":
             return [self._code_action(id_, params)]
+        if method == "textDocument/semanticTokens/full":
+            return [self._semantic_tokens(id_, params)]
         return [error_response(id_, ErrorCode.METHOD_NOT_FOUND, f"method not found: {method}")]
 
     def _initialize(self, params: Mapping[str, Any]) -> Message:
@@ -201,6 +219,10 @@ class Server:
             },
             "hoverProvider": True,
             "completionProvider": {"resolveProvider": False},
+            "semanticTokensProvider": {
+                "legend": {"tokenTypes": list(SEMANTIC_TOKEN_TYPES), "tokenModifiers": []},
+                "full": True,
+            },
         }
         if self._code_action_literals:
             capabilities["codeActionProvider"] = {"codeActionKinds": [QUICKFIX_KIND, FIX_ALL_KIND]}
@@ -297,6 +319,19 @@ class Server:
             actions.append(action)
         return _result(id_, actions)
 
+    def _semantic_tokens(self, id_: Any, params: Mapping[str, Any]) -> Message:
+        identifier = params.get("textDocument")
+        uri = identifier.get("uri") if isinstance(identifier, Mapping) else None
+        if not isinstance(uri, str):
+            return error_response(
+                id_, ErrorCode.INVALID_PARAMS, "semanticTokens needs a textDocument uri"
+            )
+        document = self._documents.get(uri)
+        if document is None:
+            return _result(id_, {"data": []})
+        found = self.linter.semantic_tokens(uri, document.text, document.language_id)
+        return _result(id_, {"data": encode_semantic_tokens(found)})
+
     # -- notifications --------------------------------------------------------
 
     def _notification(self, method: str, params: Mapping[str, Any]) -> list[Message]:
@@ -359,6 +394,20 @@ class Server:
             "diagnostics": self.linter.diagnostics(uri, document.text, document.language_id),
         }
         return _notify("textDocument/publishDiagnostics", params)
+
+
+def encode_semantic_tokens(tokens: list[SemanticToken]) -> list[int]:
+    """``tokens``, in document order, as LSP's relative ``data``: per token its
+    line less the last token's, its start less the last token's when on the
+    same line (else its own start), its length, its type and no modifiers."""
+    data: list[int] = []
+    line = character = 0
+    for token in tokens:
+        delta_line = token.line - line
+        delta_start = token.character - character if delta_line == 0 else token.character
+        data += (delta_line, delta_start, token.length, _TOKEN_TYPE_INDEX[token.kind], 0)
+        line, character = token.line, token.character
+    return data
 
 
 def _has(value: object, *keys: str) -> bool:

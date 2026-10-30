@@ -60,6 +60,7 @@ from bigfix_relevance_analyzer.fixfile import (
     plan_fix,
     write_fix,
 )
+from bigfix_relevance_analyzer.highlight import HighlightKind, HighlightSpan, highlight
 from bigfix_relevance_analyzer.inspectors import (
     Inspector,
     InspectorKind,
@@ -142,6 +143,8 @@ __all__ = [
     "Finding",
     "FixPlan",
     "FixResult",
+    "HighlightKind",
+    "HighlightSpan",
     "HtmlContext",
     "Inspector",
     "InspectorKind",
@@ -194,6 +197,7 @@ __all__ = [
     "fix_file",
     "fix_paths",
     "fix_paths_to_dict",
+    "highlight",
     "inspector_names",
     "interpret_count_results",
     "is_definite",

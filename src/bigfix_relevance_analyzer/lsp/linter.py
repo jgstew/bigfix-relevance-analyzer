@@ -104,6 +104,24 @@ nor disturbs the findings diagnostics and quick fixes share. The dialect is
 the one lint would use for the site; when that is not definite, both are
 offered.
 
+Semantic tokens
+---------------
+:meth:`DocumentLinter.semantic_tokens` colours what the editor's regex
+grammar cannot: which words are inspector names, which are operators, and
+which are cast types (:mod:`~bigfix_relevance_analyzer.highlight` says why
+only the parse tree knows). Each site is highlighted on its own and every span
+mapped into the buffer exactly as a diagnostic's is, so a BES site is coloured
+where its text is written, entities and all; a span that cannot be placed for
+certain is left uncoloured rather than coloured in the wrong place, and one
+that crosses a line break becomes one token per line, as LSP requires.
+Punctuation and lexical errors are not served: the grammar already colours
+the one and the diagnostics underline the other. Nothing is coloured where
+the diagnostics would not look either. Highlights are kept per statement text,
+like lint's analyses, so a keystroke re-highlights only the site it changed;
+placing a token costs about the same wherever it is
+(:class:`~bigfix_relevance_analyzer.lsp.positions.DocumentIndex`), and the
+tokens are kept with the document's extraction until its text changes.
+
 Runs in WASM
 ------------
 This is the code an editor extension runs inside a componentize-py component,
@@ -116,6 +134,7 @@ from __future__ import annotations
 
 import dataclasses
 import enum
+import functools
 import logging
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
@@ -141,6 +160,7 @@ from bigfix_relevance_analyzer.extract import (
     _is_recognized,
 )
 from bigfix_relevance_analyzer.fixfile import SiteAnchor, SiteFix, _plan, _site_anchor, site_fixes
+from bigfix_relevance_analyzer.highlight import HighlightKind, HighlightSpan, highlight
 from bigfix_relevance_analyzer.lint import (
     Finding,
     LintConfig,
@@ -207,6 +227,18 @@ COMPLETION_LIMIT: Final = 50
 """The most completions one request returns. A list that hits it says it is
 incomplete, so the client asks again as more of the word is typed."""
 
+SEMANTIC_KINDS: Final = (
+    HighlightKind.KEYWORD,
+    HighlightKind.OPERATOR,
+    HighlightKind.PROPERTY,
+    HighlightKind.TYPE,
+    HighlightKind.STRING,
+    HighlightKind.NUMBER,
+    HighlightKind.COMMENT,
+)
+"""The highlight kinds served as semantic tokens, in legend order; see the
+module docstring for the two that are not."""
+
 EXTRACTION_CACHE_SIZE: Final = 8
 """Documents whose last extraction the linter keeps, for hover to reuse."""
 
@@ -243,6 +275,10 @@ class _Extraction:
     """Planned quick-fix edits for this text, by site anchor (``None`` for the
     whole file); ``None`` for one that may not be offered. The edits, not the
     plans: a plan holds two copies of the document."""
+
+    semantic_tokens: list[SemanticToken] | None = None
+    """This text's semantic tokens, once asked for: a client asks again after
+    every edit, and for every editor that shows the document."""
 
     @property
     def index(self) -> DocumentIndex:
@@ -304,6 +340,23 @@ class DocumentCompletion:
     """The buffer range the insertion replaces: the partial word being typed,
     or the cursor itself when there is none. ``None`` when the partial word
     cannot be placed for certain; the client then uses its own word range."""
+
+
+class SemanticToken(NamedTuple):
+    """One semantic token, as plain data, on one line of the buffer: what the
+    protocol layer encodes into ``SemanticTokens.data``."""
+
+    line: int
+    """0-based."""
+
+    character: int
+    """0-based, in UTF-16 code units."""
+
+    length: int
+    """In UTF-16 code units; never 0."""
+
+    kind: HighlightKind
+    """One of :data:`SEMANTIC_KINDS`."""
 
 
 class CacheStats(NamedTuple):
@@ -435,6 +488,45 @@ class DocumentLinter:
         if mapped is not None:
             result["range"] = lsp_range(mapped)
         return result
+
+    def semantic_tokens(
+        self, uri: str, text: str, language_id: str | None = None
+    ) -> list[SemanticToken]:
+        """The semantic tokens of the document at ``uri`` holding ``text``, in
+        document order, none overlapping another.
+
+        Empty for a document :meth:`diagnostics` would not lint. The file type
+        is chosen exactly as :meth:`diagnostics` chooses it.
+        """
+        data = text.encode("utf-8", errors="surrogatepass")
+        if len(data) > self.max_document_bytes:
+            return []
+        extracted = self._extract(uri, text, data, language_id)
+        if extracted is None:
+            return []
+        if extracted.semantic_tokens is not None:
+            return list(extracted.semantic_tokens)
+        index = extracted.index
+        found: list[SemanticToken] = []
+        for site in extracted.sites:
+            for span in _highlighted(site.text):
+                if span.kind not in _SERVED:
+                    continue
+                mapped = index.site_range(site, TextSpan(span.start, span.end))
+                if mapped is not None:
+                    found.extend(_line_tokens(index, mapped, span.kind))
+        found.sort()
+        # Sites never share text, but a token LSP cannot order must not be sent.
+        kept: list[SemanticToken] = []
+        for token in found:
+            if kept and (token.line, token.character) < (
+                kept[-1].line,
+                kept[-1].character + kept[-1].length,
+            ):
+                continue
+            kept.append(token)
+        extracted.semantic_tokens = kept
+        return list(kept)
 
     def completions(
         self,
@@ -698,6 +790,28 @@ class DocumentLinter:
             )
             for finding in cached
         )
+
+
+_SERVED: Final = frozenset(SEMANTIC_KINDS)
+
+
+@functools.lru_cache(maxsize=DEFAULT_CACHE_SIZE)
+def _highlighted(text: str) -> tuple[HighlightSpan, ...]:
+    """:func:`~bigfix_relevance_analyzer.highlight.highlight`, kept per
+    statement text: pure, so shared by every document, as lint's analyses are."""
+    return tuple(highlight(text))
+
+
+def _line_tokens(index: DocumentIndex, mapped: Range, kind: HighlightKind) -> list[SemanticToken]:
+    """``mapped`` as one token per line it touches, skipping empty pieces (a
+    blank line inside a comment, or a range ending at a line's start)."""
+    (first, start), (last, end) = mapped
+    if first == last:
+        return [SemanticToken(first, start, end - start, kind)] if end > start else []
+    pieces = [(first, start, index.line_length(first) - start)]
+    pieces.extend((line, 0, index.line_length(line)) for line in range(first + 1, last))
+    pieces.append((last, 0, end))
+    return [SemanticToken(line, at, length, kind) for line, at, length in pieces if length > 0]
 
 
 def _path_of(uri: str) -> Path:

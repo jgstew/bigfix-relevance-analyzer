@@ -42,7 +42,7 @@ from bigfix_relevance_analyzer.lsp.linter import (
     SOURCE,
     DocumentLinter,
 )
-from bigfix_relevance_analyzer.lsp.server import Server
+from bigfix_relevance_analyzer.lsp.server import SEMANTIC_TOKEN_TYPES, Server
 
 Message = dict[str, Any]
 
@@ -138,7 +138,7 @@ def lint_expected(path: Path) -> list[tuple[str, str, int]]:
 # ---------------------------------------------------------------------------
 
 
-def test_initialize_advertises_full_sync_hover_and_completion_and_names_the_server() -> None:
+def test_initialize_advertises_sync_hover_completion_and_tokens_and_names_the_server() -> None:
     response = initialize(Server())
     assert response["id"] == 1
     assert response["result"]["capabilities"] == {
@@ -147,6 +147,10 @@ def test_initialize_advertises_full_sync_hover_and_completion_and_names_the_serv
         # No trigger characters: a space would fire on every word, and clients
         # already ask as letters are typed and on an explicit request.
         "completionProvider": {"resolveProvider": False},
+        "semanticTokensProvider": {
+            "legend": {"tokenTypes": list(SEMANTIC_TOKEN_TYPES), "tokenModifiers": []},
+            "full": True,
+        },
     }
     assert response["result"]["serverInfo"] == {"name": SOURCE, "version": __version__}
 
@@ -884,6 +888,10 @@ def test_code_actions_are_advertised_only_with_literal_support() -> None:
         "textDocumentSync": {"openClose": True, "change": 1, "save": {"includeText": False}},
         "hoverProvider": True,
         "completionProvider": {"resolveProvider": False},
+        "semanticTokensProvider": {
+            "legend": {"tokenTypes": list(SEMANTIC_TOKEN_TYPES), "tokenModifiers": []},
+            "full": True,
+        },
         "codeActionProvider": {"codeActionKinds": ["quickfix", FIX_ALL]},
     }
     plain = initialize(Server())  # capabilities: {}

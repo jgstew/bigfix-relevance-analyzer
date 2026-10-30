@@ -63,14 +63,26 @@ which also breaks on form feeds and Unicode separators a client does not."""
 _BYTE_LINE_BREAK: Final = re.compile(rb"\r\n|\r|\n")
 
 
+_BMP_LAST: Final = chr(0xFFFF)
+"""The last character UTF-16 holds in one code unit."""
+
+
 def utf16_length(text: str) -> int:
     """``text``'s length in UTF-16 code units: two for an astral character.
 
     Counted rather than encoded on purpose. A WASM host has only the codecs its
     build snapshot saw, and ``str.encode("utf-16-le")`` raised ``LookupError``
     inside a componentize-py component, losing every diagnostic.
+
+    Almost all text has no astral character, and this runs over a line's
+    prefix for every token placed on it, so that case is settled at C speed
+    first: :meth:`str.isascii` reads a flag CPython keeps, and :func:`max` is
+    one pass with no per-character Python call. Counting alone took 18 of the
+    19 seconds semantic tokens spent on a 1 MiB BES file with long lines.
     """
-    return len(text) + sum(1 for char in text if ord(char) > 0xFFFF)
+    if text.isascii() or max(text) <= _BMP_LAST:
+        return len(text)
+    return len(text) + sum(1 for char in text if char > _BMP_LAST)
 
 
 class DocumentIndex:
@@ -78,6 +90,14 @@ class DocumentIndex:
 
     Built once per lint of a document: the line split is shared by every
     finding, and the byte index only built if a BES site asks for it.
+
+    Placing a span costs about the same wherever it is. Semantic tokens place
+    every token of a document, and real BES files put thousands of sites on one
+    line, so anything measured from a line's or a site's start per span went
+    quadratic: 18 s for a 304 KB one-line statement. What that needed is worked
+    out once and kept here instead -- each site text's line starts, and for a
+    line that is not ASCII its UTF-16 columns and byte offsets -- and an ASCII
+    line, almost every line, needs no table at all.
     """
 
     def __init__(self, text: str, data: bytes) -> None:
@@ -95,6 +115,9 @@ class DocumentIndex:
         self._starts.append(position)
         self.lines.append(text[position:])
         self._byte_starts: list[int] | None = None
+        self._site_breaks: dict[str, list[int]] = {}
+        self._columns: dict[int, list[int]] = {}
+        self._byte_columns: dict[int, int | dict[int, int] | None] = {}
 
     def line_length(self, line: int) -> int:
         """Line ``line``'s length in UTF-16 code units; 0 past the end."""
@@ -282,6 +305,16 @@ class DocumentIndex:
         if not 0 <= offset <= len(self.data):
             return None
         line = bisect.bisect_right(starts, offset) - 1
+        columns = self._line_byte_columns(line)
+        if columns is not None:
+            # This line's bytes are its text, so where `offset` is, is arithmetic
+            # or a lookup. Out of range or absent is mid-character or inside the
+            # line break: `None`, as the decode below would find.
+            at = offset - starts[line]
+            if isinstance(columns, int):
+                return (line, at) if at <= columns else None
+            found = columns.get(at)
+            return None if found is None else (line, found)
         try:
             prefix = self.data[starts[line] : offset].decode("utf-8")
         except UnicodeDecodeError:
@@ -290,6 +323,58 @@ class DocumentIndex:
         if line >= len(self.lines) or not self.lines[line].startswith(prefix):
             return None
         return line, utf16_length(prefix)
+
+    def _line_byte_columns(self, line: int) -> int | dict[int, int] | None:
+        """How to place a byte of ``line`` without decoding its prefix, when the
+        line's bytes in :attr:`data` are exactly its text: its length, for an
+        ASCII line (a byte's offset is its column), else the UTF-16 column at
+        each offset that starts a character, and at its end. ``None`` for any
+        other line, which the decoding path then decides. Built once per line.
+        """
+        if line in self._byte_columns:
+            return self._byte_columns[line]
+        table: int | dict[int, int] | None = None
+        if line < len(self.lines):
+            text = self.lines[line]
+            try:
+                encoded: bytes | None = text.encode("utf-8")
+            except UnicodeEncodeError:  # a lone surrogate: never valid UTF-8 bytes
+                encoded = None
+            start = self._line_byte_starts()[line]
+            if encoded is not None and self.data[start : start + len(encoded)] == encoded:
+                if text.isascii():
+                    table = len(encoded)
+                else:
+                    table = {}
+                    at = units = 0
+                    for char in text:
+                        table[at] = units
+                        at += _utf8_length(char)
+                        units += 2 if char > _BMP_LAST else 1
+                    table[at] = units
+        self._byte_columns[line] = table
+        return table
+
+    def _utf16_column(self, line: int, index: int) -> int:
+        """The UTF-16 column of code point ``index`` of ``line``, in constant time."""
+        text = self.lines[line]
+        if text.isascii():
+            return index
+        columns = self._columns.get(line)
+        if columns is None:
+            columns = [0]
+            for char in text:
+                columns.append(columns[-1] + (2 if char > _BMP_LAST else 1))
+            self._columns[line] = columns
+        return columns[index]
+
+    def _breaks(self, text: str) -> list[int]:
+        """Where each ``\n`` of a site's text is, kept per text."""
+        found = self._site_breaks.get(text)
+        if found is None:
+            found = [match.start() for match in re.finditer("\n", text)]
+            self._site_breaks[text] = found
+        return found
 
     def _byte_at(self, line: int, index: int) -> int:
         """The byte offset of code point ``index`` of ``line``, in :attr:`data`."""
@@ -327,8 +412,8 @@ class DocumentIndex:
         if _LINE_BREAK.sub("\n", written) != site.text[start:end]:
             return None
         return (
-            (first[0], utf16_length(self.lines[first[0]][: first[1]])),
-            (last[0], utf16_length(self.lines[last[0]][: last[1]])),
+            (first[0], self._utf16_column(*first)),
+            (last[0], self._utf16_column(*last)),
         )
 
     def _text_offset(self, site: RelevanceSite, line: int, index: int) -> int | None:
@@ -352,8 +437,9 @@ class DocumentIndex:
     def _text_point(self, site: RelevanceSite, offset: int) -> tuple[int, int] | None:
         """``(line, code point index in it)`` of ``site.text[offset]`` in the buffer."""
         assert site.column is not None
-        relative = site.text.count("\n", 0, offset)
-        in_line = offset - (site.text.rfind("\n", 0, offset) + 1)
+        breaks = self._breaks(site.text)
+        relative = bisect.bisect_left(breaks, offset)
+        in_line = offset - (breaks[relative - 1] + 1 if relative else 0)
         line = site.line - 1 + relative
         index = (site.column - 1 if relative == 0 else 0) + in_line
         if not 0 <= line < len(self.lines) or index > len(self.lines[line]):
