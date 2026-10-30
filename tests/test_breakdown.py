@@ -144,6 +144,9 @@ def test_levels_carry_the_span_of_the_source_they_measure() -> None:
             id="mixed-rows-are-read-positionally",
         ),
         pytest.param([], [], id="no-rows"),
+        # Any negative is the sentinel, not only -1.
+        pytest.param(["-5"], [(Outcome.NOT_EVALUABLE, None)], id="any-negative"),
+        pytest.param(["\t4\n"], [(Outcome.COUNT, 4)], id="surrounding-whitespace"),
     ],
 )
 def test_interpret_count_results(
@@ -156,6 +159,12 @@ def test_a_non_integer_row_is_refused_rather_than_coerced() -> None:
     """Silently coercing would report a count the engine never gave."""
     with pytest.raises(ValueError, match="not a count probe result"):
         interpret_count_results(["notepad.exe"])
+
+
+@pytest.mark.parametrize("row", ["", "  ", "1.5", "1 2"], ids=repr)
+def test_rows_that_are_not_one_integer_are_refused(row: str) -> None:
+    with pytest.raises(ValueError, match="not a count probe result"):
+        interpret_count_results(["3", row])
 
 
 def test_unverified_nested_it_on_the_object_side() -> None:

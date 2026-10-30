@@ -211,6 +211,26 @@ is a client-only inspector - real evidence a text classifier can never use.
 `report.dialect_assumed` checks both: false the moment either one, or an
 explicit `dialect` argument, settles on one specific dialect.
 
+To decide which engine to *run* a statement on, use `dialect_fit(text)`. It
+always answers with the dialects worth evaluating in (`fit.dialects`, never
+empty) and why (`fit.basis`), including for text that does not parse, and names
+the references only one side has (`fit.client_only`, `fit.session_only`):
+
+```python
+from bigfix_relevance_analyzer import dialect_fit
+
+dialect_fit("names of bes computers")  # {SESSION}, "resolved"
+dialect_fit("name of operating system")  # {CLIENT}, "type-check"
+dialect_fit("now")  # {CLIENT, SESSION}, "either"
+dialect_fit("names of (bes computers")  # {SESSION}, "classified": no parse
+```
+
+`resolved_dialect` matches references by name only, so it says `BOTH` for
+`name of operating system` (session has `operating system of <bes computer>`);
+`dialect_fit` type-checks under each dialect to settle that, and leaves
+`resolved_dialect` alone. [#141](https://github.com/jgstew/bigfix-relevance-analyzer/issues/141)
+fixes `resolved_dialect` itself.
+
 `report.mermaid` (`nodes.to_mermaid`) renders the same tree as a Mermaid
 `flowchart` instead of an S-expression - a real graph built by walking the
 parsed structure, not a 1:1 rendering of every node. `to_sexpr` already is
@@ -1311,6 +1331,22 @@ ambiguities are properties of the probe design rather than something a caller
 can resolve, so they are named in the API instead of being reported as a
 confident zero.
 
+For one answer per level instead of one per context object,
+`summarize_count_results(rows)` returns a `CountSummary`: the `outcome`, the
+`total` summed over every context, the number of `contexts`, and how many were
+`not_evaluable`. A level is `not-evaluable` only when no context was; otherwise
+it reports the counted total. `outcome` is an `Outcome` value as a string, or
+`CountSummary.NO_CONTEXT` (`"no-context"`) when there were no rows at all - a
+fact about the set of rows that no single row can report, so it is not an
+`Outcome` member.
+
+```python
+from bigfix_relevance_analyzer import summarize_count_results
+
+summarize_count_results(["3", "-1", "4"])
+# CountSummary(outcome='count', total=7, contexts=3, not_evaluable=1)
+```
+
 Levels are found throughout the expression, not only along its outermost `of`
 chain - a chain inside a `whose` filter, an operator's operand, an `if` branch
 or a tuple item is a level too. One inside a filter is measured against the
@@ -1452,6 +1488,13 @@ platform in play and lets the narrowing report the answer.
 `types` distinguishes `None` from the empty set deliberately. `None` means the
 table said nothing, which - as everywhere in this package - is grounds for a
 warning at most, never proof. Empty means every candidate was ruled out.
+
+For display, `value.describe()` spells a value's plurality and types as one
+string - `"singular string"`, `"plural integer | string"`, `"plural (unknown
+type)"`, or `"unknown"` - and `value.client_platforms` is its `platforms` as a
+sorted tuple with the `session:*` environments left out, which is what "runs on"
+means for an endpoint. `client_platforms(report)` does the same from a
+`RelevanceAnalysis`, and is empty when the text did not parse.
 
 ### Platform coverage is reported, not enforced
 

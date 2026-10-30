@@ -89,11 +89,12 @@ from __future__ import annotations
 
 import enum
 import re
+from dataclasses import dataclass
 from typing import TypeGuard
 
 from bigfix_relevance_analyzer.tokenizer import _normalize_phrase
 
-__all__ = ["Dialect", "classify_relevance_dialect", "is_definite"]
+__all__ = ["Dialect", "DialectFit", "classify_relevance_dialect", "dialect_fit", "is_definite"]
 
 
 class Dialect(enum.Enum):
@@ -270,3 +271,103 @@ def classify_relevance_dialect(text: str) -> Dialect | None:
     if client:
         return Dialect.CLIENT
     return None
+
+
+# ---------------------------------------------------------------------------
+# Which dialects to run a statement as
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class DialectFit:
+    """Which dialects a statement can run as: the ones worth evaluating it in.
+
+    :attr:`basis` says how that was decided:
+
+    - ``"resolved"``: every resolved reference belongs to the one dialect
+    - ``"type-check"``: references exist in both, but only one dialect's type
+      check accepts the statement (``name of operating system``: session has
+      ``operating system of <bes computer>``, never a bare ``operating system``)
+    - ``"either"``: both type checks accept it, e.g. ``now``
+    - ``"unclear"``: neither type check accepts it (a typo) and the text gives
+      no hint: client, as for a statement that doesn't parse
+    - ``"mixed"``: it uses references from both dialects (``Dialect.UNCERTAIN``)
+    - ``"classified"``: it doesn't parse or type-check, but the text classifier
+      has a view (``bes <word>`` reads as session)
+    - ``"default"``: it doesn't parse and nothing hints at session: client
+    """
+
+    dialects: frozenset[Dialect]
+    """``CLIENT`` and/or ``SESSION``; never empty."""
+    basis: str
+    client_only: tuple[str, ...] = ()
+    """References only client relevance has."""
+    session_only: tuple[str, ...] = ()
+    """References only session relevance has."""
+
+
+def _type_checks(text: str, dialect: Dialect) -> bool:
+    """Whether ``text`` type-checks cleanly under ``dialect``.
+
+    No diagnostics is not enough on its own: an unknown name is silent, and
+    leaves only an unknown plurality behind (#141's gotchas).
+    """
+    from bigfix_relevance_analyzer.analyzer import analyze
+    from bigfix_relevance_analyzer.typecheck import Plurality
+
+    check = analyze(text, dialect=dialect).check
+    return (
+        check is not None
+        and not check.diagnostics
+        and check.value.plurality is not Plurality.UNKNOWN
+    )
+
+
+def dialect_fit(text: str) -> DialectFit:
+    """Decide which dialects ``text`` can run as, from its references and type checks.
+
+    For a front end choosing whether to evaluate a statement as client
+    relevance, session relevance or both: the answer is never empty, says why
+    (:attr:`DialectFit.basis`), and covers statements that do not parse or
+    type-check by falling back on :func:`classify_relevance_dialect`.
+
+    :attr:`~bigfix_relevance_analyzer.analyzer.RelevanceAnalysis.resolved_dialect`
+    intersects dialects by reference *name*, so it reports ``BOTH`` for some
+    client-only statements; type checking under each dialect settles those.
+    That is a workaround for #141, which fixes ``resolved_dialect`` itself.
+    Once it lands, the ``"type-check"`` branch below rarely triggers and its
+    per-dialect checks can go if ``resolved_dialect`` answers directly; the
+    API and its answers stay. This function never changes ``resolved_dialect``.
+    """
+    # Imported here: `analyzer` builds on this module.
+    from bigfix_relevance_analyzer.analyzer import analyze
+
+    both = frozenset({Dialect.CLIENT, Dialect.SESSION})
+    analysis = analyze(text)
+    client_only = analysis.references_only_in(Dialect.CLIENT)
+    session_only = analysis.references_only_in(Dialect.SESSION)
+
+    def fit(dialects: frozenset[Dialect], basis: str) -> DialectFit:
+        return DialectFit(dialects, basis, client_only, session_only)
+
+    classified = analysis.classified_dialect
+    resolved = analysis.resolved_dialect
+    if is_definite(resolved):
+        return fit(frozenset({resolved}), "resolved")
+    if resolved is Dialect.UNCERTAIN:
+        return fit(both, "mixed")
+    if resolved is Dialect.BOTH:
+        ok = frozenset(d for d in both if _type_checks(text, d))
+        if len(ok) == 1:
+            return fit(ok, "type-check")
+        if ok:
+            return fit(both, "either")
+        if is_definite(classified):
+            return fit(frozenset({classified}), "classified")
+        return fit(frozenset({Dialect.CLIENT}), "unclear")
+    # Unparsed, or nothing resolved: fall back on the text classifier.
+    if is_definite(classified):
+        return fit(frozenset({classified}), "classified")
+    if classified is Dialect.UNCERTAIN:
+        return fit(both, "mixed")
+    return fit(frozenset({Dialect.CLIENT}), "default")

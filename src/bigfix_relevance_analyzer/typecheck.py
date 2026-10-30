@@ -184,6 +184,36 @@ class RelevanceValue:
     def known(self) -> bool:
         return self.types is not None
 
+    @property
+    def client_platforms(self) -> tuple[str, ...]:
+        """The client platforms in :attr:`platforms`, sorted.
+
+        :attr:`platforms` also carries session environments
+        (``"session:rest_api"``, ...), which no endpoint can match; this is the
+        set a front end shows as "runs on". Intersected with the dumps' client
+        platforms rather than filtered on the prefix, so the two definitions
+        of "client platform" cannot drift.
+        """
+        return tuple(sorted(self.platforms & _client_platforms()))
+
+    def describe(self) -> str:
+        """Plurality and types for display.
+
+        ``"singular string"``, ``"plural integer | string"`` (types sorted),
+        ``"plural (unknown type)"`` when the plurality is known but no type is,
+        or ``"unknown"`` when neither is.
+
+        A tuple shows its element types, as the debugger's apps always have:
+        ``(1, "a")`` is ``"singular integer | string"``, not its
+        :attr:`tuple_types` spelling.
+        """
+        plurality = self.plurality.value
+        if not self.types:
+            return (
+                "unknown" if self.plurality is Plurality.UNKNOWN else f"{plurality} (unknown type)"
+            )
+        return f"{plurality} {' | '.join(sorted(self.types))}"
+
 
 @dataclass(frozen=True, slots=True)
 class TypeFix:

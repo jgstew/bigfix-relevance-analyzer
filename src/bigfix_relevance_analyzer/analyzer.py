@@ -64,6 +64,7 @@ __all__ = [
     "ReferenceReport",
     "RelevanceAnalysis",
     "analyze",
+    "client_platforms",
 ]
 
 
@@ -617,3 +618,14 @@ def analyze(
             rule for rule in cost_rules_for(effective) if rule.label in complexity.costly_inspectors
         ),
     )
+
+
+def client_platforms(analysis: RelevanceAnalysis) -> tuple[str, ...]:
+    """The client platforms ``analysis``'s statement can run on, sorted.
+
+    :attr:`~bigfix_relevance_analyzer.typecheck.RelevanceValue.client_platforms`
+    of its type check, for a caller that starts from the analysis: session
+    environments are left out, since no endpoint can match one. Empty when the
+    text did not parse, so there was nothing to check.
+    """
+    return () if analysis.check is None else analysis.check.value.client_platforms

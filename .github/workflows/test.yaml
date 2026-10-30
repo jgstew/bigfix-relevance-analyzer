@@ -74,6 +74,18 @@ jobs:
       - name: uv sync --locked --all-extras
         run: uv sync --locked --all-extras
 
+      # The package is stdlib-only and runs on iOS (verified on Python 3.15.2
+      # and 3.11.6, #213); the debugger's iOS app depends on that. Resolving
+      # the runtime dependencies for iOS and Android, wheels only, fails the
+      # moment one without a mobile wheel is added. Reads [tool.uv]
+      # exclude-newer from pyproject.toml like every other resolve here.
+      - name: runtime dependencies resolve for iOS and Android
+        run: |
+          for plat in arm64-apple-ios aarch64-linux-android; do
+            uv pip compile pyproject.toml --quiet --no-header \
+              --python-version 3.15 --python-platform "$plat" --only-binary :all:
+          done
+
       # flags live in [tool.pytest.ini_options] in pyproject.toml, not here
       - name: pytest
         run: uv run --frozen pytest

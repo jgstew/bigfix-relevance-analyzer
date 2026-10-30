@@ -44,7 +44,7 @@ from __future__ import annotations
 import enum
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, assert_never
+from typing import Any, ClassVar, assert_never
 
 from bigfix_relevance_analyzer._serialize import _span
 from bigfix_relevance_analyzer.binding import resolve_it_bindings
@@ -70,6 +70,7 @@ from bigfix_relevance_analyzer.nodes import (
 )
 
 __all__ = [
+    "CountSummary",
     "Level",
     "Outcome",
     "Probe",
@@ -77,6 +78,7 @@ __all__ = [
     "ProbeOutcome",
     "breakdown_probes",
     "interpret_count_results",
+    "summarize_count_results",
 ]
 
 
@@ -476,3 +478,50 @@ def interpret_count_results(rows: Sequence[str]) -> tuple[ProbeOutcome, ...]:
         else:
             outcomes.append(ProbeOutcome(outcome=Outcome.COUNT, count=value))
     return tuple(outcomes)
+
+
+@dataclass(frozen=True, slots=True)
+class CountSummary:
+    """One count probe's rows reduced to a single answer for the level.
+
+    :attr:`outcome` is a plain string rather than an :class:`Outcome`: it is
+    one of :class:`Outcome`'s values, or :attr:`NO_CONTEXT` when there were no
+    rows at all. That is deliberate. :class:`Outcome` describes one *row*, and
+    no row can say "no context"; it is a fact about the set of rows. Adding it
+    to the enum would put a value :func:`interpret_count_results` never returns
+    in front of every exhaustive match over :attr:`ProbeOutcome.outcome`.
+    """
+
+    NO_CONTEXT: ClassVar[str] = "no-context"
+    """The probe answered nothing at all, because its context produced no
+    objects -- so there was nothing to count against."""
+
+    outcome: str
+    total: int | None
+    """Objects summed over every context; ``None`` when nothing was evaluable."""
+    contexts: int
+    """Rows read: one per context object."""
+    not_evaluable: int
+    """How many of those rows were the not-evaluable sentinel."""
+
+
+def summarize_count_results(rows: Sequence[str]) -> CountSummary:
+    """Aggregate :func:`interpret_count_results` over every context object.
+
+    A level with some contexts not evaluable and others counted reports the
+    counted total; it is ``not-evaluable`` only when no context was. The outcome
+    is ``empty-or-error`` when that total is zero, for the reason that outcome
+    exists.
+    Raises :class:`ValueError` for a row that is not a count, as
+    :func:`interpret_count_results` does.
+    """
+    outcomes = interpret_count_results(rows)
+    contexts = len(outcomes)
+    not_evaluable = sum(o.outcome is Outcome.NOT_EVALUABLE for o in outcomes)
+    if contexts == 0:
+        return CountSummary(CountSummary.NO_CONTEXT, None, 0, 0)
+    if not_evaluable == contexts:
+        return CountSummary(Outcome.NOT_EVALUABLE.value, None, contexts, not_evaluable)
+    total = sum(o.count or 0 for o in outcomes)
+    outcome = Outcome.COUNT if total > 0 else Outcome.EMPTY_OR_ERROR
+    return CountSummary(outcome.value, total, contexts, not_evaluable)
