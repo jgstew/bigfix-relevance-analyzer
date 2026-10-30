@@ -1,0 +1,3163 @@
+{
+  "arithmetic:0:multiplication binds tighter than addition": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 + 2 * 3"
+  },
+  "arithmetic:10:a parenthesized comparison is a legal left side (qna: (1 = 1) = true is True)": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(1 = 2) = 3"
+  },
+  "arithmetic:11:ordering comparisons do not chain either (qna: 1 < 2 < 3 is a parse error)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "1 < 2 < 3"
+  },
+  "arithmetic:12:word-form comparisons do not chain (qna: 1 is 1 is true is a parse error)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "1 is 2 is 3"
+  },
+  "arithmetic:13:a parenthesized word comparison is a legal left side (qna: (1 is 1) is true is True)": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(1 is 2) is 3"
+  },
+  "arithmetic:14:word and symbol comparisons cannot mix either (qna: \"a\" contains \"a\" = true is a parse error)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "\"a\" contains \"b\" = true"
+  },
+  "arithmetic:15:and binds tighter than or": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "1 and 2 or 3"
+  },
+  "arithmetic:16:or is looser on both sides": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "1 or 2 and 3"
+  },
+  "arithmetic:17:boolean operators are case-insensitive and keep folded spelling": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "1 AND 2"
+  },
+  "arithmetic:18:comparison binds tighter than and": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 = 2 and 3 = 4"
+  },
+  "arithmetic:19:a comparison does not nest inside not (qna: not 1 = 1 demands a boolean of the bare 1)": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "not 1 = 2"
+  },
+  "arithmetic:1:parens override precedence": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "(1 + 2) * 3"
+  },
+  "arithmetic:20:not does not swallow an and": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "not 1 and 2"
+  },
+  "arithmetic:21:not nests": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "not not 1"
+  },
+  "arithmetic:22:unary minus binds only its operand": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "- 1 + 2"
+  },
+  "arithmetic:23:unary minus on the right of a binary minus": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 - - 2"
+  },
+  "arithmetic:24:a trailing operator is an error at end of input": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "1 +"
+  },
+  "arithmetic:25:a doubled operator is an error at the second operator": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "1 + * 2"
+  },
+  "arithmetic:2:addition is left-associative": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 - 2 - 3"
+  },
+  "arithmetic:3:division and mod sit with multiplication": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "4 / 2 mod 3"
+  },
+  "arithmetic:4:concatenation sits with multiplication, tighter than addition": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "1 & 2 + 3"
+  },
+  "arithmetic:5:concatenation is left-associative": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "\"a\" & \"b\" & \"c\""
+  },
+  "arithmetic:6:comparison is looser than concatenation": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "\"a\" & \"b\" = \"ab\""
+  },
+  "arithmetic:7:each comparison spelling is preserved": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 != 2"
+  },
+  "arithmetic:8:two-character comparisons lex and parse whole": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 <= 2"
+  },
+  "arithmetic:9:comparisons do not chain (qna: 1 = 1 = true is a parse error)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "1 = 2 = 3"
+  },
+  "casts:0:a cast names its target type": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "it as string"
+  },
+  "casts:1:casts chain leftward": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "it as string as lowercase"
+  },
+  "casts:2:a cast target may be a multi-word type name": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "it as trimmed string"
+  },
+  "casts:3:a cast binds tighter than comparison": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "it as string = \"x\""
+  },
+  "casts:4:a cast applies to a whole of chain": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "name of it as lowercase"
+  },
+  "casts:5:parens keep a cast inside an of chain": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(it as string) of x"
+  },
+  "casts:6:a literal casts like anything else": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "\"1.2\" as version"
+  },
+  "casts:7:a cast target must be a name": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "it as 5"
+  },
+  "casts:8:a cast target cannot be an operator's first word (qna: 5 as starts / ends / does is a parse error, all targets)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "x as starts"
+  },
+  "casts:9:a cast target may be the singular of a colliding name (qna: 5 as start says operator start is not defined)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "x as start"
+  },
+  "client_relevance/analyses/analysis_relevance_complex_property.bes#0@L6": {
+    "basis": "resolved",
+    "client_only": [
+      "smbios"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists smbios"
+  },
+  "client_relevance/analyses/analysis_relevance_complex_property.bes#1@L14": {
+    "basis": "resolved",
+    "client_only": [
+      "smbios",
+      "structures"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "unique values of ( ( item 0 of it & name of item 1 of it as trimmed string & \"=\" & ( (item 1 of it as string as trimmed string) | (item 1 of it as hexadecimal) | \"ErrorUnknownValue\" ) ) | \"ErrorUnknownName\") of (name of it & \": \", values of it) of structures of smbios"
+  },
+  "client_relevance/analyses/analysis_relevance_simple_property.bes#0@L6": {
+    "basis": "resolved",
+    "client_only": [
+      "files"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists files \"/etc/ssh/sshd_config\""
+  },
+  "client_relevance/analyses/analysis_relevance_simple_property.bes#1@L14": {
+    "basis": "resolved",
+    "client_only": [
+      "files",
+      "lines"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "lines whose(it does not start with \"#\" AND it as trimmed string != \"\") of files \"/etc/ssh/sshd_config\""
+  },
+  "client_relevance/baselines/baseline_relevance_with_components.bes#0@L6": {
+    "basis": "resolved",
+    "client_only": [
+      "unix"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "unix of operating system"
+  },
+  "client_relevance/baselines/baseline_relevance_with_components.bes#1@L7": {
+    "basis": "resolved",
+    "client_only": [
+      "folders"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists folders of folders \"/var/lib/docker/containers\""
+  },
+  "client_relevance/baselines/baseline_relevance_with_components.bes#2@L8": {
+    "basis": "resolved",
+    "client_only": [
+      "currently installed",
+      "debianpackages",
+      "packages",
+      "rpms"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists (packages \"docker-ce\" of it; packages \"docker\" of it; packages \"docker-engine\" of it; packages \"docker.io\" of it) whose(if exists properties whose(it as string contains \"currently installed of \") then (currently installed of it) else TRUE) of (if exists properties whose(it as string contains \"debianpackage:\") then debianpackages else if exists properties whose(it as string contains \"rpm:\") then rpms else ERROR \"The operators are not defined.\")"
+  },
+  "client_relevance/baselines/baseline_relevance_with_components.bes#3@L25": {
+    "basis": "resolved",
+    "client_only": [
+      "files",
+      "folders"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "number of (it as boolean) whose(it) of values of keys \"Running\" of values of keys \"State\" of jsons of files \"config.v2.json\" of folders of folders \"/var/lib/docker/containers\" | 0"
+  },
+  "client_relevance/baselines/baseline_relevance_with_components.bes#4@L29": {
+    "basis": "resolved",
+    "client_only": [
+      "files",
+      "folders"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(it as integer - (number of (it as boolean) whose(it) of values of keys \"Running\" of values of keys \"State\" of jsons of files \"config.v2.json\" of folders of folders \"/var/lib/docker/containers\" | 0) ) of (parameter \"NumRunning\")"
+  },
+  "client_relevance/baselines/baseline_relevance_with_components.bes#5@L34": {
+    "basis": "resolved",
+    "client_only": [
+      "currently installed",
+      "debianpackages",
+      "packages",
+      "rpms",
+      "unix"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(unix of operating system) AND (exists (packages \"docker-ce\" of it; packages \"docker\" of it; packages \"docker-engine\" of it; packages \"docker.io\" of it) whose(if exists properties whose(it as string contains \"currently installed of \") then (currently installed of it) else TRUE) of (if exists properties whose(it as string contains \"debianpackage:\") then debianpackages else if exists properties whose(it as string contains \"rpm:\") then rpms else ERROR \"The operators are not defined.\"))"
+  },
+  "client_relevance/baselines/baseline_relevance_with_components.bes#6@L40": {
+    "basis": "resolved",
+    "client_only": [
+      "folders"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "number of folders of folders \"/var/lib/docker/containers\" | 0"
+  },
+  "client_relevance/baselines/baseline_relevance_with_components.bes#7@L45": {
+    "basis": "resolved",
+    "client_only": [
+      "folders"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(it as integer - ( number of folders of folders \"/var/lib/docker/containers\" | 0 ) ) of (parameter \"NumContainers\")"
+  },
+  "client_relevance/baselines/baseline_relevance_with_components.bes#8@L50": {
+    "basis": "resolved",
+    "client_only": [
+      "currently installed",
+      "debianpackages",
+      "folders",
+      "packages",
+      "rpms",
+      "unix"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "((unix of operating system) AND (exists (packages \"docker-ce\" of it; packages \"docker\" of it; packages \"docker-engine\" of it; packages \"docker.io\" of it) whose(if exists properties whose(it as string contains \"currently installed of \") then (currently installed of it) else TRUE) of (if exists properties whose(it as string contains \"debianpackage:\") then debianpackages else if exists properties whose(it as string contains \"rpm:\") then rpms else ERROR \"The operators are not defined.\"))) AND (exists folders of folders \"/var/lib/docker/containers\")"
+  },
+  "client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html#0@L27": {
+    "basis": "resolved",
+    "client_only": [
+      "headers"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "number of relevant fixlets whose(exists values whose(\"Important\" = it OR \"Critical\" = it) of headers \"X-Fixlet-Source-Severity\" of it AND not exists values whose(it contains \" (Superseded)\") of headers \"Subject\" of it) of sites whose(\"Fixlet Site\" = type of it AND exists names whose(it starts with \"Updates for \" OR it starts with \"Patches for\" OR it = \"Enterprise Security\") of it) | 0"
+  },
+  "client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html#1@L28": {
+    "basis": "resolved",
+    "client_only": [
+      "headers"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "uls of html concatenations of lis of values of headers \"Subject\" of relevant fixlets whose(exists values whose(\"Important\" = it OR \"Critical\" = it) of headers \"X-Fixlet-Source-Severity\" of it AND not exists values whose(it contains \" (Superseded)\") of headers \"Subject\" of it) of sites whose(\"Fixlet Site\" = type of it AND exists names whose(it starts with \"Updates for \" OR it starts with \"Patches for\" OR it = \"Enterprise Security\") of it)"
+  },
+  "client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html#2@L31": {
+    "basis": "resolved",
+    "client_only": [
+      "headers",
+      "relevant offer actions"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "html tags \"details\" of html concatenations of ( ( html tags \"summary\" of concatenations of ( \"There \" ; (if item 0 of it = 1 then \"is\" else \"are\") ; \" \" ; item 0 of it as string ; \" \" ; item 1 of it ; (if item 0 of it = 1 then \"\" else \"s\") ; \" available.\" ) ) ; ( uls of html concatenations of lis of elements of item 2 of it ) ) of (number of elements of it, \"offer\", it) of sets of values of headers \"Subject\" of relevant offer actions of sites"
+  },
+  "client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html#3@L67": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "now as universal string"
+  },
+  "client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html#4@L68": {
+    "basis": "resolved",
+    "client_only": [
+      "drives",
+      "free space",
+      "system folders"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "free space of drives of system folders | 0"
+  },
+  "client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html#5@L69": {
+    "basis": "resolved",
+    "client_only": [
+      "drives",
+      "system folders",
+      "total space"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "total space of drives of system folders | 0"
+  },
+  "client_relevance/clientui/clientui_dashboard_no_product_meta.html#0@L11": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "ps of bs of (it as string) of now"
+  },
+  "client_relevance/computer_groups/computer_group_automatic_relevance.bes#0@L8": {
+    "basis": "resolved",
+    "client_only": [
+      "smbioses",
+      "structures"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists ( (it as string) of values \"manufacturer\" of it, (it as string) of values \"version\" of it ) whose(item 0 of it starts with \"Xen\" AND item 1 of it as lowercase contains \"amazon\") of structures \"system_information\" of smbioses"
+  },
+  "client_relevance/computer_groups/computer_group_manual_relevance.bes#0@L8": {
+    "basis": "resolved",
+    "client_only": [
+      "currently installed",
+      "debianpackages",
+      "packages",
+      "rpms",
+      "unix"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(unix of operating system) AND ( exists (packages \"docker-ce\" of it; packages \"docker\" of it; packages \"docker-engine\" of it; packages \"docker.io\" of it) whose(if exists properties whose(it as string contains \"currently installed of \") then (currently installed of it) else TRUE) of (if exists properties whose(it as string contains \"debianpackage:\") then debianpackages else if exists properties whose(it as string contains \"rpm:\") then rpms else ERROR \"The operators are not defined.\") )"
+  },
+  "client_relevance/fixlets/fixlet_multi_clause_relevance.bes#0@L6": {
+    "basis": "resolved",
+    "client_only": [
+      "windows"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "windows of operating system"
+  },
+  "client_relevance/fixlets/fixlet_multi_clause_relevance.bes#1@L7": {
+    "basis": "resolved",
+    "client_only": [
+      "files"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "not exists files \"C:\\Windows\\Temp\\EventLogBackupSecurity.evt\""
+  },
+  "client_relevance/fixlets/fixlet_registry_and_active_directory_relevance.bes#0@L6": {
+    "basis": "resolved",
+    "client_only": [
+      "windows"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "windows of operating system"
+  },
+  "client_relevance/fixlets/fixlet_registry_and_active_directory_relevance.bes#1@L7": {
+    "basis": "resolved",
+    "client_only": [
+      "dns domainnames",
+      "local computers"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists dns domainnames of local computers of active directories"
+  },
+  "client_relevance/fixlets/fixlet_registry_and_active_directory_relevance.bes#2@L8": {
+    "basis": "resolved",
+    "client_only": [
+      "registries"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists (it as trimmed string) whose(it != \"\") of substrings separated by \",\" of (it as string as lowercase) of values \"SearchList\" of keys \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\" of registries"
+  },
+  "client_relevance/fixlets/fixlet_registry_and_active_directory_relevance.bes#3@L9": {
+    "basis": "resolved",
+    "client_only": [
+      "dns domainnames",
+      "local computers",
+      "registries"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "not exists (it as trimmed string) whose(it contains unique value of dns domainnames of local computers of active directories) of substrings separated by \",\" of (it as string as lowercase) of values \"SearchList\" of keys \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\" of registries"
+  },
+  "client_relevance/fixlets/fixlet_registry_and_active_directory_relevance.bes#4@L31": {
+    "basis": "resolved",
+    "client_only": [
+      "dns domainnames",
+      "local computers",
+      "registries"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "concatenations \",\" of (it as trimmed string) of ( (unique values of dns domainnames of local computers of active directories) ; it ) of (it as string as trimmed string) of values \"SearchList\" of keys \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\" of registries"
+  },
+  "client_relevance/markdown_codeblocks/client_relevance_markdown_codeblock.md#0@L6": {
+    "basis": "resolved",
+    "client_only": [
+      "dictionaries",
+      "iokit registries",
+      "service planes"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "unique values of strings \"product-name\" of dictionaries of service planes of iokit registries"
+  },
+  "client_relevance/plain_text/client_relevance_plain_text.rel#0@L1": {
+    "basis": "resolved",
+    "client_only": [
+      "files",
+      "windows"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "windows of operating system AND not exists files \"C:\\Windows\\Temp\\EventLogBackupSecurity.evt\""
+  },
+  "client_relevance/properties/global_property_alert_hard_drive_free_space.bes#0@L3": {
+    "basis": "resolved",
+    "client_only": [
+      "drives",
+      "free space",
+      "total space"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists ((free space of it)*100/(total space of it)) whose(it <= 10) of drives whose(exists name of it AND exists free space of it AND exists type of it AND exists total space of it AND type of it = \"DRIVE_FIXED\" AND total space of it != 0 AND total space of it > 1024*1024*1024)"
+  },
+  "client_relevance/properties/global_property_serial_number_universal.bes#0@L3": {
+    "basis": "resolved",
+    "client_only": [
+      "dictionaries",
+      "dmis",
+      "hardwares",
+      "iokit registries",
+      "serial_numbers",
+      "serials",
+      "service planes",
+      "smbioses",
+      "structures",
+      "system_informations"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "unique values of ( ( if ( exists (it as string) whose(it contains \"<dmi>\") of properties ) then ( (it as string) of serial_numbers of system_informations of dmis) else NOTHINGS ) ; ( if ( exists (it as string) whose(it contains \"<smbios>\") of properties ) then ( (it as string) of values \"serial_number\" of structures \"system_information\" of smbioses) else NOTHINGS ) ; ( if ( exists (it as string) whose(it contains \"<hardware>\") of properties ) then ( (it as string) of serials of hardwares ) else NOTHINGS ) ; ( if ( exists (it as string) whose(it contains \"<iokit registry>\") of properties ) then ( (it as string as trimmed string) of strings \"IOPlatformSerialNumber\" of dictionaries of service planes of iokit registries ) else NOTHINGS ) )"
+  },
+  "client_relevance/tasks/task_power_management_sleep_when_idle.bes#0@L7": {
+    "basis": "resolved",
+    "client_only": [
+      "in proxy agent context"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "/* PowerManagement not applicable to Proxy agents */ if exists property \"in proxy agent context\" then ( not in proxy agent context ) else true"
+  },
+  "client_relevance/tasks/task_power_management_sleep_when_idle.bes#1@L8": {
+    "basis": "resolved",
+    "client_only": [
+      "unix"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "/* script for sleep NOT IMPLEMENTED for unix/linux */ not unix of operating system"
+  },
+  "client_relevance/tasks/task_power_management_sleep_when_idle.bes#2@L9": {
+    "basis": "resolved",
+    "client_only": [
+      "clients",
+      "settings"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "/* PowerManagement not applicable to LastManStanding machines */ not exists values whose(1 = it as integer) of settings \"PowerManagement_LastManStanding\" of clients"
+  },
+  "client_relevance/tasks/task_power_management_sleep_when_idle.bes#3@L10": {
+    "basis": "resolved",
+    "client_only": [
+      "clients",
+      "settings"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "/* PowerManagement not applicable to machines that consume 0 watts, which is assumed if any metric is 0 then all should be 0, which may not always be correct. */ not exists values whose(it as integer = 0) of settings whose(name of it starts with \"PowerManagement_\" AND name of it ends with \"Watts\") of clients"
+  },
+  "client_relevance/tasks/task_power_management_sleep_when_idle.bes#4@L11": {
+    "basis": "resolved",
+    "client_only": [
+      "client",
+      "in proxy agent context",
+      "platform id",
+      "smbios",
+      "structure",
+      "windows"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "/* PowerManagement not applicable to VirtualMachines */ not exists it whose(\"Virtual\" = it) of ( if ((version of client < \"8.0\") or (if (windows of operating system) then (platform id of operating system = 3) else false) or (if (version of client >= \"8.2.1078.0\") then in proxy agent context else false)) then \"N/A\" else (if exists true whose (if true then( (((item 0 of it contains \"VMware\") or ((item 0 of it contains \"Microsoft\") and not (item 1 of it as lowercase contains \"surface\")) or (item 0 of it contains \"Xen\")) of ((value \"manufacturer\" of it as string, value \"product_name\" of it as string) of structure \"system_information\" of smbios))) else false) then \"Virtual\" else \"Physical\") )"
+  },
+  "client_relevance/tasks/task_power_management_sleep_when_idle.bes#5@L12": {
+    "basis": "resolved",
+    "client_only": [
+      "active device",
+      "class",
+      "client",
+      "dictionaries",
+      "entries",
+      "iokit registry",
+      "node",
+      "nodes",
+      "nt workstation product type",
+      "product type",
+      "registry",
+      "service key value name",
+      "service plane",
+      "setting",
+      "settings"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "/* PowerManagement not applicable to Servers */ not exists it whose(\"Server\" = it) of ( if (exists true whose(if true then exists device type else false ))then device type else(if (exists value of settings \"_BESClient_DeviceTypeOverride\" of client)then (value of setting \"_BESClient_DeviceTypeOverride\" of client)else(if(it starts with \"Mac OS X\")then(if(it contains \"Server\")then \"Server\" else (if(((exists key whose(it as string as lowercase contains \"battery\") of entries of dictionaries of nodes of it) OR (exists node \"AppleACPIPlatformExpert/SMB0/AppleECSMBusController/AppleSmartBatteryManager\" of service plane of iokit registry)of it)of service plane of iokit registry)then \"Laptop\" else \"Desktop\"))else(if (it starts with \"Win\")then (if (it as lowercase contains \"mobile\")then \"Mobile\" else(if (exists key \"HKEY_LOCAL_MACHINE\\HARDWARE\\Description\\System\\BIOS\" whose (value \"SystemManufacturer\" of it as string as lowercase contains \"vmware\") of registry)then \"Server\" else(if (nt workstation product type != product type of operating system)then \"Server\" else(if (exists active device whose (class of it as lowercase = \"battery\" AND service key value name of it as lowercase = \"cmbatt\" AND (description of it as lowercase contains \"microsoft acpi\" OR description of it as lowercase contains \"acpi microsoft\")))then \"Laptop\" else \"Desktop\"))))else(if (it contains \"Linux\" OR it contains \"AIX\" OR it contains \"Sun\" OR it contains \"HP-UX\" OR it contains \"VMware\") then (\"Server\") else(if((it contains \"ios\" OR it contains \"android\" OR it contains \"ipad\" OR it contains \"iphone\" OR it contains \"ipod\" OR it contains \"smartphone\" OR it contains \"msft-\" OR it contains \"nokia\" OR it contains \"palm\" OR it contains \"pocketpc\" OR it contains \"htc\")of(it as lowercase)) then \"Mobile\" else \"Unknown\")))))of name of operating system )"
+  },
+  "client_relevance/tasks/task_power_management_sleep_when_idle.bes#6@L13": {
+    "basis": "resolved",
+    "client_only": [
+      "current system intervals",
+      "idle state",
+      "power histories"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "/* System idle for more than 8 hours */ exists (now - it) whose(it > 8 * hour) of starts of ranges of current system intervals whose(idle state = state of it) of power histories"
+  },
+  "client_relevance/tasks/task_power_management_sleep_when_idle.bes#7@L33": {
+    "basis": "resolved",
+    "client_only": [
+      "windows"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "windows of operating system"
+  },
+  "client_relevance/tasks/task_power_management_sleep_when_idle.bes#8@L39": {
+    "basis": "resolved",
+    "client_only": [
+      "mac"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "mac of operating system"
+  },
+  "client_relevance/tasks/task_power_management_sleep_when_idle.bes#9@L45": {
+    "basis": "resolved",
+    "client_only": [
+      "unix"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "unix of operating system"
+  },
+  "client_relevance/tasks/task_time_based_relevance.bes#0@L6": {
+    "basis": "resolved",
+    "client_only": [
+      "unix"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "unix of operating system"
+  },
+  "client_relevance/tasks/task_time_based_relevance.bes#1@L7": {
+    "basis": "resolved",
+    "client_only": [
+      "client",
+      "data folders",
+      "files",
+      "folders"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "not exists files whose(name of it as lowercase starts with \"disk_usage\" AND name of it as lowercase ends with \".log\" AND (now - modification time of it) < 1*hour ) of folders \"Logs\" of folders \"__Global\" of data folders of client"
+  },
+  "client_relevance/tasks/task_time_based_relevance.bes#2@L28": {
+    "basis": "resolved",
+    "client_only": [
+      "client",
+      "data folders",
+      "folders",
+      "pathname",
+      "windows"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(concatenations (if windows of operating system then \"^ \" else \"\\ \") of substrings separated by \" \" of it) of pathname of folders \"Logs\" of folders \"__Global\" of data folders of client"
+  },
+  "client_relevance/tasks/task_time_based_relevance.bes#3@L28": {
+    "basis": "resolved",
+    "client_only": [
+      "windows"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "if windows of operating system then \"\\\" else \"/\""
+  },
+  "conditionals:0:if then else is an expression": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "if 1 then 2 else 3"
+  },
+  "conditionals:1:the condition may hold boolean structure": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "if 1 and 2 then 3 else 4"
+  },
+  "conditionals:2:the then branch runs to the else": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "if 1 then 2 + 3 else 4"
+  },
+  "conditionals:3:the else branch is greedy to the right": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "if 1 then 2 else 3 + 4"
+  },
+  "conditionals:4:else if chains by nesting": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "if w then \"x\" else if b then \"p\" else \"q\""
+  },
+  "conditionals:5:a parenthesized conditional is an of operand": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "w of (if 1 then b else c)"
+  },
+  "conditionals:6:a conditional inside a whose predicate": {
+    "basis": "resolved",
+    "client_only": [
+      "files"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "files whose(if exists w then b else true)"
+  },
+  "conditionals:7:a conditional missing its else is an error": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "if 1 then 2"
+  },
+  "conditionals:8:a conditional missing its then is an error": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "if 1 else 2"
+  },
+  "error_fallback:0:the fallback binds tighter than = (qna: 0 = exit code of action | 999 is False, not 999)": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "0 = exit code of action | 999"
+  },
+  "error_fallback:10:a bare product cannot meet | (qna: parse error)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "2 * 3 | 5"
+  },
+  "error_fallback:11:division cannot meet | either (qna: parse error)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "2 / 4 | 5"
+  },
+  "error_fallback:12:mod cannot meet | either (qna: parse error)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "10 mod 1 | 3"
+  },
+  "error_fallback:13:concatenation cannot meet | either (qna: parse error)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "\"a\" & \"b\" | \"c\""
+  },
+  "error_fallback:14:the refusal holds inside a sum (qna: 2 + 2 * 3 | 5 is a parse error)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "2 + 2 * 3 | 5"
+  },
+  "error_fallback:15:exists does not absorb a fallback (qna: exists erroring | false is False, so the exists errored alone)": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists exit code of action | false"
+  },
+  "error_fallback:16:exists binds tighter than * (qna: exists 1 * 2 says operator times is not defined)": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists 1 * 2"
+  },
+  "error_fallback:17:a cast still nests inside exists (qna: exists 5 as string contains \"T\" says contains is not defined)": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "exists 5 as string"
+  },
+  "error_fallback:18:not binds tighter than = (qna: not 1 = 1 demands a boolean of the bare 1)": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "not 1 = 1"
+  },
+  "error_fallback:19:not does not absorb a fallback (qna: not (erroring = 0) | true is True)": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "not (exit code of action = 0) | true"
+  },
+  "error_fallback:1:the fallback binds tighter than = on the left too (qna: 1 | 0 = 0 is False)": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 | 0 = 0"
+  },
+  "error_fallback:20:a cast still nests inside not (qna: not 5 as boolean fails on the cast, not on not 5)": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "not 5 as boolean"
+  },
+  "error_fallback:21:unary minus binds tighter than the fallback (qna: - erroring | 5 is 5)": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "- exit code of action | 5"
+  },
+  "error_fallback:2:the fallback binds tighter than * on the left (qna: 1 | 2 * 3 is 3)": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 | 2 * 3"
+  },
+  "error_fallback:3:the fallback binds tighter than + on the left (qna: 1 | 2 + 3 is 4)": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 | 2 + 3"
+  },
+  "error_fallback:4:the fallback binds tighter than + on the right (qna: 2 + erroring | 5 is 7)": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "2 + 3 | 5"
+  },
+  "error_fallback:5:the fallback nests as the first factor of a product (qna: 2 + 3 | 5 * 2 is 8)": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "2 + 3 | 5 * 2"
+  },
+  "error_fallback:6:a trailing + applies to the fallback's result (qna: erroring | 999 + 1 is 1000)": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exit code of action | 999 + 1"
+  },
+  "error_fallback:7:the fallback binds tighter than or (qna: 1 or 2 | 3 demands a boolean, so 2 | 3 nested)": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "1 or 2 | 3"
+  },
+  "error_fallback:8:fallbacks chain (qna: 1 | 2 | 3 is 1)": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 | 2 | 3"
+  },
+  "error_fallback:9:a parenthesized product is a legal fallback left side (qna: (2 * 3) | 5 is 6)": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "(2 * 3) | 5"
+  },
+  "literals:0:an integer literal": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "42"
+  },
+  "literals:10:an unterminated string is an error at the quote": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(\"abc"
+  },
+  "literals:11:empty parens are an error at the closing paren": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "()"
+  },
+  "literals:12:an unclosed paren is an error at end of input": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(1"
+  },
+  "literals:13:trailing input after a complete expression": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "1 2"
+  },
+  "literals:1:a decimal point is not valid outside a string -- confirmed live, both engines": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "1.5"
+  },
+  "literals:2:a string literal, quotes stripped in the s-expression only": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "\"abc\""
+  },
+  "literals:3:percent escapes stay verbatim": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "\"a%22b\""
+  },
+  "literals:4:a string may span lines": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "\"a\nb\""
+  },
+  "literals:5:it is a distinguished operand": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "it"
+  },
+  "literals:6:it is case-insensitive": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "IT"
+  },
+  "literals:7:parens group without a node": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "(42)"
+  },
+  "literals:8:nested parens still group without a node": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "((42))"
+  },
+  "literals:9:a comment is trivia around an expression": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "/* pre */ 42 /* post */"
+  },
+  "mixed_context/task_with_client_and_session_relevance.bes#0@L7": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "current fixlets"
+    ],
+    "text": "names of current fixlets"
+  },
+  "mixed_context/task_with_client_and_session_relevance.bes#1@L9": {
+    "basis": "resolved",
+    "client_only": [
+      "in proxy agent context"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "NOT in proxy agent context"
+  },
+  "name_operator_collisions:0:a plural inspector name that is also an operator's first word": {
+    "basis": "resolved",
+    "client_only": [
+      "current system intervals",
+      "power histories"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "starts of ranges of current system intervals of power histories"
+  },
+  "name_operator_collisions:10:`ends with` wins even when the phrase itself ends in `ends`": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "date range ends"
+    ],
+    "text": "date range ends ends with \"z\""
+  },
+  "name_operator_collisions:11:the operator wins on both sides at once": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "starts of it starts with starts of it"
+  },
+  "name_operator_collisions:12:`does not start with` still matches in full over a colliding name": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "starts of it does not start with \"a\""
+  },
+  "name_operator_collisions:13:a cast target still stops at a real operator": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "x as string starts with \"a\""
+  },
+  "name_operator_collisions:14:a partial `does not ...` is an error at does, which cannot end a name before not": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "x does not start of it"
+  },
+  "name_operator_collisions:15:a dangling operator word after a non-reference operand is still an error": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "it ends \"a\""
+  },
+  "name_operator_collisions:16:a dangling operator word after a parenthesized operand is still an error": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(x) ends \"a\""
+  },
+  "name_operator_collisions:17:a dangling does not is an error at does (qna: \"a\" does not is a -- the engine skips it, refused as unclear)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "\"a\" does not"
+  },
+  "name_operator_collisions:18:a dangling bare does is an error too (qna: \"a\" does is a)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "\"a\" does"
+  },
+  "name_operator_collisions:19:a dangling does not before a comparison is an error (qna: \"a\" does not = \"a\" is True, the negation silently lost)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "\"a\" does not = \"a\""
+  },
+  "name_operator_collisions:1:a multi-word name ending in `starts`": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "bes actions",
+      "date range starts"
+    ],
+    "text": "date range starts of bes actions"
+  },
+  "name_operator_collisions:20:a dangling does not before a closing paren is an error at does (qna: (1 does not) = 1 is True)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(1 does not) = 1"
+  },
+  "name_operator_collisions:21:a dangling does not after a name stops the name at does (qna: name of operating system does not is the name)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "name of operating system does not"
+  },
+  "name_operator_collisions:22:a near-miss verb after does not is an error at does (qna: \"ab\" does not contains \"b\" -- operator \"does\" is not defined)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "\"ab\" does not contains \"b\""
+  },
+  "name_operator_collisions:2:a multi-word name ending in `ends`": {
+    "basis": "resolved",
+    "client_only": [
+      "stop on idle ends"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "stop on idle ends of task settings"
+  },
+  "name_operator_collisions:3:a colliding name is an ordinary comparison operand": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "bes actions",
+      "date range starts"
+    ],
+    "text": "date range starts of bes actions is greater than now"
+  },
+  "name_operator_collisions:4:exists takes a colliding name as its operand": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [],
+    "text": "exists starts of ranges"
+  },
+  "name_operator_collisions:5:not exists takes a colliding name as its operand": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "not exists starts of it"
+  },
+  "name_operator_collisions:6:aggregation over a colliding name": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "number of starts of it"
+  },
+  "name_operator_collisions:7:a colliding name filters like any other collection": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists starts whose (it > now)"
+  },
+  "name_operator_collisions:8:the real-world clause this fix was written for": {
+    "basis": "resolved",
+    "client_only": [
+      "current system intervals",
+      "idle state",
+      "power histories"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists (now - it) whose(it > 8 * hour) of starts of ranges of current system intervals whose(idle state = state of it) of power histories"
+  },
+  "name_operator_collisions:9:`starts with` wins when the name could have absorbed `starts`": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "starts starts with \"a\""
+  },
+  "of_whose:0:a bare word is a reference": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "computer"
+  },
+  "of_whose:10:a phrase stops at a word operator": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "w b and c"
+  },
+  "of_whose:11:whose filters the collection before it": {
+    "basis": "resolved",
+    "client_only": [
+      "files"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "files whose (name of it = \"x\")"
+  },
+  "of_whose:12:whose needs no space before its paren": {
+    "basis": "resolved",
+    "client_only": [
+      "files"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "files whose(name of it = \"x\")"
+  },
+  "of_whose:13:whose binds tighter than of on the left": {
+    "basis": "resolved",
+    "client_only": [
+      "files",
+      "folder"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "files whose (name of it = \"a\") of folder \"/tmp\""
+  },
+  "of_whose:14:whose binds tighter than of on the right": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "w of b whose (it = 1)"
+  },
+  "of_whose:15:exists takes a reference": {
+    "basis": "resolved",
+    "client_only": [
+      "files"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists files"
+  },
+  "of_whose:16:exist is the singular spelling of exists": {
+    "basis": "resolved",
+    "client_only": [
+      "files"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exist files"
+  },
+  "of_whose:17:not exists is one negated quantifier": {
+    "basis": "resolved",
+    "client_only": [
+      "files"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "not exists files"
+  },
+  "of_whose:18:exists swallows the whole of chain": {
+    "basis": "resolved",
+    "client_only": [
+      "file",
+      "folder"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists file \"x\" of folder \"y\""
+  },
+  "of_whose:19:exists swallows a whose filter": {
+    "basis": "resolved",
+    "client_only": [
+      "files"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists files whose (name of it = \"x\")"
+  },
+  "of_whose:1:adjacent words are one multi-word reference": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "operating system"
+  },
+  "of_whose:20:exists does not swallow a boolean operator": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists w and exists b"
+  },
+  "of_whose:21:exists does not swallow a comparison": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists w = 2"
+  },
+  "of_whose:22:exists accepts a parenthesized operand": {
+    "basis": "resolved",
+    "client_only": [
+      "files",
+      "folder"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists (files of folder \"/tmp\")"
+  },
+  "of_whose:23:the realistic statement from the tokenizer tests": {
+    "basis": "resolved",
+    "client_only": [
+      "files",
+      "folder"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists files whose (name of it = \"bes\") of folder \"/tmp\""
+  },
+  "of_whose:24:a structural word cannot start a reference": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "1 + of"
+  },
+  "of_whose:25:whose without its parenthesized predicate is an error": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "files whose name"
+  },
+  "of_whose:26:it can be the argument of a name": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "html it"
+  },
+  "of_whose:27:an it argument inside a group, from the dashboard examples": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(html it) of x"
+  },
+  "of_whose:28:`number of` is aggregation, the sibling of `exists`": {
+    "basis": "resolved",
+    "client_only": [
+      "files",
+      "folder"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "number of files of folder \"c:\\windows\""
+  },
+  "of_whose:29:aggregation over a filtered collection": {
+    "basis": "resolved",
+    "client_only": [
+      "files"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "number of files whose (size of it > 1000)"
+  },
+  "of_whose:2:a reference phrase is case-folded and space-normalized": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "OPERATING    System"
+  },
+  "of_whose:30:an indexed `number` is not aggregation": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "number \"x\" of y"
+  },
+  "of_whose:3:of joins a property to its object": {
+    "basis": "resolved",
+    "client_only": [
+      "windows"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "windows of operating system"
+  },
+  "of_whose:4:of is right-associative": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "w of b of c"
+  },
+  "of_whose:5:a string index binds to the name before any of": {
+    "basis": "resolved",
+    "client_only": [
+      "registry"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "key \"foo\" of registry"
+  },
+  "of_whose:6:a number index binds the same way": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "item 0 of it"
+  },
+  "of_whose:7:a parenthesized index binds the same way": {
+    "basis": "resolved",
+    "client_only": [
+      "registry"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "key (name of it) of registry"
+  },
+  "of_whose:8:of binds tighter than comparison": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "name of it = \"x\""
+  },
+  "of_whose:9:of binds tighter than arithmetic": {
+    "basis": "resolved",
+    "client_only": [
+      "processors"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "1 + number of processors"
+  },
+  "real_world:0:the client relevance example from the corpus": {
+    "basis": "resolved",
+    "client_only": [
+      "files",
+      "windows"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "windows of operating system AND not exists files \"C:\\Windows\\Temp\\EventLogBackupSecurity.evt\""
+  },
+  "real_world:1:the session relevance example from the corpus": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "applicable computer count",
+      "bes sites"
+    ],
+    "text": "(id of site of it | 0, id of it | 0, applicable computer count of it | 0)\nof fixlets of bes sites whose(id of it is contained by set of (2;78;80))"
+  },
+  "real_world:2:the docker package check, with conditionals as of operands": {
+    "basis": "resolved",
+    "client_only": [
+      "currently installed",
+      "debianpackages",
+      "packages"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists (packages \"docker-ce\" of it; packages \"docker\" of it)\nwhose(if exists properties whose(it as string contains \"currently installed of \")\nthen (currently installed of it) else TRUE)\nof (if exists properties whose(it as string contains \"debianpackage:\")\nthen debianpackages else ERROR \"The operators are not defined.\")"
+  },
+  "real_world:3:the registry search list walk, casts and filters chained under of": {
+    "basis": "resolved",
+    "client_only": [
+      "registries"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists (it as trimmed string) whose(it != \"\") of substrings separated by \",\"\nof (it as string as lowercase) of values \"SearchList\" of keys \"HKLM\\Tcpip\\Parameters\"\nof registries"
+  },
+  "real_world:4:negation of a bare phrase": {
+    "basis": "resolved",
+    "client_only": [
+      "in proxy agent context"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "NOT in proxy agent context"
+  },
+  "real_world:5:the smbios structure check with tuple indexing": {
+    "basis": "resolved",
+    "client_only": [
+      "smbioses",
+      "structures"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists ( (it as string) of values \"manufacturer\" of it, (it as string) of values \"version\" of it )\nwhose(item 0 of it starts with \"Xen\" AND item 1 of it as lowercase contains \"amazon\")\nof structures \"system_information\" of smbioses"
+  },
+  "session_relevance/dashboards/dashboard_session_relevance_chart.ojo#0@L20": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "bes properties",
+      "results"
+    ],
+    "text": "(html \"<div id=%22\" & item 3 of item 0 of it & html \"%22 style=%22min-width: 310px; height: 400px; max-width: 600px; margin: 0 auto%22></div>\" & item 1 of it & html \"<script> $(function () { $('#\" & item 3 of item 0 of it & html \"').highcharts({ data: { table: '\" & item 2 of item 0 of it & html \"' }, chart: { type: 'pie' }, title: { text: '\" & item 1 of item 0 of it & html \"' }, tooltip: { formatter: function () { return '<b>' + this.series.name + '</b><br/>' + this.point.y + ' of ' + this.point.name.toLowerCase(); } } }); }); </script>\") of (it, div \"style=%22display:none%22\" of (it & html \"</table>\") of (html \"<table id=%22\" & item 2 of it & html \"%22>\" & (thead of concatenations \"\" of tr of (th of \"\" & th of name of item 0 of it)) & tbody of concatenations \"\" of trs of (th of item 1 of it & td of (it as string) of item 0 of it) of (multiplicity of it, it) of unique values of values of results of item 0 of it)) of (item 0 of it, item 1 of it, \"datatable\" & item 2 of it, \"container\" & item 2 of it) of (item 0 of it, item 1 of it, (preceding text of first \" \" of item 1 of it | item 1 of it) ) of (it, name of it) of (bes properties \"Device Type\"; bes properties \"Agent Version\")"
+  },
+  "session_relevance/dashboards/dashboard_session_relevance_html_table.ojo#0@L16": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "bes tasks",
+      "mime field",
+      "mime fields"
+    ],
+    "text": "/* jquery.dataTables.min.css */ (html it) of ( ( unique value of (it as string) of ( html tag (\"style\", attr list of (\"title\", item 0 of it & \" \" & item 1 of it), (html it) of item 2 of it ) ) of (name of mime fields whose(name of it ends with \".css\") of it, mime field \"version\" of it, value of mime fields whose(name of it ends with \".css\") of it) of bes tasks whose(exists mime fields \"version\" whose(it=\"1.10.19\") of it AND name of it starts with \"Shared CSS Library\" AND exists mime fields whose(\"jquery.dataTables.min.css\" = name of it) of it) ) | \"<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/datatables/1.10.19/css/jquery.dataTables.min.css' />\" )"
+  },
+  "session_relevance/dashboards/dashboard_session_relevance_html_table.ojo#1@L17": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "bes tasks",
+      "mime field",
+      "mime fields"
+    ],
+    "text": "/* jquery.min.js */ (html it) of ( ( unique value of (it as string) of ( html tag (\"script\", attr list of (\"title\", item 0 of it & \" \" & item 1 of it), (html it) of item 2 of it ) ) of (name of mime fields whose(name of it ends with \".js\") of it, mime field \"version\" of it, value of mime fields whose(name of it ends with \".js\") of it) of bes tasks whose(exists mime fields \"version\" whose(it=\"3.1.1\") of it AND name of it starts with \"Shared Javascript Library\" AND exists mime fields whose(\"jquery.min.js\" = name of it) of it) ) | \"<script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js'></script>\" )"
+  },
+  "session_relevance/dashboards/dashboard_session_relevance_html_table.ojo#2@L18": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "bes tasks",
+      "mime field",
+      "mime fields"
+    ],
+    "text": "/* jquery.dataTables.min.js */ (html it) of ( ( unique value of (it as string) of ( html tag (\"script\", attr list of (\"title\", item 0 of it & \" \" & item 1 of it), (html it) of item 2 of it ) ) of (name of mime fields whose(name of it ends with \".js\") of it, mime field \"version\" of it, value of mime fields whose(name of it ends with \".js\") of it) of bes tasks whose(exists mime fields \"version\" whose(it=\"1.10.19\") of it AND name of it starts with \"Shared Javascript Library\" AND exists mime fields whose(\"jquery.dataTables.min.js\" = name of it) of it) ) | \"<script src='https://cdnjs.cloudflare.com/ajax/libs/datatables/1.10.19/js/jquery.dataTables.min.js'></script>\" )"
+  },
+  "session_relevance/dashboards/dashboard_session_relevance_html_table.ojo#3@L25": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "html concatenations of (trs of html concatenations of tds of ( (it as html) of preceding texts of firsts \": \" of it; (it as html) of following texts of firsts \": \" of it; (html tags it) of (\"a\", attr list of (\"href\", \"https://developer.bigfix.com/relevance/reference/\" & item 1 of it & \".html#\" & item 2 of it), item 0 of it as html) of ( it, concatenations \"-\" of it whose(it as trimmed string != \"\") of substrings separated by \",\" of substrings separated by \"(\" of substrings separated by \")\" of substrings separated by \":\" of substrings separated by \">\" of substrings separated by \"<\" of substrings separated by \" \" of following texts of firsts \": \" of it, (concatenations \"-\" of it whose(it as trimmed string != \"\") of substrings separated by \",\" of substrings separated by \"(\" of substrings separated by \")\" of substrings separated by \":\" of substrings separated by \">\" of substrings separated by \"<\" of substrings separated by \" \" of it ) ) ) ) of (it as string as trimmed string) whose(\"\" != it) of properties"
+  },
+  "session_relevance/dynamic_javascript/dashboard_relevance_via_javascript_static_and_dynamic.ojo#0@L19": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "bes computers"
+    ],
+    "text": "ps of concatenations of (\"There are \";it as string;\" registered computers right now [ \"; now as string; \" ]\") of number of bes computers"
+  },
+  "session_relevance/dynamic_javascript/dashboard_relevance_via_javascript_static_and_dynamic.ojo#1@L24": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "bes computers"
+    ],
+    "text": "tables of tbodys of html concatenations of ( trs of html concatenations of tds of (names of it; ids of it as string) of it) of (bes computers)"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#0@L13": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "current bes server"
+    ],
+    "text": "following text of first \"/\" of following text of first \"/\" of url of current bes server"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#10@L24": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "current console user"
+    ],
+    "text": "name of current console user"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#11@L24": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "current bes server"
+    ],
+    "text": "following text of first \"/\" of following text of first \"/\" of url of current bes server"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#12@L24": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "current fixlet"
+    ],
+    "text": "name of site of current fixlet"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#13@L24": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "current fixlet",
+      "custom site flag",
+      "operator site flag"
+    ],
+    "text": "(if (operator site flag of it) then \"operator\" else if (custom site flag of it) then \"custom\" else ERROR \"none\") of site of current fixlet"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#14@L30": {
+    "basis": "resolved",
+    "client_only": [
+      "windows"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "/* Windows Only */ windows of operating system"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#15@L31": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "/* Windows XP or Higher */ version of operating system >= \"5.1\""
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#16@L32": {
+    "basis": "resolved",
+    "client_only": [
+      "client"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "version of client >= \"9.0\" as version"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#17@L33": {
+    "basis": "resolved",
+    "client_only": [
+      "client",
+      "files",
+      "folder",
+      "parent folder"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "not exists files whose(name of it starts with \"RESTAPI_ImportedTasks_\" AND name of it as lowercase ends with \".log\" AND (now - modification time of it < 7*day) ) of folder \"__BESData\\__Global\\Logs\" of parent folder of client"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#18@L85": {
+    "basis": "resolved",
+    "client_only": [
+      "client folder",
+      "current site",
+      "file",
+      "folder",
+      "pathname"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "pathname of file \"7za.zip\" of folder \"__Download\" of client folder of current site"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#19@L85": {
+    "basis": "resolved",
+    "client_only": [
+      "client folder",
+      "current site",
+      "folder",
+      "pathname"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "pathname of folder \"__Download\" of client folder of current site"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#1@L14": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "current console user"
+    ],
+    "text": "name of current console user"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#20@L88": {
+    "basis": "resolved",
+    "client_only": [
+      "client folder",
+      "current site",
+      "file",
+      "folder",
+      "pathname"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(pathname of file \"7za.exe\" of folder \"__Download\" of client folder of current site)"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#21@L88": {
+    "basis": "resolved",
+    "client_only": [
+      "client folder",
+      "current site",
+      "folder",
+      "pathname"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "pathname of folder \"__Download\" of client folder of current site"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#22@L88": {
+    "basis": "resolved",
+    "client_only": [
+      "client folder",
+      "current site",
+      "file",
+      "folder",
+      "pathname"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "pathname of file \"curl.cab\" of folder \"__Download\" of client folder of current site"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#23@L92": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(parameter \"currentSiteName\" as trimmed string != \"\") AND (parameter \"currentSiteType\" as trimmed string != \"\") AND (parameter \"RootServerURL\" as trimmed string != \"\")"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#24@L95": {
+    "basis": "resolved",
+    "client_only": [
+      "client folder",
+      "current site",
+      "file",
+      "folder",
+      "pathname"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(pathname of file \"Curl.EXE\" of folder \"__Download\" of client folder of current site)"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#25@L95": {
+    "basis": "resolved",
+    "client_only": [
+      "client folder",
+      "current site",
+      "folder",
+      "pathname"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "pathname of folder \"__Download\" of client folder of current site"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#26@L95": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "parameter \"currentSiteName\""
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#27@L95": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "parameter \"currentConsoleUser\""
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#28@L95": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "parameter \"secret\""
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#29@L95": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "parameter \"RootServerURL\""
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#2@L15": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "current console user",
+      "current fixlet",
+      "explicit owners",
+      "explicit writers"
+    ],
+    "text": "exists explicit writers whose(it = current console user) of site of current fixlet OR exists explicit owners whose(it = current console user) of site of current fixlet"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#30@L95": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "parameter \"currentSiteType\""
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#31@L95": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "parameter \"currentSiteName\""
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#32@L105": {
+    "basis": "resolved",
+    "client_only": [
+      "client folders",
+      "current sites",
+      "files",
+      "folders",
+      "lines",
+      "registry",
+      "x64",
+      "x64 registry"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "/* Generate MSI Uninstall Tasks */  ( (\"\t<Task><Title>Uninstall: MSI - \" & it & \" - Windows</Title><Description><![CDATA[<P>This task will uninstall the MSI: \" & it & \"</P><P>This task was automatically generated using the task: %22RESTAPI: Generate uninstall tasks for all MSI applications on target computer - Windows%22</P><P>&nbsp;</P>%5d%5d></Description><Relevance>/* Windows Only */ windows of operating system</Relevance><Relevance><![CDATA[/* Windows XP or later */ version of operating system >= %225.1%22%5d%5d></Relevance><Relevance>/* Only run if \" & it & \" is installed */ exists keys whose( (exists values %22DisplayName%22 whose(it as string as lowercase starts with %22\" & it & \"%22 as lowercase) of it) AND (exists values whose(it as string as lowercase starts with %22msiexec%22) of it) ) of keys %22HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall%22 of ( x64 registries; x32 registries )</Relevance><Category>Software Sharing</Category><DownloadSize>0</DownloadSize><Source>RESTAPI: Generate uninstall tasks for all MSI applications on target computer - Windows</Source><SourceID>jgstew</SourceID><SourceReleaseDate>\" & ( ((year of it as string &\"-\"& month of it as two digits &\"-\"& day_of_month of it as two digits) of date (local time zone) of it) of now ) & \"</SourceReleaseDate><SourceSeverity></SourceSeverity><CVENames></CVENames><SANSID></SANSID><MIMEField><Name>x-fixlet-modification-time</Name><Value>\" & (now as string) & \"</Value></MIMEField><Domain>BESC</Domain><DefaultAction ID=%22Action1%22><Description><PreLink>Click </PreLink><Link>here</Link><PostLink> to uninstall \" & it & \"</PostLink></Description><ActionScript MIMEType=%22application/x-Fixlet-Windows-Shell%22>waithidden msiexec.exe /X %7b name of keys whose( (exists values %22DisplayName%22 whose(it as string as lowercase starts with %22\" & it & \"%22 as lowercase) of it) AND (exists values whose(it as string as lowercase starts with %22msiexec%22) of it) ) of keys %22HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall%22 of ( x64 registries; x32 registries ) %7d /qn</ActionScript><SuccessCriteria Option=%22OriginalRelevance%22></SuccessCriteria></DefaultAction></Task>\") of ( ( (if (it contains \"%a9\") then (preceding text of first \"%a9\" of it) else it) of (if (it contains \"TM\") then (preceding text of first \"TM\" of it) else it) of (if (it contains \"%ae\") then (preceding text of first \"%ae\" of it) else it) of unique values of (it as string) of values \"DisplayName\" of keys whose(exists values whose(it as string as lowercase starts with \"msiexec\") of it) of keys \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\" of ( registry; (if (x64 of operating system) then (x64 registry) else NOTHING ) ) ) whose ( not exists (it, ( (preceding text of last \" - Windows\" of following text of first \"Uninstall: MSI - \" of it) of node values whose(it starts with \"Uninstall: MSI - \" AND it contains \" - Windows\") of xpaths \"/BESAPI/Task/Name/text()\" of xml documents of files whose( (name of it as lowercase ends with \".xml\") AND (exists lines whose(it as lowercase starts with \"<?xml\") of it) AND (exists lines whose(it as uppercase starts with \"<BESAPI\") of it) AND (exists xml documents of it) ) of folders \"__Download\" of client folders of current sites ) ) whose(item 1 of it = item 0 of it) ) ) )"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#33@L112": {
+    "basis": "resolved",
+    "client_only": [
+      "client folder",
+      "contents",
+      "current site",
+      "files",
+      "folder"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(exists files \"UninstallMSI_Tasks.bes\" whose(exists contents whose(it contains \"<Task>\") of it) of folder \"__Download\" of client folder of current site)"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#34@L114": {
+    "basis": "resolved",
+    "client_only": [
+      "client folder",
+      "current site",
+      "file",
+      "folder",
+      "pathname"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(pathname of file \"Curl.EXE\" of folder \"__Download\" of client folder of current site)"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#35@L114": {
+    "basis": "resolved",
+    "client_only": [
+      "client folder",
+      "contents",
+      "current site",
+      "file",
+      "folder",
+      "pathname"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "pathname of file \"UninstallMSI_Tasks.bes\" whose(exists contents whose(it contains \"<Task>\") of it) of folder \"__Download\" of client folder of current site"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#36@L114": {
+    "basis": "resolved",
+    "client_only": [
+      "client",
+      "folder",
+      "parent folder",
+      "pathname"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(pathname of folder \"__BESData\\__Global\\Logs\" of parent folder of client)"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#37@L114": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "parameter \"currentSiteName\""
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#38@L114": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "parameter \"currentConsoleUser\""
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#39@L114": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "parameter \"secret\""
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#3@L16": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "current fixlet"
+    ],
+    "text": "name of site of current fixlet"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#40@L114": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "parameter \"RootServerURL\""
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#41@L114": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "parameter \"currentSiteType\""
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#42@L114": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "parameter \"currentSiteName\""
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#43@L119": {
+    "basis": "resolved",
+    "client_only": [
+      "client",
+      "files",
+      "folder",
+      "lines",
+      "parent folder"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "exists files whose((name of it = (\"RESTAPI_ImportedTasks_\" & (parameter \"currentSiteName\") & \".log\")) AND exists lines whose(it contains \"</Task>\") of it) of folder \"__BESData\\__Global\\Logs\" of parent folder of client"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#4@L17": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "current fixlet",
+      "custom site flag",
+      "operator site flag"
+    ],
+    "text": "(if (operator site flag of it) then \"operator\" else if (custom site flag of it) then \"custom\" else \"<invalid>\") of site of current fixlet"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#5@L18": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "current bes server"
+    ],
+    "text": "following text of first \"/\" of following text of first \"/\" of url of current bes server"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#6@L18": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "current fixlet",
+      "custom site flag",
+      "operator site flag"
+    ],
+    "text": "(if (operator site flag of it) then \"operator\" else if (custom site flag of it) then \"custom\" else \"<invalid>\") of site of current fixlet"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#7@L18": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "current fixlet"
+    ],
+    "text": "name of site of current fixlet"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#8@L24": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "current fixlet"
+    ],
+    "text": "id of current fixlet"
+  },
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#9@L24": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "current bes site"
+    ],
+    "text": "id of current bes site"
+  },
+  "session_relevance/dynamic_javascript/webreport_relevance_via_javascript.besrpt#0@L18": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "bes tasks",
+      "mime field",
+      "mime fields"
+    ],
+    "text": "/* jquery.dataTables.min.css */ (html it) of ( ( unique value of (it as string) of ( html tag (\"style\", attr list of (\"title\", item 0 of it & \" \" & item 1 of it), (html it) of item 2 of it ) ) of (name of mime fields whose(name of it ends with \".css\") of it, mime field \"version\" of it, value of mime fields whose(name of it ends with \".css\") of it) of bes tasks whose(exists mime fields \"version\" whose(it=\"1.10.19\") of it AND name of it starts with \"Shared CSS Library\" AND exists mime fields whose(\"jquery.dataTables.min.css\" = name of it) of it) ) | \"<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/datatables/1.10.19/css/jquery.dataTables.min.css' />\" )"
+  },
+  "session_relevance/dynamic_javascript/webreport_relevance_via_javascript.besrpt#1@L20": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "bes tasks",
+      "mime field",
+      "mime fields"
+    ],
+    "text": "/* jquery.min.js */ (html it) of ( ( unique value of (it as string) of ( html tag (\"script\", attr list of (\"title\", item 0 of it & \" \" & item 1 of it), (html it) of item 2 of it ) ) of (name of mime fields whose(name of it ends with \".js\") of it, mime field \"version\" of it, value of mime fields whose(name of it ends with \".js\") of it) of bes tasks whose(exists mime fields \"version\" whose(it=\"3.1.1\") of it AND name of it starts with \"Shared Javascript Library\" AND exists mime fields whose(\"jquery.min.js\" = name of it) of it) ) | \"<script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js'></script>\" )"
+  },
+  "session_relevance/dynamic_javascript/webreport_relevance_via_javascript.besrpt#2@L21": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "bes tasks",
+      "mime field",
+      "mime fields"
+    ],
+    "text": "/* jquery.dataTables.min.js */ (html it) of ( ( unique value of (it as string) of ( html tag (\"script\", attr list of (\"title\", item 0 of it & \" \" & item 1 of it), (html it) of item 2 of it ) ) of (name of mime fields whose(name of it ends with \".js\") of it, mime field \"version\" of it, value of mime fields whose(name of it ends with \".js\") of it) of bes tasks whose(exists mime fields \"version\" whose(it=\"1.10.19\") of it AND name of it starts with \"Shared Javascript Library\" AND exists mime fields whose(\"jquery.dataTables.min.js\" = name of it) of it) ) | \"<script src='https://cdnjs.cloudflare.com/ajax/libs/datatables/1.10.19/js/jquery.dataTables.min.js'></script>\" )"
+  },
+  "session_relevance/markdown_codeblocks/session_relevance_markdown_codeblock.md#0@L11": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "( it, (\"https://developer.bigfix.com/relevance/reference/\" & it & \".html\") of (concatenations \"-\" of substrings separated by \" \" of it) ) of (it as string as trimmed string) whose(\"\" != it) of types"
+  },
+  "session_relevance/plain_text/session_relevance_plain_text.bsr#0@L1": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "applicable computer count",
+      "bes sites"
+    ],
+    "text": "(id of site of it | 0, id of it | 0, applicable computer count of it | 0) of fixlets of bes sites whose(id of it is contained by set of (2;78;80;82;84;86;90;93;96;98;101;209;211;3068;6099;6100;8076;8077;8078;8320;9283;9284;9285;12001;12002;13066;15068;13089;13087;5095;8251;8426;12033;8520;15103;12015;15005;15178) )"
+  },
+  "session_relevance/webreports/webreport_session_relevance_basic.besrpt#0@L3": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "bes computers",
+      "bes property",
+      "results from"
+    ],
+    "text": "(\"There are \" & (multiplicity of it as string) & \" of \" & it) of unique values whose(multiplicity of it > 4) of ( \"Model:\" & ((it as trimmed string) of value of results from (bes property \"Computer Model - Windows\") of it) & \"'s in Domain:\" & (value of results from (bes property \"Domain/Workgroup - Windows\") of it) ) of bes computers whose( (exists values of results from (bes property \"Computer Model - Windows\") of it) AND (exists values of results from (bes property \"Domain/Workgroup - Windows\") of it) )"
+  },
+  "session_relevance/webreports/webreport_session_relevance_chart.besrpt#0@L40": {
+    "basis": "resolved",
+    "client_only": [],
+    "dialects": [
+      "session"
+    ],
+    "session_only": [
+      "bes fixlets",
+      "globally visible flag",
+      "locally visible flag"
+    ],
+    "text": "(\"[ \" & it & \" ]\") of concatenations \", \" of (html it) of (\"{ %22label%22: %22\" & item 0 of it & \"%22, %22value%22: \" & item 1 of it as string & \" }\") of ( ( \"Globally Hidden\", number of bes fixlets whose(not globally visible flag of it) );( \"Locally Hidden\", number of bes fixlets whose(not locally visible flag of it) ) )"
+  },
+  "tuples_collections:0:a comma builds a tuple": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1, 2"
+  },
+  "tuples_collections:10:a trailing comma is an error": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "1, 2,"
+  },
+  "tuples_collections:11:a tuple index is its own node, not a property access": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "item 0 of (1, 2, 3)"
+  },
+  "tuples_collections:12:the plural spelling is the same node, marked plural (qna: `items 1 of (\"a\",\"b\") | \"x\"` is `A singular expression is required.`)": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "items 0 of (1, 2, 3)"
+  },
+  "tuples_collections:13:a tuple index too big for an integer is still a tuple index; the checker refuses it (qna: \"integer constant was too large\" / \"not an integer literal\", all targets)": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "item 99999999999999999999 of (1, 2)"
+  },
+  "tuples_collections:14:a string tuple index is an error, not a property (qna: item \"foo\" of folder is \"tuple index which was not an integer literal\", all targets)": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "item \"foo\" of folder \"c:\\temp\""
+  },
+  "tuples_collections:15:a computed tuple index is an error too (qna: item (0+1) of (1,2) is \"not an integer literal\")": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "item (0+1) of (1, 2)"
+  },
+  "tuples_collections:16:a parenthesized integer literal is still a tuple index (qna: item (1) of (1,2) is 2)": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "item (1) of (1, 2)"
+  },
+  "tuples_collections:17:the plural `items` is a property too, not aggregation": {
+    "basis": "resolved",
+    "client_only": [
+      "folder",
+      "items"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "items of folder \"c:\\temp\""
+  },
+  "tuples_collections:18:a decimal-point index is not writable -- there is no such numeral syntax": {
+    "basis": "default",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "item 1.5 of (1, 2)"
+  },
+  "tuples_collections:19:the error fallback is its own node, not a binary operator": {
+    "basis": "resolved",
+    "client_only": [
+      "file"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "size of file \"c:\\nope.txt\" | 42"
+  },
+  "tuples_collections:1:tuples are flat, not nested pairs": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1, 2, 3"
+  },
+  "tuples_collections:2:parens nest a tuple inside a tuple (qna: item 1 of ((1, 2), 3) is 3)": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "(1, 2), 3"
+  },
+  "tuples_collections:3:a semicolon builds a collection": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1; 2; 3"
+  },
+  "tuples_collections:4:comma binds tighter than semicolon": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1, 2; 3, 4"
+  },
+  "tuples_collections:5:the error fallback binds tighter than a comma": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 | 0, 2 | 0"
+  },
+  "tuples_collections:6:the error fallback is looser than an of chain": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "name of it | \"none\""
+  },
+  "tuples_collections:7:a set literal is a collection under of": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "set of (2; 78; 80)"
+  },
+  "tuples_collections:8:a tuple is an of operand": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(w, b) of c"
+  },
+  "tuples_collections:9:a collection of of-chains": {
+    "basis": "resolved",
+    "client_only": [
+      "packages"
+    ],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(packages \"docker-ce\" of it; packages \"docker\" of it)"
+  },
+  "versions:0:a version literal is a reference with a string index": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "version \"1.2.3\""
+  },
+  "versions:1:a one-component version literal is the same shape": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "version \"14\""
+  },
+  "versions:2:a string cast to version is a cast, not a reference": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "\"1.2.3\" as version"
+  },
+  "versions:3:version as a property of an object is an of chain": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "version of operating system"
+  },
+  "versions:4:pad of wraps the version literal, not the comparison": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "pad of version \"1.2\""
+  },
+  "versions:5:a padded comparison keeps pad on each side": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "pad of version \"1.2\" > pad of version \"1.2.3\""
+  },
+  "versions:6:a version literal compared against a bare string": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "version \"2.10.1\" > \"2.3.3\""
+  },
+  "versions:7:a cast binds tighter than the comparison it sits in": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "\"2.10.1\" > \"2.3.3\" as version"
+  },
+  "versions:8:the operator spelling is kept as written, not canonicalized": {
+    "basis": "type-check",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "version of operating system >= version \"14\""
+  },
+  "versions:9:strverscmp version is a distinct multi-word cast target": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "\"1.2.3\" as strverscmp version"
+  },
+  "word_operators:0:contains is a comparison": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "it contains \"x\""
+  },
+  "word_operators:10:a shorter prefix still matches when the longer form does not continue": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 is greater than 2"
+  },
+  "word_operators:11:is contained by": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "id of it is contained by y"
+  },
+  "word_operators:12:word comparisons bind looser than of on both sides": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "item 0 of it starts with \"Xen\""
+  },
+  "word_operators:13:word comparisons bind tighter than and": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "it contains \"a\" and it contains \"b\""
+  },
+  "word_operators:14:a real filter: trimmed substrings": {
+    "basis": "unclear",
+    "client_only": [],
+    "dialects": [
+      "client"
+    ],
+    "session_only": [],
+    "text": "(it as trimmed string) whose(it != \"\")"
+  },
+  "word_operators:15:does not equal is one negated operator (issue 51)": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 does not equal 2"
+  },
+  "word_operators:16:is not greater than is one operator, not is-not around an inspector (issue 51)": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 is not greater than 2"
+  },
+  "word_operators:17:is not greater than or equal to takes the longest match (issue 51)": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 is not greater than or equal to 2"
+  },
+  "word_operators:18:is not less than (issue 51)": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 is not less than 2"
+  },
+  "word_operators:19:is not less than or equal to (issue 51)": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 is not less than or equal to 2"
+  },
+  "word_operators:1:starts with is one operator across two words": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "\"ab\" starts with \"a\""
+  },
+  "word_operators:2:word operators fold their case": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "\"ab\" Starts With \"a\""
+  },
+  "word_operators:3:ends with": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "\"ab\" ends with \"b\""
+  },
+  "word_operators:4:negated word operators are one operator": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "\"ab\" does not contain \"c\""
+  },
+  "word_operators:5:does not start with": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "\"ab\" does not start with \"b\""
+  },
+  "word_operators:6:is compares like =, keeping its spelling": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 is 2"
+  },
+  "word_operators:7:is not is one operator, not is around a not": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 is not 2"
+  },
+  "word_operators:8:equals keeps its spelling": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 equals 2"
+  },
+  "word_operators:9:the trie takes the longest operator that matches": {
+    "basis": "either",
+    "client_only": [],
+    "dialects": [
+      "client",
+      "session"
+    ],
+    "session_only": [],
+    "text": "1 is greater than or equal to 2"
+  }
+}

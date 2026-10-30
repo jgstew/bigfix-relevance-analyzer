@@ -38,7 +38,9 @@ ignore-words-list = thead,theads,oprating,wnidows,wit,notin
 # tools/generate_inspector_data.py - the same verbatim BigFix inspector names
 # (e.g. `additional_information of <dmi>`), just relocated into src/ so the
 # library can read them at runtime. Same rationale, same exclusion.
+# tests/golden/dialect_fit_corpus.json quotes every statement of both corpora,
+# tests/examples/ included, verbatim: same again.
 # npm lockfiles are generated, and their integrity hashes and truncated
 # registry metadata produce false positives that cannot be
 # fixed in the file -- regenerating it would just bring them back.
-skip = tests/examples/**,src/bigfix_relevance_analyzer/_inspector_data.py,tools/playground-wasm/**/package-lock.json,tools/vscode-extension/**/package-lock.json
+skip = tests/examples/**,src/bigfix_relevance_analyzer/_inspector_data.py,tests/golden/dialect_fit_corpus.json,tools/playground-wasm/**/package-lock.json,tools/vscode-extension/**/package-lock.json

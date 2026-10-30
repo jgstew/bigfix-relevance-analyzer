@@ -25,6 +25,9 @@ oprating = "oprating"
 # just relocated into src/ so the library can read them at runtime. Same
 # rationale, same exclusion.
 #
+# tests/golden/dialect_fit_corpus.json quotes every statement of both corpora,
+# tests/examples/ included, verbatim: same rationale, same exclusion.
+#
 # npm lockfiles are generated, and their integrity hashes and truncated
 # registry metadata produce false positives that cannot
 # be fixed in the file - regenerating it would just bring them back.
@@ -32,6 +35,7 @@ oprating = "oprating"
 extend-exclude = [
     "tests/examples/**",
     "src/bigfix_relevance_analyzer/_inspector_data.py",
+    "tests/golden/dialect_fit_corpus.json",
     "tools/playground-wasm/**/package-lock.json",
     "tools/vscode-extension/**/package-lock.json",
 ]

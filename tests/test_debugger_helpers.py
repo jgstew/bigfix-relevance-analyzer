@@ -10,7 +10,12 @@ contract its NiceGUI and iOS apps were built against.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
+from _corpus import EXAMPLES, corpus_cases, extracted_sites
+from _helpers import golden_text
 
 from bigfix_relevance_analyzer import (
     CountSummary,
@@ -248,3 +253,39 @@ def test_dialect_fit_is_never_empty_and_only_names_client_or_session() -> None:
         fit = dialect_fit(text)
         assert fit.dialects
         assert fit.dialects <= {C, S}
+
+
+# --- dialect_fit over the corpora ---------------------------------------------------
+#
+# The debugger dispatches on both `dialects` and `basis`, so #141 fixing
+# resolved_dialect must not move either for any real statement. Pinned from
+# 1.42.0, before that fix: every statement in both corpora, valid or not.
+
+DIALECT_FIT_GOLDEN = Path(__file__).parent / "golden" / "dialect_fit_corpus.json"
+
+
+def corpus_statements() -> list[tuple[str, str]]:
+    """``(id, text)`` for every corpus statement; ids are unique, as in parity.py."""
+    rows = [(case.id, case.source) for case in corpus_cases()]
+    ordinals: dict[Path, int] = {}
+    for path, site in extracted_sites():
+        index = ordinals[path] = ordinals.get(path, -1) + 1
+        rows.append((f"{path.relative_to(EXAMPLES).as_posix()}#{index}@L{site.line}", site.text))
+    return rows
+
+
+def test_dialect_fit_is_unchanged_over_the_corpora() -> None:
+    fits = {}
+    for statement_id, text in corpus_statements():
+        fit = dialect_fit(text)
+        fits[statement_id] = {
+            "text": text,
+            "dialects": sorted(d.value for d in fit.dialects),
+            "basis": fit.basis,
+            "client_only": list(fit.client_only),
+            "session_only": list(fit.session_only),
+        }
+    actual = json.dumps(fits, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+
+    assert len(fits) == len(corpus_statements())  # ids are unique
+    assert actual == golden_text(DIALECT_FIT_GOLDEN, actual)
