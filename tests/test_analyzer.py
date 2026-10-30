@@ -295,6 +295,11 @@ def test_resolved_dialect_does_not_depend_on_the_environment(
     whose own narrowing also records empty resolutions, may move it."""
     assert analyze("name of operating system", dialect, platform).resolved_dialect is Dialect.CLIENT
     assert analyze("now", dialect, platform).resolved_dialect is Dialect.BOTH
+    # Session's `modules` here is the world's, by the fallback; client's matches
+    # the client-only `modules of <grub bootable image>`, whose `name` does not
+    # exist. Checking one dialect says nothing about what the other resolves.
+    nil_whose = analyze("nil whose (exists name of modules)", dialect, platform)
+    assert nil_whose.resolved_dialect is Dialect.SESSION
 
 
 def test_resolved_dialect_narrows_on_types_as_well_as_forms() -> None:
@@ -336,30 +341,21 @@ def test_form_narrowing_checks_again_only_when_names_say_both(
         return typecheck.check(node, environment, source=source)
 
     monkeypatch.setattr("bigfix_relevance_analyzer.analyzer.check", counting)
-    # Names settle it, or nothing parses or resolves: one check at most.
-    # Names say BOTH, but every row the statement can reach is in both
-    # dialects, so a second check would resolve the same rows: one check.
+    # Names settle it, nothing parses or resolves, or there are no references
+    # (BOTH whatever the checks say): one check at most.
     for text in [
         'files of folder "/etc"',
         "names of bes computers",
         "1 +",
         "nme",
-        "now",
-        "exists true",
         '"abc" as uppercase',
         "(1;2)",
-        "current date",
     ]:
         calls = 0
         analyze(text)
         assert calls <= 1, text
-    # A reference resolved to a row in only one dialect, or to none at all, so
-    # only the other dialect's check can say whether it fits: two checks.
-    for text in [
-        "name of operating system",
-        "name of current analysis",
-        "names of it of properties",
-    ]:
+    # Names say BOTH: only the other dialect's own check can say whether it fits.
+    for text in ["name of operating system", "name of current analysis", "now"]:
         calls = 0
         analyze(text)
         assert calls == 2, text
