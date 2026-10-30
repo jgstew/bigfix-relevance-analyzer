@@ -214,10 +214,10 @@ def test_summarize_count_results_reads_rows_as_interpret_count_results_does() ->
 
 # --- dialect_fit does not change resolved_dialect ----------------------------------
 #
-# dialect_fit works around #141 instead of fixing it. These pin what
-# resolved_dialect and classified_dialect say today for the statements above, so
-# a change here is visible. When #141 lands, the BOTH rows for client-only
-# statements become CLIENT, and dialect_fit's "type-check" branch can simplify.
+# These pin what resolved_dialect and classified_dialect say for the statements
+# above, so a change here is visible. Since #141, a client global written bare
+# (`name of operating system`) resolves CLIENT, while dialect_fit keeps calling
+# it "type-check": the name alone is in both dialects.
 
 
 @pytest.mark.parametrize(
@@ -225,12 +225,12 @@ def test_summarize_count_results_reads_rows_as_interpret_count_results_does() ->
     [
         ('names of files of folder "/etc"', C, None),
         ("names of bes computers", S, S),
-        ("name of operating system", Dialect.BOTH, None),  # #141: should be CLIENT
-        ("version of operating system", Dialect.BOTH, None),  # #141: should be CLIENT
+        ("name of operating system", C, None),  # #141
+        ("version of operating system", C, None),  # #141
         ("now", Dialect.BOTH, None),
         ('(1, "a")', Dialect.BOTH, None),
         ("names of bes computers whose (name of it = computer name)", Dialect.UNCERTAIN, S),
-        ("nme of operating system", Dialect.BOTH, None),
+        ("nme of operating system", C, None),  # #141: the known name decides
         ("names of bes computerz", Dialect.BOTH, S),
         ("names of (bes computers", None, S),
         ("name of (operating system", None, None),
@@ -289,3 +289,33 @@ def test_dialect_fit_is_unchanged_over_the_corpora() -> None:
 
     assert len(fits) == len(corpus_statements())  # ids are unique
     assert actual == golden_text(DIALECT_FIT_GOLDEN, actual)
+
+
+@pytest.mark.parametrize(
+    ("text", "analyses"),
+    [
+        # Names say BOTH and one is known: the checks analyze() ran are reused.
+        ("name of operating system", 1),
+        ("now", 1),
+        # No references, so analyze() ran no second check: checked again.
+        ('(1, "a")', 3),
+    ],
+    ids=repr,
+)
+def test_dialect_fit_reuses_the_checks_analysis_already_ran(
+    monkeypatch: pytest.MonkeyPatch, text: str, analyses: int
+) -> None:
+    from bigfix_relevance_analyzer import analyzer
+
+    calls = 0
+    real = analyzer.analyze
+
+    def counting(text: str, dialect: Dialect | None = None) -> analyzer.RelevanceAnalysis:
+        nonlocal calls
+        calls += 1
+        return real(text, dialect)
+
+    monkeypatch.setattr(analyzer, "analyze", counting)
+    dialect_fit(text)
+
+    assert calls == analyses

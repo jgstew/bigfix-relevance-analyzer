@@ -208,6 +208,10 @@ intersection, across every resolved `Reference`, of the dialects its table rows
 are actually defined in. `files of folder "C:\Windows"` classifies as
 `None` (no text marker fires) but resolves as `Dialect.CLIENT`, because `files`
 is a client-only inspector - real evidence a text classifier can never use.
+When the names alone are in both dialects, the form each is written in
+decides: `name of operating system` resolves as `Dialect.CLIENT`, because
+session has `operating system` only as `operating system of <bes computer>`,
+with a direct object.
 `report.dialect_assumed` checks both: false the moment either one, or an
 explicit `dialect` argument, settles on one specific dialect.
 
@@ -225,11 +229,11 @@ dialect_fit("now")  # {CLIENT, SESSION}, "either"
 dialect_fit("names of (bes computers")  # {SESSION}, "classified": no parse
 ```
 
-`resolved_dialect` matches references by name only, so it says `BOTH` for
-`name of operating system` (session has `operating system of <bes computer>`);
-`dialect_fit` type-checks under each dialect to settle that, and leaves
-`resolved_dialect` alone. [#141](https://github.com/jgstew/bigfix-relevance-analyzer/issues/141)
-fixes `resolved_dialect` itself.
+`dialect_fit` asks one more thing than `resolved_dialect`: when the names are
+in both dialects, it also wants a clean type check in the one it picks. So
+`name of operating system` is `"type-check"` rather than `"resolved"`, and a
+typo like `nme of operating system`, which `resolved_dialect` calls client on
+the strength of the one name it knows, is `"unclear"`.
 
 `report.mermaid` (`nodes.to_mermaid`) renders the same tree as a Mermaid
 `flowchart` instead of an S-expression - a real graph built by walking the

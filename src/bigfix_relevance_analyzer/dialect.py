@@ -90,9 +90,12 @@ from __future__ import annotations
 import enum
 import re
 from dataclasses import dataclass
-from typing import TypeGuard
+from typing import TYPE_CHECKING, TypeGuard
 
 from bigfix_relevance_analyzer.tokenizer import _normalize_phrase
+
+if TYPE_CHECKING:
+    from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis
 
 __all__ = ["Dialect", "DialectFit", "classify_relevance_dialect", "dialect_fit", "is_definite"]
 
@@ -112,8 +115,9 @@ class Dialect(enum.Enum):
     BOTH = "both"
     """Valid as either dialect: every inspector used is available to both.
 
-    Real but rare. Nothing emits this yet -- proving it of a statement requires
-    resolving every inspector in it, which needs the future relevance parser.
+    Only a parse can prove it, so the text classifier never returns it;
+    :attr:`~bigfix_relevance_analyzer.analyzer.RelevanceAnalysis.resolved_dialect`
+    does, once every known reference is in both dialects in the form written.
     """
 
 
@@ -306,16 +310,19 @@ class DialectFit:
     """References only session relevance has."""
 
 
-def _type_checks(text: str, dialect: Dialect) -> bool:
-    """Whether ``text`` type-checks cleanly under ``dialect``.
+def _type_checks(analysis: RelevanceAnalysis, dialect: Dialect) -> bool:
+    """Whether ``analysis``'s statement type-checks cleanly under ``dialect``.
 
     No diagnostics is not enough on its own: an unknown name is silent, and
-    leaves only an unknown plurality behind (#141's gotchas).
+    leaves only an unknown plurality behind (#141's gotchas). Reads the check
+    :func:`~bigfix_relevance_analyzer.analyzer.analyze` already ran as
+    ``dialect`` where there is one, which is whenever the names say BOTH and
+    one is known; otherwise checks again, as before.
     """
     from bigfix_relevance_analyzer.analyzer import analyze
     from bigfix_relevance_analyzer.typecheck import Plurality
 
-    check = analyze(text, dialect=dialect).check
+    check = analysis._dialect_checks.get(dialect) or analyze(analysis.text, dialect=dialect).check
     return (
         check is not None
         and not check.diagnostics
@@ -331,13 +338,15 @@ def dialect_fit(text: str) -> DialectFit:
     (:attr:`DialectFit.basis`), and covers statements that do not parse or
     type-check by falling back on :func:`classify_relevance_dialect`.
 
-    :attr:`~bigfix_relevance_analyzer.analyzer.RelevanceAnalysis.resolved_dialect`
-    intersects dialects by reference *name*, so it reports ``BOTH`` for some
-    client-only statements; type checking under each dialect settles those.
-    That is a workaround for #141, which fixes ``resolved_dialect`` itself.
-    Once it lands, the ``"type-check"`` branch below rarely triggers and its
-    per-dialect checks can go if ``resolved_dialect`` answers directly; the
-    API and its answers stay. This function never changes ``resolved_dialect``.
+    It branches on the dialects the reference *names* settle on, and when
+    those say ``BOTH``, on whether each dialect's type check is clean. That is
+    one step stricter than
+    :attr:`~bigfix_relevance_analyzer.analyzer.RelevanceAnalysis.resolved_dialect`,
+    which since #141 also narrows ``BOTH`` by the form each name is written in
+    (``name of operating system`` is CLIENT there, ``"type-check"`` here) but
+    does not ask for a clean check: ``nme of operating system`` is CLIENT
+    there and ``"unclear"`` here. The checks are the ones the analysis already
+    ran, so this costs one analysis, not three.
     """
     # Imported here: `analyzer` builds on this module.
     from bigfix_relevance_analyzer.analyzer import analyze
@@ -351,13 +360,13 @@ def dialect_fit(text: str) -> DialectFit:
         return DialectFit(dialects, basis, client_only, session_only)
 
     classified = analysis.classified_dialect
-    resolved = analysis.resolved_dialect
+    resolved = analysis._named_dialect
     if is_definite(resolved):
         return fit(frozenset({resolved}), "resolved")
     if resolved is Dialect.UNCERTAIN:
         return fit(both, "mixed")
     if resolved is Dialect.BOTH:
-        ok = frozenset(d for d in both if _type_checks(text, d))
+        ok = frozenset(d for d in both if _type_checks(analysis, d))
         if len(ok) == 1:
             return fit(ok, "type-check")
         if ok:
