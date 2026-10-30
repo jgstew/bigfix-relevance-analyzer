@@ -12,6 +12,7 @@ exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
 bigfix-remote-client-relevance = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+bigfix-remote-session-relevance = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 
 [[package]]
 name = "annotated-doc"
@@ -173,10 +174,10 @@ wasm = [{ name = "componentize-py", specifier = "==0.25.1" }]
 
 [[package]]
 name = "bigfix-remote-client-relevance"
-version = "1.6.2"
+version = "1.11.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "asyncssh" },
+    { name = "asyncssh", marker = "sys_platform != 'android' and sys_platform != 'ios'" },
     { name = "beautifulsoup4" },
     { name = "bigfix-remote-session-relevance" },
     { name = "docker" },
@@ -186,16 +187,16 @@ dependencies = [
     { name = "rpmfile" },
     { name = "tomlkit" },
     { name = "typer" },
-    { name = "zstandard", marker = "python_full_version < '3.14'" },
+    { name = "zstandard", marker = "python_full_version < '3.14' and sys_platform != 'android' and sys_platform != 'ios'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cf/72/366f05a75659c9b67d58b994f6843620ea2ea984930040c6f3f796a63c32/bigfix_remote_client_relevance-1.6.2.tar.gz", hash = "sha256:ac949f694cdf160803b23eea06b2117c8ba163c7502031b81cf41b8702996d8c", size = 497253, upload-time = "2026-10-20T21:47:57.806Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8e/51/ce66d18dd8984a5eefab5f1bd0c88f6f400c4593acf3ffeffb5ec14f4709/bigfix_remote_client_relevance-1.11.1.tar.gz", hash = "sha256:da9f42432ba06bb7b755aef78f4281a8e21e2f8ce0b525ac9b3401bc836f377d", size = 548927, upload-time = "2026-10-30T15:33:46.548Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ce/fa/1e01b501ce0790fc7931e74c64a68e370ea6d4cba678707e2a079b9f8e6f/bigfix_remote_client_relevance-1.6.2-py3-none-any.whl", hash = "sha256:801b28a8ea81fc4fca4c280ca6ff39609e09a105b19ecb0fafca4743669bc2d5", size = 160946, upload-time = "2026-10-20T21:47:55.833Z" },
+    { url = "https://files.pythonhosted.org/packages/43/84/e192f2c06e3c98b525b11337cca850902606ae43723609620865b657c26e/bigfix_remote_client_relevance-1.11.1-py3-none-any.whl", hash = "sha256:c43bd987294628a34f449995550218773dd423c4e2c8d8888d5896fe2670224d", size = 180342, upload-time = "2026-10-30T15:33:44.933Z" },
 ]
 
 [[package]]
 name = "bigfix-remote-session-relevance"
-version = "1.2.0"
+version = "1.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -205,9 +206,9 @@ dependencies = [
     { name = "httpx" },
     { name = "tomlkit" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e3/ee/d7b5cc5410717ffea99cde9269112a505a13f52115de843c883c907427ec/bigfix_remote_session_relevance-1.2.0.tar.gz", hash = "sha256:34554432fffb813856831b6c6a14b27f36b2fc132040f1d6d94a98e77baafe42", size = 248689, upload-time = "2026-10-22T12:20:44.025Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b3/10/711ab18f6a366c49aacd98be02c169441c4c1e20d4a2150ddf4ed8d7dd39/bigfix_remote_session_relevance-1.5.0.tar.gz", hash = "sha256:98ec1124aead3dc06226d90ec72a6bcf75715e0226a9d000caf1b76c47b9b310", size = 270524, upload-time = "2026-10-30T15:13:48.106Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e9/8d/556e42d267dadc1240c28d6a3e25d30b5e5368e765d762c77548bb266350/bigfix_remote_session_relevance-1.2.0-py3-none-any.whl", hash = "sha256:e16f0e85f1d3077ab2c807ea4b70fc9ba0cc0ccffcfbca2ca943ec46f8679aa5", size = 90946, upload-time = "2026-10-22T12:20:42.737Z" },
+    { url = "https://files.pythonhosted.org/packages/12/66/dc6e7d965cbbd07d3846c2e62e09a2f54fbe87bd6673aa4e608598a75f6b/bigfix_remote_session_relevance-1.5.0-py3-none-any.whl", hash = "sha256:9f2a199f9f1a70b38738c3545f46f629f16757fba89f47fcc5889f8f564fe2bd", size = 98993, upload-time = "2026-10-30T15:13:47.038Z" },
 ]
 
 [[package]]

@@ -21,8 +21,13 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # The author's own `bigfix*` libraries are exempt, as in exclude-newer-package
+    # in pyproject.toml; tests/test_dependency_cooldown.py keeps the lists equal.
     cooldown:
       default-days: 7
+      exclude:
+        - "bigfix-remote-client-relevance"
+        - "bigfix-remote-session-relevance"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
