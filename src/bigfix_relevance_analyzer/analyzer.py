@@ -142,6 +142,8 @@ class ReferenceReport:
         know about the name, which cannot depend on the environment the lookup
         already filtered by, or the answer would just restate the environment.
         """
+        if self.matches is inspectors.lookup(self.phrase):
+            return inspectors._dialects_of_name(self.phrase)  # the usual case, cached
         return inspectors._dialects_of(self.matches)
 
     @property
