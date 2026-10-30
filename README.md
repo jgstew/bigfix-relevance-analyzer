@@ -529,9 +529,11 @@ from bigfix_relevance_analyzer import highlight
 ```
 
 Text that does not parse - a statement being typed - is classified from its
-tokens alone: a complete word operator (`starts with`, `does not contain`) is
-an operator, a structural word (`of`, `whose`, `it`, ...) a keyword, and any
-other word a name. It never raises. It costs one parse, one walk of the tree
+tokens alone, as the parse would colour it, so a keystroke that breaks the
+parse does not recolour what came before: a complete word operator (`starts
+with`, `does not contain`) is an operator, `number of` and `item N of` are
+keywords, the words after `as` are a type, any other structural word (`of`,
+`whose`, `it`, ...) is a keyword, and any other word a name. It never raises. It costs one parse, one walk of the tree
 and one pass over the tokens: about 1.5x `try_parse_relevance` alone.
 
 ## Linting content

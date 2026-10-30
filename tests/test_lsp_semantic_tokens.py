@@ -10,6 +10,7 @@ says what text the editor colours rather than which numbers it was given.
 
 from __future__ import annotations
 
+import time
 from itertools import pairwise
 from typing import Any
 
@@ -21,7 +22,7 @@ from test_lsp import initialize, notification, request, started, uri
 from bigfix_relevance_analyzer.extract import _extract_data
 from bigfix_relevance_analyzer.highlight import HighlightKind, highlight
 from bigfix_relevance_analyzer.lsp import linter as linter_module
-from bigfix_relevance_analyzer.lsp.linter import DocumentLinter, SemanticToken
+from bigfix_relevance_analyzer.lsp.linter import DocumentLinter, SemanticToken, _highlighted
 from bigfix_relevance_analyzer.lsp.positions import utf16_length
 from bigfix_relevance_analyzer.lsp.server import SEMANTIC_TOKEN_TYPES, Server
 
@@ -257,3 +258,49 @@ def test_a_document_that_is_not_open_has_no_tokens() -> None:
 def test_semantic_tokens_without_a_uri_are_invalid_params() -> None:
     (response,) = started().handle(request("textDocument/semanticTokens/full", {}, id_=3))
     assert response["error"]["code"] == -32602
+
+
+# ---------------------------------------------------------------------------
+# Performance
+# ---------------------------------------------------------------------------
+
+
+def _seconds(call: Any) -> float:
+    start = time.perf_counter()
+    call()
+    return time.perf_counter() - start
+
+
+ONE_LINE_REL = " or ".join(f'exists file "f{i}"' for i in range(6000))
+ONE_LINE_BES = (
+    "<BES><Task>"
+    + "".join(f'<Relevance>exists file "f{i}"</Relevance>' for i in range(4000))
+    + "</Task></BES>"
+)
+
+
+@pytest.mark.parametrize(
+    ("name", "text"), [("a.rel", ONE_LINE_REL), ("a.bes", ONE_LINE_BES)], ids=["rel", "bes"]
+)
+def test_placing_tokens_costs_less_than_highlighting_them(name: str, text: str) -> None:
+    """Each token is placed in about constant time, however long its line or
+    its statement: one long line is the worst case for anything that measures
+    from the line's start per token, which goes quadratic. Compared with
+    highlighting the same sites, so the bound holds on any machine."""
+    linter = DocumentLinter()
+    sites = linter._extract(uri(name), text, text.encode(), None)
+    assert sites is not None
+    _highlighted.cache_clear()
+    highlighting = _seconds(lambda: [highlight(site.text) for site in sites.sites])
+    _highlighted.cache_clear()
+    serving = min(
+        _seconds(lambda: DocumentLinter().semantic_tokens(uri(name), text)) for _ in range(2)
+    )
+    assert serving < 3 * highlighting + 0.05, (serving, highlighting)
+
+
+def test_unchanged_text_is_not_placed_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    linter = DocumentLinter()
+    first = linter.semantic_tokens(uri("a.rel"), STATEMENT)
+    monkeypatch.setattr(linter_module, "_highlighted", None)  # any use would raise
+    assert linter.semantic_tokens(uri("a.rel"), STATEMENT) == first

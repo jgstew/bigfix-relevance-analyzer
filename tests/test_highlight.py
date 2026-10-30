@@ -208,6 +208,40 @@ CASES = [
         ],
     ),
     (
+        # Unparsed, but colored as the parse would color it, so a keystroke that
+        # breaks the parse does not recolor the words before it.
+        'number of items 0 of (1, x as floating point = ("a"',
+        [
+            ("number", K.KEYWORD),
+            ("of", K.KEYWORD),
+            ("items", K.KEYWORD),
+            ("0", K.NUMBER),
+            ("of", K.KEYWORD),
+            ("1", K.NUMBER),
+            ("x", K.PROPERTY),
+            ("as", K.KEYWORD),
+            ("floating", K.TYPE),
+            ("point", K.TYPE),
+            ("=", K.OPERATOR),
+            ('"a"', K.STRING),
+        ],
+    ),
+    (
+        # Unparsed: only a `number` before `of` is the aggregate, and only an
+        # `item` before a number; a type ends at the next grammar word.
+        'number, item "x" of y as string of (',
+        [
+            ("number", K.PROPERTY),
+            ("item", K.PROPERTY),
+            ('"x"', K.STRING),
+            ("of", K.KEYWORD),
+            ("y", K.PROPERTY),
+            ("as", K.KEYWORD),
+            ("string", K.TYPE),
+            ("of", K.KEYWORD),
+        ],
+    ),
+    (
         # An unterminated string is an error token, and never raises.
         'exists file "unterminated',
         [("exists", K.KEYWORD), ("file", K.PROPERTY), ('"unterminated', K.ERROR)],

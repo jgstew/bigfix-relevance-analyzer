@@ -10,7 +10,9 @@ whenever the buffer cannot be shown to hold it.
 
 from __future__ import annotations
 
+import bisect
 import dataclasses
+import re
 from pathlib import Path
 
 import pytest
@@ -710,3 +712,58 @@ def test_utf16_length_counts_code_units(text: str) -> None:
     """Against a per-character oracle: two units for an astral character, one
     for anything else, whichever path the count takes."""
     assert utf16_length(text) == sum(2 if ord(char) > 0xFFFF else 1 for char in text)
+
+
+def _byte_position_by_decoding(index: DocumentIndex, offset: int) -> tuple[int, int] | None:
+    """What :meth:`DocumentIndex._byte_position` answered before it kept
+    per-line tables: decode the line's bytes up to ``offset`` and measure them."""
+    starts = [0, *(m.end() for m in re.finditer(rb"\r\n|\r|\n", index.data))]
+    if not 0 <= offset <= len(index.data):
+        return None
+    line = bisect.bisect_right(starts, offset) - 1
+    try:
+        prefix = index.data[starts[line] : offset].decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    if line >= len(index.lines) or not index.lines[line].startswith(prefix):
+        return None
+    return line, utf16_length(prefix)
+
+
+ASTRAL = chr(0x1F600)
+
+BUFFERS = [
+    "name of it",
+    "",
+    "a\r\nb\rc\n\nd",
+    f"x{chr(0xE9)}y\r\n{ASTRAL}z\n{chr(0xE9)}",
+    f"{ASTRAL}{ASTRAL}\n\n",
+]
+
+
+@pytest.mark.parametrize("text", BUFFERS)
+@pytest.mark.parametrize("matching", [True, False], ids=["own-bytes", "other-bytes"])
+def test_byte_positions_agree_with_decoding_every_prefix(text: str, matching: bool) -> None:
+    """Every byte offset, and one past either end, through the per-line tables
+    and through the decode they replace. ``other-bytes`` is an index built over
+    bytes that are not the text's, where only the decoding path can decide."""
+    data = text.encode("utf-8") if matching else text.replace("y", "Y").encode("utf-8") + b"q"
+    index = DocumentIndex(text, data)
+    for offset in range(-1, len(data) + 2):
+        assert index._byte_position(offset) == _byte_position_by_decoding(index, offset), offset
+
+
+def test_a_line_with_a_lone_surrogate_takes_the_decoding_path() -> None:
+    text = f"ab{chr(0xD800)}c\nname"
+    data = text.encode("utf-8", errors="surrogatepass")
+    index = DocumentIndex(text, data)
+    for offset in range(len(data) + 1):
+        assert index._byte_position(offset) == _byte_position_by_decoding(index, offset), offset
+
+
+@pytest.mark.parametrize("text", BUFFERS)
+def test_utf16_columns_agree_with_measuring_the_prefix(text: str) -> None:
+    index = DocumentIndex(text, text.encode("utf-8"))
+    for line, written in enumerate(index.lines):
+        for at in range(len(written) + 1):
+            assert index._utf16_column(line, at) == utf16_length(written[:at])

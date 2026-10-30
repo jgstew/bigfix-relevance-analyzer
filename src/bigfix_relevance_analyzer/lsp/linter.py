@@ -117,7 +117,10 @@ that crosses a line break becomes one token per line, as LSP requires.
 Punctuation and lexical errors are not served: the grammar already colours
 the one and the diagnostics underline the other. Nothing is coloured where
 the diagnostics would not look either. Highlights are kept per statement text,
-like lint's analyses, so a keystroke re-highlights only the site it changed.
+like lint's analyses, so a keystroke re-highlights only the site it changed;
+placing a token costs about the same wherever it is
+(:class:`~bigfix_relevance_analyzer.lsp.positions.DocumentIndex`), and the
+tokens are kept with the document's extraction until its text changes.
 
 Runs in WASM
 ------------
@@ -272,6 +275,10 @@ class _Extraction:
     """Planned quick-fix edits for this text, by site anchor (``None`` for the
     whole file); ``None`` for one that may not be offered. The edits, not the
     plans: a plan holds two copies of the document."""
+
+    semantic_tokens: list[SemanticToken] | None = None
+    """This text's semantic tokens, once asked for: a client asks again after
+    every edit, and for every editor that shows the document."""
 
     @property
     def index(self) -> DocumentIndex:
@@ -497,6 +504,8 @@ class DocumentLinter:
         extracted = self._extract(uri, text, data, language_id)
         if extracted is None:
             return []
+        if extracted.semantic_tokens is not None:
+            return list(extracted.semantic_tokens)
         index = extracted.index
         found: list[SemanticToken] = []
         for site in extracted.sites:
@@ -516,7 +525,8 @@ class DocumentLinter:
             ):
                 continue
             kept.append(token)
-        return kept
+        extracted.semantic_tokens = kept
+        return list(kept)
 
     def completions(
         self,

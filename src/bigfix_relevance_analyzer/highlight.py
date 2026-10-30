@@ -25,10 +25,13 @@ these apart, so names are coloured here from what the parser built:
   ``exists``...).
 
 Text that does not parse -- the normal state of a buffer being typed --
-degrades to the same judgement made from the tokens alone: a word that begins
-a *complete* word operator (the parser's own trie, so ``starts`` alone stays a
-name) is an operator, a structural word is a keyword, and any other word a
-name. Literals, comments and lexical errors never need the tree.
+degrades to the same judgement made from the tokens alone, so a keystroke
+that breaks the parse does not recolor what came before it: a *complete* word
+operator (the parser's own trie, so ``starts`` alone stays a name) is an
+operator; ``number`` before ``of`` and ``item`` before a number are keywords;
+the words after ``as``, up to the next grammar word, are a type; any other
+structural word is a keyword, and any other word a name. Literals, comments
+and lexical errors never need the tree.
 
 One tree walk, not a lookup per token
 -------------------------------------
@@ -51,7 +54,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from bigfix_relevance_analyzer import nodes
-from bigfix_relevance_analyzer.grammar import STRUCTURAL_WORDS, WORD_INFIX_TRIE
+from bigfix_relevance_analyzer.grammar import STRUCTURAL_WORDS, TUPLE_INDEX_WORDS, WORD_INFIX_TRIE
 from bigfix_relevance_analyzer.parser import _try_parse_lexed
 from bigfix_relevance_analyzer.tokenizer import Token, TokenKind, _lex
 
@@ -152,33 +155,69 @@ def _regions(root: nodes.Node) -> list[_Region]:
 
 
 def _token_regions(code: Sequence[Token]) -> list[_Region]:
-    """For text that does not parse: one region per complete word operator,
-    matched longest-first against the parser's own trie, as the parser would.
+    """For text that does not parse: the regions the tree would have given,
+    judged from the tokens, so a keystroke that breaks the parse does not
+    recolor the words before it.
 
-    A word that only *begins* an operator stays a name, so ``starts of`` keeps
-    ``starts`` an inspector even here.
+    * A complete word operator, matched longest-first against the parser's own
+      trie, as the parser would. A word that only *begins* one stays a name, so
+      ``starts of`` keeps ``starts`` an inspector even here.
+    * ``number`` before ``of``, and ``item``/``items`` before a number: the
+      aggregate and the tuple index, as the parser reads them.
+    * ``as`` and the words after it, up to the next structural word or
+      operator: a cast and its type.
     """
     regions: list[_Region] = []
     at = 0
     while at < len(code):
-        state = WORD_INFIX_TRIE
-        matched = 0
-        ahead = 0
-        while at + ahead < len(code) and code[at + ahead].kind is TokenKind.WORD:
-            next_state = state.children.get(code[at + ahead].normalized)
-            if next_state is None:
-                break
-            state = next_state
-            ahead += 1
-            if state.op is not None:
-                matched = ahead
-        if matched:
-            last = code[at + matched - 1]
-            regions.append((code[at].offset, last.offset + len(last.text), HighlightKind.OPERATOR))
+        token = code[at]
+        word = token.normalized if token.kind is TokenKind.WORD else None
+        following = code[at + 1] if at + 1 < len(code) else None
+        if (matched := _operator_length(code, at)) > 0:
+            regions.append((token.offset, _end(code[at + matched - 1]), HighlightKind.OPERATOR))
             at += matched
+        elif (word == "number" and following is not None and following.normalized == "of") or (
+            word in TUPLE_INDEX_WORDS
+            and following is not None
+            and following.kind is TokenKind.NUMBER
+        ):
+            regions.append((token.offset, _end(token), HighlightKind.KEYWORD))
+            at += 1
+        elif word == "as":
+            last = at
+            while (
+                last + 1 < len(code)
+                and code[last + 1].kind is TokenKind.WORD
+                and code[last + 1].normalized not in STRUCTURAL_WORDS
+                and _operator_length(code, last + 1) == 0
+            ):
+                last += 1
+            regions.append((token.offset, _end(code[last]), HighlightKind.TYPE))
+            at = last + 1
         else:
             at += 1
     return regions
+
+
+def _operator_length(code: Sequence[Token], at: int) -> int:
+    """How many words of ``code`` from ``at`` make the longest complete word
+    operator there, by the parser's trie; 0 for none."""
+    state = WORD_INFIX_TRIE
+    matched = 0
+    ahead = 0
+    while at + ahead < len(code) and code[at + ahead].kind is TokenKind.WORD:
+        next_state = state.children.get(code[at + ahead].normalized)
+        if next_state is None:
+            break
+        state = next_state
+        ahead += 1
+        if state.op is not None:
+            matched = ahead
+    return matched
+
+
+def _end(token: Token) -> int:
+    return token.offset + len(token.text)
 
 
 def _classify(tokens: Sequence[Token], regions: Sequence[_Region]) -> list[HighlightSpan]:
