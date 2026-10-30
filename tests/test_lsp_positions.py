@@ -690,3 +690,23 @@ def test_the_cursor_after_spaces_at_the_end_of_a_line_inside_a_site() -> None:
     found = cursor_in("a.rel", 'exists files of  @\n whose (name of it = "a")')
     assert found is not None
     assert found[1:] == (len("exists files of  "), False)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "",
+        "name of it",
+        f"x{chr(0xE9)}y",
+        chr(0xFFFF),
+        chr(0x10000),
+        f'"{chr(0x1F600)}{chr(0x1F600)}" = name',
+        # A lone surrogate, as a buffer read with surrogatepass can hold: one unit.
+        chr(0xD800),
+        "x" * 5000 + chr(0x1F600),
+    ],
+)
+def test_utf16_length_counts_code_units(text: str) -> None:
+    """Against a per-character oracle: two units for an astral character, one
+    for anything else, whichever path the count takes."""
+    assert utf16_length(text) == sum(2 if ord(char) > 0xFFFF else 1 for char in text)

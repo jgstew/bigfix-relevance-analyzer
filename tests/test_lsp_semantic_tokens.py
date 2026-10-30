@@ -18,7 +18,9 @@ from _corpus import corpus_files
 from _helpers import lsp_text
 from test_lsp import initialize, notification, request, started, uri
 
+from bigfix_relevance_analyzer.extract import _extract_data
 from bigfix_relevance_analyzer.highlight import HighlightKind, highlight
+from bigfix_relevance_analyzer.lsp import linter as linter_module
 from bigfix_relevance_analyzer.lsp.linter import DocumentLinter, SemanticToken
 from bigfix_relevance_analyzer.lsp.positions import utf16_length
 from bigfix_relevance_analyzer.lsp.server import SEMANTIC_TOKEN_TYPES, Server
@@ -200,6 +202,23 @@ def test_the_language_id_picks_the_extractor_for_an_unsaved_buffer() -> None:
 def test_nothing_is_coloured_past_the_size_guard() -> None:
     linter = DocumentLinter(max_document_bytes=10)
     assert linter.semantic_tokens("file:///workspace/a.rel", "name of operating system") == []
+
+
+def test_overlapping_sites_never_send_overlapping_tokens(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No extractor is known to return two sites over the same text, but LSP
+    cannot encode overlapping tokens, so the first one placed wins."""
+    extract = _extract_data
+
+    def twice(*args: Any) -> Any:
+        sites, problems = extract(*args)
+        return [*sites, *sites], problems
+
+    monkeypatch.setattr(linter_module, "_extract_data", twice)
+    assert coloured("a.rel", "name of it") == [
+        ("name", K.PROPERTY),
+        ("of", K.KEYWORD),
+        ("it", K.KEYWORD),
+    ]
 
 
 @pytest.mark.parametrize("path", corpus_files(), ids=lambda path: path.name)

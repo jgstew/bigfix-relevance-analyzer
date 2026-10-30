@@ -63,14 +63,26 @@ which also breaks on form feeds and Unicode separators a client does not."""
 _BYTE_LINE_BREAK: Final = re.compile(rb"\r\n|\r|\n")
 
 
+_BMP_LAST: Final = chr(0xFFFF)
+"""The last character UTF-16 holds in one code unit."""
+
+
 def utf16_length(text: str) -> int:
     """``text``'s length in UTF-16 code units: two for an astral character.
 
     Counted rather than encoded on purpose. A WASM host has only the codecs its
     build snapshot saw, and ``str.encode("utf-16-le")`` raised ``LookupError``
     inside a componentize-py component, losing every diagnostic.
+
+    Almost all text has no astral character, and this runs over a line's
+    prefix for every token placed on it, so that case is settled at C speed
+    first: :meth:`str.isascii` reads a flag CPython keeps, and :func:`max` is
+    one pass with no per-character Python call. Counting alone took 18 of the
+    19 seconds semantic tokens spent on a 1 MiB BES file with long lines.
     """
-    return len(text) + sum(1 for char in text if ord(char) > 0xFFFF)
+    if text.isascii() or max(text) <= _BMP_LAST:
+        return len(text)
+    return len(text) + sum(1 for char in text if char > _BMP_LAST)
 
 
 class DocumentIndex:
