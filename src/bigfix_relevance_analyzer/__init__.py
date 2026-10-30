@@ -3,13 +3,14 @@
 import logging
 from importlib.metadata import PackageNotFoundError, version
 
-from bigfix_relevance_analyzer.analyzer import ReferenceReport, RelevanceAnalysis
+from bigfix_relevance_analyzer.analyzer import ReferenceReport, RelevanceAnalysis, client_platforms
 from bigfix_relevance_analyzer.analyzer import analyze as analyze_relevance
 from bigfix_relevance_analyzer.analyzer import analyze_to_dict as analyze_relevance_to_dict
 from bigfix_relevance_analyzer.autofix import AutofixResult
 from bigfix_relevance_analyzer.autofix import autofix as autofix_relevance
 from bigfix_relevance_analyzer.binding import Binder, ItBinding, resolve_it_bindings
 from bigfix_relevance_analyzer.breakdown import (
+    CountSummary,
     Level,
     Outcome,
     Probe,
@@ -17,6 +18,7 @@ from bigfix_relevance_analyzer.breakdown import (
     ProbeOutcome,
     breakdown_probes,
     interpret_count_results,
+    summarize_count_results,
 )
 from bigfix_relevance_analyzer.complexity import (
     COST_RULES,
@@ -26,7 +28,13 @@ from bigfix_relevance_analyzer.complexity import (
 from bigfix_relevance_analyzer.complexity import analyze as analyze_relevance_complexity
 from bigfix_relevance_analyzer.complexity import score as score_relevance_complexity
 from bigfix_relevance_analyzer.diagnostics import DIAGNOSTICS, Diagnostic, Origin
-from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect, is_definite
+from bigfix_relevance_analyzer.dialect import (
+    Dialect,
+    DialectFit,
+    classify_relevance_dialect,
+    dialect_fit,
+    is_definite,
+)
 from bigfix_relevance_analyzer.extract import (
     HtmlContext,
     RelevanceSite,
@@ -125,8 +133,10 @@ __all__ = [
     "Binder",
     "CheckResult",
     "CostRule",
+    "CountSummary",
     "Diagnostic",
     "Dialect",
+    "DialectFit",
     "FileFix",
     "FileFixResult",
     "Finding",
@@ -172,7 +182,9 @@ __all__ = [
     "breakdown_probes",
     "check_types",
     "classify_relevance_dialect",
+    "client_platforms",
     "code_tokens",
+    "dialect_fit",
     "extract_relevance_from_actionscript",
     "extract_relevance_from_bes_xml",
     "extract_relevance_from_file",
@@ -204,6 +216,7 @@ __all__ = [
     "score_relevance_complexity",
     "search",
     "suggest",
+    "summarize_count_results",
     "to_mermaid",
     "to_sexpr",
     "tokenize",

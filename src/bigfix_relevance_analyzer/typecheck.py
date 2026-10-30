@@ -184,6 +184,30 @@ class RelevanceValue:
     def known(self) -> bool:
         return self.types is not None
 
+    @property
+    def client_platforms(self) -> tuple[str, ...]:
+        """The client platforms in :attr:`platforms`, sorted.
+
+        :attr:`platforms` also carries session environments
+        (``"session:rest_api"``, ...), which no endpoint can match; this is the
+        set a front end shows as "runs on".
+        """
+        return tuple(sorted(p for p in self.platforms if not p.startswith("session:")))
+
+    def describe(self) -> str:
+        """Plurality and types for display.
+
+        ``"singular string"``, ``"plural integer | string"`` (types sorted),
+        ``"plural (unknown type)"`` when the plurality is known but no type is,
+        or ``"unknown"`` when neither is.
+        """
+        plurality = self.plurality.value
+        if not self.types:
+            return (
+                "unknown" if self.plurality is Plurality.UNKNOWN else f"{plurality} (unknown type)"
+            )
+        return f"{plurality} {' | '.join(sorted(self.types))}"
+
 
 @dataclass(frozen=True, slots=True)
 class TypeFix:
