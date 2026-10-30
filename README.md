@@ -211,7 +211,9 @@ is a client-only inspector - real evidence a text classifier can never use.
 When the names alone are in both dialects, the form each is written in
 decides: `name of operating system` resolves as `Dialect.CLIENT`, because
 session has `operating system` only as `operating system of <bes computer>`,
-with a direct object.
+with a direct object. The types those forms produce count too:
+`name of current analysis` is `Dialect.SESSION`, because client's
+`current analysis` is a `fixlet`, which has no `name` property.
 `report.dialect_assumed` checks both: false the moment either one, or an
 explicit `dialect` argument, settles on one specific dialect.
 

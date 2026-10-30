@@ -11,7 +11,9 @@ contract its NiceGUI and iOS apps were built against.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import pytest
 from _corpus import EXAMPLES, corpus_cases, extracted_sites
@@ -28,7 +30,7 @@ from bigfix_relevance_analyzer import (
     dialect_fit,
     summarize_count_results,
 )
-from bigfix_relevance_analyzer.typecheck import RelevanceValue
+from bigfix_relevance_analyzer.typecheck import CheckResult, RelevanceValue
 
 
 def platforms_of(text: str) -> tuple[str, ...]:
@@ -308,14 +310,16 @@ def test_dialect_fit_reuses_the_checks_analysis_already_ran(
     from bigfix_relevance_analyzer import analyzer
 
     calls = 0
-    real = analyzer.analyze
+    real = analyzer._analyze
 
-    def counting(text: str, dialect: Dialect | None = None) -> analyzer.RelevanceAnalysis:
+    def counting(
+        text: str, dialect: Dialect | None = None, platform: str | None = None, **kwargs: Any
+    ) -> tuple[analyzer.RelevanceAnalysis, Mapping[Dialect, CheckResult]]:
         nonlocal calls
         calls += 1
-        return real(text, dialect)
+        return real(text, dialect, platform, **kwargs)
 
-    monkeypatch.setattr(analyzer, "analyze", counting)
+    monkeypatch.setattr(analyzer, "_analyze", counting)
     dialect_fit(text)
 
     assert calls == analyses

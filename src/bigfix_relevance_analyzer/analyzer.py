@@ -200,15 +200,13 @@ class RelevanceAnalysis:
     cost_rules: tuple[CostRule, ...]
     """The heavy-inspector rules this statement matched, in table order."""
 
-    _dialect_checks: Mapping[Dialect, CheckResult] = field(
-        default_factory=lambda: MappingProxyType({}), repr=False, compare=False
-    )
-    """The statement checked as each dialect, with no platform, keyed by dialect.
+    _form_dialect: Dialect | None = field(default=None, repr=False, compare=False)
+    """The one dialect the forms written leave, when the names alone say
+    :attr:`~bigfix_relevance_analyzer.dialect.Dialect.BOTH`; else ``None``.
 
-    Filled by :func:`analyze` only when the names alone say
-    :attr:`~bigfix_relevance_analyzer.dialect.Dialect.BOTH` and at least one
-    is known: that is when which rows each reference resolved to can still
-    tell the dialects apart (#141). Empty otherwise.
+    Worked out by :func:`analyze` while the tree it checked is alive, because
+    the checks it reads are keyed by ``id()`` (#141). Stored as the answer, so
+    an analysis returned from a worker pool keeps it.
     """
 
     @property
@@ -240,8 +238,12 @@ class RelevanceAnalysis:
         inspectors: ``operating system of <bes computer>`` is session, while
         ``operating system`` with no direct object is client only. So when the
         names say BOTH, the statement is checked as each dialect and the forms
-        it is actually written in decide: a dialect is ruled out when a known
-        reference resolves to no row in it. ``name of operating system`` is
+        it is actually written in decide, with the types they produce: a
+        dialect is ruled out when a known reference resolves to no row in it.
+        That is usually the form (no direct object), but can be a type only one
+        dialect's tables give a property: ``name of current analysis`` is
+        SESSION, because client's ``current analysis`` is a ``fixlet``, which
+        has no ``name``. ``name of operating system`` is
         therefore CLIENT, and so is ``nme of operating system``, its unknown
         name proving nothing. If that rules out one dialect, the other is the
         answer; if it rules out neither, or both, the answer stays BOTH --
@@ -267,14 +269,9 @@ class RelevanceAnalysis:
         least one reference and none of them resolved to a known name.
         """
         named = self._named_dialect
-        if named is not Dialect.BOTH or not self._dialect_checks:
-            return named
-        fits = [
-            dialect
-            for dialect, checked in self._dialect_checks.items()
-            if not _rules_out(checked, self.references)
-        ]
-        return fits[0] if len(fits) == 1 else Dialect.BOTH
+        if named is Dialect.BOTH and self._form_dialect is not None:
+            return self._form_dialect
+        return named
 
     @property
     def _named_dialect(self) -> Dialect | None:
@@ -627,6 +624,23 @@ def analyze(
 
     Never raises for bad relevance: see the module docstring.
     """
+    return _analyze(text, dialect, platform, probe_kind=probe_kind)[0]
+
+
+def _analyze(
+    text: str,
+    dialect: Dialect | None = None,
+    platform: str | None = None,
+    *,
+    probe_kind: ProbeKind = ProbeKind.COUNT,
+) -> tuple[RelevanceAnalysis, Mapping[Dialect, CheckResult]]:
+    """:func:`analyze`, plus the checks it ran as each dialect with no platform.
+
+    The checks are filled only when the names say BOTH and one is known, and
+    empty otherwise. :func:`~bigfix_relevance_analyzer.dialect.dialect_fit`
+    reuses them rather than checking twice more; they stay out of the analysis
+    itself because their ``id()`` keys mean nothing once it is copied.
+    """
     classified = classify_relevance_dialect(text)
     effective = dialect or classified or Dialect.CLIENT
     environment = TypeEnvironment.create(effective, platform)
@@ -643,6 +657,7 @@ def analyze(
     levels: tuple[Level, ...] = ()
     checked: CheckResult | None = None
     dialect_checks: Mapping[Dialect, CheckResult] = MappingProxyType({})
+    form_dialect: Dialect | None = None
     if node is not None:
         checked = check(node, environment, source=text)
         references = tuple(
@@ -670,9 +685,11 @@ def analyze(
                     for each in (Dialect.CLIENT, Dialect.SESSION)
                 }
             )
+            fits = [d for d, c in dialect_checks.items() if not _rules_out(c, references)]
+            form_dialect = fits[0] if len(fits) == 1 else None
 
     complexity = _analyze_lexed(lexed.code, effective)
-    return RelevanceAnalysis(
+    analysis = RelevanceAnalysis(
         text=text,
         classified_dialect=classified,
         requested_dialect=dialect,
@@ -691,8 +708,9 @@ def analyze(
         cost_rules=tuple(
             rule for rule in cost_rules_for(effective) if rule.label in complexity.costly_inspectors
         ),
-        _dialect_checks=dialect_checks,
+        _form_dialect=form_dialect,
     )
+    return analysis, dialect_checks
 
 
 def client_platforms(analysis: RelevanceAnalysis) -> tuple[str, ...]:

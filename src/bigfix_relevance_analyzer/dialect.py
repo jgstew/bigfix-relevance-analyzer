@@ -95,7 +95,9 @@ from typing import TYPE_CHECKING, TypeGuard
 from bigfix_relevance_analyzer.tokenizer import _normalize_phrase
 
 if TYPE_CHECKING:
-    from bigfix_relevance_analyzer.analyzer import RelevanceAnalysis
+    from collections.abc import Mapping
+
+    from bigfix_relevance_analyzer.typecheck import CheckResult
 
 __all__ = ["Dialect", "DialectFit", "classify_relevance_dialect", "dialect_fit", "is_definite"]
 
@@ -310,19 +312,19 @@ class DialectFit:
     """References only session relevance has."""
 
 
-def _type_checks(analysis: RelevanceAnalysis, dialect: Dialect) -> bool:
-    """Whether ``analysis``'s statement type-checks cleanly under ``dialect``.
+def _type_checks(text: str, dialect: Dialect, checks: Mapping[Dialect, CheckResult]) -> bool:
+    """Whether ``text`` type-checks cleanly under ``dialect``.
 
     No diagnostics is not enough on its own: an unknown name is silent, and
     leaves only an unknown plurality behind (#141's gotchas). Reads the check
-    :func:`~bigfix_relevance_analyzer.analyzer.analyze` already ran as
-    ``dialect`` where there is one, which is whenever the names say BOTH and
-    one is known; otherwise checks again, as before.
+    in ``checks`` that analysis already ran as ``dialect`` where there is one,
+    which is whenever the names say BOTH and one is known; otherwise checks
+    again, as before.
     """
     from bigfix_relevance_analyzer.analyzer import analyze
     from bigfix_relevance_analyzer.typecheck import Plurality
 
-    check = analysis._dialect_checks.get(dialect) or analyze(analysis.text, dialect=dialect).check
+    check = checks.get(dialect) or analyze(text, dialect=dialect).check
     return (
         check is not None
         and not check.diagnostics
@@ -349,10 +351,10 @@ def dialect_fit(text: str) -> DialectFit:
     ran, so this costs one analysis, not three.
     """
     # Imported here: `analyzer` builds on this module.
-    from bigfix_relevance_analyzer.analyzer import analyze
+    from bigfix_relevance_analyzer.analyzer import _analyze
 
     both = frozenset({Dialect.CLIENT, Dialect.SESSION})
-    analysis = analyze(text)
+    analysis, checks = _analyze(text)
     client_only = analysis.references_only_in(Dialect.CLIENT)
     session_only = analysis.references_only_in(Dialect.SESSION)
 
@@ -366,7 +368,7 @@ def dialect_fit(text: str) -> DialectFit:
     if resolved is Dialect.UNCERTAIN:
         return fit(both, "mixed")
     if resolved is Dialect.BOTH:
-        ok = frozenset(d for d in both if _type_checks(analysis, d))
+        ok = frozenset(d for d in both if _type_checks(text, d, checks))
         if len(ok) == 1:
             return fit(ok, "type-check")
         if ok:

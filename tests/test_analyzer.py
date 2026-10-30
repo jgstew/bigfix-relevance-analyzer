@@ -5,9 +5,11 @@ that every part is reached, that the dialect and platform selection reaches the
 parts that depend on it, and that broken input degrades instead of raising.
 """
 
+import copy
 import json
+import pickle
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -293,6 +295,29 @@ def test_resolved_dialect_does_not_depend_on_the_environment(
     whose own narrowing also records empty resolutions, may move it."""
     assert analyze("name of operating system", dialect, platform).resolved_dialect is Dialect.CLIENT
     assert analyze("now", dialect, platform).resolved_dialect is Dialect.BOTH
+
+
+def test_resolved_dialect_narrows_on_types_as_well_as_forms() -> None:
+    """Both dialects have a bare `current analysis`, but in client it is a
+    `fixlet`, which has no `name`: only session types it, so it is SESSION.
+    Per the inspector tables, not checked against an engine."""
+    assert analyze("name of current analysis").resolved_dialect is Dialect.SESSION
+
+
+@pytest.mark.parametrize("text", ["name of operating system", "now", "names of bes computers"])
+@pytest.mark.parametrize(
+    "copy_of",
+    [lambda a: pickle.loads(pickle.dumps(a)), copy.deepcopy],
+    ids=["pickle", "deepcopy"],
+)
+def test_an_analysis_survives_a_copy_with_its_resolved_dialect(
+    copy_of: Callable[[RelevanceAnalysis], RelevanceAnalysis], text: str
+) -> None:
+    """An analysis can be returned from a worker pool. The narrowing must not
+    depend on `id()`-keyed state, which means nothing on the far side."""
+    report = analyze(text)
+
+    assert copy_of(report).resolved_dialect is report.resolved_dialect
 
 
 def test_form_narrowing_checks_again_only_when_names_say_both(
