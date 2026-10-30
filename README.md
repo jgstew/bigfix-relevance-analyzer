@@ -505,6 +505,35 @@ inspector table below and type-directed disambiguation, both of which are parser
 work. Keeping this layer table-free makes it total: any input lexes, and the
 same input always lexes the same way, regardless of which dumps happen to exist.
 
+### Highlighting
+
+`highlight(text)` colours a statement for an editor that has no TextMate
+engine - a native text view, or a Python GUI toolkit - and is what the
+[language server](#language-server)'s semantic tokens are made from. It returns
+a `HighlightSpan(start, end, kind)` per token, character offsets with the end
+exclusive as `Span`'s are, sorted and never overlapping. `kind` is a
+`HighlightKind`, a string enum: `keyword`, `operator`, `property` (a word of an
+inspector name), `type` (a cast target), `string`, `number`, `comment`,
+`punctuation` (`(`, `)`, `,`, `;`) or `error` (text that does not lex).
+Whitespace and articles get no span.
+
+Relevance has no reserved words, so the parse tree decides, not a word list:
+
+```python
+from bigfix_relevance_analyzer import highlight
+
+[(s.start, s.end, s.kind.value) for s in highlight("starts of ranges")][0]
+# (0, 6, 'property'): the plural `start` inspector
+[(s.start, s.end, s.kind.value) for s in highlight('name of it starts with "a"')][3]
+# (11, 17, 'operator'): half of `starts with`
+```
+
+Text that does not parse - a statement being typed - is classified from its
+tokens alone: a complete word operator (`starts with`, `does not contain`) is
+an operator, a structural word (`of`, `whose`, `it`, ...) a keyword, and any
+other word a name. It never raises. It costs one parse, one walk of the tree
+and one pass over the tokens: about 1.5x `try_parse_relevance` alone.
+
 ## Linting content
 
 `bigfix_relevance_analyzer.lint` turns the analyses above into pre-commit-shaped
@@ -752,6 +781,31 @@ always a name, never an operator's symbol, so it can stand where the name is. Th
 each `unknown-inspector` diagnostic as `data: {"suggestions": [...]}`, best
 first, so a client can build its own UI without parsing the message; no other
 diagnostic has `data`, and one that had to fall back to its whole line has none.
+
+It serves semantic tokens (`textDocument/semanticTokens/full`), so a client
+can colour what its regex grammar cannot: which words are inspector names, which
+are operators and which are cast types - `starts` is a name in `starts of
+ranges` and an operator in `starts with`. They are [`highlight()`](#highlighting)
+of every statement the linter reads, placed in the buffer the way diagnostics
+are (UTF-16 columns; BES entities, CDATA and CRLF as written; one token per line
+for a comment or string that spans lines). The legend uses only LSP's standard
+token types, so any theme colours them with no configuration:
+
+| `tokenTypes` index | Type | Covers |
+| --- | --- | --- |
+| 0 | `keyword` | `of`, `whose`, `it`, `as`, `if`/`then`/`else`, `exists`, prefix `not`, `number of`, `item N of` |
+| 1 | `operator` | word and symbol operators: `starts with`, `and`, `mod`, `=`, `-`, `\|` |
+| 2 | `property` | inspector and property names |
+| 3 | `type` | cast targets: `lowercase` in `it as lowercase` |
+| 4 | `string` | string literals |
+| 5 | `number` | numeric literals |
+| 6 | `comment` | `/* */` comments |
+
+There are no modifiers. Punctuation and lexical errors are not served: the
+grammar colours the one and the diagnostics underline the other. A token that
+cannot be placed for certain (one that only partly covers a BES entity, such as
+a string containing `&amp;`) is left uncoloured rather than misplaced, and
+nothing is served past the size guard.
 
 The protocol logic does no I/O, so it can also run without stdio. A host such
 as a WASM runtime inside an editor extension passes each parsed JSON-RPC
