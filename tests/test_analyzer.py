@@ -336,13 +336,33 @@ def test_form_narrowing_checks_again_only_when_names_say_both(
         return typecheck.check(node, environment, source=source)
 
     monkeypatch.setattr("bigfix_relevance_analyzer.analyzer.check", counting)
-    for text in ['files of folder "/etc"', "names of bes computers", "1 +", "nme"]:
+    # Names settle it, or nothing parses or resolves: one check at most.
+    # Names say BOTH, but every row the statement can reach is in both
+    # dialects, so a second check would resolve the same rows: one check.
+    for text in [
+        'files of folder "/etc"',
+        "names of bes computers",
+        "1 +",
+        "nme",
+        "now",
+        "exists true",
+        '"abc" as uppercase',
+        "(1;2)",
+        "current date",
+    ]:
         calls = 0
         analyze(text)
         assert calls <= 1, text
-    calls = 0
-    analyze("name of operating system")
-    assert calls == 2
+    # A reference resolved to a row in only one dialect, or to none at all, so
+    # only the other dialect's check can say whether it fits: two checks.
+    for text in [
+        "name of operating system",
+        "name of current analysis",
+        "names of it of properties",
+    ]:
+        calls = 0
+        analyze(text)
+        assert calls == 2, text
 
 
 def test_forced_dialect_overrides_classification() -> None:

@@ -296,11 +296,12 @@ def test_dialect_fit_is_unchanged_over_the_corpora() -> None:
 @pytest.mark.parametrize(
     ("text", "analyses"),
     [
-        # Names say BOTH and one is known: the checks analyze() ran are reused.
+        # Names say BOTH: one analysis runs both dialects' checks.
         ("name of operating system", 1),
         ("now", 1),
-        # No references, so analyze() ran no second check: checked again.
-        ('(1, "a")', 3),
+        ('(1, "a")', 1),
+        # Names settle it: no type check is asked for.
+        ("names of bes computers", 1),
     ],
     ids=repr,
 )

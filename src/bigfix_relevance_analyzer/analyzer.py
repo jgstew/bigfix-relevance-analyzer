@@ -31,12 +31,13 @@ error tokens positioned, and the complexity metrics, which are lexical.
 
 from __future__ import annotations
 
+import functools
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
-from bigfix_relevance_analyzer import inspectors
+from bigfix_relevance_analyzer import grammar, inspectors
 from bigfix_relevance_analyzer._serialize import _enum, _position, _span
 from bigfix_relevance_analyzer.binding import ItBinding, resolve_it_bindings
 from bigfix_relevance_analyzer.breakdown import Level, ProbeKind, breakdown_probes
@@ -48,8 +49,11 @@ from bigfix_relevance_analyzer.complexity import (
 )
 from bigfix_relevance_analyzer.dialect import Dialect, classify_relevance_dialect, is_definite
 from bigfix_relevance_analyzer.nodes import (
+    Binary,
+    Cast,
     Node,
     Reference,
+    Unary,
     to_mermaid,
     to_sexpr,
     tree_depth,
@@ -583,6 +587,60 @@ def _rules_out(checked: CheckResult, references: tuple[ReferenceReport, ...]) ->
     )
 
 
+@functools.cache
+def _in_both_dialects(name: str, kind: inspectors.InspectorKind | None = None) -> bool:
+    """Whether every table row named ``name`` is defined in both dialects."""
+    return all(
+        Dialect.CLIENT in entry.dialects and Dialect.SESSION in entry.dialects
+        for entry in inspectors.lookup(name, kind=kind)
+    )
+
+
+def _both_fit(
+    node: Node, references: tuple[ReferenceReport, ...], checked: CheckResult | None
+) -> bool:
+    """Whether checking ``node`` as the other dialect cannot rule either out.
+
+    The checker reads dialect-filtered rows in four places: references,
+    casts, and binary and unary operators. ``checked`` ran as one dialect with
+    no platform. If every known reference resolved there, to rows all defined
+    in both dialects, and every cast and operator is the same in both, the
+    other dialect sees at least those rows, so it resolves each reference to
+    at least as much, and neither dialect is ruled out: the answer is BOTH
+    without a second check. With no such check (a platform narrowed it), every
+    row a reference could reach has to be in both instead.
+    """
+    for reference in references:
+        if not reference.known:
+            continue
+        if checked is None:
+            if not _in_both_dialects(reference.phrase):
+                return False
+            continue
+        rows = checked.resolutions.get(id(reference.reference))
+        if not rows or not all(
+            Dialect.CLIENT in entry.dialects and Dialect.SESSION in entry.dialects for entry in rows
+        ):
+            return False  # absent, ruled out here, or resolved to one dialect's row
+    for item in walk(node):
+        if isinstance(item, Cast):
+            neutral = _in_both_dialects(item.target, inspectors.InspectorKind.CAST)
+        elif isinstance(item, Binary):
+            form = grammar.CANONICAL_BINARY.get(item.op)
+            neutral = form is None or _in_both_dialects(
+                form.operator, inspectors.InspectorKind.BINARY_OPERATOR
+            )
+        elif isinstance(item, Unary):
+            neutral = item.op == "not" or _in_both_dialects(
+                item.op, inspectors.InspectorKind.UNARY_OPERATOR
+            )
+        else:
+            continue
+        if not neutral:
+            return False
+    return True
+
+
 def analyze_to_dict(
     text: str,
     dialect: Dialect | None = None,
@@ -633,13 +691,16 @@ def _analyze(
     platform: str | None = None,
     *,
     probe_kind: ProbeKind = ProbeKind.COUNT,
+    all_checks: bool = False,
 ) -> tuple[RelevanceAnalysis, Mapping[Dialect, CheckResult]]:
     """:func:`analyze`, plus the checks it ran as each dialect with no platform.
 
-    The checks are filled only when the names say BOTH and one is known, and
-    empty otherwise. :func:`~bigfix_relevance_analyzer.dialect.dialect_fit`
-    reuses them rather than checking twice more; they stay out of the analysis
-    itself because their ``id()`` keys mean nothing once it is copied.
+    The checks are filled when the names say BOTH and checking again could
+    tell the dialects apart, and empty otherwise. ``all_checks`` fills them
+    whenever the names say BOTH, which is what
+    :func:`~bigfix_relevance_analyzer.dialect.dialect_fit` needs: it reuses
+    them rather than checking twice more. They stay out of the analysis itself
+    because their ``id()`` keys mean nothing once it is copied.
     """
     classified = classify_relevance_dialect(text)
     effective = dialect or classified or Dialect.CLIENT
@@ -672,7 +733,15 @@ def _analyze(
         )
         it_bindings = resolve_it_bindings(node)
         levels = breakdown_probes(text, node, kind=probe_kind)
-        if references and _dialect_of_names(references) is Dialect.BOTH:
+        # No references is BOTH whatever the checks say; only dialect_fit,
+        # which wants each dialect's verdict, checks those again.
+        if _dialect_of_names(references) is Dialect.BOTH and (
+            all_checks
+            or (
+                references
+                and not _both_fit(node, references, checked if platform is None else None)
+            )
+        ):
             # One name can be two inspectors (#141); which rows each reference
             # resolves to in each dialect decides. No platform, so platform
             # narrowing cannot rule a dialect out: reuse the check above only

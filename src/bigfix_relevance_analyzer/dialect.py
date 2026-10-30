@@ -354,7 +354,7 @@ def dialect_fit(text: str) -> DialectFit:
     from bigfix_relevance_analyzer.analyzer import _analyze
 
     both = frozenset({Dialect.CLIENT, Dialect.SESSION})
-    analysis, checks = _analyze(text)
+    analysis, checks = _analyze(text, all_checks=True)
     client_only = analysis.references_only_in(Dialect.CLIENT)
     session_only = analysis.references_only_in(Dialect.SESSION)
 
