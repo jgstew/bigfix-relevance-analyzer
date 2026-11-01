@@ -74,6 +74,10 @@ logger = logging.getLogger(__name__)
 class TokenKind(enum.Enum):
     """What a token is, lexically -- never what it means."""
 
+    # Members are singletons compared by identity, so this agrees with
+    # equality; Enum's own hash is a Python frame on every set or dict probe (#199).
+    __hash__ = object.__hash__
+
     WORD = "word"
     """A bare word: part of an inspector name, a grammar word, a type name."""
 

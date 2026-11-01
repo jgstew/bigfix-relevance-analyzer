@@ -134,6 +134,10 @@ class Plurality(enum.Enum):
     diagnostics treat it -- they interpolate ``'{plurality} {type}'``.
     """
 
+    # Members are singletons compared by identity, so this agrees with
+    # equality; Enum's own hash is a Python frame on every set or dict probe (#199).
+    __hash__ = object.__hash__
+
     SINGULAR = "singular"
     PLURAL = "plural"
     UNKNOWN = "unknown"
