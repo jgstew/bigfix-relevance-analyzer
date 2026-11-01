@@ -19,7 +19,8 @@ records a digest of:
   platform half of :meth:`TypeEnvironment.visible` is pinned too;
 * ``dialect_fit`` -- dialects, basis and the two exclusive-reference lists;
 * ``highlight`` -- every span, start, end and kind;
-* ``tokens`` -- the whole token stream, positions included.
+* ``tokens`` -- the whole token stream, positions included;
+* ``lint`` -- every finding :func:`lint_analysis` reports for it.
 
 and, per example file, a digest of the lint report.
 
@@ -49,8 +50,9 @@ from _helpers import golden_text
 
 from bigfix_relevance_analyzer.analyzer import analyze
 from bigfix_relevance_analyzer.dialect import Dialect, dialect_fit
+from bigfix_relevance_analyzer.extract import RelevanceSite
 from bigfix_relevance_analyzer.highlight import highlight
-from bigfix_relevance_analyzer.lint import LintConfig, lint_paths_to_dict
+from bigfix_relevance_analyzer.lint import LintConfig, lint_analysis, lint_paths_to_dict
 from bigfix_relevance_analyzer.tokenizer import tokenize
 
 GOLDEN = Path(__file__).parent / "golden" / "perf_equivalence.json"
@@ -79,7 +81,7 @@ def _analysis(text: str, dialect: Dialect | None = None, platform: str | None = 
     )
 
 
-def _statement(text: str, site_dialect: Dialect | None) -> dict[str, str]:
+def _statement(text: str, site: RelevanceSite | None) -> dict[str, str]:
     fit = dialect_fit(text)
     record = {
         "analyze": _analysis(text),
@@ -97,8 +99,18 @@ def _statement(text: str, site_dialect: Dialect | None) -> dict[str, str]:
             [(t.kind.value, t.text, t.offset, t.line, t.column) for t in tokenize(text)]
         ),
     }
-    if site_dialect is not None:
-        record["analyze/site"] = _analysis(text, site_dialect)
+    if site is not None:
+        record["analyze/site"] = _analysis(text, site.dialect)
+    # The lint verdict on its own, per statement: most example files lint
+    # clean, so a per-file report digest alone pins little about findings.
+    record["lint"] = _digest(
+        [
+            finding.to_dict()
+            for finding in lint_analysis(
+                analyze(text, None if site is None else site.dialect), LintConfig(), site=site
+            )
+        ]
+    )
     return record
 
 
@@ -110,7 +122,7 @@ def _snapshot() -> dict[str, Any]:
     for path, site in extracted_sites():
         index = ordinals[path] = ordinals.get(path, -1) + 1
         key = f"examples/{path.relative_to(EXAMPLES).as_posix()}#{index}@L{site.line}"
-        statements[key] = _statement(site.text, site.dialect)
+        statements[key] = _statement(site.text, site)
     lint = {
         path.relative_to(EXAMPLES).as_posix(): _digest(lint_paths_to_dict([path], LintConfig()))
         for path in corpus_files()
