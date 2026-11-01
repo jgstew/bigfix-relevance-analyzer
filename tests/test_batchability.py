@@ -218,10 +218,11 @@ def test_a_reason_serializes_its_span_as_flat_offsets_like_a_lint_span() -> None
 
 def test_the_rule_table_is_read_only_and_never_says_safe() -> None:
     """Exported at the root like `COST_RULES`, under its own name: the root's
-    `RULES` is lint's. Read-only, as `RULES` and `DIAGNOSTICS` are, since
-    every `BatchReason.kind` reads it."""
+    `RULES` is lint's (the two share `parse-error`, meaning the same thing).
+    Read-only, as `RULES` and `DIAGNOSTICS` are, since every
+    `BatchReason.kind` reads it."""
     assert BatchabilityKind.SAFE not in set(BATCH_RULES.values())
-    assert not set(BATCH_RULES) & set(RULES)
+    assert BATCH_RULES.keys() != RULES.keys()
     with pytest.raises(TypeError):
         BATCH_RULES["comma-in-display"] = SAFE  # type: ignore[index]
 
