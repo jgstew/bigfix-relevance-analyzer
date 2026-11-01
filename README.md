@@ -359,7 +359,8 @@ batchability("exists wmi", platform="rhel").kind  # ERROR_RISK, "not-on-platform
 ```
 
 Only `BatchabilityKind.SAFE` means batch it; each `BatchReason` names the rule
-that fired and the span it fired on. Pass the endpoint's `platform` whenever
+that fired (`BATCH_RULES` maps every rule to the verdict it implies) and the
+span it fired on. Pass the endpoint's `platform` whenever
 it is known: over 545 statements on four hosts a safe verdict was right 97.0%
 of the time with it and 81.3% without (`tools/batchability/`). The verdict is
 a hint, not a guarantee, so a caller still verifies each tuple answer and falls

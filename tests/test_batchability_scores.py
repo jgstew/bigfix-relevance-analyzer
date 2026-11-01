@@ -35,14 +35,15 @@ def test_the_scores_are_what_the_committed_outcomes_give() -> None:
     assert actual == golden_text(TOOL / "scores.md", actual)
 
 
-def test_a_safe_verdict_with_the_platform_is_right_at_least_96_percent_of_the_time() -> None:
-    """The figure the module docstring and the PR quote. A floor, not the
-    exact count, so the message says what broke when the golden also moves."""
+def test_the_figures_the_docs_quote_are_the_pinned_ones() -> None:
+    """97.0% with the platform (846 of 872) and 81.3% without, as the module
+    docstring, the README and tools/batchability/README.md say. When the golden
+    moves on purpose, this says which prose to update with it."""
     scores = (TOOL / "scores.md").read_text(encoding="utf-8")
-    safe, one = _all_hosts(scores, "classifier (platform known)")
 
-    assert (safe, one) == (872, 846)
-    assert one / safe >= 0.96
+    assert _all_hosts(scores, "classifier (platform known)") == (872, 846)
+    safe, one = _all_hosts(scores, "classifier (platform-agnostic)")
+    assert f"{one / safe:.1%}" == "81.3%"
 
 
 def test_the_outcomes_carry_no_host_names_or_paths() -> None:

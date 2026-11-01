@@ -26,7 +26,8 @@ these verdicts are meant to feed.
 Measured accuracy (#225; corpus, outcomes and scorer in ``tools/batchability``):
 with the endpoint's platform passed, a ``SAFE`` verdict was right 97.0% of the
 time over 545 statements on four hosts with qna 11.0.7, and 81.3% without it --
-almost all of the difference is Windows-only inspectors on other platforms.
+of the 170 (statement, host) pairs the platform turns from a wrong ``SAFE``
+into a right refusal, 107 use a Windows-only inspector.
 Pass ``platform`` whenever the endpoint's is known.
 
 The rules, by the verdict they produce (the worst one wins):
@@ -34,7 +35,9 @@ The rules, by the verdict they produce (the worst one wins):
 ``error-risk``
     The statement does not parse or does not type-check (it will error), it
     uses an inspector client relevance does not have at all (a session
-    inspector) or the target platform does not have, or -- outside an
+    inspector, anywhere) or the target platform does not have (outside an
+    ``if`` branch), or names a property with no object (``exists size``), or
+    -- outside an
     error guard -- the checker reports a runtime risk
     (``singular-spelling-mid-chain``, ``singular-over-plural-object``), or it
     looks up a singular object by name (``file "x"``, ``setting "x" of
@@ -65,8 +68,9 @@ from __future__ import annotations
 
 import enum
 import re
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any
 
 from bigfix_relevance_analyzer import inspectors
@@ -92,7 +96,7 @@ from bigfix_relevance_analyzer.nodes import (
 )
 from bigfix_relevance_analyzer.typecheck import AGGREGATES, Plurality, _client_platforms
 
-__all__ = ["RULES", "BatchReason", "Batchability", "BatchabilityKind", "batchability"]
+__all__ = ["BATCH_RULES", "BatchReason", "Batchability", "BatchabilityKind", "batchability"]
 
 
 class BatchabilityKind(enum.Enum):
@@ -130,21 +134,24 @@ _COMMA_TYPES = frozenset({"time", "date"})
 # `( a, b )`, by qna 11.0.7 and REST Fast Query alike.
 _WRAP_MARKERS = (",", "(", ")")
 
-RULES: dict[str, BatchabilityKind] = {
-    "parse-error": BatchabilityKind.ERROR_RISK,
-    "type-error": BatchabilityKind.ERROR_RISK,
-    "runtime-risk": BatchabilityKind.ERROR_RISK,
-    "not-on-platform": BatchabilityKind.ERROR_RISK,
-    "not-client-relevance": BatchabilityKind.ERROR_RISK,
-    "singular-lookup": BatchabilityKind.ERROR_RISK,
-    "singular-property": BatchabilityKind.ERROR_RISK,
-    "aggregate-of-plural": BatchabilityKind.ERROR_RISK,
-    "unknown-reference": BatchabilityKind.UNKNOWN,
-    "unknown-plurality": BatchabilityKind.UNKNOWN,
-    "plural-result": BatchabilityKind.PLURAL_RISK,
-    "whose-may-be-empty": BatchabilityKind.PLURAL_RISK,
-    "comma-in-display": BatchabilityKind.SPLIT_RISK,
-}
+BATCH_RULES: Mapping[str, BatchabilityKind] = MappingProxyType(
+    {
+        "parse-error": BatchabilityKind.ERROR_RISK,
+        "type-error": BatchabilityKind.ERROR_RISK,
+        "runtime-risk": BatchabilityKind.ERROR_RISK,
+        "not-on-platform": BatchabilityKind.ERROR_RISK,
+        "not-client-relevance": BatchabilityKind.ERROR_RISK,
+        "property-without-object": BatchabilityKind.ERROR_RISK,
+        "singular-lookup": BatchabilityKind.ERROR_RISK,
+        "singular-property": BatchabilityKind.ERROR_RISK,
+        "aggregate-of-plural": BatchabilityKind.ERROR_RISK,
+        "unknown-reference": BatchabilityKind.UNKNOWN,
+        "unknown-plurality": BatchabilityKind.UNKNOWN,
+        "plural-result": BatchabilityKind.PLURAL_RISK,
+        "whose-may-be-empty": BatchabilityKind.PLURAL_RISK,
+        "comma-in-display": BatchabilityKind.SPLIT_RISK,
+    }
+)
 """Every rule :func:`batchability` can report, and the verdict it implies."""
 
 
@@ -153,7 +160,7 @@ class BatchReason:
     """One rule that fired, and where."""
 
     rule: str
-    """A key of :data:`RULES`; see the module docstring."""
+    """A key of :data:`BATCH_RULES`; see the module docstring."""
 
     span: Span | None
     """The node it fired on; ``None`` for the statement as a whole."""
@@ -162,13 +169,20 @@ class BatchReason:
 
     @property
     def kind(self) -> BatchabilityKind:
-        return RULES[self.rule]
+        return BATCH_RULES[self.rule]
 
     def to_dict(self) -> dict[str, Any]:
-        """JSON-serializable plain data. The span as offsets, which an editor
-        underlines directly."""
-        span = None if self.span is None else {"start": self.span.start, "end": self.span.end}
-        return {"rule": self.rule, "kind": self.kind.value, "span": span, "detail": self.detail}
+        """JSON-serializable plain data. The span as ``start``/``end`` offsets,
+        as a lint finding's spans are, which an editor underlines directly;
+        both ``None`` for the statement as a whole."""
+        span = self.span
+        return {
+            "rule": self.rule,
+            "kind": self.kind.value,
+            "start": None if span is None else span.start,
+            "end": None if span is None else span.end,
+            "detail": self.detail,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -228,6 +242,11 @@ def _classify(analysis: RelevanceAnalysis, platform: str | None) -> Batchability
         detail = f"{diagnostic.code}: {diagnostic.message}"
         if _is_fault(diagnostic.code):
             reasons.append(BatchReason("type-error", diagnostic.span, detail))
+        elif diagnostic.code == "world-property-not-defined":
+            # Advisory to the checker, but the engine has no such world
+            # inspector: `exists size` is "The operator "size" is not
+            # defined.", under `exists` or not (#225 review, qna-verified).
+            reasons.append(BatchReason("property-without-object", diagnostic.span, detail))
         elif diagnostic.span in unguarded_spans:
             # A risk the runtime raises (`singular-over-plural-object`,
             # `singular-spelling-mid-chain`), unless a guard absorbs it:
@@ -236,23 +255,24 @@ def _classify(analysis: RelevanceAnalysis, platform: str | None) -> Batchability
     for phrase in analysis.unknown_references:
         reasons.append(BatchReason("unknown-reference", None, phrase))
     # Wherever it is written -- under `exists`, after `false and` -- an
-    # inspector the endpoint lacks errors ("The operator ... is not defined.");
-    # only an `if` branch not taken escapes it, which is how content guards one
-    # (`if windows of operating system then ...`).
+    # inspector the endpoint lacks errors ("The operator ... is not defined.").
+    # A platform's inspector escapes it only in an `if` branch not taken, which
+    # is how content guards one (`if windows of operating system then ...`), so
+    # that check skips branches. No condition makes a session-only inspector
+    # (`bes computers`) defined on any endpoint, so that one is flagged in a
+    # branch too: `if true then number of bes computers else 0` errors. It is
+    # needed at all because the name is known -- no `unknown-reference` -- and
+    # `number of` / `exists` hide its plurality.
     reachable = {id(node) for node in _outside_branches(analysis.node)}
     for report in analysis.references:
-        # Known, but nothing visible as client relevance (on this platform,
-        # when there is one): not defined there.
-        if not report.known or report.visible or id(report.reference) not in reachable:
+        if not report.known or report.visible:
             continue
         if not any(Dialect.CLIENT in row.dialects for row in report.matches):
-            # Session-only (`bes computers`): no endpoint has it, so this
-            # needs no platform. Silent otherwise -- the name is known, so not
-            # an `unknown-reference`, and `number of` hides its plurality.
             reasons.append(
                 BatchReason("not-client-relevance", report.reference.span, report.phrase)
             )
-        elif platform is not None:
+        elif platform is not None and id(report.reference) in reachable:
+            # Known as client relevance, but nothing visible on this platform.
             reasons.append(BatchReason("not-on-platform", report.reference.span, report.phrase))
 
     if value.plurality is Plurality.PLURAL:

@@ -9,6 +9,7 @@ from bigfix_relevance_analyzer.analyzer import analyze_to_dict as analyze_releva
 from bigfix_relevance_analyzer.autofix import AutofixResult
 from bigfix_relevance_analyzer.autofix import autofix as autofix_relevance
 from bigfix_relevance_analyzer.batchability import (
+    BATCH_RULES,
     Batchability,
     BatchabilityKind,
     BatchReason,
@@ -132,6 +133,7 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 # moment it asks about a name.
 
 __all__ = [
+    "BATCH_RULES",
     "COST_RULES",
     "DIAGNOSTICS",
     "MAX_PARSE_DEPTH",

@@ -12,6 +12,8 @@ from __future__ import annotations
 import pytest
 
 from bigfix_relevance_analyzer import (
+    BATCH_RULES,
+    RULES,
     Batchability,
     BatchabilityKind,
     BatchReason,
@@ -174,7 +176,7 @@ def test_to_dict() -> None:
 
     assert payload["kind"] == "error-risk"
     assert payload["plurality"] == "singular"
-    assert {"rule", "kind", "span", "detail"} <= set(payload["reasons"][0])
+    assert {"rule", "kind", "start", "end", "detail"} <= set(payload["reasons"][0])
 
 
 # ---------------------------------------------------------------------------
@@ -200,26 +202,28 @@ def test_a_safe_verdict_serializes_with_no_reasons() -> None:
     }
 
 
-def test_a_reason_serializes_its_span_as_offsets_and_none_for_the_whole_statement() -> None:
+def test_a_reason_serializes_its_span_as_flat_offsets_like_a_lint_span() -> None:
     lookup = BatchReason("singular-lookup", analyze_relevance('file "x"').node.span, "file")  # type: ignore[union-attr]
     whole = BatchReason("parse-error", None, "no parse")
 
     assert lookup.to_dict() == {
         "rule": "singular-lookup",
         "kind": "error-risk",
-        "span": {"start": 0, "end": 8},
+        "start": 0,
+        "end": 8,
         "detail": "file",
     }
-    assert whole.to_dict()["span"] is None
+    assert (whole.to_dict()["start"], whole.to_dict()["end"]) == (None, None)
 
 
-def test_every_reason_names_a_rule_with_a_kind() -> None:
-    from bigfix_relevance_analyzer.batchability import RULES
-
-    assert set(RULES.values()) <= set(BatchabilityKind) - {SAFE}
-    for text in ('size of file "/x"', "now", "(1;2)", "nope nope", "name of", "exists wmi"):
-        for reason in batchability(text, platform="rhel").reasons:
-            assert reason.rule in RULES
+def test_the_rule_table_is_read_only_and_never_says_safe() -> None:
+    """Exported at the root like `COST_RULES`, under its own name: the root's
+    `RULES` is lint's. Read-only, as `RULES` and `DIAGNOSTICS` are, since
+    every `BatchReason.kind` reads it."""
+    assert BatchabilityKind.SAFE not in set(BATCH_RULES.values())
+    assert not set(BATCH_RULES) & set(RULES)
+    with pytest.raises(TypeError):
+        BATCH_RULES["comma-in-display"] = SAFE  # type: ignore[index]
 
 
 def test_an_unknown_platform_is_refused_rather_than_ruling_out_every_inspector() -> None:
@@ -250,6 +254,49 @@ def test_a_session_inspector_is_an_error_risk_with_or_without_a_platform(
     assert verdict.kind is ERROR_RISK
     assert "not-client-relevance" in rules(text, platform)
     assert "not-on-platform" not in rules(text, platform)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # qna: E: The operator "bes computers" is not defined. -- no condition
+        # makes a session inspector defined, so a branch is no escape.
+        "if true then number of bes computers else 0",
+        "if windows of operating system then exists bes computers else false",
+        "exists bes computers | false",
+        "exists true whose (exists bes computers)",
+    ],
+)
+def test_a_session_inspector_is_flagged_inside_a_branch_or_a_guard(text: str) -> None:
+    assert "not-client-relevance" in rules(text)
+    assert batchability(text).kind is ERROR_RISK
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["exists current date", "now", "current date", "exists true"],
+)
+def test_a_name_both_dialects_have_is_not_session_only(text: str) -> None:
+    assert "not-client-relevance" not in rules(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    # qna: E: The operator "size" is not defined. -- a property only, bare,
+    # under `exists` / `number of` or not.
+    ["exists size", "number of names", "exists versions", "size"],
+)
+def test_a_property_with_no_object_is_an_error_risk(text: str) -> None:
+    assert "property-without-object" in rules(text)
+    assert batchability(text).kind is ERROR_RISK
+
+
+def test_a_platform_inspector_in_a_branch_taken_is_still_missed() -> None:
+    """A known gap, pinned so changing it is a decision: the branch exemption
+    is what lets `if windows of operating system then <windows inspector>`
+    through, and statically a taken branch looks the same. qna on macOS:
+    `if true then exists wmi else false` errors."""
+    assert batchability("if true then exists wmi else false", platform="macos").safe
 
 
 @pytest.mark.parametrize("text", ["", "   ", "1\u00b2", "(" * 2000, '"unterminated'])

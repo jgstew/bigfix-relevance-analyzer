@@ -1,7 +1,8 @@
 # Batchability measurement
 
 How accurate `batchability()` (#225) is, and the data to check it again. Not
-shipped, not imported by the package.
+imported by the package and not in the wheel (the sdist carries `tools/`, as
+it always has).
 
 | file | what |
 | --- | --- |
@@ -29,8 +30,10 @@ message (cut at ` -- `, which is where a harness message starts adding paths).
 ## Method
 
 Each statement was evaluated twice through the client library's
-`evaluate_many` (qna's stdin batch path): alone, and as
-`((E), "bfrcr-78-sentinel")`. A statement's outcome is **`one`** (batchable)
+`evaluate_many`: alone, and as `((E), "bfrcr-78-sentinel")`. That is qna's
+stdin batch path, except for most of the Windows corpus, which ran one qna per
+expression (`--no-batch`) because the batch hung now and then over SSH (timing,
+not content); the answers are the same. A statement's outcome is **`one`** (batchable)
 when alone it answered exactly one value with no error, and the tuple came
 back as exactly one answer that splits on `", "` into that value and the
 sentinel, with no part holding `,`, `(` or `)`. Otherwise it is `error`,
@@ -47,8 +50,10 @@ were tuned on even-numbered statements only; odd ones are the holdout.
 With the endpoint's platform passed, a `safe` verdict was right **97.0%** of
 the time (846 of 872 (statement, host) pairs), catching 84.5% of what really
 was batchable; 96.7% on the holdout half alone. Without the platform, 81.3%,
-almost all of the difference being Windows-only inspectors on other
-platforms. The analyzer's plurality alone (`SINGULAR`) scores 70.1%.
+mostly from Windows-only inspectors on other platforms: of the 170
+(statement, host) pairs the platform turns from a wrong `safe` into a right
+refusal, 107 use a Windows-only inspector, 22 one only macOS and Windows have,
+and 29 a Linux-only one. The analyzer's plurality alone (`SINGULAR`) scores 70.1%.
 
 Of the 26 misses, 25 are errors the tables cannot foresee: 22 inspectors that
 need the agent's client context (`No inspector context.` under qna, and under
@@ -64,5 +69,11 @@ which a caller's split check refuses: a fallback, not a wrong answer.
   exercise Fast Query itself, ten-item tuples, or an item that is not last;
   that a caller's split check holds for those rests on the display rule, which
   REST Fast Query matched in a handful of live queries.
-- No statement in the corpus uses a session inspector, so the
-  `not-client-relevance` rule added in the move never fires on it.
+- qna's context is the one Fast Query uses without `UseClientContext`; with
+  it, the 22 `No inspector context.` misses would most likely answer.
+- An evaluation that timed out counts as `error`, which can only lower the
+  number of truly batchable statements (none did in these runs).
+- Two rules were added in the move, after review: `not-client-relevance` (a
+  session inspector) never fires on the corpus, and `property-without-object`
+  (`exists size`) fires on one statement, which errored on all four hosts and
+  was already refused. Neither moves a number.
