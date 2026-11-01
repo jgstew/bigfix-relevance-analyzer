@@ -341,6 +341,31 @@ text; only an actual filesystem hit switches to extraction. `--dialect` still
 overrides every site when passed. A file with no relevance in it reports that
 and exits 0; the exit status otherwise reflects whether every site parsed.
 
+## Batching statements into one tuple query
+
+A front end that evaluates many client statements on one endpoint (BigFix Fast
+Query, where each statement is a ClientQuery round trip) can send several as
+one tuple, `((e1), (e2), ...)`, but only when every item yields exactly one
+value, none errors, and none displays with `,`, `(` or `)`. `batchability(text,
+platform=...)` predicts that from the text:
+
+```python
+from bigfix_relevance_analyzer import batchability
+
+batchability('exists file "/etc/hosts"').safe  # True: exists absorbs a missing file
+batchability('size of file "/etc/hosts"').kind  # ERROR_RISK, "singular-lookup"
+batchability("now").kind  # SPLIT_RISK: a time displays with a comma
+batchability("exists wmi", platform="rhel").kind  # ERROR_RISK, "not-on-platform"
+```
+
+Only `BatchabilityKind.SAFE` means batch it; each `BatchReason` names the rule
+that fired and the span it fired on. Pass the endpoint's `platform` whenever
+it is known: over 545 statements on four hosts a safe verdict was right 97.0%
+of the time with it and 81.3% without (`tools/batchability/`). The verdict is
+a hint, not a guarantee, so a caller still verifies each tuple answer and falls
+back to single statements, as bigfix-remote-client-relevance 1.13.0's
+`evaluate_many(..., tuple_batchable=[...])` does.
+
 ## Extracting relevance
 
 `extract_relevance_from_file` finds every relevance statement in a file and
