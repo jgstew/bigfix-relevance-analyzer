@@ -615,12 +615,23 @@ def _evaluation_cost_rules_lexed(
     )
 
 
+_RUN_SEPARATOR = "\n"
+"""What :func:`_evaluation_cost` joins word runs with, to search them all at once.
+
+A run never contains one -- it is words joined by single spaces -- and no cost
+pattern can match one, see past one, or match nothing, which
+``test_cost_patterns_cannot_match_across_runs`` holds every rule to. So one
+search over the joined text counts exactly what one search per run did, with
+one regex call per rule rather than one per rule per run (#199)."""
+
+
 def _evaluation_cost(runs: list[str], dialect: Dialect | None) -> tuple[float, tuple[str, ...]]:
     """Total cost of ``runs`` and the labels that contributed, in table order."""
     total = 0.0
     labels: list[str] = []
+    text = _RUN_SEPARATOR.join(runs)
     for rule in cost_rules_for(dialect):
-        occurrences = sum(len(rule.pattern.findall(run)) for run in runs)
+        occurrences = len(rule.pattern.findall(text))
         if occurrences:
             total += rule.cost_for(dialect) * occurrences
             labels.append(rule.label)

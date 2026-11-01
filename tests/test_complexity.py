@@ -8,6 +8,7 @@ a test-breaking change.
 
 from __future__ import annotations
 
+import re
 from itertools import pairwise
 
 import pytest
@@ -21,6 +22,7 @@ from bigfix_relevance_analyzer.complexity import (
     COST_MODERATE,
     COST_RULES,
     DEPTH_EXPONENT,
+    CostRule,
     RelevanceComplexity,
     analyze,
     cost_rules_for,
@@ -987,3 +989,55 @@ def test_cost_rules_for_is_computed_once_per_dialect(dialect: Dialect | None) ->
         else tuple(rule for rule in COST_RULES if dialect in rule.dialects)
     )
     assert first == expected
+
+
+# ---------------------------------------------------------------------------
+# #199: each cost pattern runs once over the joined word runs, not per run
+# ---------------------------------------------------------------------------
+
+# Regex constructs that could see past a run's edge or match the separator:
+# anchors that mean something different mid-string, classes that match a
+# newline, lookbehind, and the flags that let `.` or `^`/`$` cross lines.
+_CROSSING_SYNTAX = ("^", "$", r"\s", r"\S", r"\W", r"\D", r"\B", "[^", r"\n", r"\A", r"\Z", "(?<")
+
+
+@pytest.mark.parametrize("rule", COST_RULES, ids=lambda rule: rule.label)
+def test_cost_patterns_cannot_match_across_runs(rule: CostRule) -> None:
+    """What makes one search over ``"\\n".join(runs)`` count exactly what one
+    search per run did: no pattern can match the separator, see past it, or
+    match nothing at all (an empty match would count once per gap)."""
+    from bigfix_relevance_analyzer.complexity import _RUN_SEPARATOR
+
+    assert _RUN_SEPARATOR == "\n"
+    assert not rule.pattern.flags & (re.DOTALL | re.MULTILINE | re.VERBOSE)
+    for construct in _CROSSING_SYNTAX:
+        assert construct not in rule.pattern.pattern, construct
+    assert rule.pattern.search("") is None
+    assert rule.pattern.search(_RUN_SEPARATOR) is None
+
+
+def _legacy_cost(runs: list[str], dialect: Dialect | None) -> tuple[float, tuple[str, ...]]:
+    total = 0.0
+    labels: list[str] = []
+    for rule in cost_rules_for(dialect):
+        occurrences = sum(len(rule.pattern.findall(run)) for run in runs)
+        if occurrences:
+            total += rule.cost_for(dialect) * occurrences
+            labels.append(rule.label)
+    return total, tuple(labels)
+
+
+def test_joined_search_counts_what_per_run_search_counted() -> None:
+    """Every rule's example, its runs alone and run up against every other
+    example's -- so a match that could reach across the edge would show --
+    and each run split into single words, so no phrase is left whole."""
+    from bigfix_relevance_analyzer.complexity import _evaluation_cost, _word_runs
+
+    examples = [_word_runs(tuple(code_tokens(rule.example))) for rule in COST_RULES]
+    cases: list[list[str]] = [[], [""]]
+    cases += examples
+    cases += [left + right for left in examples for right in examples]
+    cases += [[word for run in runs for word in run.split()] for runs in examples]
+    for runs in cases:
+        for dialect in (None, *Dialect):
+            assert _evaluation_cost(runs, dialect) == _legacy_cost(runs, dialect), runs
