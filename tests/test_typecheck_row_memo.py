@@ -163,3 +163,24 @@ def test_the_memo_is_bounded_and_hands_out_tuples(name: str) -> None:
     rows = memo(*_SAMPLE_ARGUMENTS[name], TypeEnvironment.create(Dialect.CLIENT))
     assert isinstance(rows, tuple)
     assert rows
+
+
+def _every_name() -> list[str]:
+    return sorted(inspectors._by_name())
+
+
+def test_visible_lookup_matches_the_inline_filter() -> None:
+    """What ``analyze`` reports as a reference's visible rows (#199 item 5):
+    every row of any kind the name has, filtered by the environment alone."""
+    typecheck._visible_lookup.cache_clear()
+    for env in ENVIRONMENTS:
+        for name in [*_every_name(), "no such inspector", "NAME"]:
+            want = _legacy_visible(inspectors.lookup(name), env)
+            assert list(typecheck._visible_lookup(name, env)) == want, (name, env)
+
+
+def test_visible_lookup_is_bounded_and_hands_out_tuples() -> None:
+    assert typecheck._visible_lookup.cache_info().maxsize is not None
+    rows = typecheck._visible_lookup("name", TypeEnvironment.create(Dialect.SESSION))
+    assert isinstance(rows, tuple)
+    assert rows

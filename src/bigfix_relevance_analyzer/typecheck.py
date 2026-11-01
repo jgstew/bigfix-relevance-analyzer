@@ -1037,6 +1037,19 @@ def _visible_rows(
     return rows
 
 
+@functools.lru_cache(maxsize=_VISIBLE_ROWS_CACHE_SIZE)
+def _visible_lookup(name: str, environment: TypeEnvironment) -> tuple[inspectors.Inspector, ...]:
+    """Every row of any kind ``name`` has that this dialect and platform can see.
+
+    What :func:`~bigfix_relevance_analyzer.analyzer.analyze` reports as a
+    reference's visible rows. It used to filter :func:`inspectors.lookup`
+    through :meth:`TypeEnvironment.visible` for every reference of every
+    statement, repeating work that depends only on these two arguments (#199).
+    Bounded and keyed as :func:`_visible_rows` is, for the same reasons.
+    """
+    return tuple(entry for entry in inspectors.lookup(name) if environment.visible(entry))
+
+
 _OPERATION_ROWS_CACHE_SIZE: Final = 4096
 """How many keys each of :func:`_cast_rows`, :func:`_unary_rows` and
 :func:`_binary_rows` keeps.
