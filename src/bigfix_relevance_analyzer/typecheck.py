@@ -1246,6 +1246,9 @@ def resolve_property(
     declared on the base type, so ``size`` resolves for ``application`` only
     through ``application -> file``.
     """
+    # Part of a cache key below, so it must hash; callers used to be able to
+    # pass any collection of type names, since it was only ever iterated.
+    subject = None if subject is None else frozenset(subject)
     reading = _property_reading(name, subject, environment, indexed)
     if reading is None:
         return RelevanceValue(types=None, platforms=environment.universe)

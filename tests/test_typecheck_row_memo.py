@@ -264,3 +264,12 @@ def test_matched_rows_hands_out_tuples() -> None:
     rows = typecheck._matched_rows("name", frozenset({"file"}), ENVIRONMENTS[0])
     assert isinstance(rows, tuple)
     assert rows
+
+
+@pytest.mark.parametrize("subject", [{"file"}, ["file"], ("file", "file")], ids=type)
+def test_resolve_property_still_takes_any_collection_of_types(subject: object) -> None:
+    """Public, and it only ever iterated ``subject``: a set or a list worked
+    before the memo made the subject part of a cache key, and still must."""
+    env = TypeEnvironment.create(Dialect.CLIENT)
+    want = _legacy_resolve("name", frozenset({"file"}), env, None)
+    assert typecheck.resolve_property("name", subject, env) == want  # type: ignore[arg-type]
