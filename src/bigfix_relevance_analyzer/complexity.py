@@ -108,6 +108,7 @@ server side, so they cover the constructs whose expansion the dumps make plain
 from __future__ import annotations
 
 import dataclasses
+import functools
 import math
 import re
 from dataclasses import dataclass
@@ -560,6 +561,7 @@ COST_RULES: tuple[CostRule, ...] = (
 )
 
 
+@functools.cache
 def cost_rules_for(dialect: Dialect | None) -> tuple[CostRule, ...]:
     """The rules that apply to ``dialect``.
 
@@ -568,6 +570,9 @@ def cost_rules_for(dialect: Dialect | None) -> tuple[CostRule, ...]:
     evidence to exclude anything *with*. Over-charging is close to harmless in
     practice: a rule's pattern names inspectors the other engine does not
     define, so text from the wrong dialect rarely contains them.
+
+    Cached: the answer depends on ``dialect`` alone, of which there are five,
+    and every analysis asked for it at least twice (#199).
     """
     if not is_definite(dialect):
         return COST_RULES

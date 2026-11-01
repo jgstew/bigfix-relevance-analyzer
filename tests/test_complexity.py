@@ -973,3 +973,17 @@ def test_filtering_a_member_pays_off_even_under_an_outer_filter() -> None:
 def test_an_outer_filter_still_beats_no_filter() -> None:
     three = "(items a, items b, items c)"
     assert score(f'{three} whose (item 0 of it = "x")') < score(three)
+
+
+@pytest.mark.parametrize("dialect", [None, *Dialect], ids=lambda d: getattr(d, "value", "none"))
+def test_cost_rules_for_is_computed_once_per_dialect(dialect: Dialect | None) -> None:
+    """#199: it was rebuilt -- every rule's dialect set included -- twice per
+    analysis. Its answer depends on the dialect alone, of which there are five."""
+    first = cost_rules_for(dialect)
+    assert cost_rules_for(dialect) is first
+    expected = (
+        COST_RULES
+        if dialect in (None, Dialect.BOTH, Dialect.UNCERTAIN)
+        else tuple(rule for rule in COST_RULES if dialect in rule.dialects)
+    )
+    assert first == expected
