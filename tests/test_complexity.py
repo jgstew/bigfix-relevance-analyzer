@@ -1041,3 +1041,8 @@ def test_joined_search_counts_what_per_run_search_counted() -> None:
     for runs in cases:
         for dialect in (None, *Dialect):
             assert _evaluation_cost(runs, dialect) == _legacy_cost(runs, dialect), runs
+
+
+def test_cost_rules_for_cache_is_bounded() -> None:
+    """Public, so a caller can hand it anything hashable; only five keys are real."""
+    assert cost_rules_for.cache_info().maxsize is not None

@@ -561,7 +561,7 @@ COST_RULES: tuple[CostRule, ...] = (
 )
 
 
-@functools.cache
+@functools.lru_cache(maxsize=8)
 def cost_rules_for(dialect: Dialect | None) -> tuple[CostRule, ...]:
     """The rules that apply to ``dialect``.
 
@@ -571,7 +571,8 @@ def cost_rules_for(dialect: Dialect | None) -> tuple[CostRule, ...]:
     practice: a rule's pattern names inspectors the other engine does not
     define, so text from the wrong dialect rarely contains them.
 
-    Cached: the answer depends on ``dialect`` alone, of which there are five,
+    Cached, and bounded because it is public and takes any hashable argument:
+    the answer depends on ``dialect`` alone, of which there are five,
     and every analysis asked for it at least twice (#199).
     """
     if not is_definite(dialect):
