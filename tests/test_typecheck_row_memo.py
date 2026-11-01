@@ -184,3 +184,83 @@ def test_visible_lookup_is_bounded_and_hands_out_tuples() -> None:
     rows = typecheck._visible_lookup("name", TypeEnvironment.create(Dialect.SESSION))
     assert isinstance(rows, tuple)
     assert rows
+
+
+def _legacy_matched(
+    name: str, subject: frozenset[str] | None, env: TypeEnvironment, indexed: bool | None
+) -> list[Inspector] | None:
+    rows = typecheck._visible_rows(name, env, indexed)
+    if not rows:
+        return None
+    if subject is None:
+        return [entry for entry in rows if not entry.operands]
+    return [
+        entry
+        for entry in rows
+        if any(_accepts(operand, candidate) for candidate in subject for operand in entry.operands)
+    ]
+
+
+def _legacy_resolve(
+    name: str, subject: frozenset[str] | None, env: TypeEnvironment, indexed: bool | None
+) -> typecheck.RelevanceValue:
+    matched = _legacy_matched(name, subject, env, indexed)
+    if matched is None:
+        return typecheck.RelevanceValue(types=None, platforms=env.universe)
+    return typecheck.RelevanceValue(
+        types=frozenset(entry.return_type for entry in matched),
+        plurality=typecheck._written_plurality(name, matched),
+        platforms=env.platforms_of(matched),
+    )
+
+
+def _property_cases() -> list[tuple[str, frozenset[str] | None]]:
+    """Every 7th property name, written both bare and against the types its
+    rows take, plus names in both spellings and one the tables lack."""
+    names = [*_names(Kind.PROPERTY)[::7], "names", "files", "no such property"]
+    cases: list[tuple[str, frozenset[str] | None]] = []
+    for name in names:
+        rows = inspectors.lookup(name, kind=Kind.PROPERTY)
+        cases.append((name, None))
+        cases.append((name, frozenset(_operand_types(rows)[:3])))
+    return cases
+
+
+def test_property_matches_and_resolutions_match_the_inline_computation() -> None:
+    typecheck._matched_rows.cache_clear()
+    typecheck._property_reading.cache_clear()
+    for env in ENVIRONMENTS:
+        for name, subject in _property_cases():
+            for indexed in (None, True, False):
+                matched = typecheck._matched_rows(name, subject, env, indexed=indexed)
+                want = _legacy_matched(name, subject, env, indexed)
+                assert (None if matched is None else list(matched)) == want, (name, subject, env)
+                resolved = typecheck.resolve_property(name, subject, env, indexed=indexed)
+                assert resolved == _legacy_resolve(name, subject, env, indexed)
+
+
+def test_resolution_reads_the_platform_universe_of_the_environment_it_was_given() -> None:
+    """``TypeEnvironment`` hashes on ``(dialect, platform)`` only, so the
+    cached half must not carry the universe: an environment with a narrower
+    one still gets its own, however warm the cache is."""
+    full = TypeEnvironment.create(Dialect.CLIENT)
+    narrow = TypeEnvironment(dialect=Dialect.CLIENT, _all_platforms=frozenset({"windows"}))
+    for name in ("no such property", "name"):
+        assert typecheck.resolve_property(name, None, full) == _legacy_resolve(
+            name, None, full, None
+        )
+        assert typecheck.resolve_property(name, None, narrow) == _legacy_resolve(
+            name, None, narrow, None
+        )
+    assert typecheck.resolve_property("no such property", None, narrow).platforms == {"windows"}
+
+
+@pytest.mark.parametrize("name", ["_matched_rows", "_property_reading"])
+def test_the_property_memos_are_bounded(name: str) -> None:
+    assert getattr(typecheck, name).cache_info().maxsize is not None
+
+
+def test_matched_rows_hands_out_tuples() -> None:
+    rows = typecheck._matched_rows("name", frozenset({"file"}), ENVIRONMENTS[0])
+    assert isinstance(rows, tuple)
+    assert rows

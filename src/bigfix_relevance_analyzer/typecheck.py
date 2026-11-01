@@ -1110,30 +1110,42 @@ def _binary_rows(
     )
 
 
+_PROPERTY_CACHE_SIZE: Final = 4096
+"""How many ``(name, subject, environment, indexed)`` keys :func:`_matched_rows`
+and :func:`_property_reading` each keep -- bounded for
+:data:`_OPERATION_ROWS_CACHE_SIZE`'s reason: ``subject`` is a type set."""
+
+
+@functools.lru_cache(maxsize=_PROPERTY_CACHE_SIZE)
 def _matched_rows(
     name: str,
     subject: frozenset[str] | None,
     environment: TypeEnvironment,
     *,
     indexed: bool | None = None,
-) -> list[inspectors.Inspector] | None:
+) -> tuple[inspectors.Inspector, ...] | None:
     """The visible property rows ``name`` resolves to against ``subject``.
 
     ``None`` when no visible row carries the name at all -- the "not in this
     snapshot" case :func:`resolve_property` must keep distinct from an empty
     match, which *is* a finding. Parameters mean what they mean there.
+
+    Memoized (#199): a reference is resolved, recorded and sometimes retried
+    against the world, each asking this again, and the same names recur from
+    statement to statement. Every argument is hashable and immutable, and the
+    tables are fixed for the run.
     """
     rows = _visible_rows(name, environment, indexed)
     if not rows:
         return None
 
     if subject is None:
-        return [entry for entry in rows if not entry.operands]
-    return [
+        return tuple(entry for entry in rows if not entry.operands)
+    return tuple(
         entry
         for entry in rows
         if any(_accepts(operand, candidate) for candidate in subject for operand in entry.operands)
-    ]
+    )
 
 
 def _plural_alternative(
@@ -1153,7 +1165,7 @@ def _plural_alternative(
     tables, and only the multivalued ones can raise `Singular expression
     refers to non-unique object.`
     """
-    matched = _matched_rows(name, subject, environment, indexed=indexed) or []
+    matched = _matched_rows(name, subject, environment, indexed=indexed) or ()
     if not all(entry.multivalued for entry in matched):
         return None
     return _sole_plural(matched, name)
@@ -1175,10 +1187,10 @@ def _plural_spelling(
     hazard is not the question: `file "x" whose (...)` cannot collapse, and
     `files "x" whose (...)` is still the better shape.
     """
-    return _sole_plural(_matched_rows(name, subject, environment, indexed=indexed) or [], name)
+    return _sole_plural(_matched_rows(name, subject, environment, indexed=indexed) or (), name)
 
 
-def _sole_plural(matched: list[inspectors.Inspector], name: str) -> str | None:
+def _sole_plural(matched: Sequence[inspectors.Inspector], name: str) -> str | None:
     """The one plural name every row in ``matched`` agrees on, when it differs
     from the ``name`` written; ``None`` for no rows, disagreeing rows, or a
     name already plural."""
@@ -1234,14 +1246,34 @@ def resolve_property(
     declared on the base type, so ``size`` resolves for ``application`` only
     through ``application -> file``.
     """
+    reading = _property_reading(name, subject, environment, indexed)
+    if reading is None:
+        return RelevanceValue(types=None, platforms=environment.universe)
+    types, plurality, contexts = reading
+    # `platforms_of(matched)`, split: the contexts are cached, the universe is
+    # not, because `environment` hashes on (dialect, platform) alone.
+    return RelevanceValue(
+        types=types, plurality=plurality, platforms=contexts & environment.universe
+    )
+
+
+@functools.lru_cache(maxsize=_PROPERTY_CACHE_SIZE)
+def _property_reading(
+    name: str,
+    subject: frozenset[str] | None,
+    environment: TypeEnvironment,
+    indexed: bool | None,
+) -> tuple[frozenset[str], Plurality, frozenset[str]] | None:
+    """The part of :func:`resolve_property` that depends only on its arguments'
+    hashed halves: return types, written plurality, and the contexts that
+    define the matched rows. ``None`` when the name is not in the snapshot."""
     matched = _matched_rows(name, subject, environment, indexed=indexed)
     if matched is None:
-        return RelevanceValue(types=None, platforms=environment.universe)
-
-    return RelevanceValue(
-        types=frozenset(entry.return_type for entry in matched),
-        plurality=_written_plurality(name, matched),
-        platforms=environment.platforms_of(matched),
+        return None
+    return (
+        frozenset(entry.return_type for entry in matched),
+        _written_plurality(name, matched),
+        inspectors._contexts_of(matched),
     )
 
 
@@ -1942,7 +1974,7 @@ class _Checker:
         if index is None or index.types is None or not value.types:
             return value
         given = index.tuple_types | {name for name in index.types if name.startswith("(")}
-        rows = _matched_rows(node.phrase, subject, self.env, indexed=True) or []
+        rows = _matched_rows(node.phrase, subject, self.env, indexed=True) or ()
         if not rows:
             return value
 
