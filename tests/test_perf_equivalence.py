@@ -69,6 +69,28 @@ def _digest(value: Any) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
+def _portable(value: Any, root: Path) -> Any:
+    """``value`` with every path under ``root`` spelled ``<examples>/...``.
+
+    A lint report names each finding's file by the path it was handed, which
+    is absolute here, so without this the baseline pinned the directory the
+    checkout happened to live in -- and failed on CI (#224).
+    """
+    if isinstance(value, dict):
+        return {key: _portable(item, root) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_portable(item, root) for item in value]
+    if isinstance(value, str):
+        prefix = str(root) + "/"
+        if value.startswith(prefix):
+            return "<examples>/" + Path(value).relative_to(root).as_posix()
+    return value
+
+
+def _lint_digest(path: Path, root: Path) -> str:
+    return _digest(_portable(lint_paths_to_dict([path], LintConfig()), root))
+
+
 def _analysis(text: str, dialect: Dialect | None = None, platform: str | None = None) -> str:
     result = analyze(text, dialect, platform)
     resolved = result.resolved_dialect
@@ -124,7 +146,7 @@ def _snapshot() -> dict[str, Any]:
         key = f"examples/{path.relative_to(EXAMPLES).as_posix()}#{index}@L{site.line}"
         statements[key] = _statement(site.text, site)
     lint = {
-        path.relative_to(EXAMPLES).as_posix(): _digest(lint_paths_to_dict([path], LintConfig()))
+        path.relative_to(EXAMPLES).as_posix(): _lint_digest(path, EXAMPLES)
         for path in corpus_files()
     }
     return {"statements": statements, "lint": lint}
@@ -160,3 +182,21 @@ def test_the_baseline_covers_both_corpora_and_every_lint_report() -> None:
     assert sum(key.startswith("corpus/") for key in keys) == len(corpus_cases())
     assert sum(key.startswith("examples/") for key in keys) == len(extracted_sites())
     assert len(pinned["lint"]) == len(corpus_files())
+
+
+def test_a_lint_digest_does_not_depend_on_where_the_checkout_lives(tmp_path: Path) -> None:
+    """A lint report names its file by the path it was given, which is absolute
+    here; the baseline recorded on one machine has to match on CI's. This file
+    has findings, so its report carries that path -- a clean one would not."""
+    source = (
+        EXAMPLES / "client_relevance/properties/global_property_alert_hard_drive_free_space.bes"
+    )
+    digests = set()
+    for checkout in ("one", "elsewhere/two"):
+        root = tmp_path / checkout / "examples"
+        target = root / source.relative_to(EXAMPLES)
+        target.parent.mkdir(parents=True)
+        target.write_bytes(source.read_bytes())
+        assert lint_paths_to_dict([target], LintConfig())["findings"]
+        digests.add(_lint_digest(target, root))
+    assert len(digests) == 1
