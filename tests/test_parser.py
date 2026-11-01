@@ -865,3 +865,11 @@ def test_does_not_before_any_other_word_names_the_verbs() -> None:
         with pytest.raises(ParseError) as info:
             parse(source)
         assert "must be followed by" in info.value.message, source
+
+
+def test_try_parse_never_raises_on_a_digit_that_is_not_decimal() -> None:
+    """#226: `try_parse` is the non-raising entry point, so a superscript after
+    a number is a failed parse, not an exception."""
+    result = try_parse("1\u00b2")
+    assert not result.ok
+    assert try_parse('exists file "x" whose (size of it > 1\u00b2)') is not None

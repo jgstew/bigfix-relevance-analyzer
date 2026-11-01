@@ -502,3 +502,23 @@ def test_its_actions_are_pinned_and_its_token_read_only() -> None:
         assert re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", action), action
     assert "permissions:\n  contents: read" in text
     assert text.count("persist-credentials: false") == text.count("actions/checkout@")
+
+
+def test_a_digit_that_is_not_decimal_in_a_bes_file_is_reported_not_raised(
+    tmp_path: Path,
+) -> None:
+    """#226: the hook lints every staged file in one ``lint_paths`` call, so a
+    tokenizer crash on a superscript in one fixlet lost every file's report."""
+    odd = tmp_path / "odd.bes"
+    odd.write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n<BES>\n<Task>\n'
+        "\t<Relevance>1\u00b2</Relevance>\n"
+        "</Task>\n</BES>\n"
+    )
+    broken = tmp_path / "broken.rel"
+    broken.write_text('exists file "unterminated\n')
+
+    findings = lint_paths([odd, broken], LintConfig(severities=dict(HOOK_DEFAULT_SEVERITIES)))
+    report = _hook_report(findings)
+    assert f"{odd}:4: [" in report
+    assert f"{broken}:1: [" in report

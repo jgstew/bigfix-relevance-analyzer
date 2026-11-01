@@ -1057,3 +1057,38 @@ def test_cli_json_types_a_tuple_by_its_spelling(capsys: pytest.CaptureFixture[st
     main(["--json", TUPLE_STATEMENT])
     payload = json.loads(capsys.readouterr().out)
     assert payload["types"]["types"] == ["( version, string, version )"]
+
+
+# #226: a superscript at a token start crashed the tokenizer, so every layer
+# that lexes first -- which is all of them -- raised. Escapes, not literals: the
+# ASCII pre-commit hook would transliterate a literal superscript two.
+_SUPERSCRIPT_INPUTS = [
+    "1\u00b2",
+    "\u00b2",
+    "x = \u00b2",
+    'exists file "x" whose (size of it > 1\u00b2)',
+]
+
+
+@pytest.mark.parametrize("text", _SUPERSCRIPT_INPUTS)
+def test_every_public_text_entry_point_completes_on_a_digit_that_is_not_decimal(
+    text: str,
+) -> None:
+    import bigfix_relevance_analyzer as pkg
+
+    analysis = analyze_relevance(text)
+    assert analysis.to_dict()
+    analysis.resolved_dialect  # noqa: B018 -- evaluated for the raise, not the value
+    pkg.analyze_relevance_to_dict(text)
+    pkg.analyze_relevance_complexity(text)
+    pkg.score_relevance_complexity(text)
+    pkg.dialect_fit(text)
+    pkg.highlight(text)
+    pkg.autofix_relevance(text)
+    pkg.lint_text(text, pkg.LintConfig())
+    assert pkg.try_parse_relevance(text) is not None
+
+
+def test_cli_reports_on_a_digit_that_is_not_decimal(capsys: pytest.CaptureFixture[str]) -> None:
+    main(["x = \u00b2"])
+    assert capsys.readouterr().out

@@ -1217,3 +1217,13 @@ def test_the_editor_component_snapshots_completion() -> None:
         "    assert name in sys.modules, name\n"
         "print('ok')\n"
     )
+
+
+def test_a_digit_that_is_not_decimal_still_publishes_diagnostics() -> None:
+    """#226: the tokenizer raised on a superscript, `_handle` logged and
+    dropped the notification, and the document's diagnostics went stale."""
+    server = started()
+    did_open(server, "odd.rel", CLIENT)
+    found = diagnostics(did_change(server, "odd.rel", "1\u00b2", 2), "odd.rel")
+    assert found
+    assert all(diagnostic["severity"] == 1 for diagnostic in found)
