@@ -373,3 +373,64 @@ def test_article_is_trivia(article: str) -> None:
 @pytest.mark.parametrize("word", ["thename", "theme", "ant", "a_b", "abc"])
 def test_article_must_be_a_whole_word(word: str) -> None:
     assert code(word) == [(WORD, word)]
+
+
+# ---------------------------------------------------------------------------
+# #199: punctuation is found by first character, not by trying every lexeme
+# ---------------------------------------------------------------------------
+
+
+def test_punctuation_candidates_are_indexed_by_first_character_in_table_order() -> None:
+    """The index `_scan` reads must be :data:`PUNCTUATION` regrouped, never
+    reordered: within one first character, longest-first is what keeps `!=`
+    from lexing as `!` and `=`."""
+    from bigfix_relevance_analyzer.tokenizer import _PUNCTUATION_BY_FIRST, PUNCTUATION
+
+    assert set(_PUNCTUATION_BY_FIRST) == {lexeme[0] for lexeme in PUNCTUATION}
+    for first, candidates in _PUNCTUATION_BY_FIRST.items():
+        assert candidates == tuple(lexeme for lexeme in PUNCTUATION if lexeme[0] == first)
+
+
+def _legacy_kind_and_end(text: str) -> tuple[TokenKind, int]:
+    """The first token's kind and end, the way `_scan` found punctuation
+    before #199: every lexeme of :data:`PUNCTUATION` tried in turn."""
+    import re
+
+    from bigfix_relevance_analyzer import tokenizer
+
+    char = text[0]
+    if char.isspace():
+        return TokenKind.WHITESPACE, re.compile(r"\s+").match(text).end()  # type: ignore[union-attr]
+    if text.startswith("/*"):
+        end = text.find("*/", 2)
+        return (TokenKind.COMMENT, end + 2) if end != -1 else (TokenKind.ERROR, len(text))
+    if char == '"':
+        end = text.find('"', 1)
+        return (TokenKind.STRING, end + 1) if end != -1 else (TokenKind.ERROR, len(text))
+    if char.isdigit():
+        return TokenKind.NUMBER, re.compile(r"\d+").match(text).end()  # type: ignore[union-attr]
+    for lexeme in tokenizer.PUNCTUATION:
+        if text.startswith(lexeme):
+            return TokenKind.PUNCT, len(lexeme)
+    if word := tokenizer._WORD_RE.match(text):
+        if word.end() <= 3 and word.group().lower() in {"a", "an", "the"}:
+            return TokenKind.ARTICLE, word.end()
+        return TokenKind.WORD, word.end()
+    return TokenKind.ERROR, 1
+
+
+def test_scan_agrees_with_trying_every_lexeme_on_every_short_input() -> None:
+    """Exhaustive over three-character strings of every character that starts
+    or continues a punctuation lexeme, plus one of each other token class."""
+    import itertools
+
+    from bigfix_relevance_analyzer.tokenizer import PUNCTUATION, _scan
+
+    alphabet = sorted({char for lexeme in PUNCTUATION for char in lexeme} | set('!.a1 "x'))
+    for length in (1, 2, 3):
+        for chars in itertools.product(alphabet, repeat=length):
+            text = "".join(chars)
+            kind, end = _legacy_kind_and_end(text)
+            assert _scan(text, 0) == (kind, end), text
+            # And not only at offset 0: `_scan` reads from `at`.
+            assert _scan("x" + text, 1) == (kind, end + 1), text
