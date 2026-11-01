@@ -2264,9 +2264,19 @@ def test_visible_rows_are_resolved_once_per_name_and_environment() -> None:
     real statements, against 613 distinct `(name, environment, indexed)`
     combinations. The subject-type narrowing below it still runs per call,
     because that genuinely varies; only the dialect/platform slice is fixed.
-    """
-    from bigfix_relevance_analyzer.typecheck import _visible_rows
 
+    `_matched_rows` and `_property_reading` are memoized in front of it since
+    #199, so they are cleared too: warm from an earlier test, they would answer
+    without asking this one at all.
+    """
+    from bigfix_relevance_analyzer.typecheck import (
+        _matched_rows,
+        _property_reading,
+        _visible_rows,
+    )
+
+    _matched_rows.cache_clear()
+    _property_reading.cache_clear()
     _visible_rows.cache_clear()
     environment = TypeEnvironment.create(Dialect.CLIENT)
     node = parse('name of file "x" & name of folder "y" & name of file "z"')

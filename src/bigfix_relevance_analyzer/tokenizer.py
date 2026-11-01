@@ -74,6 +74,10 @@ logger = logging.getLogger(__name__)
 class TokenKind(enum.Enum):
     """What a token is, lexically -- never what it means."""
 
+    # Members are singletons compared by identity, so this agrees with
+    # equality; Enum's own hash is a Python frame on every set or dict probe (#199).
+    __hash__ = object.__hash__
+
     WORD = "word"
     """A bare word: part of an inspector name, a grammar word, a type name."""
 
@@ -159,6 +163,15 @@ PUNCTUATION: tuple[str, ...] = (
     "<",
     ">",
 )
+
+# `_scan`'s index into PUNCTUATION by first character, each group in table order
+# so longest-first still holds within it. Only a lexeme that starts with the
+# character under the cursor can match there, so this tries the one to three
+# candidates that could rather than all sixteen, per token (#199).
+_PUNCTUATION_BY_FIRST: dict[str, tuple[str, ...]] = {
+    first: tuple(lexeme for lexeme in PUNCTUATION if lexeme[0] == first)
+    for first in dict.fromkeys(lexeme[0] for lexeme in PUNCTUATION)
+}
 
 # Words that carry grammatical structure. This is a *heuristic* set for
 # consumers that want to tell scaffolding from names -- it is not a keyword
@@ -258,7 +271,7 @@ def _scan(text: str, at: int) -> tuple[TokenKind, int]:
     if char.isdigit():
         return TokenKind.NUMBER, _NUMBER_RE.match(text, at).end()  # type: ignore[union-attr]
 
-    for lexeme in PUNCTUATION:
+    for lexeme in _PUNCTUATION_BY_FIRST.get(char, ()):
         if text.startswith(lexeme, at):
             return TokenKind.PUNCT, at + len(lexeme)
 

@@ -1,0 +1,2523 @@
+{
+ "lint": {
+  "client_relevance/analyses/analysis_relevance_complex_property.bes": "1616e03b4b5872b5",
+  "client_relevance/analyses/analysis_relevance_simple_property.bes": "1616e03b4b5872b5",
+  "client_relevance/baselines/baseline_relevance_with_components.bes": "1616e03b4b5872b5",
+  "client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html": "1616e03b4b5872b5",
+  "client_relevance/clientui/clientui_dashboard_no_product_meta.html": "1616e03b4b5872b5",
+  "client_relevance/computer_groups/computer_group_automatic_relevance.bes": "1616e03b4b5872b5",
+  "client_relevance/computer_groups/computer_group_manual_relevance.bes": "1616e03b4b5872b5",
+  "client_relevance/fixlets/fixlet_multi_clause_relevance.bes": "1616e03b4b5872b5",
+  "client_relevance/fixlets/fixlet_registry_and_active_directory_relevance.bes": "1616e03b4b5872b5",
+  "client_relevance/markdown_codeblocks/client_relevance_markdown_codeblock.md": "1616e03b4b5872b5",
+  "client_relevance/plain_text/client_relevance_plain_text.rel": "1616e03b4b5872b5",
+  "client_relevance/properties/global_property_alert_hard_drive_free_space.bes": "a93f8e8fae50d8f5",
+  "client_relevance/properties/global_property_serial_number_universal.bes": "1616e03b4b5872b5",
+  "client_relevance/tasks/task_power_management_sleep_when_idle.bes": "dec832f918277043",
+  "client_relevance/tasks/task_time_based_relevance.bes": "bb94b7c163470494",
+  "mixed_context/task_with_client_and_session_relevance.bes": "1616e03b4b5872b5",
+  "session_relevance/dashboards/dashboard_session_relevance_chart.ojo": "1616e03b4b5872b5",
+  "session_relevance/dashboards/dashboard_session_relevance_html_table.ojo": "1616e03b4b5872b5",
+  "session_relevance/dynamic_javascript/dashboard_relevance_via_javascript_interactive.ojo": "1616e03b4b5872b5",
+  "session_relevance/dynamic_javascript/dashboard_relevance_via_javascript_static_and_dynamic.ojo": "1616e03b4b5872b5",
+  "session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes": "00838444bd0da878",
+  "session_relevance/dynamic_javascript/webreport_relevance_via_javascript.besrpt": "1616e03b4b5872b5",
+  "session_relevance/markdown_codeblocks/session_relevance_markdown_codeblock.md": "1616e03b4b5872b5",
+  "session_relevance/plain_text/session_relevance_plain_text.bsr": "1616e03b4b5872b5",
+  "session_relevance/webreports/webreport_session_relevance_basic.besrpt": "1616e03b4b5872b5",
+  "session_relevance/webreports/webreport_session_relevance_chart.besrpt": "1616e03b4b5872b5"
+ },
+ "statements": {
+  "corpus/arithmetic:0:multiplication binds tighter than addition": {
+   "analyze": "e3299c2b5715f6f3",
+   "analyze/windows": "7fbd868a4cd0a376",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "53ae979b5e846ab7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "d219608ff8f2d6d6"
+  },
+  "corpus/arithmetic:10:a parenthesized comparison is a legal left side (qna: (1 = 1) = true is True)": {
+   "analyze": "e0878e65fba797b9",
+   "analyze/windows": "a9313d217f3b9f96",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "975a2e7a557270ed",
+   "lint": "7f5ab64d65298659",
+   "tokens": "10e201839d202293"
+  },
+  "corpus/arithmetic:11:ordering comparisons do not chain either (qna: 1 < 2 < 3 is a parse error)": {
+   "analyze": "c911dd2138fd0358",
+   "analyze/windows": "baad00d8d77f9683",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "53ae979b5e846ab7",
+   "lint": "e8a710142e02b58b",
+   "tokens": "cb61b448965289d2"
+  },
+  "corpus/arithmetic:12:word-form comparisons do not chain (qna: 1 is 1 is true is a parse error)": {
+   "analyze": "7622a265e0553b5b",
+   "analyze/windows": "ce0c0045a2b39319",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "fe163f1c4667f3d6",
+   "lint": "6f3a2402be9a68b9",
+   "tokens": "6efda9c1e5d66f0e"
+  },
+  "corpus/arithmetic:13:a parenthesized word comparison is a legal left side (qna: (1 is 1) is true is True)": {
+   "analyze": "8783813e17d02c04",
+   "analyze/windows": "7b9ff96900d0f6e9",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "e958609b20baabe3",
+   "lint": "dcff672ad646e86c",
+   "tokens": "5f04acf7e98ab2c4"
+  },
+  "corpus/arithmetic:14:word and symbol comparisons cannot mix either (qna: \"a\" contains \"a\" = true is a parse error)": {
+   "analyze": "abb0ece327ff50d7",
+   "analyze/windows": "f9ab2954711998b7",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "02f69e4f91126d19",
+   "lint": "60166e43acd3c6dd",
+   "tokens": "5d6d68ad529b955b"
+  },
+  "corpus/arithmetic:15:and binds tighter than or": {
+   "analyze": "56211653970786b3",
+   "analyze/windows": "3d1a1c788c982313",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "ead7bc56f48bb512",
+   "lint": "dfb0830291c573c1",
+   "tokens": "9864d359d9d221c9"
+  },
+  "corpus/arithmetic:16:or is looser on both sides": {
+   "analyze": "f71225afabc14e7d",
+   "analyze/windows": "92cee844279a7494",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "5a5fb2811d7b21a1",
+   "lint": "c2c14402489f80e6",
+   "tokens": "3886d9c6415b064c"
+  },
+  "corpus/arithmetic:17:boolean operators are case-insensitive and keep folded spelling": {
+   "analyze": "e86a61019d4741e0",
+   "analyze/windows": "5d77914f8f0ab52a",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "9d038227d612203f",
+   "lint": "ecb3ff0129113f71",
+   "tokens": "24526e66e3c88cda"
+  },
+  "corpus/arithmetic:18:comparison binds tighter than and": {
+   "analyze": "b4b68daf2da0696b",
+   "analyze/windows": "3991266d0849f28a",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "4ac66e2abf996c75",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "e2629b32a8a64053"
+  },
+  "corpus/arithmetic:19:a comparison does not nest inside not (qna: not 1 = 1 demands a boolean of the bare 1)": {
+   "analyze": "559e5127f6efd06c",
+   "analyze/windows": "71637b55dbc1631b",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "c97769e6c69bf6e9",
+   "lint": "ea3e7965bf5a9e19",
+   "tokens": "9ea887b9c6a795c1"
+  },
+  "corpus/arithmetic:1:parens override precedence": {
+   "analyze": "7fe92b1e9e21c1d9",
+   "analyze/windows": "a8519d31e7295a4b",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "975a2e7a557270ed",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "b35f4f2b3dbffd13"
+  },
+  "corpus/arithmetic:20:not does not swallow an and": {
+   "analyze": "de272b9b73dc3e46",
+   "analyze/windows": "6f0fb385752b4f09",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "28ea48cce974938a",
+   "lint": "3cc1ce56655230d4",
+   "tokens": "6b29400988e2a72d"
+  },
+  "corpus/arithmetic:21:not nests": {
+   "analyze": "5dac36b63382e461",
+   "analyze/windows": "5d695c9c6bc4a8ba",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "71a45d409a94be84",
+   "lint": "7c9ee7dc921cf128",
+   "tokens": "55da0870338d85dd"
+  },
+  "corpus/arithmetic:22:unary minus binds only its operand": {
+   "analyze": "c649c4a79b5d4144",
+   "analyze/windows": "6e008bd6775e9709",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "331bb5c185f74b43",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "1692ed90341cdc71"
+  },
+  "corpus/arithmetic:23:unary minus on the right of a binary minus": {
+   "analyze": "0f3495d4421f379a",
+   "analyze/windows": "80ab866d2ddfbd94",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "e27d4902e2805283",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "d488f4de330f13fa"
+  },
+  "corpus/arithmetic:24:a trailing operator is an error at end of input": {
+   "analyze": "22c8f0d032959ac4",
+   "analyze/windows": "c79bf5b3ebec9e0d",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "adb861c3fc216fe3",
+   "lint": "f00ec1584a496029",
+   "tokens": "cfe6234d3d8622e3"
+  },
+  "corpus/arithmetic:25:a doubled operator is an error at the second operator": {
+   "analyze": "00ee1f334b500c9c",
+   "analyze/windows": "3fcefc2640bfb8e1",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "e27d4902e2805283",
+   "lint": "3932eba01cec8a48",
+   "tokens": "7452ce73681dcb35"
+  },
+  "corpus/arithmetic:2:addition is left-associative": {
+   "analyze": "a371cb7d3bc64e29",
+   "analyze/windows": "05b3bfcb04361512",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "53ae979b5e846ab7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "b053960c780932f4"
+  },
+  "corpus/arithmetic:3:division and mod sit with multiplication": {
+   "analyze": "7ace32556ab349b2",
+   "analyze/windows": "d34f97db9b3cc885",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "7cf3d9f0b627c2e7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "1518a08f2bd9b8d2"
+  },
+  "corpus/arithmetic:4:concatenation sits with multiplication, tighter than addition": {
+   "analyze": "7f06a4a34a6cbdca",
+   "analyze/windows": "9cc83e1a20bae3f6",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "53ae979b5e846ab7",
+   "lint": "e26cc9bad9071896",
+   "tokens": "24e13fc900f4038f"
+  },
+  "corpus/arithmetic:5:concatenation is left-associative": {
+   "analyze": "511820ae7f972cb4",
+   "analyze/windows": "cc8560cdd89abb0f",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "181deb5bce12230f",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "8b54adde7114a13b"
+  },
+  "corpus/arithmetic:6:comparison is looser than concatenation": {
+   "analyze": "e67df01e538ed784",
+   "analyze/windows": "51ea054cda6133e2",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "5ce49e1abbee3c78",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "ab4d6d22cb45375b"
+  },
+  "corpus/arithmetic:7:each comparison spelling is preserved": {
+   "analyze": "33ac06ac74185d6c",
+   "analyze/windows": "c68bfae3f16a0b3f",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "d76745e1c7c6413e",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "69407396036186cf"
+  },
+  "corpus/arithmetic:8:two-character comparisons lex and parse whole": {
+   "analyze": "af9654b6bdb9f91a",
+   "analyze/windows": "1fb871573c7775a8",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "d76745e1c7c6413e",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "a0ee426a86990d7c"
+  },
+  "corpus/arithmetic:9:comparisons do not chain (qna: 1 = 1 = true is a parse error)": {
+   "analyze": "9f2226ed611c8dc7",
+   "analyze/windows": "c40b58f2839f6e95",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "53ae979b5e846ab7",
+   "lint": "53bc228032b8fa1f",
+   "tokens": "c5d7f42093f60729"
+  },
+  "corpus/casts:0:a cast names its target type": {
+   "analyze": "ff75864e0c891294",
+   "analyze/windows": "a2750fd856531a40",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "af89c3186cddb3c0",
+   "lint": "e4300811456e5f18",
+   "tokens": "23d46f6be005e7e9"
+  },
+  "corpus/casts:1:casts chain leftward": {
+   "analyze": "b1ca0d3db4777bb5",
+   "analyze/windows": "470ab0044bfee912",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "d5d0f78629f412e7",
+   "lint": "e4300811456e5f18",
+   "tokens": "d7851f95e645c2b7"
+  },
+  "corpus/casts:2:a cast target may be a multi-word type name": {
+   "analyze": "de29b69cd06147d2",
+   "analyze/windows": "087d29cd3b73692e",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "88e64eb7a415f9e1",
+   "lint": "e4300811456e5f18",
+   "tokens": "dfae572c34f88ef6"
+  },
+  "corpus/casts:3:a cast binds tighter than comparison": {
+   "analyze": "ed3f3eb7be95345f",
+   "analyze/windows": "2c64ed55ff334d7f",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "d47303de5d1d8c56",
+   "lint": "e4300811456e5f18",
+   "tokens": "7daab17d5a6b8ddb"
+  },
+  "corpus/casts:4:a cast applies to a whole of chain": {
+   "analyze": "4187fc460dd33531",
+   "analyze/windows": "310f0eae7ae8f196",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "c5dbfdb2a9207dc5",
+   "lint": "a4f06bd289dbfb6d",
+   "tokens": "7c172c9b659d6162"
+  },
+  "corpus/casts:5:parens keep a cast inside an of chain": {
+   "analyze": "48fc26a3a8788c4b",
+   "analyze/windows": "e8ea521c07ca3583",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "1d2f53666a1b8a8a",
+   "lint": "b958d637fdb2a474",
+   "tokens": "0a3ecae9539c91ad"
+  },
+  "corpus/casts:6:a literal casts like anything else": {
+   "analyze": "e31b2d78c33f8a17",
+   "analyze/windows": "fa00ae57ba88749a",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "16bb512f392ca762",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "f660337ae24bc58b"
+  },
+  "corpus/casts:7:a cast target must be a name": {
+   "analyze": "b4c40bb7f2b3e278",
+   "analyze/windows": "5ce69b7e0787be8a",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "c60accc690eb697c",
+   "lint": "9e44d6b3bc4b6787",
+   "tokens": "45ea256bf0d3a0c9"
+  },
+  "corpus/casts:8:a cast target cannot be an operator's first word (qna: 5 as starts / ends / does is a parse error, all targets)": {
+   "analyze": "39a646299266e2ee",
+   "analyze/windows": "1e9df61f4ccd580d",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "1e92ec82bfad6d8b",
+   "lint": "c50567654a85a1a8",
+   "tokens": "188e0e5b4ddc6f9d"
+  },
+  "corpus/casts:9:a cast target may be the singular of a colliding name (qna: 5 as start says operator start is not defined)": {
+   "analyze": "7b4570b7eb3d2443",
+   "analyze/windows": "78c35c94e3f1284d",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "736a5d16fae9728a",
+   "lint": "8e8d4cf09ce4ae5d",
+   "tokens": "b1210ce41d1b9023"
+  },
+  "corpus/conditionals:0:if then else is an expression": {
+   "analyze": "857c94bbb688a48a",
+   "analyze/windows": "718b7704842746b7",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "714218f4c586f4fb",
+   "lint": "71c577f24a8ed8f5",
+   "tokens": "1a9ac7795111345f"
+  },
+  "corpus/conditionals:1:the condition may hold boolean structure": {
+   "analyze": "033d0154058b0a99",
+   "analyze/windows": "9f374c0ead2733e7",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "7440b91e43193f92",
+   "lint": "a4651339287d6950",
+   "tokens": "359020403898cdfb"
+  },
+  "corpus/conditionals:2:the then branch runs to the else": {
+   "analyze": "8626a15ad71182d8",
+   "analyze/windows": "b54f20e450baf1f5",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "93e670e4904143ed",
+   "lint": "71c577f24a8ed8f5",
+   "tokens": "27d194b8ccd5b2c4"
+  },
+  "corpus/conditionals:3:the else branch is greedy to the right": {
+   "analyze": "269fbf197dc71f96",
+   "analyze/windows": "39fe2efcb00c0649",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "dab18d805043cbce",
+   "lint": "71c577f24a8ed8f5",
+   "tokens": "db79122cd46b9a04"
+  },
+  "corpus/conditionals:4:else if chains by nesting": {
+   "analyze": "8cb4811eae8c481a",
+   "analyze/windows": "b30213e9716bf433",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "21d008d2f635e22d",
+   "lint": "f59c5bcf54a9e5bd",
+   "tokens": "04fa4ff7870ad58f"
+  },
+  "corpus/conditionals:5:a parenthesized conditional is an of operand": {
+   "analyze": "242ff17999a0a822",
+   "analyze/windows": "b92355bc46aa4169",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "df7d74ae1584158d",
+   "lint": "a52f43d7955d5bdf",
+   "tokens": "0b5c3464e1a9dfba"
+  },
+  "corpus/conditionals:6:a conditional inside a whose predicate": {
+   "analyze": "b285f139d2fa45bd",
+   "analyze/windows": "81b6ec52554071bb",
+   "dialect_fit": "cf0d6a89c83d0294",
+   "highlight": "3547970854f3465a",
+   "lint": "3584472c7f5f8859",
+   "tokens": "075994db9584b9b1"
+  },
+  "corpus/conditionals:7:a conditional missing its else is an error": {
+   "analyze": "f230e5d7a698f950",
+   "analyze/windows": "78bae9419098a87c",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "b7da917d37bf4605",
+   "lint": "5f28583294e12e22",
+   "tokens": "486c90a2beaddb63"
+  },
+  "corpus/conditionals:8:a conditional missing its then is an error": {
+   "analyze": "52c1f4ce29dbd54d",
+   "analyze/windows": "8d5cfabb5c2ff19c",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "b7da917d37bf4605",
+   "lint": "96d48fdfd975c894",
+   "tokens": "b60f275645c39620"
+  },
+  "corpus/error_fallback:0:the fallback binds tighter than = (qna: 0 = exit code of action | 999 is False, not 999)": {
+   "analyze": "0a8583b04f5e22c0",
+   "analyze/windows": "423b37f0632d6ff7",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "2df1d7e6e4aab2e7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "8edd11d2a7921473"
+  },
+  "corpus/error_fallback:10:a bare product cannot meet | (qna: parse error)": {
+   "analyze": "c3e2d7bef5afdfd3",
+   "analyze/windows": "40232d85857c2c05",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "53ae979b5e846ab7",
+   "lint": "1677a4e2ce0056a6",
+   "tokens": "7b20f6668925f236"
+  },
+  "corpus/error_fallback:11:division cannot meet | either (qna: parse error)": {
+   "analyze": "1c5b0488b37c7e1b",
+   "analyze/windows": "ec302bb0f6fc7205",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "53ae979b5e846ab7",
+   "lint": "4008a3e66fe2348e",
+   "tokens": "53834b82ba34eb26"
+  },
+  "corpus/error_fallback:12:mod cannot meet | either (qna: parse error)": {
+   "analyze": "af76fc881dbabd1c",
+   "analyze/windows": "4a13c9c49c7dfc3a",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "1edb3105c969a96e",
+   "lint": "3815f7dc9549bc83",
+   "tokens": "f56a0fdd2889d13a"
+  },
+  "corpus/error_fallback:13:concatenation cannot meet | either (qna: parse error)": {
+   "analyze": "0027b61ad2679c74",
+   "analyze/windows": "f3e26a7eb98c707b",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "181deb5bce12230f",
+   "lint": "e1e0b323f1734a26",
+   "tokens": "0b034eb5f1f486f8"
+  },
+  "corpus/error_fallback:14:the refusal holds inside a sum (qna: 2 + 2 * 3 | 5 is a parse error)": {
+   "analyze": "20bdc5404a36186b",
+   "analyze/windows": "6711f61e10c7691c",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "e296781d76fd82d3",
+   "lint": "b682ea51fd9f4b0a",
+   "tokens": "ded79734a000fed8"
+  },
+  "corpus/error_fallback:15:exists does not absorb a fallback (qna: exists erroring | false is False, so the exists errored alone)": {
+   "analyze": "466abac521a1465b",
+   "analyze/windows": "2e8546e76142f52e",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "f119934bf3c3c5e7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "40e6f292ad1c7134"
+  },
+  "corpus/error_fallback:16:exists binds tighter than * (qna: exists 1 * 2 says operator times is not defined)": {
+   "analyze": "332f412e9bf747b6",
+   "analyze/windows": "fba314663929c2ee",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "55453772c6fabd5e",
+   "lint": "6cb6974277d82649",
+   "tokens": "70fe4e8502f622af"
+  },
+  "corpus/error_fallback:17:a cast still nests inside exists (qna: exists 5 as string contains \"T\" says contains is not defined)": {
+   "analyze": "102b87b56d20fd86",
+   "analyze/windows": "311abd8c5de60c6b",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "c9b24096109d39a6",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "7ed4ad431b3f6df4"
+  },
+  "corpus/error_fallback:18:not binds tighter than = (qna: not 1 = 1 demands a boolean of the bare 1)": {
+   "analyze": "5e9b06c9457981b1",
+   "analyze/windows": "05601016dfab4004",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "c97769e6c69bf6e9",
+   "lint": "ea3e7965bf5a9e19",
+   "tokens": "338a6fe0df36ecd4"
+  },
+  "corpus/error_fallback:19:not does not absorb a fallback (qna: not (erroring = 0) | true is True)": {
+   "analyze": "6cad8d13124528bd",
+   "analyze/windows": "337d87ed9ca4d9b3",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "b4b20f0910cabcdb",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "f809e217d3944cc2"
+  },
+  "corpus/error_fallback:1:the fallback binds tighter than = on the left too (qna: 1 | 0 = 0 is False)": {
+   "analyze": "940a7699b102bf4f",
+   "analyze/windows": "e213050eb086ed5f",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "53ae979b5e846ab7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "0d124647d5b1a47a"
+  },
+  "corpus/error_fallback:20:a cast still nests inside not (qna: not 5 as boolean fails on the cast, not on not 5)": {
+   "analyze": "7ca1821879314014",
+   "analyze/windows": "c409d8b7698edccc",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "71e778ff4839f98a",
+   "lint": "0d9e51833708b41a",
+   "tokens": "d797527d4555e9bb"
+  },
+  "corpus/error_fallback:21:unary minus binds tighter than the fallback (qna: - erroring | 5 is 5)": {
+   "analyze": "82b2ca1f5c61ecba",
+   "analyze/windows": "c332d40f172286e0",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "98ba241c4a06a71f",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "2de0cdec04ff3de7"
+  },
+  "corpus/error_fallback:2:the fallback binds tighter than * on the left (qna: 1 | 2 * 3 is 3)": {
+   "analyze": "3841c4368dd92b83",
+   "analyze/windows": "ae448eae5a60c804",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "53ae979b5e846ab7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "b08d3ad587b4c18c"
+  },
+  "corpus/error_fallback:3:the fallback binds tighter than + on the left (qna: 1 | 2 + 3 is 4)": {
+   "analyze": "6d5d1259a465a791",
+   "analyze/windows": "c17c35fa97d46036",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "53ae979b5e846ab7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "9e8cfd7a99b64594"
+  },
+  "corpus/error_fallback:4:the fallback binds tighter than + on the right (qna: 2 + erroring | 5 is 7)": {
+   "analyze": "2bdefa5ea1f07523",
+   "analyze/windows": "e0db59cf4e24c3a9",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "53ae979b5e846ab7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "02828cd7d043e2f2"
+  },
+  "corpus/error_fallback:5:the fallback nests as the first factor of a product (qna: 2 + 3 | 5 * 2 is 8)": {
+   "analyze": "8b234b0920561974",
+   "analyze/windows": "632145969fdf9646",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "e296781d76fd82d3",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "22e06ac3e95e89c6"
+  },
+  "corpus/error_fallback:6:a trailing + applies to the fallback's result (qna: erroring | 999 + 1 is 1000)": {
+   "analyze": "3f70c60b01a984df",
+   "analyze/windows": "6b8647c41bc5103f",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "f5419c2523b3e618",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "d47e4d1f2ce02075"
+  },
+  "corpus/error_fallback:7:the fallback binds tighter than or (qna: 1 or 2 | 3 demands a boolean, so 2 | 3 nested)": {
+   "analyze": "33c822c575bd63b2",
+   "analyze/windows": "be6e5511663e9a2e",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "35baeb3d98d5192f",
+   "lint": "4802b9b9d72cba41",
+   "tokens": "a250233b70a4a42d"
+  },
+  "corpus/error_fallback:8:fallbacks chain (qna: 1 | 2 | 3 is 1)": {
+   "analyze": "2d51022a102d35af",
+   "analyze/windows": "114123420eb580ad",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "53ae979b5e846ab7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "60282b98452f0a79"
+  },
+  "corpus/error_fallback:9:a parenthesized product is a legal fallback left side (qna: (2 * 3) | 5 is 6)": {
+   "analyze": "019ef452d27f19b3",
+   "analyze/windows": "ec6d236a6b2a6494",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "975a2e7a557270ed",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "76411e014d7d487c"
+  },
+  "corpus/literals:0:an integer literal": {
+   "analyze": "8e7b2a6c66a55301",
+   "analyze/windows": "2bc479276fe961f9",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "3fbb63444c54b9d6",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "d2c76e3a974d40df"
+  },
+  "corpus/literals:10:an unterminated string is an error at the quote": {
+   "analyze": "97ec60900405a821",
+   "analyze/windows": "1ac8f37253099312",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "bdc9460e8ff48dfa",
+   "lint": "df8fb6bb971f5c1b",
+   "tokens": "fb1edcfd9c090b54"
+  },
+  "corpus/literals:11:empty parens are an error at the closing paren": {
+   "analyze": "233ca0e583a7c17e",
+   "analyze/windows": "5d241a6d28b9e093",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "fa76a920d4aba15e",
+   "lint": "71ad0a65dc1c02d7",
+   "tokens": "f0edf0707f2a032a"
+  },
+  "corpus/literals:12:an unclosed paren is an error at end of input": {
+   "analyze": "409bed4a25dad386",
+   "analyze/windows": "22f7cb00cc1a23e0",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "e33e406b4e183acd",
+   "lint": "e910844ec96092f4",
+   "tokens": "2f5953b90b42db35"
+  },
+  "corpus/literals:13:trailing input after a complete expression": {
+   "analyze": "391350d91063c915",
+   "analyze/windows": "0a21f440a87dd422",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "289ee0403ffe25b0",
+   "lint": "82c7f6ace35eaa6f",
+   "tokens": "c4005eaa03a404e9"
+  },
+  "corpus/literals:1:a decimal point is not valid outside a string -- confirmed live, both engines": {
+   "analyze": "712258ff448459bf",
+   "analyze/windows": "438163c995f60eaa",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "8b360edfd82b8e26",
+   "lint": "e1e99ba371deb0a3",
+   "tokens": "0532d391cae6c5f6"
+  },
+  "corpus/literals:2:a string literal, quotes stripped in the s-expression only": {
+   "analyze": "2c0402df638f5b1c",
+   "analyze/windows": "c279286c31639a6b",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "9906723172c5360c",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "7bd8cb1f553b37e7"
+  },
+  "corpus/literals:3:percent escapes stay verbatim": {
+   "analyze": "802c02f608491906",
+   "analyze/windows": "5e5ae0875ca3e997",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "4e7489ce9b56bf6a",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "afc78ba5bdec3d47"
+  },
+  "corpus/literals:4:a string may span lines": {
+   "analyze": "974084672051f980",
+   "analyze/windows": "26bb9268a3a998cb",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "9906723172c5360c",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "1e9402138c688968"
+  },
+  "corpus/literals:5:it is a distinguished operand": {
+   "analyze": "9f8a21d058b2952b",
+   "analyze/windows": "5d5a3b0bb86f157e",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "fea7b7d31f8eb44e",
+   "lint": "e4300811456e5f18",
+   "tokens": "8dd3e246d9eecc07"
+  },
+  "corpus/literals:6:it is case-insensitive": {
+   "analyze": "61572b7d12cab902",
+   "analyze/windows": "73fe807ef03e58f7",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "fea7b7d31f8eb44e",
+   "lint": "e4300811456e5f18",
+   "tokens": "1ab3103a70be14a2"
+  },
+  "corpus/literals:7:parens group without a node": {
+   "analyze": "ebdb5c7d42647358",
+   "analyze/windows": "72eb0a9f3117eb81",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "ca398570fe1b8464",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "0a9b9c6c1ea2b72f"
+  },
+  "corpus/literals:8:nested parens still group without a node": {
+   "analyze": "ff004aa85c31d64d",
+   "analyze/windows": "b43c5010d1287c71",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "fd214ee07dc47a5d",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "a3e59d7606a2c5d2"
+  },
+  "corpus/literals:9:a comment is trivia around an expression": {
+   "analyze": "c5e4e9e30caf3031",
+   "analyze/windows": "2fd0e679e5883384",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "57bd8ac5afa05d9a",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "2af052edbdab4a7c"
+  },
+  "corpus/name_operator_collisions:0:a plural inspector name that is also an operator's first word": {
+   "analyze": "9af2e236406122e8",
+   "analyze/windows": "fadb8b9e06a54602",
+   "dialect_fit": "74524a790e5d9818",
+   "highlight": "804792435b7b3ffa",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "438c51106fcd9bf2"
+  },
+  "corpus/name_operator_collisions:10:`ends with` wins even when the phrase itself ends in `ends`": {
+   "analyze": "8815d5ffcd183c55",
+   "analyze/windows": "9661118aeb3e0f75",
+   "dialect_fit": "79f512474bbdc16a",
+   "highlight": "b8a4f3c4c59509b0",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "93b2a3b5d69c89de"
+  },
+  "corpus/name_operator_collisions:11:the operator wins on both sides at once": {
+   "analyze": "24850277c3c8f0e0",
+   "analyze/windows": "b6bfbddf7ec7a87a",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "1fdf86ee53d94660",
+   "lint": "ca9323535c7176bb",
+   "tokens": "b6903137754d53c5"
+  },
+  "corpus/name_operator_collisions:12:`does not start with` still matches in full over a colliding name": {
+   "analyze": "c23c8d609be3999d",
+   "analyze/windows": "50d5cffafe0ad5f1",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "dd12af06496aa305",
+   "lint": "d3ed2e5d5e32e428",
+   "tokens": "b8a90627f7dadb5f"
+  },
+  "corpus/name_operator_collisions:13:a cast target still stops at a real operator": {
+   "analyze": "007f824d6d15e09c",
+   "analyze/windows": "5105a63bf9e36e89",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "4146caf9cee0ccf5",
+   "lint": "8e8d4cf09ce4ae5d",
+   "tokens": "eecd997e8568ce82"
+  },
+  "corpus/name_operator_collisions:14:a partial `does not ...` is an error at does, which cannot end a name before not": {
+   "analyze": "c73bf514d58cf46d",
+   "analyze/windows": "94db177f865d4645",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "bdab36b0a5dec26f",
+   "lint": "2aa9f0b37e825b2c",
+   "tokens": "66d9a0b1cad026b9"
+  },
+  "corpus/name_operator_collisions:15:a dangling operator word after a non-reference operand is still an error": {
+   "analyze": "c796908606781aea",
+   "analyze/windows": "c50375f01f65135b",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "53797ad16e9a89c4",
+   "lint": "26ba125a8e044140",
+   "tokens": "6469f9548a9c02b7"
+  },
+  "corpus/name_operator_collisions:16:a dangling operator word after a parenthesized operand is still an error": {
+   "analyze": "e6d504e4a520fbc9",
+   "analyze/windows": "fd20c4e6108a09ef",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "e25cebdd16c30a09",
+   "lint": "4ef0210825301540",
+   "tokens": "4dc24f6d6dc8be37"
+  },
+  "corpus/name_operator_collisions:17:a dangling does not is an error at does (qna: \"a\" does not is a -- the engine skips it, refused as unclear)": {
+   "analyze": "69404fd187fb9402",
+   "analyze/windows": "73d60fa68865cce3",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "086f9626839376cf",
+   "lint": "c183fa5fdded926b",
+   "tokens": "6ebef87cc6305897"
+  },
+  "corpus/name_operator_collisions:18:a dangling bare does is an error too (qna: \"a\" does is a)": {
+   "analyze": "4d2857e7f0bde15d",
+   "analyze/windows": "c2ad6f7e8956e13d",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "9dec6ddf813da18c",
+   "lint": "fcaba71b63a9135d",
+   "tokens": "6293eac0c198b9e0"
+  },
+  "corpus/name_operator_collisions:19:a dangling does not before a comparison is an error (qna: \"a\" does not = \"a\" is True, the negation silently lost)": {
+   "analyze": "dae033f113d97fd7",
+   "analyze/windows": "d21c6506811057e4",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "1332df108ecaf3ed",
+   "lint": "c183fa5fdded926b",
+   "tokens": "73fb360e5defdb7a"
+  },
+  "corpus/name_operator_collisions:1:a multi-word name ending in `starts`": {
+   "analyze": "14c4c6d4059c1dac",
+   "analyze/windows": "a6a71d2261e03915",
+   "dialect_fit": "24999ee0e1a7ada6",
+   "highlight": "f4beddfa8a3d6f8e",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "e9c461879219d480"
+  },
+  "corpus/name_operator_collisions:20:a dangling does not before a closing paren is an error at does (qna: (1 does not) = 1 is True)": {
+   "analyze": "b5b3eac9c8697df1",
+   "analyze/windows": "2e698b67c672e900",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "a4d7b480e51534db",
+   "lint": "1e6d7dd45ca1466f",
+   "tokens": "a04810764d367c7f"
+  },
+  "corpus/name_operator_collisions:21:a dangling does not after a name stops the name at does (qna: name of operating system does not is the name)": {
+   "analyze": "b9c6bc3881d08d27",
+   "analyze/windows": "e496bc4c9aa7bf2b",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "403782ce3eac4323",
+   "lint": "49bc06a1903a8b48",
+   "tokens": "7d429463043ce25b"
+  },
+  "corpus/name_operator_collisions:22:a near-miss verb after does not is an error at does (qna: \"ab\" does not contains \"b\" -- operator \"does\" is not defined)": {
+   "analyze": "44ff046f93c4f552",
+   "analyze/windows": "f68c061dc5c8da80",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "528ee8161d13139a",
+   "lint": "74feae237b489710",
+   "tokens": "71d97cf96a8b2e54"
+  },
+  "corpus/name_operator_collisions:2:a multi-word name ending in `ends`": {
+   "analyze": "7feab783aa342cfd",
+   "analyze/windows": "ceb3acc0c6c5f399",
+   "dialect_fit": "0aec5c7d9bd8580a",
+   "highlight": "bf7e93d7c8403d15",
+   "lint": "a3ed40e5f0fd34a1",
+   "tokens": "6fe789d7b8d74417"
+  },
+  "corpus/name_operator_collisions:3:a colliding name is an ordinary comparison operand": {
+   "analyze": "f205219db7a24f85",
+   "analyze/windows": "1703e853a2105479",
+   "dialect_fit": "24999ee0e1a7ada6",
+   "highlight": "8eecd94591aa51b5",
+   "lint": "47c955fa13d064f0",
+   "tokens": "8c13a55fdeaf093b"
+  },
+  "corpus/name_operator_collisions:4:exists takes a colliding name as its operand": {
+   "analyze": "81bf63ccbb4c90b1",
+   "analyze/windows": "8f8d81a0e071dd07",
+   "dialect_fit": "6431cf776dc286b9",
+   "highlight": "668c97a07aa3d894",
+   "lint": "f0ca1e94d6fff0c0",
+   "tokens": "ed856f6d035ed755"
+  },
+  "corpus/name_operator_collisions:5:not exists takes a colliding name as its operand": {
+   "analyze": "31ee325f54776ffa",
+   "analyze/windows": "16f91df257525727",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "60b1760b198d9fb5",
+   "lint": "a367484a302677b5",
+   "tokens": "241b919e57ebae63"
+  },
+  "corpus/name_operator_collisions:6:aggregation over a colliding name": {
+   "analyze": "8c7ae2130d834883",
+   "analyze/windows": "7aa9f65e7dd014b7",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "a5715380331c072e",
+   "lint": "9327aee25a00ad7e",
+   "tokens": "a5339c6c8828fcda"
+  },
+  "corpus/name_operator_collisions:7:a colliding name filters like any other collection": {
+   "analyze": "782c850def3e19f6",
+   "analyze/windows": "5e48d6ebadc27307",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "0b45ea01ba68b9fa",
+   "lint": "ece35a486ba96ff4",
+   "tokens": "4892e65ce4cedf90"
+  },
+  "corpus/name_operator_collisions:8:the real-world clause this fix was written for": {
+   "analyze": "5436429bb3e4d635",
+   "analyze/windows": "c86344c21fb3c26b",
+   "dialect_fit": "90efc2d6de6d0e6e",
+   "highlight": "31a800dca1417e85",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "e38399fb2b470082"
+  },
+  "corpus/name_operator_collisions:9:`starts with` wins when the name could have absorbed `starts`": {
+   "analyze": "32bc4071e61b9466",
+   "analyze/windows": "052ff5880078de5e",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "06978ff1933977e3",
+   "lint": "a10080292e62023e",
+   "tokens": "5574d930537caee1"
+  },
+  "corpus/of_whose:0:a bare word is a reference": {
+   "analyze": "862776b395fc914e",
+   "analyze/windows": "360cfd58439d16ff",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "e4d60695284ff19f",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "9c513d40f8a9e2fe"
+  },
+  "corpus/of_whose:10:a phrase stops at a word operator": {
+   "analyze": "f72b058350fb9980",
+   "analyze/windows": "5373e646de7a95d5",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "352534e7ce32d43f",
+   "lint": "b531c7fc7729c109",
+   "tokens": "3c4ca5fa689b5729"
+  },
+  "corpus/of_whose:11:whose filters the collection before it": {
+   "analyze": "a3f5e608e3a3b16a",
+   "analyze/windows": "5cc21bbccf76b3e7",
+   "dialect_fit": "cf0d6a89c83d0294",
+   "highlight": "c8e4e3dccefc2540",
+   "lint": "a83d2ba18a167135",
+   "tokens": "98b0763f02c547b5"
+  },
+  "corpus/of_whose:12:whose needs no space before its paren": {
+   "analyze": "121a9f74f0f848be",
+   "analyze/windows": "713eff23b2e19a78",
+   "dialect_fit": "cf0d6a89c83d0294",
+   "highlight": "f0a299947233849f",
+   "lint": "a83d2ba18a167135",
+   "tokens": "f3100c7a6ad68c6c"
+  },
+  "corpus/of_whose:13:whose binds tighter than of on the left": {
+   "analyze": "ca411e473d195177",
+   "analyze/windows": "70446e19c9441d88",
+   "dialect_fit": "f25df6e26c256787",
+   "highlight": "5f46114e9b91839b",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "3d18246c4ffd792f"
+  },
+  "corpus/of_whose:14:whose binds tighter than of on the right": {
+   "analyze": "9a0ba750deecdfb9",
+   "analyze/windows": "7261901f4f70a6ce",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "6dcc69e357fe3de8",
+   "lint": "15ccf259147866f6",
+   "tokens": "4353e1941b6f7563"
+  },
+  "corpus/of_whose:15:exists takes a reference": {
+   "analyze": "30e09797805a01c8",
+   "analyze/windows": "19c48eaea675b8aa",
+   "dialect_fit": "cf0d6a89c83d0294",
+   "highlight": "b81ca101427a097f",
+   "lint": "03f7f5717e79bc16",
+   "tokens": "e1b57410021df16f"
+  },
+  "corpus/of_whose:16:exist is the singular spelling of exists": {
+   "analyze": "012ac9e94350f4f8",
+   "analyze/windows": "535d3329ce7cf821",
+   "dialect_fit": "cf0d6a89c83d0294",
+   "highlight": "1ae92f2c20c57353",
+   "lint": "43b292183a41db40",
+   "tokens": "f53f0c89d7f8d215"
+  },
+  "corpus/of_whose:17:not exists is one negated quantifier": {
+   "analyze": "5a72da816618ac03",
+   "analyze/windows": "e1065c939865b75f",
+   "dialect_fit": "cf0d6a89c83d0294",
+   "highlight": "a2866121effb9eb7",
+   "lint": "505b62e30859a491",
+   "tokens": "e42b4c86b1e0569b"
+  },
+  "corpus/of_whose:18:exists swallows the whole of chain": {
+   "analyze": "c81306b83321c628",
+   "analyze/windows": "590e1c6eba2b54be",
+   "dialect_fit": "0081c6b3c279a40b",
+   "highlight": "85cc350ca31e1775",
+   "lint": "28fee897e100988a",
+   "tokens": "f12728b44e7eb994"
+  },
+  "corpus/of_whose:19:exists swallows a whose filter": {
+   "analyze": "b753fbab93a73c2b",
+   "analyze/windows": "6533bbfdc2048ade",
+   "dialect_fit": "cf0d6a89c83d0294",
+   "highlight": "6173fd84e6015245",
+   "lint": "03f7f5717e79bc16",
+   "tokens": "6d54c50a1c713cab"
+  },
+  "corpus/of_whose:1:adjacent words are one multi-word reference": {
+   "analyze": "aa06a8388246933d",
+   "analyze/windows": "afda64b784ca13b2",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "6ba4df00af97e20a",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "26b0ad4264c8c253"
+  },
+  "corpus/of_whose:20:exists does not swallow a boolean operator": {
+   "analyze": "6e1ac21bd3ed049e",
+   "analyze/windows": "c155cd5f3a01365a",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "d657cdeeffbab515",
+   "lint": "a2e61e1d8afdc099",
+   "tokens": "127353386f215637"
+  },
+  "corpus/of_whose:21:exists does not swallow a comparison": {
+   "analyze": "a08be991de09a89c",
+   "analyze/windows": "cea4f5260e94d2d8",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "f9e4d9c75aa8c48a",
+   "lint": "a0569ba386e88bb7",
+   "tokens": "6b236dc5048ec3b9"
+  },
+  "corpus/of_whose:22:exists accepts a parenthesized operand": {
+   "analyze": "7eb686eba2bc7df3",
+   "analyze/windows": "d7433dc54cfd3ae4",
+   "dialect_fit": "f25df6e26c256787",
+   "highlight": "2d4a64ad099fba20",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "788741fb6fa276f9"
+  },
+  "corpus/of_whose:23:the realistic statement from the tokenizer tests": {
+   "analyze": "3cd1c765c9ef169b",
+   "analyze/windows": "2e3f46d4e5fbe71e",
+   "dialect_fit": "f25df6e26c256787",
+   "highlight": "3b97c152237011d7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "080fc227f705a85e"
+  },
+  "corpus/of_whose:24:a structural word cannot start a reference": {
+   "analyze": "9e602431a695e903",
+   "analyze/windows": "5d0444425ab9da9e",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "6e7c87fcfc84bc13",
+   "lint": "f28fc8ef8679c225",
+   "tokens": "11c465a7d01e72d2"
+  },
+  "corpus/of_whose:25:whose without its parenthesized predicate is an error": {
+   "analyze": "1264a2b05dd81f13",
+   "analyze/windows": "df4e9abdb3179620",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "1bcb888804940223",
+   "lint": "bb671b9f287518e8",
+   "tokens": "c7e2cf6a2f6a2a3d"
+  },
+  "corpus/of_whose:26:it can be the argument of a name": {
+   "analyze": "c24e63c6240c52c4",
+   "analyze/windows": "778aa6e24ac71ee5",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "a3221587b3d732f0",
+   "lint": "6e2094bc140e0851",
+   "tokens": "5ee202153efc6414"
+  },
+  "corpus/of_whose:27:an it argument inside a group, from the dashboard examples": {
+   "analyze": "053cd0487fd48cf2",
+   "analyze/windows": "454945e0d302c8cc",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "722e8f4e14580a66",
+   "lint": "524858aac5199d83",
+   "tokens": "b1bb3da3cbef2c76"
+  },
+  "corpus/of_whose:28:`number of` is aggregation, the sibling of `exists`": {
+   "analyze": "7a04f3ba5eb9ae18",
+   "analyze/windows": "990a07a8e4ef903d",
+   "dialect_fit": "f25df6e26c256787",
+   "highlight": "21cd1d153435bd1e",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "1f826376e27c8a43"
+  },
+  "corpus/of_whose:29:aggregation over a filtered collection": {
+   "analyze": "9d94b41387b58348",
+   "analyze/windows": "7518632e6f5de083",
+   "dialect_fit": "cf0d6a89c83d0294",
+   "highlight": "6f26d873ddf7c974",
+   "lint": "84011672b5e1c11f",
+   "tokens": "347f2b4ae12ba034"
+  },
+  "corpus/of_whose:2:a reference phrase is case-folded and space-normalized": {
+   "analyze": "92b9c6944a0f0e53",
+   "analyze/windows": "41135d4d3e08e7ee",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "5b9bcb1bbbd67497",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "7948f58e8c10bf69"
+  },
+  "corpus/of_whose:30:an indexed `number` is not aggregation": {
+   "analyze": "6e67e7c2e6f70fbb",
+   "analyze/windows": "bd97425a7952a383",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "7d8055a9090bcf8a",
+   "lint": "bf9aa92b979eea77",
+   "tokens": "61cbfe13d17ff1f3"
+  },
+  "corpus/of_whose:3:of joins a property to its object": {
+   "analyze": "c1cd4bccccac5d1b",
+   "analyze/windows": "1c8e68b710a5eda2",
+   "dialect_fit": "17540a36ca502612",
+   "highlight": "f57c9b29fcd9f1f7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "4fb10f58dcb2ce6a"
+  },
+  "corpus/of_whose:4:of is right-associative": {
+   "analyze": "2a7babcfeabade5b",
+   "analyze/windows": "4f05d8b289b6025b",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "e8ae03090a1066c3",
+   "lint": "23d7864f4811e177",
+   "tokens": "226550dcd760e2c7"
+  },
+  "corpus/of_whose:5:a string index binds to the name before any of": {
+   "analyze": "e6541b9b9684f163",
+   "analyze/windows": "2625e9ac60bdd61b",
+   "dialect_fit": "c4dbf305b8a57a14",
+   "highlight": "260d24609015510b",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "49155ecbcbee343f"
+  },
+  "corpus/of_whose:6:a number index binds the same way": {
+   "analyze": "e4173f2504020196",
+   "analyze/windows": "cc214f3fac1a5938",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "05b5bf1cba146755",
+   "lint": "d3ed2e5d5e32e428",
+   "tokens": "f17043e81d106fce"
+  },
+  "corpus/of_whose:7:a parenthesized index binds the same way": {
+   "analyze": "76976796ee11f69e",
+   "analyze/windows": "68763ed54e6d9f3f",
+   "dialect_fit": "c4dbf305b8a57a14",
+   "highlight": "7f2bc3f9aedeacb1",
+   "lint": "61df2cedd1061f74",
+   "tokens": "daab23cccb4ce9ff"
+  },
+  "corpus/of_whose:8:of binds tighter than comparison": {
+   "analyze": "3a73ec1e474152e9",
+   "analyze/windows": "bcd59ff42391070f",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "ceceb3d6c80a1936",
+   "lint": "a4f06bd289dbfb6d",
+   "tokens": "b72eeea250303f5e"
+  },
+  "corpus/of_whose:9:of binds tighter than arithmetic": {
+   "analyze": "8c5345bfbc1352da",
+   "analyze/windows": "5924ca36aa41086f",
+   "dialect_fit": "2cab623013b26188",
+   "highlight": "f5ceebacf279b3bf",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "ce627f66cc3d7fc8"
+  },
+  "corpus/real_world:0:the client relevance example from the corpus": {
+   "analyze": "245cf3617ab2312b",
+   "analyze/windows": "1b4121593ecdfc79",
+   "dialect_fit": "fd848c4a4d2c4acc",
+   "highlight": "79093fcf2acb1aff",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "7935e6abb8945ada"
+  },
+  "corpus/real_world:1:the session relevance example from the corpus": {
+   "analyze": "59d89160fb67b87b",
+   "analyze/windows": "e9c40ed9ac4e5a8b",
+   "dialect_fit": "1b80fc936c333966",
+   "highlight": "1af556a0bc82a0fc",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "a87ac8ecf50798b1"
+  },
+  "corpus/real_world:2:the docker package check, with conditionals as of operands": {
+   "analyze": "b1279b0152f0ce32",
+   "analyze/windows": "3b0e58b3e9b4fba9",
+   "dialect_fit": "5f920b248befd0af",
+   "highlight": "32fbb8eb3b585afa",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "e697d2b1fef2ed09"
+  },
+  "corpus/real_world:3:the registry search list walk, casts and filters chained under of": {
+   "analyze": "47e7342a05da1e88",
+   "analyze/windows": "2e258e548944be55",
+   "dialect_fit": "051b390712f4d506",
+   "highlight": "720fb92725891960",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "420c27c68b6039ff"
+  },
+  "corpus/real_world:4:negation of a bare phrase": {
+   "analyze": "787c53286f248287",
+   "analyze/windows": "8d4c67e1b1ef1ab0",
+   "dialect_fit": "b8df2adfd0482701",
+   "highlight": "5e3b9d60ec9618ee",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "4429ab9c0450f6aa"
+  },
+  "corpus/real_world:5:the smbios structure check with tuple indexing": {
+   "analyze": "b8732d1c4c5f5a3c",
+   "analyze/windows": "5036ba1cd63eba71",
+   "dialect_fit": "fd44450035a4e605",
+   "highlight": "14c732a9f1bb5d0d",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "e223882502330f34"
+  },
+  "corpus/tuples_collections:0:a comma builds a tuple": {
+   "analyze": "f8284bf21641dbe8",
+   "analyze/windows": "63368443593aef0a",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "487858ec4ba3a64c",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "e24779328bb5c32a"
+  },
+  "corpus/tuples_collections:10:a trailing comma is an error": {
+   "analyze": "7eef16963ba233f5",
+   "analyze/windows": "666292e063ab393f",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "30ca2343d6322469",
+   "lint": "67acc6870814c334",
+   "tokens": "50aae01bb7e14887"
+  },
+  "corpus/tuples_collections:11:a tuple index is its own node, not a property access": {
+   "analyze": "237b5ab19225c6bf",
+   "analyze/windows": "6726274d07f8286a",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "8643b97f36fdda9f",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "1557e531efad0d3a"
+  },
+  "corpus/tuples_collections:12:the plural spelling is the same node, marked plural (qna: `items 1 of (\"a\",\"b\") | \"x\"` is `A singular expression is required.`)": {
+   "analyze": "1b356ccb650cff3d",
+   "analyze/windows": "82262a6b9c13eaf2",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "853ef6cca6886e58",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "671dca95a87965e2"
+  },
+  "corpus/tuples_collections:13:a tuple index too big for an integer is still a tuple index; the checker refuses it (qna: \"integer constant was too large\" / \"not an integer literal\", all targets)": {
+   "analyze": "45180d8576adb6e3",
+   "analyze/windows": "e41e514205f48cbc",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "83c319ccb03728e7",
+   "lint": "cb97841919c57e05",
+   "tokens": "4c6140bcb3389871"
+  },
+  "corpus/tuples_collections:14:a string tuple index is an error, not a property (qna: item \"foo\" of folder is \"tuple index which was not an integer literal\", all targets)": {
+   "analyze": "d1aa6076cf3168c0",
+   "analyze/windows": "dddbcf7720dff430",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "af3ab3ba37e7f9cb",
+   "lint": "c29cf87b3bb129bf",
+   "tokens": "f09656cb0a9a5a9d"
+  },
+  "corpus/tuples_collections:15:a computed tuple index is an error too (qna: item (0+1) of (1,2) is \"not an integer literal\")": {
+   "analyze": "5428a5b4a86e18c5",
+   "analyze/windows": "6f760be567b45c30",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "92104e5d9fb43a1e",
+   "lint": "4aa7c74714e8b07b",
+   "tokens": "d5f799dd07c86ed9"
+  },
+  "corpus/tuples_collections:16:a parenthesized integer literal is still a tuple index (qna: item (1) of (1,2) is 2)": {
+   "analyze": "f05e8d6c2d84494b",
+   "analyze/windows": "49947ac0fe18c757",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "05c1b943f81a0522",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "ab296b6c25337fc5"
+  },
+  "corpus/tuples_collections:17:the plural `items` is a property too, not aggregation": {
+   "analyze": "e70f0ac7353ffb4f",
+   "analyze/windows": "dd1c8b43677e03dd",
+   "dialect_fit": "ecc715f26bceb2fb",
+   "highlight": "eb21e9e754445da6",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "75fb4cfd03f30259"
+  },
+  "corpus/tuples_collections:18:a decimal-point index is not writable -- there is no such numeral syntax": {
+   "analyze": "91d0e886c9058800",
+   "analyze/windows": "646e996165a6a90b",
+   "dialect_fit": "94c9621d6425af30",
+   "highlight": "0f0804410a45f42a",
+   "lint": "c4afc72674877680",
+   "tokens": "1487fc4ccb3ea0d4"
+  },
+  "corpus/tuples_collections:19:the error fallback is its own node, not a binary operator": {
+   "analyze": "119e41c927dc6df2",
+   "analyze/windows": "0c437f6733ef8a22",
+   "dialect_fit": "7c8f88f1b1ffb0b5",
+   "highlight": "ae224a382d015f07",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "1deb9bf011be55d4"
+  },
+  "corpus/tuples_collections:1:tuples are flat, not nested pairs": {
+   "analyze": "c292bbe450da6019",
+   "analyze/windows": "7f6dc118417c5e85",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "efbc311b852c08f7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "ed606940deb19f75"
+  },
+  "corpus/tuples_collections:2:parens nest a tuple inside a tuple (qna: item 1 of ((1, 2), 3) is 3)": {
+   "analyze": "855363998cd89731",
+   "analyze/windows": "8be60a24812b2d70",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "44b1fcde1c95b9c2",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "b63a952222dd6b92"
+  },
+  "corpus/tuples_collections:3:a semicolon builds a collection": {
+   "analyze": "c33f8d957e689e16",
+   "analyze/windows": "8caad319b00c73f2",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "efbc311b852c08f7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "1e3a886fd71b72f2"
+  },
+  "corpus/tuples_collections:4:comma binds tighter than semicolon": {
+   "analyze": "cdfa9a8fc1057900",
+   "analyze/windows": "e5867f7b23bbd025",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "146eb7e5e6feb952",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "5d93d535283ded0b"
+  },
+  "corpus/tuples_collections:5:the error fallback binds tighter than a comma": {
+   "analyze": "b6a4652e86d4650a",
+   "analyze/windows": "62a360fe054a17f7",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "062e9f4c0a191572",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "d8c8aa518ac9144d"
+  },
+  "corpus/tuples_collections:6:the error fallback is looser than an of chain": {
+   "analyze": "2db1625adbf6ff55",
+   "analyze/windows": "f46782933f5d2e10",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "cfa77649319cf819",
+   "lint": "a4f06bd289dbfb6d",
+   "tokens": "98dcec158d78518e"
+  },
+  "corpus/tuples_collections:7:a set literal is a collection under of": {
+   "analyze": "09a8649fd56bfb7e",
+   "analyze/windows": "89e94b4c7cde01a5",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "f0fe4d9e825498da",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "c2f8a69db66e4b72"
+  },
+  "corpus/tuples_collections:8:a tuple is an of operand": {
+   "analyze": "567ffcf204fb2ed0",
+   "analyze/windows": "c49b7f5524789137",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "db86c719b4ef1c86",
+   "lint": "9bf74202619821d4",
+   "tokens": "5db3da338751df27"
+  },
+  "corpus/tuples_collections:9:a collection of of-chains": {
+   "analyze": "50168ad1270a43c5",
+   "analyze/windows": "064af22b5ed26472",
+   "dialect_fit": "2ac2c14e2575a7f8",
+   "highlight": "996090bfed0854cd",
+   "lint": "a649eddcda1e5dcf",
+   "tokens": "07dca9680189391c"
+  },
+  "corpus/versions:0:a version literal is a reference with a string index": {
+   "analyze": "9f2632bfa9980d8a",
+   "analyze/windows": "706d2af2d95ca48c",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "19131f9a5e1e9ef2",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "eb77df1b32f3eb34"
+  },
+  "corpus/versions:1:a one-component version literal is the same shape": {
+   "analyze": "d8777b1b5972f671",
+   "analyze/windows": "84d2cb7c509ea23b",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "eddb85445b6826b7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "69396b8ea90aa8bc"
+  },
+  "corpus/versions:2:a string cast to version is a cast, not a reference": {
+   "analyze": "e99611fd050a2634",
+   "analyze/windows": "3b8d66f45b524f45",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "dff19eed3f8c8f0c",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "45724786de4b9218"
+  },
+  "corpus/versions:3:version as a property of an object is an of chain": {
+   "analyze": "fb5a9bb62fc7b97f",
+   "analyze/windows": "51e5f7bc13201c66",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "f57c9b29fcd9f1f7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "d5fb5c63c0638a75"
+  },
+  "corpus/versions:4:pad of wraps the version literal, not the comparison": {
+   "analyze": "918ba6517e5649cc",
+   "analyze/windows": "af87e05b3539d1fd",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "ac70eb043a9560df",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "28b6def1c0afc933"
+  },
+  "corpus/versions:5:a padded comparison keeps pad on each side": {
+   "analyze": "2ccac3941746d716",
+   "analyze/windows": "117fef528318030a",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "09e4c7cba403df48",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "1eb1b8135872dfab"
+  },
+  "corpus/versions:6:a version literal compared against a bare string": {
+   "analyze": "6b9ca0ae0b1ab1c5",
+   "analyze/windows": "b9fa398cb83ec77e",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "f5e1aabd8eacdc61",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "ed79cfc8903888d7"
+  },
+  "corpus/versions:7:a cast binds tighter than the comparison it sits in": {
+   "analyze": "e6582bc94a7d4db8",
+   "analyze/windows": "2945f8ae59db6140",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "e20d086180bcfa44",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "977502c026c995c5"
+  },
+  "corpus/versions:8:the operator spelling is kept as written, not canonicalized": {
+   "analyze": "9374d102cf82929e",
+   "analyze/windows": "719daf1f1abb71e1",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "a38c96a1c6284881",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "d2e468f1c7a8acbf"
+  },
+  "corpus/versions:9:strverscmp version is a distinct multi-word cast target": {
+   "analyze": "2a134bc6f3d908f4",
+   "analyze/windows": "a70937e5789632a1",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "19abb27644b104b7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "f1896dea47f6e016"
+  },
+  "corpus/word_operators:0:contains is a comparison": {
+   "analyze": "2b013272f3771aae",
+   "analyze/windows": "0aef56ee6acc1566",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "fa7a9c9c90d76ece",
+   "lint": "e4300811456e5f18",
+   "tokens": "8f7df8efbad8348d"
+  },
+  "corpus/word_operators:10:a shorter prefix still matches when the longer form does not continue": {
+   "analyze": "14842913c303a9a3",
+   "analyze/windows": "6791615ee30a1ee3",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "fc910a8395988bc6",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "f044e33b52304043"
+  },
+  "corpus/word_operators:11:is contained by": {
+   "analyze": "7a6767f4be872e4d",
+   "analyze/windows": "000d28d47e28102c",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "b6b318f34f9d7eca",
+   "lint": "c7e3cbc53d8c5629",
+   "tokens": "8a052ee6feba41bb"
+  },
+  "corpus/word_operators:12:word comparisons bind looser than of on both sides": {
+   "analyze": "5067f103de2d393a",
+   "analyze/windows": "1a5c24be02120ad6",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "d3be7354c439e731",
+   "lint": "d3ed2e5d5e32e428",
+   "tokens": "a7af947aadc7cfb3"
+  },
+  "corpus/word_operators:13:word comparisons bind tighter than and": {
+   "analyze": "5b165709cfcb4f42",
+   "analyze/windows": "6dbfe02a932054e1",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "aa8cf802d61a3349",
+   "lint": "573f8fb04f0166b8",
+   "tokens": "71be9ae152366ffc"
+  },
+  "corpus/word_operators:14:a real filter: trimmed substrings": {
+   "analyze": "a70cd1f1d148913c",
+   "analyze/windows": "3c70b3723f406792",
+   "dialect_fit": "211e037c06a6e63f",
+   "highlight": "84b448e731b0538e",
+   "lint": "31649106f9143088",
+   "tokens": "5b4536dff1ffc383"
+  },
+  "corpus/word_operators:15:does not equal is one negated operator (issue 51)": {
+   "analyze": "ba77a830876e4566",
+   "analyze/windows": "d471018dade4f046",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "66659d57b7763d73",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "f67213dec43b8be3"
+  },
+  "corpus/word_operators:16:is not greater than is one operator, not is-not around an inspector (issue 51)": {
+   "analyze": "3baeeab67413e745",
+   "analyze/windows": "03391b45ea85a110",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "f44bdec898da6900",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "07537f6793624c7a"
+  },
+  "corpus/word_operators:17:is not greater than or equal to takes the longest match (issue 51)": {
+   "analyze": "8b2b02c24fe1cb08",
+   "analyze/windows": "21d51cff82266658",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "936caa0dcd2e1e33",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "78363fd45303aa4f"
+  },
+  "corpus/word_operators:18:is not less than (issue 51)": {
+   "analyze": "4ff18dbd89dc7adf",
+   "analyze/windows": "b2e1a6f4a7f659d7",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "d93f0ccc290204a0",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "15bf12597e2e8a0f"
+  },
+  "corpus/word_operators:19:is not less than or equal to (issue 51)": {
+   "analyze": "49cc09a8e4f33ee5",
+   "analyze/windows": "64be760b94e7ae78",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "6d03779545913ea7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "f1e766959dfe4c1e"
+  },
+  "corpus/word_operators:1:starts with is one operator across two words": {
+   "analyze": "9fa68c2302095494",
+   "analyze/windows": "64adc997bba08a9b",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "70eba6014eb196cd",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "82e394c78efa5c45"
+  },
+  "corpus/word_operators:2:word operators fold their case": {
+   "analyze": "598d0dbe46105acd",
+   "analyze/windows": "6efb6060fceb0b4a",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "70eba6014eb196cd",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "c6a5840c1e65ae10"
+  },
+  "corpus/word_operators:3:ends with": {
+   "analyze": "2c9cd1cb9350ab2f",
+   "analyze/windows": "e681bb35309caefc",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "2be4a884c10496f5",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "450c04d1e613e8fc"
+  },
+  "corpus/word_operators:4:negated word operators are one operator": {
+   "analyze": "d0ad76d34db690b4",
+   "analyze/windows": "b133dacd4906710b",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "810935520b9d7ef6",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "d668fd6cb4405d3f"
+  },
+  "corpus/word_operators:5:does not start with": {
+   "analyze": "d67633c1a7e38f2d",
+   "analyze/windows": "c00801047edec18b",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "eeebe10ad2934d56",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "fc1584be787ef8d7"
+  },
+  "corpus/word_operators:6:is compares like =, keeping its spelling": {
+   "analyze": "891697559398fe87",
+   "analyze/windows": "aff5918a5c1777a4",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "d76745e1c7c6413e",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "a066b84733c26a42"
+  },
+  "corpus/word_operators:7:is not is one operator, not is around a not": {
+   "analyze": "3457ca3bd29ec63f",
+   "analyze/windows": "c8db8e06132b1f28",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "2b13d0443a48e60a",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "e3c94ed2c42c6a6c"
+  },
+  "corpus/word_operators:8:equals keeps its spelling": {
+   "analyze": "ef0960a7029795af",
+   "analyze/windows": "0950d122b411ed6e",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "69fc2952e8f8db0d",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "995926ec7a1fb892"
+  },
+  "corpus/word_operators:9:the trie takes the longest operator that matches": {
+   "analyze": "bb13d076050a63c0",
+   "analyze/windows": "124fe9a8cb821bb7",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "7f14adee36347778",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "3ada0f211f3e6a65"
+  },
+  "examples/client_relevance/analyses/analysis_relevance_complex_property.bes#0@L6": {
+   "analyze": "164443b43831689a",
+   "analyze/site": "136231f7c5606172",
+   "analyze/windows": "2f973c533a28c386",
+   "dialect_fit": "9f922fa6a8ea2e72",
+   "highlight": "d5045d2df9ddf87e",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "622e4f8abf497c16"
+  },
+  "examples/client_relevance/analyses/analysis_relevance_complex_property.bes#1@L14": {
+   "analyze": "b09242b6c28f3aa1",
+   "analyze/site": "29e021fac6e3f76f",
+   "analyze/windows": "ef896bd30343c97b",
+   "dialect_fit": "ad5ca84e8996a151",
+   "highlight": "bb87225c49a7ee54",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "8556b91f46a5863e"
+  },
+  "examples/client_relevance/analyses/analysis_relevance_simple_property.bes#0@L6": {
+   "analyze": "6da0909de0de65cb",
+   "analyze/site": "8a435ecbace4ae24",
+   "analyze/windows": "83af68e3e2038f26",
+   "dialect_fit": "cf0d6a89c83d0294",
+   "highlight": "3ede6cb2a9223610",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "fddc1c2426dd3b1c"
+  },
+  "examples/client_relevance/analyses/analysis_relevance_simple_property.bes#1@L14": {
+   "analyze": "6cc6b74ab8ba1b33",
+   "analyze/site": "e2fa946e63df9b41",
+   "analyze/windows": "f00f167c4be46268",
+   "dialect_fit": "8ce818366f35240f",
+   "highlight": "57ef38ba5ce3f792",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "87e445176f554e52"
+  },
+  "examples/client_relevance/baselines/baseline_relevance_with_components.bes#0@L6": {
+   "analyze": "c6a13d38471f6962",
+   "analyze/site": "1ecf5954af371991",
+   "analyze/windows": "df253d9e43bd7be8",
+   "dialect_fit": "81f22a42feb5335d",
+   "highlight": "2378993cbd658486",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "8726740792e49c48"
+  },
+  "examples/client_relevance/baselines/baseline_relevance_with_components.bes#1@L7": {
+   "analyze": "110c4adf793257ae",
+   "analyze/site": "cdaa7a4bf746a8f9",
+   "analyze/windows": "3e251cbb5c82a790",
+   "dialect_fit": "d4c512c9934125fd",
+   "highlight": "c869bb906e34bb10",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "405260e46e3733ab"
+  },
+  "examples/client_relevance/baselines/baseline_relevance_with_components.bes#2@L8": {
+   "analyze": "0acd51a271c1ca07",
+   "analyze/site": "781f8b03cab2d043",
+   "analyze/windows": "c955cc22e188aeed",
+   "dialect_fit": "5ca86e2e2a3726d9",
+   "highlight": "14731743b6be4851",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "16820bfb9e739cf5"
+  },
+  "examples/client_relevance/baselines/baseline_relevance_with_components.bes#3@L25": {
+   "analyze": "6ced4319fe453ecd",
+   "analyze/site": "ac25c5a057687123",
+   "analyze/windows": "7f5df79e5a5ae668",
+   "dialect_fit": "7870cf0321701edb",
+   "highlight": "4ee81f4230fb4ba5",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "192477ac12f44bb2"
+  },
+  "examples/client_relevance/baselines/baseline_relevance_with_components.bes#4@L29": {
+   "analyze": "8d5a15bfa011806d",
+   "analyze/site": "0c57997fb215221b",
+   "analyze/windows": "135d645dae42afa8",
+   "dialect_fit": "7870cf0321701edb",
+   "highlight": "abb957fc22c40436",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "70927b77692ece5a"
+  },
+  "examples/client_relevance/baselines/baseline_relevance_with_components.bes#5@L34": {
+   "analyze": "519283348867a1c6",
+   "analyze/site": "c39e2a55dbdc9d7c",
+   "analyze/windows": "e730fdd072da0602",
+   "dialect_fit": "afea610559a79328",
+   "highlight": "8e38b4a57be3c6f8",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "eabddc354d828010"
+  },
+  "examples/client_relevance/baselines/baseline_relevance_with_components.bes#6@L40": {
+   "analyze": "ce82bd598a203a02",
+   "analyze/site": "794ca78a084dd238",
+   "analyze/windows": "5904e44911ae15ea",
+   "dialect_fit": "d4c512c9934125fd",
+   "highlight": "0cc8f406c6986585",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "1aa9f8e7f7d7fd22"
+  },
+  "examples/client_relevance/baselines/baseline_relevance_with_components.bes#7@L45": {
+   "analyze": "4c054c35c3c57e41",
+   "analyze/site": "55b4a45cdaff14dd",
+   "analyze/windows": "9fc8d8c1d51b37ec",
+   "dialect_fit": "d4c512c9934125fd",
+   "highlight": "84b9d1d97195750a",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "c2d2c2cfe822ccb4"
+  },
+  "examples/client_relevance/baselines/baseline_relevance_with_components.bes#8@L50": {
+   "analyze": "5bd9e6d4f818a36b",
+   "analyze/site": "1083cd361eb762aa",
+   "analyze/windows": "9e3e7fa4b8aac8ad",
+   "dialect_fit": "dc0f8698c22bed97",
+   "highlight": "fd25246cc1991f8c",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "92adf3959617f330"
+  },
+  "examples/client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html#0@L27": {
+   "analyze": "712c429833b40082",
+   "analyze/site": "b2be83d37aba22e4",
+   "analyze/windows": "4234584e06590506",
+   "dialect_fit": "3f1312805ab0c444",
+   "highlight": "25d156e3079f84b7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "9e7aab6a7b8075dd"
+  },
+  "examples/client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html#1@L28": {
+   "analyze": "231d164ae5e50225",
+   "analyze/site": "ede136b6993ef753",
+   "analyze/windows": "eabc12a97935d0b3",
+   "dialect_fit": "3f1312805ab0c444",
+   "highlight": "1df91e951c40996a",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "cfad70ab094daee0"
+  },
+  "examples/client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html#2@L31": {
+   "analyze": "3ac287ef1c1f59f6",
+   "analyze/site": "869b81ca1b92d166",
+   "analyze/windows": "a84080b67d48d16d",
+   "dialect_fit": "6e4d446b35252a4a",
+   "highlight": "fc159a8dacb1b73d",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "78a5a86f61112ad1"
+  },
+  "examples/client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html#3@L67": {
+   "analyze": "52486a4c64c03769",
+   "analyze/site": "e8a276b6502f8068",
+   "analyze/windows": "d2d5c3f05fac5079",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "20640adb6b9feb86",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "af2d16adf4e0d7e6"
+  },
+  "examples/client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html#4@L68": {
+   "analyze": "e86aa1be14f3282c",
+   "analyze/site": "1cb1a0700aa883a3",
+   "analyze/windows": "660e23ee65129682",
+   "dialect_fit": "4dde6772a52178c3",
+   "highlight": "ff0c062d008b8900",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "8cc2753deb78f3ba"
+  },
+  "examples/client_relevance/clientui/clientui_dashboard_client_relevance_substitution.html#5@L69": {
+   "analyze": "36e65708d085d3be",
+   "analyze/site": "359298337d324813",
+   "analyze/windows": "f0c77dffe89ced8a",
+   "dialect_fit": "4c1db5cc741d15fa",
+   "highlight": "846f608911467981",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "2e950b1060f63e7c"
+  },
+  "examples/client_relevance/clientui/clientui_dashboard_no_product_meta.html#0@L11": {
+   "analyze": "bc1db0ab827d7b6f",
+   "analyze/site": "b55a96eb09c36e1e",
+   "analyze/windows": "9b631c2ae492e293",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "647fb05357d9b2a3",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "efd7e2a6236bfc7e"
+  },
+  "examples/client_relevance/computer_groups/computer_group_automatic_relevance.bes#0@L8": {
+   "analyze": "3185c2d08e8fdd1b",
+   "analyze/site": "efb44387e5811045",
+   "analyze/windows": "9e57070f1368bf7a",
+   "dialect_fit": "fd44450035a4e605",
+   "highlight": "14c732a9f1bb5d0d",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "afc3fe4b02286aed"
+  },
+  "examples/client_relevance/computer_groups/computer_group_manual_relevance.bes#0@L8": {
+   "analyze": "da725c82c2e12b79",
+   "analyze/site": "5748778b17c16bd2",
+   "analyze/windows": "1684734dbefee638",
+   "dialect_fit": "afea610559a79328",
+   "highlight": "f05278d8fa353bce",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "ac1b85bb22132ddc"
+  },
+  "examples/client_relevance/fixlets/fixlet_multi_clause_relevance.bes#0@L6": {
+   "analyze": "c1cd4bccccac5d1b",
+   "analyze/site": "a22008392e592175",
+   "analyze/windows": "1c8e68b710a5eda2",
+   "dialect_fit": "17540a36ca502612",
+   "highlight": "f57c9b29fcd9f1f7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "4fb10f58dcb2ce6a"
+  },
+  "examples/client_relevance/fixlets/fixlet_multi_clause_relevance.bes#1@L7": {
+   "analyze": "0c8b4cddc4695fac",
+   "analyze/site": "18ecd7fc570d5940",
+   "analyze/windows": "3f1495da96f8bf20",
+   "dialect_fit": "cf0d6a89c83d0294",
+   "highlight": "42fd917ae2bb1ea7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "a2984ffe8d27a83b"
+  },
+  "examples/client_relevance/fixlets/fixlet_registry_and_active_directory_relevance.bes#0@L6": {
+   "analyze": "c1cd4bccccac5d1b",
+   "analyze/site": "a22008392e592175",
+   "analyze/windows": "1c8e68b710a5eda2",
+   "dialect_fit": "17540a36ca502612",
+   "highlight": "f57c9b29fcd9f1f7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "4fb10f58dcb2ce6a"
+  },
+  "examples/client_relevance/fixlets/fixlet_registry_and_active_directory_relevance.bes#1@L7": {
+   "analyze": "394e161b74861e80",
+   "analyze/site": "9fbc61b166a8336f",
+   "analyze/windows": "7671553d1eb16155",
+   "dialect_fit": "0b51f4d49c65cccd",
+   "highlight": "78282f557116416f",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "9da3533f1c62e534"
+  },
+  "examples/client_relevance/fixlets/fixlet_registry_and_active_directory_relevance.bes#2@L8": {
+   "analyze": "0017ba05db219de5",
+   "analyze/site": "43ff2617ed7dead0",
+   "analyze/windows": "9312af1072d30acc",
+   "dialect_fit": "051b390712f4d506",
+   "highlight": "5005993652689799",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "d21c2807590dd68a"
+  },
+  "examples/client_relevance/fixlets/fixlet_registry_and_active_directory_relevance.bes#3@L9": {
+   "analyze": "7bce6bf2712f5743",
+   "analyze/site": "0394a40957fc8dae",
+   "analyze/windows": "7c5146ae64d00586",
+   "dialect_fit": "2b2d55422e09617f",
+   "highlight": "4b2122073f48752f",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "796ec29dfabbefd9"
+  },
+  "examples/client_relevance/fixlets/fixlet_registry_and_active_directory_relevance.bes#4@L31": {
+   "analyze": "088aed6981617c77",
+   "analyze/site": "da05475a0ec44982",
+   "analyze/windows": "caf7c734f1d390b9",
+   "dialect_fit": "2b2d55422e09617f",
+   "highlight": "79bc50a1e69b9b11",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "16a1ff10db7b14ae"
+  },
+  "examples/client_relevance/markdown_codeblocks/client_relevance_markdown_codeblock.md#0@L6": {
+   "analyze": "8a6f2f316ed82f35",
+   "analyze/site": "caae5312ff4e1f0f",
+   "analyze/windows": "bdce878ca98d1ba7",
+   "dialect_fit": "0fc466da596f41fd",
+   "highlight": "6e68a90e3ab0bbba",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "3fafeed4990401d8"
+  },
+  "examples/client_relevance/plain_text/client_relevance_plain_text.rel#0@L1": {
+   "analyze": "245cf3617ab2312b",
+   "analyze/site": "b066aa52cd9b5157",
+   "analyze/windows": "1b4121593ecdfc79",
+   "dialect_fit": "fd848c4a4d2c4acc",
+   "highlight": "79093fcf2acb1aff",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "7935e6abb8945ada"
+  },
+  "examples/client_relevance/properties/global_property_alert_hard_drive_free_space.bes#0@L3": {
+   "analyze": "a2627b8ee43748b5",
+   "analyze/site": "5286de79d6f4abf0",
+   "analyze/windows": "cfeaa888a651f062",
+   "dialect_fit": "478f82f3b05be206",
+   "highlight": "f5ba20e6e93cc574",
+   "lint": "7629e8ce9805d349",
+   "tokens": "32a9a3b3ecd2dde3"
+  },
+  "examples/client_relevance/properties/global_property_serial_number_universal.bes#0@L3": {
+   "analyze": "55dad8d51e2878b6",
+   "analyze/site": "8ab2ca27cdbd0de4",
+   "analyze/windows": "0b26a1e4a2b68052",
+   "dialect_fit": "39903e33abfacc87",
+   "highlight": "868a6f9de55001a3",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "6adebac2b9fe95cc"
+  },
+  "examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes#0@L7": {
+   "analyze": "34a2dd2eb1f8c41b",
+   "analyze/site": "ae44111cb500272f",
+   "analyze/windows": "59ff33acb171490f",
+   "dialect_fit": "b8df2adfd0482701",
+   "highlight": "6f079a35d97fa684",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "c045c1bcddaf70af"
+  },
+  "examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes#1@L8": {
+   "analyze": "c5ef33d39df3058b",
+   "analyze/site": "26fc2143c65aa438",
+   "analyze/windows": "303068d00273eebe",
+   "dialect_fit": "81f22a42feb5335d",
+   "highlight": "e208ca2920ac5612",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "8f1122157707454b"
+  },
+  "examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes#2@L9": {
+   "analyze": "b0276b9577bd4a9d",
+   "analyze/site": "10b8db23b0792965",
+   "analyze/windows": "0ecdc57ff2f5d8f7",
+   "dialect_fit": "0e371d7a443d2d4f",
+   "highlight": "ff28b890b9eaf77d",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "3e26b2c3b5db7eea"
+  },
+  "examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes#3@L10": {
+   "analyze": "ec9e4b36ab393af3",
+   "analyze/site": "3b44ededf92d99eb",
+   "analyze/windows": "d8056f9a06fd9cc8",
+   "dialect_fit": "0e371d7a443d2d4f",
+   "highlight": "177b3149f4037e55",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "48e57163066ee69b"
+  },
+  "examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes#4@L11": {
+   "analyze": "1f047ef9caca5b51",
+   "analyze/site": "681024769c46af61",
+   "analyze/windows": "6646f4db584dbd8f",
+   "dialect_fit": "7783d55d5fa6403c",
+   "highlight": "0c9788d818775989",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "b779f93e6cc3f1df"
+  },
+  "examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes#5@L12": {
+   "analyze": "9d0902982efb2d15",
+   "analyze/site": "1073362d487a91d5",
+   "analyze/windows": "8f0369a218574316",
+   "dialect_fit": "3a8e051f1442bc10",
+   "highlight": "fcd654fee5ad5dc3",
+   "lint": "297d9f3d1bc8d977",
+   "tokens": "b4b1b3134fc90b8c"
+  },
+  "examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes#6@L13": {
+   "analyze": "4a29d3073c18ea3d",
+   "analyze/site": "cb80acace381b17f",
+   "analyze/windows": "cf3aa87b780d415d",
+   "dialect_fit": "90efc2d6de6d0e6e",
+   "highlight": "63636180c8dcf8f6",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "59b71f6ae15a943c"
+  },
+  "examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes#7@L33": {
+   "analyze": "c1cd4bccccac5d1b",
+   "analyze/site": "a22008392e592175",
+   "analyze/windows": "1c8e68b710a5eda2",
+   "dialect_fit": "17540a36ca502612",
+   "highlight": "f57c9b29fcd9f1f7",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "4fb10f58dcb2ce6a"
+  },
+  "examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes#8@L39": {
+   "analyze": "5b7ac19c9b320669",
+   "analyze/site": "f2065614cc2ab0e4",
+   "analyze/windows": "6c9f235659d6ec46",
+   "dialect_fit": "91c477052b26624e",
+   "highlight": "6b1b2a524108e3e5",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "6b1f87ed222d75cc"
+  },
+  "examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes#9@L45": {
+   "analyze": "c6a13d38471f6962",
+   "analyze/site": "1ecf5954af371991",
+   "analyze/windows": "df253d9e43bd7be8",
+   "dialect_fit": "81f22a42feb5335d",
+   "highlight": "2378993cbd658486",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "8726740792e49c48"
+  },
+  "examples/client_relevance/tasks/task_time_based_relevance.bes#0@L6": {
+   "analyze": "c6a13d38471f6962",
+   "analyze/site": "1ecf5954af371991",
+   "analyze/windows": "df253d9e43bd7be8",
+   "dialect_fit": "81f22a42feb5335d",
+   "highlight": "2378993cbd658486",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "8726740792e49c48"
+  },
+  "examples/client_relevance/tasks/task_time_based_relevance.bes#1@L7": {
+   "analyze": "ff3a262de3934e8a",
+   "analyze/site": "931177839a7b89ff",
+   "analyze/windows": "0f4448b2c4121928",
+   "dialect_fit": "0c7465828289bb66",
+   "highlight": "dd0009ca62c6ae60",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "3397e2b502ef67ca"
+  },
+  "examples/client_relevance/tasks/task_time_based_relevance.bes#2@L28": {
+   "analyze": "055606db94304703",
+   "analyze/site": "4ef3136260b2f1f5",
+   "analyze/windows": "970025471fcc1a27",
+   "dialect_fit": "ef4e0df615ccf3d3",
+   "highlight": "0bd8e1163aa6874f",
+   "lint": "301472d4939bdfd6",
+   "tokens": "ba23b15d5e921934"
+  },
+  "examples/client_relevance/tasks/task_time_based_relevance.bes#3@L28": {
+   "analyze": "5272dfe74a4be26c",
+   "analyze/site": "0746174b871a3465",
+   "analyze/windows": "75bef90b7a09b1d0",
+   "dialect_fit": "17540a36ca502612",
+   "highlight": "f5a2b87f4d9676c3",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "7cacf03507bcfcb2"
+  },
+  "examples/mixed_context/task_with_client_and_session_relevance.bes#0@L7": {
+   "analyze": "7ee8eca7545f2872",
+   "analyze/site": "0d9f543eccdfd27d",
+   "analyze/windows": "01db96cdd913bdbf",
+   "dialect_fit": "db28a07679ab1517",
+   "highlight": "0cd755bec3df2b25",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "ee71e3c2acc646df"
+  },
+  "examples/mixed_context/task_with_client_and_session_relevance.bes#1@L9": {
+   "analyze": "787c53286f248287",
+   "analyze/site": "628626ab844e5ff5",
+   "analyze/windows": "8d4c67e1b1ef1ab0",
+   "dialect_fit": "b8df2adfd0482701",
+   "highlight": "5e3b9d60ec9618ee",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "4429ab9c0450f6aa"
+  },
+  "examples/session_relevance/dashboards/dashboard_session_relevance_chart.ojo#0@L20": {
+   "analyze": "ec3231e548807949",
+   "analyze/site": "b54ed251782d6154",
+   "analyze/windows": "98ce2bfce95b5768",
+   "dialect_fit": "c080747582cd41f8",
+   "highlight": "a7f04bd93ed4894b",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "cde3f3c97eccc4a8"
+  },
+  "examples/session_relevance/dashboards/dashboard_session_relevance_html_table.ojo#0@L16": {
+   "analyze": "585a55229551d142",
+   "analyze/site": "85ea3f47522a60dc",
+   "analyze/windows": "824070a773d8a70c",
+   "dialect_fit": "0efccb2180e6add3",
+   "highlight": "8ae09c2013cbdb55",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "b4134ff1ef37de1f"
+  },
+  "examples/session_relevance/dashboards/dashboard_session_relevance_html_table.ojo#1@L17": {
+   "analyze": "6c30e1e3cd19166c",
+   "analyze/site": "a0de8113407f085e",
+   "analyze/windows": "fc8b78c29e69f4ac",
+   "dialect_fit": "0efccb2180e6add3",
+   "highlight": "c1d2679585127e5e",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "1ca00594af80df1f"
+  },
+  "examples/session_relevance/dashboards/dashboard_session_relevance_html_table.ojo#2@L18": {
+   "analyze": "ebf67299370cc93a",
+   "analyze/site": "5c5103a73a94b174",
+   "analyze/windows": "3e0bf74fe9664c31",
+   "dialect_fit": "0efccb2180e6add3",
+   "highlight": "b14c9edace380b20",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "ce485e76f54c4819"
+  },
+  "examples/session_relevance/dashboards/dashboard_session_relevance_html_table.ojo#3@L25": {
+   "analyze": "d620722bd86e5423",
+   "analyze/site": "25ef81438d420ded",
+   "analyze/windows": "cbdfb7d594d6c8d1",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "9b23e9c3bdb5e4d3",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "5cc37ec9b292c458"
+  },
+  "examples/session_relevance/dynamic_javascript/dashboard_relevance_via_javascript_static_and_dynamic.ojo#0@L19": {
+   "analyze": "7ef70809afc09c18",
+   "analyze/site": "1e692a40049a1fb9",
+   "analyze/windows": "35b948e4c8067322",
+   "dialect_fit": "2a40c714ae3c554b",
+   "highlight": "e0195cd29c0b6d88",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "6664f314d7b637d5"
+  },
+  "examples/session_relevance/dynamic_javascript/dashboard_relevance_via_javascript_static_and_dynamic.ojo#1@L24": {
+   "analyze": "4b5bb183544220ed",
+   "analyze/site": "f5070e32ed71da45",
+   "analyze/windows": "56c12638ab6c20ff",
+   "dialect_fit": "2a40c714ae3c554b",
+   "highlight": "4f6cbdbda52e9f1c",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "0bb44b8e10ec5a92"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#0@L13": {
+   "analyze": "1ce430b99f9de5ef",
+   "analyze/site": "797a8307ecc7b24e",
+   "analyze/windows": "e2ba56f795b211ff",
+   "dialect_fit": "ff91bf19cd45f03f",
+   "highlight": "840db3ace092e503",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "6f6445193e47338c"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#10@L24": {
+   "analyze": "464a2b06df1bfa33",
+   "analyze/site": "73e2dfcdff05c797",
+   "analyze/windows": "7b454af28d11b0fa",
+   "dialect_fit": "c4ce4be9b73f2a28",
+   "highlight": "b6a31ee405846b54",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "26866fc69d0b45c5"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#11@L24": {
+   "analyze": "1ce430b99f9de5ef",
+   "analyze/site": "797a8307ecc7b24e",
+   "analyze/windows": "e2ba56f795b211ff",
+   "dialect_fit": "ff91bf19cd45f03f",
+   "highlight": "840db3ace092e503",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "6f6445193e47338c"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#12@L24": {
+   "analyze": "c611836bcaa0b2a4",
+   "analyze/site": "8e12c27efd16a574",
+   "analyze/windows": "b088e2b7dd43a312",
+   "dialect_fit": "c89db4501e4f67d9",
+   "highlight": "178edf2725783d35",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "333c2d14e308d070"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#13@L24": {
+   "analyze": "0126e02c48bc0de4",
+   "analyze/site": "7b7d35332e81d6e1",
+   "analyze/windows": "931baf791cd12df9",
+   "dialect_fit": "3d92473aef4774c2",
+   "highlight": "7c2f7f7c1a0ff37a",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "ccfee14aeba7c3cf"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#14@L30": {
+   "analyze": "e90f6a21efe9f262",
+   "analyze/site": "ee7c3a67f203cdfc",
+   "analyze/windows": "a614a282e77cd383",
+   "dialect_fit": "17540a36ca502612",
+   "highlight": "3b5e681e696aa434",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "dcea0ac670c21125"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#15@L31": {
+   "analyze": "600b56c445a0672a",
+   "analyze/site": "8f83cd751d63194f",
+   "analyze/windows": "10d515efbe755d89",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "231ea533ac942b58",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "31223cde90fc7026"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#16@L32": {
+   "analyze": "78c278c778237567",
+   "analyze/site": "20941b6b6cfbf93b",
+   "analyze/windows": "b51263fc89858079",
+   "dialect_fit": "46ff0dd76237fc6c",
+   "highlight": "9054ad7426d9f9c2",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "1dfab92d877d7eb5"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#17@L33": {
+   "analyze": "b1380e2883407847",
+   "analyze/site": "47350c581b1c1881",
+   "analyze/windows": "6c4492fba2358f98",
+   "dialect_fit": "f403c140735450cd",
+   "highlight": "4d7f5a9feb4aa9af",
+   "lint": "480ccef6baba8c94",
+   "tokens": "1d1559fb94676d5b"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#18@L85": {
+   "analyze": "c22d261b3b7e14ab",
+   "analyze/site": "ffc047aabdae0843",
+   "analyze/windows": "bb6c8835057cd5cc",
+   "dialect_fit": "2cfeab9fae9a1cf7",
+   "highlight": "bbada54a9f403291",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "2357e43ebaf76f23"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#19@L85": {
+   "analyze": "e61091f07036ca10",
+   "analyze/site": "d68c14fac112f959",
+   "analyze/windows": "cedbc228ee5851a7",
+   "dialect_fit": "e1d70fe885fc91b1",
+   "highlight": "4f453ef2269ebc6d",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "574d962a02a22f47"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#1@L14": {
+   "analyze": "464a2b06df1bfa33",
+   "analyze/site": "73e2dfcdff05c797",
+   "analyze/windows": "7b454af28d11b0fa",
+   "dialect_fit": "c4ce4be9b73f2a28",
+   "highlight": "b6a31ee405846b54",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "26866fc69d0b45c5"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#20@L88": {
+   "analyze": "d73140901d550fe3",
+   "analyze/site": "4ae578cc3832aaab",
+   "analyze/windows": "d8479cb22083399f",
+   "dialect_fit": "2cfeab9fae9a1cf7",
+   "highlight": "625b5db148177fe0",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "0cbae4ae1f895847"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#21@L88": {
+   "analyze": "e61091f07036ca10",
+   "analyze/site": "d68c14fac112f959",
+   "analyze/windows": "cedbc228ee5851a7",
+   "dialect_fit": "e1d70fe885fc91b1",
+   "highlight": "4f453ef2269ebc6d",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "574d962a02a22f47"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#22@L88": {
+   "analyze": "141cbec79d8500dd",
+   "analyze/site": "54865bc1a6cc03a8",
+   "analyze/windows": "cdcec9bb695e4589",
+   "dialect_fit": "2cfeab9fae9a1cf7",
+   "highlight": "34fe7135700e97b5",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "9fb3272f1e858ac5"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#23@L92": {
+   "analyze": "852ebb9874b2ee9f",
+   "analyze/site": "91f15074f5a3e4b8",
+   "analyze/windows": "31e84fd841baff04",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "c10f86d922063c0c",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "29974b8b47f772d9"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#24@L95": {
+   "analyze": "1d227198fde720e1",
+   "analyze/site": "05e843094d84a0f4",
+   "analyze/windows": "4e60a2d785da9cb7",
+   "dialect_fit": "2cfeab9fae9a1cf7",
+   "highlight": "e457384a0a49e188",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "88eb5dd01dbe7a0f"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#25@L95": {
+   "analyze": "e61091f07036ca10",
+   "analyze/site": "d68c14fac112f959",
+   "analyze/windows": "cedbc228ee5851a7",
+   "dialect_fit": "e1d70fe885fc91b1",
+   "highlight": "4f453ef2269ebc6d",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "574d962a02a22f47"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#26@L95": {
+   "analyze": "1fc71afd23dd51d9",
+   "analyze/site": "aac8443567d17685",
+   "analyze/windows": "bbf1875450b5083d",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "377eec395298662b",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "553b446e13c6d5f9"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#27@L95": {
+   "analyze": "e56395df2d817d30",
+   "analyze/site": "3bf88c34e66f436a",
+   "analyze/windows": "63bc47a84bcb5636",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "5fe7a44c6ecf7234",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "686caf60bf0bd33a"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#28@L95": {
+   "analyze": "b447f793e3b02e1c",
+   "analyze/site": "4bd669b53977ca65",
+   "analyze/windows": "f7a638971c04730f",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "e95c77a08a4ae90f",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "cc90a574047c04b1"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#29@L95": {
+   "analyze": "baa51382f825a626",
+   "analyze/site": "652054c1968271be",
+   "analyze/windows": "866ef69bd07a2cb1",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "a381fcf19a23a375",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "2974051c2c8c5aa0"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#2@L15": {
+   "analyze": "d1b719c5b06dfaae",
+   "analyze/site": "b9709f518f728710",
+   "analyze/windows": "89244d96aedde7b9",
+   "dialect_fit": "a5da8c0bd4d0819c",
+   "highlight": "7cb38281e7769fff",
+   "lint": "f8d3540ca6de8079",
+   "tokens": "2fdaa1b474dbc56c"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#30@L95": {
+   "analyze": "b18ecf3713f8a910",
+   "analyze/site": "8e0b09228f1b35f2",
+   "analyze/windows": "cddc3251195ac782",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "377eec395298662b",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "b607fadc60c3d080"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#31@L95": {
+   "analyze": "1fc71afd23dd51d9",
+   "analyze/site": "aac8443567d17685",
+   "analyze/windows": "bbf1875450b5083d",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "377eec395298662b",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "553b446e13c6d5f9"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#32@L105": {
+   "analyze": "897018bb28029b33",
+   "analyze/site": "76f03a990a2c7eb4",
+   "analyze/windows": "d0fd31c8d07f8bb9",
+   "dialect_fit": "f9c1a92e8bd6024e",
+   "highlight": "6abd3e5db93284cb",
+   "lint": "a7ea8d6d9e653662",
+   "tokens": "c1b0167193d8371c"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#33@L112": {
+   "analyze": "4c13ff9036186e50",
+   "analyze/site": "8704d3b39f0f1508",
+   "analyze/windows": "3463879ad7d133ce",
+   "dialect_fit": "d92663b9fd6826e8",
+   "highlight": "c50bdf716741c95a",
+   "lint": "0c2dfb2f3c028972",
+   "tokens": "3de0f48aec8eb7b1"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#34@L114": {
+   "analyze": "1d227198fde720e1",
+   "analyze/site": "05e843094d84a0f4",
+   "analyze/windows": "4e60a2d785da9cb7",
+   "dialect_fit": "2cfeab9fae9a1cf7",
+   "highlight": "e457384a0a49e188",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "88eb5dd01dbe7a0f"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#35@L114": {
+   "analyze": "22e858d9ad725b1f",
+   "analyze/site": "cb3e73228b6ca6e5",
+   "analyze/windows": "2af3de9caf326f0f",
+   "dialect_fit": "fb840a4edc8ddfe9",
+   "highlight": "1f7c092bfcd96695",
+   "lint": "4174c0ae38f9a8dd",
+   "tokens": "c9417d1a54334d24"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#36@L114": {
+   "analyze": "bdd9399621c13fb6",
+   "analyze/site": "1f024c9bc0b59720",
+   "analyze/windows": "c7ac4a5b1a3953b0",
+   "dialect_fit": "0759d11f7ba4383a",
+   "highlight": "ac05fa5feb113d39",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "3da013fcfb767413"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#37@L114": {
+   "analyze": "1fc71afd23dd51d9",
+   "analyze/site": "aac8443567d17685",
+   "analyze/windows": "bbf1875450b5083d",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "377eec395298662b",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "553b446e13c6d5f9"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#38@L114": {
+   "analyze": "e56395df2d817d30",
+   "analyze/site": "3bf88c34e66f436a",
+   "analyze/windows": "63bc47a84bcb5636",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "5fe7a44c6ecf7234",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "686caf60bf0bd33a"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#39@L114": {
+   "analyze": "b447f793e3b02e1c",
+   "analyze/site": "4bd669b53977ca65",
+   "analyze/windows": "f7a638971c04730f",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "e95c77a08a4ae90f",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "cc90a574047c04b1"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#3@L16": {
+   "analyze": "c611836bcaa0b2a4",
+   "analyze/site": "8e12c27efd16a574",
+   "analyze/windows": "b088e2b7dd43a312",
+   "dialect_fit": "c89db4501e4f67d9",
+   "highlight": "178edf2725783d35",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "333c2d14e308d070"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#40@L114": {
+   "analyze": "baa51382f825a626",
+   "analyze/site": "652054c1968271be",
+   "analyze/windows": "866ef69bd07a2cb1",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "a381fcf19a23a375",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "2974051c2c8c5aa0"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#41@L114": {
+   "analyze": "b18ecf3713f8a910",
+   "analyze/site": "8e0b09228f1b35f2",
+   "analyze/windows": "cddc3251195ac782",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "377eec395298662b",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "b607fadc60c3d080"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#42@L114": {
+   "analyze": "1fc71afd23dd51d9",
+   "analyze/site": "aac8443567d17685",
+   "analyze/windows": "bbf1875450b5083d",
+   "dialect_fit": "0e4d73446065bb68",
+   "highlight": "377eec395298662b",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "553b446e13c6d5f9"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#43@L119": {
+   "analyze": "a88c5d153d71190a",
+   "analyze/site": "173d82a60c12354b",
+   "analyze/windows": "a77b6a3c57449c0f",
+   "dialect_fit": "032f477e8db393ea",
+   "highlight": "a975cfbdf6d131ef",
+   "lint": "c6ba807980173ce9",
+   "tokens": "2112e66d1277c2c4"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#4@L17": {
+   "analyze": "43302da84b76829e",
+   "analyze/site": "ca31003d235435a9",
+   "analyze/windows": "e8b6b67ca9b1b218",
+   "dialect_fit": "3d92473aef4774c2",
+   "highlight": "0142baf385999e62",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "353349af118a71d8"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#5@L18": {
+   "analyze": "1ce430b99f9de5ef",
+   "analyze/site": "797a8307ecc7b24e",
+   "analyze/windows": "e2ba56f795b211ff",
+   "dialect_fit": "ff91bf19cd45f03f",
+   "highlight": "840db3ace092e503",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "6f6445193e47338c"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#6@L18": {
+   "analyze": "43302da84b76829e",
+   "analyze/site": "ca31003d235435a9",
+   "analyze/windows": "e8b6b67ca9b1b218",
+   "dialect_fit": "3d92473aef4774c2",
+   "highlight": "0142baf385999e62",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "353349af118a71d8"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#7@L18": {
+   "analyze": "c611836bcaa0b2a4",
+   "analyze/site": "8e12c27efd16a574",
+   "analyze/windows": "b088e2b7dd43a312",
+   "dialect_fit": "c89db4501e4f67d9",
+   "highlight": "178edf2725783d35",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "333c2d14e308d070"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#8@L24": {
+   "analyze": "1be6a1e1a50c88aa",
+   "analyze/site": "9f04ba589236789f",
+   "analyze/windows": "b318064e93850034",
+   "dialect_fit": "c89db4501e4f67d9",
+   "highlight": "a1d52a076134578e",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "2f6644615f5d1c2c"
+  },
+  "examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes#9@L24": {
+   "analyze": "187c7d6a7952754a",
+   "analyze/site": "99f1778d5f57a969",
+   "analyze/windows": "37fc9ec28cb89fda",
+   "dialect_fit": "7850d33c5a1c90fe",
+   "highlight": "a78519e789303ce6",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "ead735654fe5620e"
+  },
+  "examples/session_relevance/dynamic_javascript/webreport_relevance_via_javascript.besrpt#0@L18": {
+   "analyze": "585a55229551d142",
+   "analyze/site": "85ea3f47522a60dc",
+   "analyze/windows": "824070a773d8a70c",
+   "dialect_fit": "0efccb2180e6add3",
+   "highlight": "8ae09c2013cbdb55",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "b4134ff1ef37de1f"
+  },
+  "examples/session_relevance/dynamic_javascript/webreport_relevance_via_javascript.besrpt#1@L20": {
+   "analyze": "6c30e1e3cd19166c",
+   "analyze/site": "a0de8113407f085e",
+   "analyze/windows": "fc8b78c29e69f4ac",
+   "dialect_fit": "0efccb2180e6add3",
+   "highlight": "c1d2679585127e5e",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "1ca00594af80df1f"
+  },
+  "examples/session_relevance/dynamic_javascript/webreport_relevance_via_javascript.besrpt#2@L21": {
+   "analyze": "ebf67299370cc93a",
+   "analyze/site": "5c5103a73a94b174",
+   "analyze/windows": "3e0bf74fe9664c31",
+   "dialect_fit": "0efccb2180e6add3",
+   "highlight": "b14c9edace380b20",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "ce485e76f54c4819"
+  },
+  "examples/session_relevance/markdown_codeblocks/session_relevance_markdown_codeblock.md#0@L11": {
+   "analyze": "8955d00499efc818",
+   "analyze/site": "0a9729817fb42af5",
+   "analyze/windows": "d30d2e1becdbd189",
+   "dialect_fit": "bda3390e29b2304f",
+   "highlight": "36b5e14fc566f760",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "f135be1792b20698"
+  },
+  "examples/session_relevance/plain_text/session_relevance_plain_text.bsr#0@L1": {
+   "analyze": "a5a9d177660aad09",
+   "analyze/site": "54bed8541a85ebad",
+   "analyze/windows": "d057a1bf146dc028",
+   "dialect_fit": "1b80fc936c333966",
+   "highlight": "d6332cf67076328b",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "569b220708a69170"
+  },
+  "examples/session_relevance/webreports/webreport_session_relevance_basic.besrpt#0@L3": {
+   "analyze": "d9baa7e25dacd2c1",
+   "analyze/site": "7907f3619fa623a6",
+   "analyze/windows": "4b02d81350bef2da",
+   "dialect_fit": "1aa2726040ec8db9",
+   "highlight": "6d528d795a45ad15",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "562de90d4e89dbd6"
+  },
+  "examples/session_relevance/webreports/webreport_session_relevance_chart.besrpt#0@L40": {
+   "analyze": "9fdb2f0ef5c8ba8c",
+   "analyze/site": "0cb65a40b9b88cd5",
+   "analyze/windows": "4f0cd6d72e2bd891",
+   "dialect_fit": "b080140a72ff1dd7",
+   "highlight": "1509c522fd036f16",
+   "lint": "4f53cda18c2baa0c",
+   "tokens": "1d172a253e455925"
+  }
+ }
+}

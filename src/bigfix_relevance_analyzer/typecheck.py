@@ -134,6 +134,10 @@ class Plurality(enum.Enum):
     diagnostics treat it -- they interpolate ``'{plurality} {type}'``.
     """
 
+    # Members are singletons compared by identity, so this agrees with
+    # equality; Enum's own hash is a Python frame on every set or dict probe (#199).
+    __hash__ = object.__hash__
+
     SINGULAR = "singular"
     PLURAL = "plural"
     UNKNOWN = "unknown"
@@ -422,7 +426,7 @@ class TypeEnvironment:
             return self.platform in entry.contexts
         return True
 
-    def platforms_of(self, entries: list[inspectors.Inspector]) -> frozenset[str]:
+    def platforms_of(self, entries: Iterable[inspectors.Inspector]) -> frozenset[str]:
         return inspectors._contexts_of(entries) & self.universe
 
 
@@ -1033,30 +1037,115 @@ def _visible_rows(
     return rows
 
 
+@functools.lru_cache(maxsize=_VISIBLE_ROWS_CACHE_SIZE)
+def _visible_lookup(name: str, environment: TypeEnvironment) -> tuple[inspectors.Inspector, ...]:
+    """Every row of any kind ``name`` has that this dialect and platform can see.
+
+    What :func:`~bigfix_relevance_analyzer.analyzer.analyze` reports as a
+    reference's visible rows. It used to filter :func:`inspectors.lookup`
+    through :meth:`TypeEnvironment.visible` for every reference of every
+    statement, repeating work that depends only on these two arguments (#199).
+    Bounded and keyed as :func:`_visible_rows` is, for the same reasons.
+    """
+    return tuple(entry for entry in inspectors.lookup(name) if environment.visible(entry))
+
+
+_OPERATION_ROWS_CACHE_SIZE: Final = 4096
+"""How many keys each of :func:`_cast_rows`, :func:`_unary_rows` and
+:func:`_binary_rows` keeps.
+
+Bounded for :data:`_VISIBLE_ROWS_CACHE_SIZE`'s reason, and more so: the key
+carries operand *type sets*, which a long-lived language server sees an open
+number of. Real content repeats a few dozen (#199's 12 MB file is 6,060 tasks
+with the same handful of casts).
+"""
+
+
+@functools.lru_cache(maxsize=_OPERATION_ROWS_CACHE_SIZE)
+def _cast_rows(
+    target: str, types: frozenset[str], environment: TypeEnvironment
+) -> tuple[inspectors.Inspector, ...]:
+    """The visible ``as target`` rows that take any of ``types``.
+
+    Memoized because :meth:`_Checker.combine_cast` asked it once per cast
+    node, and ``as string`` alone filters ~50 rows each time (#199). It depends
+    on nothing else: the tables are fixed for the run, and ``environment``
+    hashes on exactly its ``(dialect, platform)`` -- see :func:`_visible_rows`.
+    """
+    return tuple(
+        entry
+        for entry in inspectors.lookup(target, kind=inspectors.InspectorKind.CAST)
+        if environment.visible(entry)
+        and entry.name == target
+        and any(_accepts(source, candidate) for candidate in types for source in entry.operands)
+    )
+
+
+@functools.lru_cache(maxsize=_OPERATION_ROWS_CACHE_SIZE)
+def _unary_rows(
+    operator: str, types: frozenset[str], environment: TypeEnvironment
+) -> tuple[inspectors.Inspector, ...]:
+    """The visible unary ``operator`` rows that take any of ``types``; see :func:`_cast_rows`."""
+    return tuple(
+        entry
+        for entry in inspectors.lookup(operator, kind=inspectors.InspectorKind.UNARY_OPERATOR)
+        if environment.visible(entry) and any(_accepts(o, t) for t in types for o in entry.operands)
+    )
+
+
+@functools.lru_cache(maxsize=_OPERATION_ROWS_CACHE_SIZE)
+def _binary_rows(
+    operator: str, lhs: frozenset[str], rhs: frozenset[str], environment: TypeEnvironment
+) -> tuple[inspectors.Inspector, ...]:
+    """The visible binary ``operator`` rows taking ``lhs`` on the left and
+    ``rhs`` on the right, already swapped for the operator's canonical form;
+    see :func:`_cast_rows`."""
+    return tuple(
+        entry
+        for entry in inspectors.lookup(operator, kind=inspectors.InspectorKind.BINARY_OPERATOR)
+        if environment.visible(entry)
+        and len(entry.operands) == 2
+        and any(_accepts(entry.operands[0], t) for t in lhs)
+        and any(_accepts(entry.operands[1], t) for t in rhs)
+    )
+
+
+_PROPERTY_CACHE_SIZE: Final = 4096
+"""How many ``(name, subject, environment, indexed)`` keys :func:`_matched_rows`
+and :func:`_property_reading` each keep -- bounded for
+:data:`_OPERATION_ROWS_CACHE_SIZE`'s reason: ``subject`` is a type set."""
+
+
+@functools.lru_cache(maxsize=_PROPERTY_CACHE_SIZE)
 def _matched_rows(
     name: str,
     subject: frozenset[str] | None,
     environment: TypeEnvironment,
     *,
     indexed: bool | None = None,
-) -> list[inspectors.Inspector] | None:
+) -> tuple[inspectors.Inspector, ...] | None:
     """The visible property rows ``name`` resolves to against ``subject``.
 
     ``None`` when no visible row carries the name at all -- the "not in this
     snapshot" case :func:`resolve_property` must keep distinct from an empty
     match, which *is* a finding. Parameters mean what they mean there.
+
+    Memoized (#199): a reference is resolved, recorded and sometimes retried
+    against the world, each asking this again, and the same names recur from
+    statement to statement. Every argument is hashable and immutable, and the
+    tables are fixed for the run.
     """
     rows = _visible_rows(name, environment, indexed)
     if not rows:
         return None
 
     if subject is None:
-        return [entry for entry in rows if not entry.operands]
-    return [
+        return tuple(entry for entry in rows if not entry.operands)
+    return tuple(
         entry
         for entry in rows
         if any(_accepts(operand, candidate) for candidate in subject for operand in entry.operands)
-    ]
+    )
 
 
 def _plural_alternative(
@@ -1076,7 +1165,7 @@ def _plural_alternative(
     tables, and only the multivalued ones can raise `Singular expression
     refers to non-unique object.`
     """
-    matched = _matched_rows(name, subject, environment, indexed=indexed) or []
+    matched = _matched_rows(name, subject, environment, indexed=indexed) or ()
     if not all(entry.multivalued for entry in matched):
         return None
     return _sole_plural(matched, name)
@@ -1098,10 +1187,10 @@ def _plural_spelling(
     hazard is not the question: `file "x" whose (...)` cannot collapse, and
     `files "x" whose (...)` is still the better shape.
     """
-    return _sole_plural(_matched_rows(name, subject, environment, indexed=indexed) or [], name)
+    return _sole_plural(_matched_rows(name, subject, environment, indexed=indexed) or (), name)
 
 
-def _sole_plural(matched: list[inspectors.Inspector], name: str) -> str | None:
+def _sole_plural(matched: Sequence[inspectors.Inspector], name: str) -> str | None:
     """The one plural name every row in ``matched`` agrees on, when it differs
     from the ``name`` written; ``None`` for no rows, disagreeing rows, or a
     name already plural."""
@@ -1157,14 +1246,37 @@ def resolve_property(
     declared on the base type, so ``size`` resolves for ``application`` only
     through ``application -> file``.
     """
+    # Part of a cache key below, so it must hash; callers used to be able to
+    # pass any collection of type names, since it was only ever iterated.
+    subject = None if subject is None else frozenset(subject)
+    reading = _property_reading(name, subject, environment, indexed)
+    if reading is None:
+        return RelevanceValue(types=None, platforms=environment.universe)
+    types, plurality, contexts = reading
+    # `platforms_of(matched)`, split: the contexts are cached, the universe is
+    # not, because `environment` hashes on (dialect, platform) alone.
+    return RelevanceValue(
+        types=types, plurality=plurality, platforms=contexts & environment.universe
+    )
+
+
+@functools.lru_cache(maxsize=_PROPERTY_CACHE_SIZE)
+def _property_reading(
+    name: str,
+    subject: frozenset[str] | None,
+    environment: TypeEnvironment,
+    indexed: bool | None,
+) -> tuple[frozenset[str], Plurality, frozenset[str]] | None:
+    """The part of :func:`resolve_property` that depends only on its arguments'
+    hashed halves: return types, written plurality, and the contexts that
+    define the matched rows. ``None`` when the name is not in the snapshot."""
     matched = _matched_rows(name, subject, environment, indexed=indexed)
     if matched is None:
-        return RelevanceValue(types=None, platforms=environment.universe)
-
-    return RelevanceValue(
-        types=frozenset(entry.return_type for entry in matched),
-        plurality=_written_plurality(name, matched),
-        platforms=environment.platforms_of(matched),
+        return None
+    return (
+        frozenset(entry.return_type for entry in matched),
+        _written_plurality(name, matched),
+        inspectors._contexts_of(matched),
     )
 
 
@@ -1363,12 +1475,9 @@ class _Checker:
             platforms=self.env.universe if platforms is None else platforms,
         )
 
-    def rows(self, entries: tuple[inspectors.Inspector, ...]) -> list[inspectors.Inspector]:
-        return [entry for entry in entries if self.env.visible(entry)]
-
     def from_rows(
         self,
-        rows: list[inspectors.Inspector],
+        rows: Sequence[inspectors.Inspector],
         *,
         plurality: Plurality,
         fallback_platforms: frozenset[str],
@@ -1868,7 +1977,7 @@ class _Checker:
         if index is None or index.types is None or not value.types:
             return value
         given = index.tuple_types | {name for name in index.types if name.startswith("(")}
-        rows = _matched_rows(node.phrase, subject, self.env, indexed=True) or []
+        rows = _matched_rows(node.phrase, subject, self.env, indexed=True) or ()
         if not rows:
             return value
 
@@ -2145,18 +2254,7 @@ class _Checker:
             return self.unknown()
         if _ruled_out(operand):
             return operand
-        rows = [
-            entry
-            for entry in self.rows(
-                inspectors.lookup(node.target, kind=inspectors.InspectorKind.CAST)
-            )
-            if entry.name == node.target
-            and any(
-                _accepts(source, candidate)
-                for candidate in operand.types
-                for source in entry.operands
-            )
-        ]
+        rows = _cast_rows(node.target, operand.types, self.env)
         if not rows:
             self.report(
                 "cast-not-defined",
@@ -2207,15 +2305,9 @@ class _Checker:
             self.check_version_comparison(node, form, left.types, right.types)
 
         lhs, rhs = (right, left) if form.swapped else (left, right)
-        rows = [
-            entry
-            for entry in self.rows(
-                inspectors.lookup(form.operator, kind=inspectors.InspectorKind.BINARY_OPERATOR)
-            )
-            if len(entry.operands) == 2
-            and any(_accepts(entry.operands[0], t) for t in lhs.types or frozenset())
-            and any(_accepts(entry.operands[1], t) for t in rhs.types or frozenset())
-        ]
+        rows = _binary_rows(
+            form.operator, lhs.types or frozenset(), rhs.types or frozenset(), self.env
+        )
         if not rows:
             self.report(
                 "binary-operator-not-defined",
@@ -2365,13 +2457,7 @@ class _Checker:
             return self.unknown()
         if _ruled_out(operand):
             return operand
-        rows = [
-            entry
-            for entry in self.rows(
-                inspectors.lookup(node.op, kind=inspectors.InspectorKind.UNARY_OPERATOR)
-            )
-            if any(_accepts(o, t) for t in operand.types for o in entry.operands)
-        ]
+        rows = _unary_rows(node.op, operand.types, self.env)
         if not rows:
             self.report(
                 "unary-operator-not-defined",

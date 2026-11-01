@@ -28,6 +28,9 @@ oprating = "oprating"
 # tests/golden/dialect_fit_corpus.json quotes every statement of both corpora,
 # tests/examples/ included, verbatim: same rationale, same exclusion.
 #
+# tests/golden/perf_equivalence.json is hex digests keyed by example file
+# names: a digest is not a word, and the names are the verbatim ones above.
+#
 # npm lockfiles are generated, and their integrity hashes and truncated
 # registry metadata produce false positives that cannot
 # be fixed in the file - regenerating it would just bring them back.
@@ -36,6 +39,7 @@ extend-exclude = [
     "tests/examples/**",
     "src/bigfix_relevance_analyzer/_inspector_data.py",
     "tests/golden/dialect_fit_corpus.json",
+    "tests/golden/perf_equivalence.json",
     "tools/playground-wasm/**/package-lock.json",
     "tools/vscode-extension/**/package-lock.json",
 ]

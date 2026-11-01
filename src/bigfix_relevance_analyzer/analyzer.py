@@ -57,7 +57,12 @@ from bigfix_relevance_analyzer.nodes import (
 )
 from bigfix_relevance_analyzer.parser import ParseError, _try_parse_lexed
 from bigfix_relevance_analyzer.tokenizer import Token, TokenKind, _lex
-from bigfix_relevance_analyzer.typecheck import CheckResult, TypeEnvironment, check
+from bigfix_relevance_analyzer.typecheck import (
+    CheckResult,
+    TypeEnvironment,
+    _visible_lookup,
+    check,
+)
 
 if TYPE_CHECKING:
     from bigfix_relevance_analyzer.autofix import AutofixResult, Guard
@@ -668,8 +673,8 @@ def _analyze(
         references = tuple(
             ReferenceReport(
                 reference=item,
-                matches=(matches := inspectors.lookup(item.phrase)),
-                visible=tuple(entry for entry in matches if environment.visible(entry)),
+                matches=inspectors.lookup(item.phrase),
+                visible=_visible_lookup(item.phrase, environment),
                 narrowed=checked.resolutions.get(id(item), ()),
             )
             for item in walk(node)

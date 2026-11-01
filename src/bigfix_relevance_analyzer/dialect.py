@@ -105,6 +105,10 @@ __all__ = ["Dialect", "DialectFit", "classify_relevance_dialect", "dialect_fit",
 class Dialect(enum.Enum):
     """Which relevance dialect a statement is written in."""
 
+    # Members are singletons compared by identity, so this agrees with
+    # equality; Enum's own hash is a Python frame on every set or dict probe (#199).
+    __hash__ = object.__hash__
+
     CLIENT = "client"
     """Client relevance, evaluated by the BES Client on an endpoint."""
 

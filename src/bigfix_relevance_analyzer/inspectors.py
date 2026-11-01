@@ -89,6 +89,10 @@ __all__ = [
 class WrittenForm(enum.Enum):
     """Which spelling of an inspector an expression used."""
 
+    # Members are singletons compared by identity, so this agrees with
+    # equality; Enum's own hash is a Python frame on every set or dict probe (#199).
+    __hash__ = object.__hash__
+
     SINGULAR = "singular"
     PLURAL = "plural"
     UNKNOWN = "unknown"
@@ -99,6 +103,10 @@ class WrittenForm(enum.Enum):
 
 class InspectorKind(enum.Enum):
     """Which introspection category a row came from."""
+
+    # Members are singletons compared by identity, so this agrees with
+    # equality; Enum's own hash is a Python frame on every set or dict probe (#199).
+    __hash__ = object.__hash__
 
     PROPERTY = "property"
     """A named property, e.g. ``windows of <operating system>``."""
