@@ -440,10 +440,10 @@ def test_scan_agrees_with_trying_every_lexeme_on_every_short_input() -> None:
 # #226: no code point crashes the scanner
 # ---------------------------------------------------------------------------
 
-# `str.isdigit()` is true for 128 `No` characters -- superscripts, subscripts,
-# circled digits -- that `\d` does not match. A NUMBER guard on `isdigit()`
-# handed them to a regex that then failed to match, and `.end()` on the `None`
-# raised. Escapes only, for the pre-commit reasons given at the top.
+# `str.isdigit()` is true for `No` characters (128 of them in Unicode 16) --
+# superscripts, subscripts, circled digits -- that `\d` does not match. A
+# NUMBER guard on `isdigit()` handed them to a regex that then failed to
+# match, and `.end()` on the `None` raised. Escapes only: see the note in `test_roundtrip`.
 _DIGIT_NOT_DECIMAL = "\u00b2\u00b3\u00b9\u2070\u2074\u2079\u2080\u2089\u2460\u1369\u19da"
 
 
