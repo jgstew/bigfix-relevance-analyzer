@@ -1,0 +1,93 @@
+tests/examples/client_relevance/properties/global_property_alert_hard_drive_free_space.bes:3: [plural-preferred] auto-fixed: name -> names (plural-preferred)
+tests/examples/client_relevance/properties/global_property_alert_hard_drive_free_space.bes:3: [plural-preferred] auto-fixed: free space -> free spaces (plural-preferred)
+tests/examples/client_relevance/properties/global_property_alert_hard_drive_free_space.bes:3: [plural-preferred] auto-fixed: type -> types (plural-preferred)
+tests/examples/client_relevance/properties/global_property_alert_hard_drive_free_space.bes:3: [plural-preferred] auto-fixed: total space -> total spaces (plural-preferred)
+tests/examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes:12: [plural-preferred] auto-fixed: node -> nodes (plural-preferred)
+tests/examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes:12: [plural-preferred] auto-fixed: service plane -> service planes (plural-preferred)
+tests/examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes:12: [plural-preferred] warning: 'key whose (...)' writes a filter on a singular spelling and errors when the filter matches nothing; prefer 'keys whose (...)' and, where a singular is required, 'unique value of' at the end of the chain (plural-preferred)
+tests/examples/client_relevance/tasks/task_time_based_relevance.bes:28: [plural-substitution] warning: BES/Task/DefaultAction/ActionScript is plural: the values are joined with no separator (`("a";"b")` gives `ab`, no values give an empty string) -- use `concatenation "<sep>" of (...)` if more than one is possible, or a tighter filter if exactly one is meant (plural-substitution)
+tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes:15: [plural-preferred] auto-fixed: site -> sites (plural-preferred)
+tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes:15: [plural-preferred] auto-fixed: site -> sites (plural-preferred)
+tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes:33: [plural-preferred] auto-fixed: folder -> folders (plural-preferred)
+tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes:33: [plural-preferred] auto-fixed: parent folder -> parent folders (plural-preferred)
+tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes:112: [plural-preferred] auto-fixed: folder -> folders (plural-preferred)
+tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes:112: [plural-preferred] auto-fixed: client folder -> client folders (plural-preferred)
+tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes:119: [plural-preferred] auto-fixed: folder -> folders (plural-preferred)
+tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes:119: [plural-preferred] auto-fixed: parent folder -> parent folders (plural-preferred)
+tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes:105: [plural-substitution] warning: BES/Fixlet/DefaultAction/ActionScript is plural: the values are joined with no separator (`("a";"b")` gives `ab`, no values give an empty string) -- use `concatenation "<sep>" of (...)` if more than one is possible, or a tighter filter if exactly one is meant (plural-substitution)
+tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes:105: [complexity] score 568 > 550 (token_count=325, max_paren_depth=8, unique_identifiers=41) (complexity)
+tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes:114: [plural-preferred] warning: 'file whose (...)' writes a filter on a singular spelling and errors when the filter matches nothing; prefer 'files whose (...)' and, where a singular is required, 'unique value of' at the end of the chain (plural-preferred)
+tests/golden/pre_commit_bigfix/notes.md:6: [unknown-inspector] warning: no dump defines `totally bogus made up inspector` (unknown-inspector)
+tests/golden/pre_commit_bigfix/notes.md:11: [parse-error] col 17: expected ')' to close the whose predicate (parse-error)
+tests/golden/pre_commit_bigfix/notes.md:14: [unterminated-code-fence] warning: this relevance code fence is never closed, so the relevance in it was not linted. Close it with a matching fence line (unterminated-code-fence)
+tests/golden/pre_commit_bigfix/page.html:4: [type-error] the operator '=' is not defined for the types '<string> = <integer>' (type-error)
+tests/golden/pre_commit_bigfix/page.html:6: [unterminated-processing-instruction] `<?Relevance` has no closing `?>` after it, so the relevance in it was not linted. Close it with `?>` (unterminated-processing-instruction)
+tests/golden/pre_commit_bigfix/task_errors.bes:8: [type-error] the operator '=' is not defined for the types '<integer> = <string>' (type-error)
+tests/golden/pre_commit_bigfix/task_errors.bes:9: [unknown-inspector] warning: no dump defines `totally bogus made up inspector` (unknown-inspector)
+tests/golden/pre_commit_bigfix/task_errors.bes:11: [unbound-it] `it` used with no context to bind to (unbound-it)
+tests/golden/pre_commit_bigfix/task_errors.bes:14: [parse-error] col 17: expected ')' to close the group opened here (parse-error)
+tests/golden/pre_commit_bigfix/task_errors.bes:15: [parse-error] col 13: unterminated string literal (parse-error)
+tests/golden/pre_commit_bigfix/task_errors.bes:15: [error-token] unlexable text '"unterminated' (error-token)
+tests/golden/pre_commit_bigfix/task_errors.bes:34: [unterminated-substitution] `{` opens a relevance substitution that is not closed on this line; the action fails here. Close it with `}` on the same line, or write `{{` for a literal brace (unterminated-substitution)
+tests/golden/pre_commit_bigfix/task_errors.bes:35: [plural-substitution] warning: BES/Task/DefaultAction/ActionScript is plural: the values are joined with no separator (`("a";"b")` gives `ab`, no values give an empty string) -- use `concatenation "<sep>" of (...)` if more than one is possible, or a tighter filter if exactly one is meant (plural-substitution)
+tests/golden/pre_commit_bigfix/whole_file.rel:2: [parse-error] col 7: expected an expression, found end of input (parse-error)
+tests/golden/pre_commit_bigfix_fix/crlf.rel:1: [plural-preferred] auto-fixed: setting -> settings (plural-preferred)
+tests/golden/pre_commit_bigfix_fix/fixable.bes:6: [plural-preferred] auto-fixed: setting -> settings (plural-preferred)
+tests/golden/pre_commit_bigfix_fix/fixable.bes:7: [plural-preferred] auto-fixed: setting -> settings (plural-preferred)
+tests/golden/pre_commit_bigfix_fix/fixable.bes:8: [singular-required] auto-fixed: names of files "z" -> unique value of names of files "z" (singular-required)
+tests/golden/pre_commit_bigfix_fix/fixable.bes:24: [plural-preferred] auto-fixed: setting -> settings (plural-preferred)
+tests/golden/pre_commit_bigfix_fix/partly_fixed.md:8: [plural-preferred] auto-fixed: setting -> settings (plural-preferred)
+tests/golden/pre_commit_bigfix_fix/partly_fixed.md:12: [singular-required] the left operand of '|' must be singular; wrapped in `unique value of`: this position requires a single value (singular-required)
+    suggested fix: (unique value of pathnames of files "x" | "y") = "z" and exists file "a0" and exists file "a1" and exists file "a2" and exists file "a3" and exists file "a4" and exists file "a5" and exists file "a6" and exists file "a7" and exists file "a8" and exists file "a9" and exists file "a10" and exists file "a11" and exists file "a12" and exists file "a13" and exists file "a14" and exists file "a15" and exists file "a16" and exists file "a17" and exists file "a18" and exists file "a19" and exists file "a20" and exists file "a21" and exists file "a22" and exists file "a23" and exists file "a24" and exists file "a25" and exists file "a26" and exists file "a27" and exists file "a28" and exists file "a29" and exists file "a30" and exists file "a31" and exists file "a32" and exists file "a33" and exists file "a34" and exists file "a35" and exists file "a36" and exists file "a37" and exists file "a38" and exists file "a39" and exists file "a40" and exists file "a41" and exists file "a42" and exists file "a43" and exists file "a44" and exists file "a45" and exists file "a46" and exists file "a47" and exists file "a48" and exists file "a49" and exists file "a50" and exists file "a51" and exists file "a52" and exists file "a53" and exists file "a54" and exists file "a55" and exists file "a56" and exists file "a57" and exists file "a58" and exists file "a59" and exists file "a60" and exists file "a61" and exists file "a62" and exists file "a63" and exists file "a64" and exists file "a65" and exists file "a66" and exists file "a67" and exists file "a68" and exists file "a69" and exists file "a70" and exists file "a71" and exists file "a72" and exists file "a73" and exists file "a74" and exists file "a75" and exists file "a76" and exists file "a77" and exists file "a78" and exists file "a79" and exists file "a80" (not auto-fixed: the fix would add a complexity finding)
+
+auto-fixed 20 issue(s); review and re-stage the changes.
+8 warning(s).
+12 issue(s).
+
+# bytes changed
+--- a/tests/examples/client_relevance/properties/global_property_alert_hard_drive_free_space.bes
++++ b/tests/examples/client_relevance/properties/global_property_alert_hard_drive_free_space.bes
+@@ -3 +3 @@
+-	<Property Name="Alert::Hard Drive - Less Than 10 Percent Free" EvaluationPeriod="PT1H"><![CDATA[exists ((free space of it)*100/(total space of it)) whose(it <= 10) of drives whose(exists name of it AND exists free space of it AND exists type of it AND exists total space of it AND type of it = "DRIVE_FIXED" AND total space of it != 0 AND total space of it > 1024*1024*1024)]]></Property>\r
++	<Property Name="Alert::Hard Drive - Less Than 10 Percent Free" EvaluationPeriod="PT1H"><![CDATA[exists ((free space of it)*100/(total space of it)) whose(it <= 10) of drives whose(exists names of it AND exists free spaces of it AND exists types of it AND exists total spaces of it AND type of it = "DRIVE_FIXED" AND total space of it != 0 AND total space of it > 1024*1024*1024)]]></Property>\r
+--- a/tests/examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes
++++ b/tests/examples/client_relevance/tasks/task_power_management_sleep_when_idle.bes
+@@ -12 +12 @@
+-		<Relevance>/* PowerManagement not applicable to Servers */ not exists it whose("Server" = it) of ( if (exists true whose(if true then exists device type else false ))then device type else(if (exists value of settings "_BESClient_DeviceTypeOverride" of client)then (value of setting "_BESClient_DeviceTypeOverride" of client)else(if(it starts with "Mac OS X")then(if(it contains "Server")then "Server" else (if(((exists key whose(it as string as lowercase contains "battery") of entries of dictionaries of nodes of it) OR (exists node "AppleACPIPlatformExpert/SMB0/AppleECSMBusController/AppleSmartBatteryManager" of service plane of iokit registry)of it)of service plane of iokit registry)then "Laptop" else "Desktop"))else(if (it starts with "Win")then (if (it as lowercase contains "mobile")then "Mobile" else(if (exists key "HKEY_LOCAL_MACHINE\HARDWARE\Description\System\BIOS" whose (value "SystemManufacturer" of it as string as lowercase contains "vmware") of registry)then "Server" else(if (nt workstation product type != product type of operating system)then "Server" else(if (exists active device whose (class of it as lowercase = "battery" AND service key value name of it as lowercase = "cmbatt" AND (description of it as lowercase contains "microsoft acpi" OR description of it as lowercase contains "acpi microsoft")))then "Laptop" else "Desktop"))))else(if (it contains "Linux" OR it contains "AIX" OR it contains "Sun" OR it contains "HP-UX" OR it contains "VMware") then ("Server") else(if((it contains "ios" OR it contains "android" OR it contains "ipad" OR it contains "iphone" OR it contains "ipod" OR it contains "smartphone" OR it contains "msft-" OR it contains "nokia" OR it contains "palm" OR it contains "pocketpc" OR it contains "htc")of(it as lowercase)) then "Mobile" else "Unknown")))))of name of operating system )</Relevance>\r
++		<Relevance>/* PowerManagement not applicable to Servers */ not exists it whose("Server" = it) of ( if (exists true whose(if true then exists device type else false ))then device type else(if (exists value of settings "_BESClient_DeviceTypeOverride" of client)then (value of setting "_BESClient_DeviceTypeOverride" of client)else(if(it starts with "Mac OS X")then(if(it contains "Server")then "Server" else (if(((exists key whose(it as string as lowercase contains "battery") of entries of dictionaries of nodes of it) OR (exists nodes "AppleACPIPlatformExpert/SMB0/AppleECSMBusController/AppleSmartBatteryManager" of service planes of iokit registry)of it)of service plane of iokit registry)then "Laptop" else "Desktop"))else(if (it starts with "Win")then (if (it as lowercase contains "mobile")then "Mobile" else(if (exists key "HKEY_LOCAL_MACHINE\HARDWARE\Description\System\BIOS" whose (value "SystemManufacturer" of it as string as lowercase contains "vmware") of registry)then "Server" else(if (nt workstation product type != product type of operating system)then "Server" else(if (exists active device whose (class of it as lowercase = "battery" AND service key value name of it as lowercase = "cmbatt" AND (description of it as lowercase contains "microsoft acpi" OR description of it as lowercase contains "acpi microsoft")))then "Laptop" else "Desktop"))))else(if (it contains "Linux" OR it contains "AIX" OR it contains "Sun" OR it contains "HP-UX" OR it contains "VMware") then ("Server") else(if((it contains "ios" OR it contains "android" OR it contains "ipad" OR it contains "iphone" OR it contains "ipod" OR it contains "smartphone" OR it contains "msft-" OR it contains "nokia" OR it contains "palm" OR it contains "pocketpc" OR it contains "htc")of(it as lowercase)) then "Mobile" else "Unknown")))))of name of operating system )</Relevance>\r
+--- a/tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes
++++ b/tests/examples/session_relevance/dynamic_javascript/fixlet_description_relevance_via_javascript.bes
+@@ -15 +15 @@
+-document.write("<p>CurrentConsoleUserHasWritePrivileges:  " + Relevance('exists explicit writers whose(it = current console user) of site of current fixlet OR exists explicit owners whose(it = current console user) of site of current fixlet') + "</p>" );\r
++document.write("<p>CurrentConsoleUserHasWritePrivileges:  " + Relevance('exists explicit writers whose(it = current console user) of sites of current fixlet OR exists explicit owners whose(it = current console user) of sites of current fixlet') + "</p>" );\r
+@@ -33 +33 @@
+-		<Relevance><![CDATA[not exists files whose(name of it starts with "RESTAPI_ImportedTasks_" AND name of it as lowercase ends with ".log" AND (now - modification time of it < 7*day) ) of folder "__BESData\__Global\Logs" of parent folder of client]]></Relevance>\r
++		<Relevance><![CDATA[not exists files whose(name of it starts with "RESTAPI_ImportedTasks_" AND name of it as lowercase ends with ".log" AND (now - modification time of it < 7*day) ) of folders "__BESData\__Global\Logs" of parent folders of client]]></Relevance>\r
+@@ -112 +112 @@
+-if{ (exists files "UninstallMSI_Tasks.bes" whose(exists contents whose(it contains "<Task>") of it) of folder "__Download" of client folder of current site) }\r
++if{ (exists files "UninstallMSI_Tasks.bes" whose(exists contents whose(it contains "<Task>") of it) of folders "__Download" of client folders of current site) }\r
+@@ -119 +119 @@
+-continue if{exists files whose((name of it = ("RESTAPI_ImportedTasks_" & (parameter "currentSiteName") & ".log")) AND exists lines whose(it contains "</Task>") of it) of folder "__BESData\__Global\Logs" of parent folder of client}\r
++continue if{exists files whose((name of it = ("RESTAPI_ImportedTasks_" & (parameter "currentSiteName") & ".log")) AND exists lines whose(it contains "</Task>") of it) of folders "__BESData\__Global\Logs" of parent folders of client}\r
+--- a/tests/golden/pre_commit_bigfix_fix/crlf.rel
++++ b/tests/golden/pre_commit_bigfix_fix/crlf.rel
+@@ -1 +1 @@
+-exists values of setting "x" of client\r
++exists values of settings "x" of client\r
+--- a/tests/golden/pre_commit_bigfix_fix/fixable.bes
++++ b/tests/golden/pre_commit_bigfix_fix/fixable.bes
+@@ -6,3 +6,3 @@
+-		<Relevance>exists values of setting "x" of client and 1 &lt; 2</Relevance>\r
+-		<Relevance><![CDATA[exists values of setting "y" of client]]></Relevance>\r
+-		<Relevance>exists ("a" &amp; names of files "z")</Relevance>\r
++		<Relevance>exists values of settings "x" of client and 1 &lt; 2</Relevance>\r
++		<Relevance><![CDATA[exists values of settings "y" of client]]></Relevance>\r
++		<Relevance>exists ("a" &amp; unique value of names of files "z")</Relevance>\r
+@@ -24 +24 @@
+-if {exists values of setting "w" of client}\r
++if {exists values of settings "w" of client}\r
+--- a/tests/golden/pre_commit_bigfix_fix/partly_fixed.md
++++ b/tests/golden/pre_commit_bigfix_fix/partly_fixed.md
+@@ -8 +8 @@
+-exists values of setting "x" of client
++exists values of settings "x" of client

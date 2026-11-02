@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<BES xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="BES.xsd">
+	<Task>
+		<Title>Fixable relevance - pre-commit-bigfix auto-fix golden</Title>
+		<Description><![CDATA[Inputs for tests/test_downstream_pre_commit_bigfix.py: every site here has a fix the hook writes with --auto-fix=yes.]]></Description>
+		<Relevance>exists values of setting "x" of client and 1 &lt; 2</Relevance>
+		<Relevance><![CDATA[exists values of setting "y" of client]]></Relevance>
+		<Relevance>exists ("a" &amp; names of files "z")</Relevance>
+		<Category></Category>
+		<Source>Internal</Source>
+		<SourceID>jgstew</SourceID>
+		<SourceReleaseDate>2026-11-01</SourceReleaseDate>
+		<SourceSeverity></SourceSeverity>
+		<CVENames></CVENames>
+		<SANSID></SANSID>
+		<Domain>BESC</Domain>
+		<DefaultAction ID="Action1">
+			<Description>
+				<PreLink>Click </PreLink>
+				<Link>here</Link>
+				<PostLink> to deploy this action.</PostLink>
+			</Description>
+			<ActionScript MIMEType="application/x-Fixlet-Windows-Shell"><![CDATA[
+if {exists values of setting "w" of client}
+	// nothing
+endif
+]]></ActionScript>
+			<SuccessCriteria Option="OriginalRelevance"></SuccessCriteria>
+		</DefaultAction>
+	</Task>
+</BES>
