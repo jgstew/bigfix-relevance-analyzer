@@ -174,7 +174,7 @@ wasm = [{ name = "componentize-py", specifier = "==0.25.1" }]
 
 [[package]]
 name = "bigfix-remote-client-relevance"
-version = "1.11.1"
+version = "1.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asyncssh", marker = "sys_platform != 'android' and sys_platform != 'ios'" },
@@ -189,9 +189,9 @@ dependencies = [
     { name = "typer" },
     { name = "zstandard", marker = "python_full_version < '3.14' and sys_platform != 'android' and sys_platform != 'ios'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8e/51/ce66d18dd8984a5eefab5f1bd0c88f6f400c4593acf3ffeffb5ec14f4709/bigfix_remote_client_relevance-1.11.1.tar.gz", hash = "sha256:da9f42432ba06bb7b755aef78f4281a8e21e2f8ce0b525ac9b3401bc836f377d", size = 548927, upload-time = "2026-10-30T15:33:46.548Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f9/8a/7641ff9cfdce780f4bdf3c32222cfc7aaae1560dc7e103e2be9409fc3caf/bigfix_remote_client_relevance-1.12.0.tar.gz", hash = "sha256:9cacfcf2206779db06ce7ce872cc16f75217a5e3859b6b780782f2672799ddab", size = 560948, upload-time = "2026-10-30T17:08:37.206Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/43/84/e192f2c06e3c98b525b11337cca850902606ae43723609620865b657c26e/bigfix_remote_client_relevance-1.11.1-py3-none-any.whl", hash = "sha256:c43bd987294628a34f449995550218773dd423c4e2c8d8888d5896fe2670224d", size = 180342, upload-time = "2026-10-30T15:33:44.933Z" },
+    { url = "https://files.pythonhosted.org/packages/45/4a/0fa398d77c6b0c8b6912a1436d54888cabb201d73cc24ae7fa9494165535/bigfix_remote_client_relevance-1.12.0-py3-none-any.whl", hash = "sha256:ba8dfec0c9ac6841ba6ee10ad57bd69c9e5f9ac2ed8b59c47131f8ba58b36705", size = 183304, upload-time = "2026-10-30T17:08:35.937Z" },
 ]
 
 [[package]]
