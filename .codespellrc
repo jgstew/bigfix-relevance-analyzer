@@ -42,7 +42,9 @@ ignore-words-list = thead,theads,oprating,wnidows,wit,notin
 # tests/examples/ included, verbatim: same again.
 # tests/golden/perf_equivalence.json is hex digests keyed by example file names:
 # a digest is not a word, and the names are the verbatim ones above.
+# tools/batchability/ quotes bigfix-content statements and qna's answers
+# verbatim, and its scores were measured on exactly that text: same again.
 # npm lockfiles are generated, and their integrity hashes and truncated
 # registry metadata produce false positives that cannot be
 # fixed in the file -- regenerating it would just bring them back.
-skip = tests/examples/**,src/bigfix_relevance_analyzer/_inspector_data.py,tests/golden/dialect_fit_corpus.json,tests/golden/perf_equivalence.json,tools/playground-wasm/**/package-lock.json,tools/vscode-extension/**/package-lock.json
+skip = tests/examples/**,src/bigfix_relevance_analyzer/_inspector_data.py,tests/golden/dialect_fit_corpus.json,tests/golden/perf_equivalence.json,tools/batchability/corpus.jsonl,tools/batchability/outcomes.jsonl,tools/batchability/scores.md,tools/playground-wasm/**/package-lock.json,tools/vscode-extension/**/package-lock.json

@@ -31,6 +31,10 @@ oprating = "oprating"
 # tests/golden/perf_equivalence.json is hex digests keyed by example file
 # names: a digest is not a word, and the names are the verbatim ones above.
 #
+# tools/batchability/ quotes 545 statements from bigfix-content verbatim, with
+# their file names and qna's answers to them (#225): same rationale, and
+# "fixing" one would also change what the pinned scores were measured on.
+#
 # npm lockfiles are generated, and their integrity hashes and truncated
 # registry metadata produce false positives that cannot
 # be fixed in the file - regenerating it would just bring them back.
@@ -40,6 +44,9 @@ extend-exclude = [
     "src/bigfix_relevance_analyzer/_inspector_data.py",
     "tests/golden/dialect_fit_corpus.json",
     "tests/golden/perf_equivalence.json",
+    "tools/batchability/corpus.jsonl",
+    "tools/batchability/outcomes.jsonl",
+    "tools/batchability/scores.md",
     "tools/playground-wasm/**/package-lock.json",
     "tools/vscode-extension/**/package-lock.json",
 ]

@@ -8,6 +8,13 @@ from bigfix_relevance_analyzer.analyzer import analyze as analyze_relevance
 from bigfix_relevance_analyzer.analyzer import analyze_to_dict as analyze_relevance_to_dict
 from bigfix_relevance_analyzer.autofix import AutofixResult
 from bigfix_relevance_analyzer.autofix import autofix as autofix_relevance
+from bigfix_relevance_analyzer.batchability import (
+    BATCH_RULES,
+    Batchability,
+    BatchabilityKind,
+    BatchReason,
+    batchability,
+)
 from bigfix_relevance_analyzer.binding import Binder, ItBinding, resolve_it_bindings
 from bigfix_relevance_analyzer.breakdown import (
     CountSummary,
@@ -126,11 +133,15 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 # moment it asks about a name.
 
 __all__ = [
+    "BATCH_RULES",
     "COST_RULES",
     "DIAGNOSTICS",
     "MAX_PARSE_DEPTH",
     "RULES",
     "AutofixResult",
+    "BatchReason",
+    "Batchability",
+    "BatchabilityKind",
     "Binder",
     "CheckResult",
     "CostRule",
@@ -182,6 +193,7 @@ __all__ = [
     "analyze_relevance_to_dict",
     "ancestors",
     "autofix_relevance",
+    "batchability",
     "breakdown_probes",
     "check_types",
     "classify_relevance_dialect",
