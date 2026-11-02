@@ -19,3 +19,8 @@
 # byte-for-byte (see tests/examples/relevance_inspectors/README.md) - including
 # the trailing tabs that carry meaning. Same reasoning.
 tests/examples/relevance_inspectors/*.txt -text diff
+
+# Inputs for tests/test_downstream_pre_commit_bigfix.py's auto-fix golden,
+# which pins every byte the hook changes in them, line endings included
+# (crlf.rel is CRLF on purpose). Same reasoning as the .bes rule above.
+tests/golden/pre_commit_bigfix_fix/** -text diff

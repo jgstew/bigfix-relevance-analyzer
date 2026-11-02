@@ -115,7 +115,9 @@ HOOK_RULES = frozenset(
 )
 
 # The hook switches xml-parse-error off unless a repo enables it (its
-# DEFAULT_DISABLED), so that is the configuration its users run by default.
+# DEFAULT_DISABLED). Since pre-commit-bigfix 2.3.0 it switches W601
+# (non-unique-risk) off the same way; the golden run passes --enable W601, so
+# this is the configuration that golden pins across hook releases.
 HOOK_DEFAULT_SEVERITIES = {"xml-parse-error": Severity.IGNORE}
 
 
@@ -399,9 +401,9 @@ def test_the_real_hook_prints_the_golden_report() -> None:
     Its E/W-codes become rule names for the comparison, the one difference the
     copy makes on purpose; and its closing count lines are left out.
 
-    ``--enable W601`` is a no-op on today's hook, which disables W601 in its
-    hook declaration rather than its code; once the auto-fix release moves that
-    into its code (#115 Part B), this keeps the golden the same across both.
+    ``--enable W601`` is a no-op on hooks before 2.3.0, which disable W601 in
+    their hook declaration, and switches it back on from 2.3.0, which disables
+    it in code (#115 Part B); either way the golden stays the same.
     No ``--auto-fix`` is passed, so this also pins that the default never
     writes.
     """
@@ -486,6 +488,7 @@ def test_the_real_hook_auto_fixes_as_the_golden_says(tmp_path: Path) -> None:
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             status = hook.main(["--auto-fix=yes", *files])
+        fixed_once = {name: (tmp_path / name).read_bytes() for name in files}
         again = io.StringIO()
         with contextlib.redirect_stdout(again):
             hook.main(["--auto-fix=yes", *files])
@@ -493,7 +496,9 @@ def test_the_real_hook_auto_fixes_as_the_golden_says(tmp_path: Path) -> None:
         os.chdir(previous)
 
     assert status == 1  # anything auto-fixed fails the hook, for review
+    # idempotent: a second run finds nothing to write, and writes nothing
     assert "auto-fixed: " not in again.getvalue().replace("not auto-fixed: ", "")
+    assert {name: (tmp_path / name).read_bytes() for name in files} == fixed_once
     report = _as_rules(hook, output.getvalue())
     diff = [
         line
