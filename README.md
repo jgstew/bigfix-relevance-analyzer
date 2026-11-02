@@ -18,6 +18,8 @@ safe fixes.
 | [Command Line `uvx`](#command-line-via-uvx) | Analyse one statement, or lint files, with nothing installed |
 | [pre-commit hook](#pre-commit-hook) | Lint the relevance in a BigFix content repo on every commit |
 | [Python library](#python-library) | `import` it from PyPI into your own tool |
+| [bigfix-root-mcp](https://github.com/jgstew/bigfix-root-mcp) | An MCP server for AI agents: an `analyze_relevance` tool, static analysis of every query before it reaches the root server, and the language reference as resources |
+| [Language server](#language-server) | `uvx --from bigfix-relevance-analyzer bigfix-relevance-lsp`: diagnostics, hover, completion, quick fixes and semantic tokens over stdio, for any LSP editor |
 
 ### Browser playground
 
