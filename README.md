@@ -12,6 +12,7 @@ safe fixes.
 | --- | --- |
 | [Browser playground](#browser-playground) | Paste relevance into a self-contained [web page](https://www.jgstew.com/files/bigfix-relevance-analyzer-playground.html); nothing to install, nothing sent anywhere |
 | [VS Code extension](#vs-code-extension) | Diagnostics, hover, completion and quick fixes [as you type](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer) |
+| [Relevance debugger](https://github.com/jgstew/bigfix-relevance-debugger) | `uvx bigfix-relevance-debugger` opens a browser GUI with the analyzer's editor, live analysis, and evaluation through qna, the REST API, BigFix Explorer or Web Reports |
 | BigFix WebUI app | [relevance-query.webui](https://github.com/jgstew/bigfix-site-webui-jgstew/tree/main/ServerFiles) evaluates session relevance, or client relevance as a BigFix Query, with the analyzer's editor |
 | BigFix Web Report | [relevance-debugger-webreport.beswrpt](https://github.com/jgstew/bigfix-site-reporting-jgstew/tree/main/ServerFiles) runs session relevance in Web Reports with the analyzer's editor |
 | [Command Line `uvx`](#command-line-via-uvx) | Analyse one statement, or lint files, with nothing installed |
