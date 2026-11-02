@@ -34,10 +34,13 @@ release notes, and change pre-commit-bigfix to match if it needs to.
 Precise diagnostic ranges (issue #96, item 1) are planned to leave all of it
 alone: ``Finding.line`` keeps its meaning, and anything new is additive.
 
-The hook's opt-in auto-fix (#115, Part B) will also call ``plan_fix`` and
-``write_fix``, check a ``FixPlan`` against BES.xsd between the two, and name
-its own code per change from ``TextEdit.rule``. That surface is pinned here
-before the hook ships it.
+The hook's opt-in auto-fix (#115, Part B; pre-commit-bigfix 2.3.0) also
+calls ``plan_fix`` and ``write_fix``, checks a ``FixPlan`` against BES.xsd
+between the two, and names its own code per change from ``TextEdit.rule``.
+That surface is pinned here, and a second golden,
+``pre_commit_bigfix_fix_report.txt``, pins what ``--auto-fix=yes`` prints and
+writes over copies of the same files plus the fixable fixtures in
+``tests/golden/pre_commit_bigfix_fix/``. It skips until the hook has the flag.
 
 A deliberate change to the output (a reworded message, say) regenerates the
 golden, and its diff is exactly what the hook's users will see::
@@ -54,6 +57,7 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
+import difflib
 import importlib
 import inspect
 import io
@@ -415,6 +419,103 @@ def test_the_real_hook_prints_the_golden_report() -> None:
             line = line.replace(f": [{code}] ", f": [{rule}] ", 1)
         lines.append(line)
     assert "".join(f"{line}\n" for line in lines) == GOLDEN.read_text(encoding="utf-8")
+
+
+FIX_FIXTURES = Path("tests/golden/pre_commit_bigfix_fix")
+FIX_GOLDEN = REPO_ROOT / "tests" / "golden" / "pre_commit_bigfix_fix_report.txt"
+
+
+def _fix_files() -> list[str]:
+    """The auto-fix golden's inputs: the report's, plus fixtures with a fix in
+    every file type and container the hook writes into."""
+    with _in_repo_root():
+        fixable = sorted(
+            str(path) for path in FIX_FIXTURES.rglob("*") if path.is_file() and _is_recognized(path)
+        )
+    return [*_example_files(), *fixable]
+
+
+def _as_rules(hook: Any, output: str) -> list[str]:
+    """The hook's lines with its E/W-codes turned back into rule names, as the
+    report golden compares them; the hook's own guard code has no rule and stays."""
+    rules_by_code = {code: rule for rule, code in hook.CODES.items()}
+    lines = []
+    for line in output.splitlines():
+        for code, rule in rules_by_code.items():
+            line = line.replace(f": [{code}] ", f": [{rule}] ", 1)
+        lines.append(line)
+    return lines
+
+
+def _byte_diff(before: bytes, after: bytes, path: str) -> list[str]:
+    """``before`` -> ``after`` as a unified diff with no context, every byte
+    shown: a ``\\r`` is printed as one, so a lost CRLF cannot hide."""
+
+    def lines(data: bytes) -> list[str]:
+        text = data.decode("utf-8", "backslashreplace")
+        return [line.replace("\r", "\\r") for line in text.split("\n")]
+
+    return list(
+        difflib.unified_diff(
+            lines(before), lines(after), f"a/{path}", f"b/{path}", n=0, lineterm=""
+        )
+    )
+
+
+def test_the_real_hook_auto_fixes_as_the_golden_says(tmp_path: Path) -> None:
+    """``bes-relevance-lint --auto-fix=yes``, the config a repo opts in with,
+    over copies of the report's files plus fixable fixtures (#115, golden 32).
+
+    Pinned: every ``auto-fixed`` line, the ``suggested fix: ... (not
+    auto-fixed: ...)`` left where a fix was refused, the findings reported
+    after the fix, the footer, and the bytes changed in each file. A second
+    run must find nothing left to write. Skipped until the hook has
+    ``--auto-fix`` (pre-commit-bigfix 2.3.0).
+    """
+    hook = _hook_module()
+    if not hasattr(hook, "write_fix"):
+        pytest.skip("this pre-commit-bigfix predates bes-relevance-lint --auto-fix (#115 Part B)")
+    files = _fix_files()
+    for name in files:
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_bytes((REPO_ROOT / name).read_bytes())
+
+    previous = Path.cwd()
+    os.chdir(tmp_path)
+    try:
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            status = hook.main(["--auto-fix=yes", *files])
+        again = io.StringIO()
+        with contextlib.redirect_stdout(again):
+            hook.main(["--auto-fix=yes", *files])
+    finally:
+        os.chdir(previous)
+
+    assert status == 1  # anything auto-fixed fails the hook, for review
+    assert "auto-fixed: " not in again.getvalue().replace("not auto-fixed: ", "")
+    report = _as_rules(hook, output.getvalue())
+    diff = [
+        line
+        for name in files
+        for line in _byte_diff(
+            (REPO_ROOT / name).read_bytes(), (tmp_path / name).read_bytes(), name
+        )
+    ]
+    actual = "".join(f"{line}\n" for line in [*report, "", "# bytes changed", *diff])
+    assert actual == golden_text(FIX_GOLDEN, actual)
+
+
+def test_the_auto_fix_golden_covers_every_kind_of_line() -> None:
+    expected = FIX_GOLDEN.read_text(encoding="utf-8")
+    assert "] auto-fixed: " in expected
+    assert ": [plural-preferred] auto-fixed: " in expected
+    assert ": [singular-required] auto-fixed: " in expected
+    assert "(not auto-fixed: the fix would add a complexity finding)" in expected
+    assert "review and re-stage the changes." in expected
+    for fixture in ("fixable.bes", "partly_fixed.md", "crlf.rel"):
+        assert f"+++ b/{FIX_FIXTURES / fixture}" in expected, fixture
+    assert "\\r" in expected  # CRLF kept, and visible
 
 
 # ---------------------------------------------------------------------------
