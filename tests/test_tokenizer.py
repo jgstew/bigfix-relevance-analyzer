@@ -434,3 +434,54 @@ def test_scan_agrees_with_trying_every_lexeme_on_every_short_input() -> None:
             assert _scan(text, 0) == (kind, end), text
             # And not only at offset 0: `_scan` reads from `at`.
             assert _scan("x" + text, 1) == (kind, end + 1), text
+
+
+# ---------------------------------------------------------------------------
+# #226: no code point crashes the scanner
+# ---------------------------------------------------------------------------
+
+# `str.isdigit()` is true for `No` characters (128 of them in Unicode 16) --
+# superscripts, subscripts, circled digits -- that `\d` does not match. A
+# NUMBER guard on `isdigit()` handed them to a regex that then failed to
+# match, and `.end()` on the `None` raised. Escapes only: see the note in `test_roundtrip`.
+_DIGIT_NOT_DECIMAL = "\u00b2\u00b3\u00b9\u2070\u2074\u2079\u2080\u2089\u2460\u1369\u19da"
+
+
+@pytest.mark.parametrize("char", _DIGIT_NOT_DECIMAL)
+@pytest.mark.parametrize("template", ["{}", "1{}", "x = {}", "1{}{}", '"a" & {}'])
+def test_a_digit_that_is_not_decimal_lexes_without_raising(template: str, char: str) -> None:
+    text = template.format(char, char)
+    assert "".join(token.text for token in tokenize(text)) == text
+    assert list(code_tokens(text))
+
+
+def test_a_digit_that_is_not_decimal_is_not_a_number() -> None:
+    """`1` then the superscript as a word, the way `x` + superscript already
+    lexes as one word: only the code point that crashed changes."""
+    assert kinds_and_texts("1\u00b2") == [(NUMBER, "1"), (WORD, "\u00b2")]
+    assert kinds_and_texts("\u00b2\u00b2") == [(WORD, "\u00b2\u00b2")]
+    assert kinds_and_texts("x\u00b2") == [(WORD, "x\u00b2")]
+    # A decimal digit outside ASCII is untouched by #226 (still a NUMBER).
+    assert kinds_and_texts("\u0663") == [(NUMBER, "\u0663")]
+
+
+def test_every_code_point_scans_without_raising_at_a_token_start_and_after_a_digit() -> None:
+    """The whole of Unicode, through the scanner directly (about a second):
+    alone, and after a digit run so a NUMBER branch has to stop at it."""
+    from bigfix_relevance_analyzer.tokenizer import _scan
+
+    for cp in range(0x110000):
+        char = chr(cp)
+        assert _scan(char, 0)[1] > 0, hex(cp)
+        assert _scan("1" + char, 1)[1] > 1, hex(cp)
+
+
+def test_every_digit_like_code_point_roundtrips_through_tokenize() -> None:
+    """The full public path, for every code point either digit predicate
+    claims: alone and after a digit."""
+    for cp in range(0x110000):
+        char = chr(cp)
+        if not (char.isdigit() or char.isdecimal() or char.isnumeric()):
+            continue
+        for text in (char, "1" + char, char + "1"):
+            assert "".join(token.text for token in tokenize(text)) == text, hex(cp)

@@ -252,8 +252,10 @@ def _scan(text: str, at: int) -> tuple[TokenKind, int]:
     """
     char = text[at]
 
-    if char.isspace():
-        return TokenKind.WHITESPACE, _WHITESPACE_RE.match(text, at).end()  # type: ignore[union-attr]
+    # `isspace` and `\s` agree on every code point; the match is still checked
+    # rather than assumed, for the reason given at the NUMBER branch below.
+    if char.isspace() and (space := _WHITESPACE_RE.match(text, at)):
+        return TokenKind.WHITESPACE, space.end()
 
     if text.startswith("/*", at):
         # Non-nesting, matching `dialect._NOT_CODE_RE`: the comment ends at the
@@ -268,8 +270,14 @@ def _scan(text: str, at: int) -> tuple[TokenKind, int]:
         end = text.find('"', at + 1)
         return (TokenKind.STRING, end + 1) if end != -1 else (TokenKind.ERROR, len(text))
 
-    if char.isdigit():
-        return TokenKind.NUMBER, _NUMBER_RE.match(text, at).end()  # type: ignore[union-attr]
+    # `isdecimal`, not `isdigit`: `\d` in a str pattern matches exactly the
+    # decimal digits, while `isdigit` also claims superscripts, subscripts
+    # and circled digits the regex then fails on (#226). Those fall through to
+    # a WORD, as one already does mid-word (`x` + superscript two). The walrus
+    # rather than a `type: ignore` means any future disagreement between the
+    # two also falls through instead of raising.
+    if char.isdecimal() and (number := _NUMBER_RE.match(text, at)):
+        return TokenKind.NUMBER, number.end()
 
     for lexeme in _PUNCTUATION_BY_FIRST.get(char, ()):
         if text.startswith(lexeme, at):

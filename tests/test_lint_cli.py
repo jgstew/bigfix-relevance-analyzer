@@ -741,3 +741,17 @@ def test_markdown_says_so_when_nothing_was_found(capsys: pytest.CaptureFixture[s
 def test_json_and_markdown_are_mutually_exclusive() -> None:
     with pytest.raises(SystemExit):
         main(["--json", "--markdown", "name of operating system"])
+
+
+def test_a_digit_that_is_not_decimal_is_reported_and_the_run_goes_on(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """#226: a superscript crashed the tokenizer and the traceback aborted the
+    whole run, losing every other file's findings."""
+    odd = write(tmp_path, "odd.rel", "1\u00b2\n")
+    broken = write(tmp_path, "broken.rel", BROKEN)
+
+    assert main([str(odd), str(broken)]) == 1
+    out = capsys.readouterr().out
+    assert f"{odd}:1: error [parse-error]" in out
+    assert f"{broken}:1: error [parse-error]" in out
