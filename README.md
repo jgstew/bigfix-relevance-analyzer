@@ -1001,6 +1001,15 @@ or in the way. What genuinely has to agree between them is the *value* schema -
 the key names in a payload, and the words used to explain a finding - and that
 is what is provided.
 
+For a working example, see
+[bigfix-root-mcp](https://github.com/jgstew/bigfix-root-mcp), a read-only MCP
+server around `besapi`. Its `analyze_relevance` tool serves the analysis
+offline, never evaluating the relevance. Every relevance-taking tool also runs the
+analyzer over its relevance before sending it, and adds the findings as an
+advisory: the query still goes to the server. The client and session language
+references from [`reference.documents()`](#language-reference-resources) are served
+as MCP resources.
+
 ### Every result type serializes
 
 `RelevanceAnalysis.to_dict()` was always the wire format. Now every type a
