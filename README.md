@@ -11,9 +11,9 @@ safe fixes.
 | Where | What you get |
 | --- | --- |
 | [Browser playground](#browser-playground) | Paste relevance into a self-contained [web page](https://www.jgstew.com/files/bigfix-relevance-analyzer-playground.html); nothing to install, nothing sent anywhere |
+| [VS Code extension](#vs-code-extension) | Diagnostics, hover, completion and quick fixes [as you type](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer) |
 | BigFix WebUI app | [relevance-query.webui](https://github.com/jgstew/bigfix-site-webui-jgstew/tree/main/ServerFiles) evaluates session relevance, or client relevance as a BigFix Query, with the analyzer's editor |
 | BigFix Web Report | [relevance-debugger-webreport.beswrpt](https://github.com/jgstew/bigfix-site-reporting-jgstew/tree/main/ServerFiles) runs session relevance in Web Reports with the analyzer's editor |
-| [VS Code extension](#vs-code-extension) | Diagnostics, hover, completion and quick fixes [as you type](https://marketplace.visualstudio.com/items?itemName=jgstew.bigfix-relevance-developer) |
 | [Command Line `uvx`](#command-line-via-uvx) | Analyse one statement, or lint files, with nothing installed |
 | [pre-commit hook](#pre-commit-hook) | Lint the relevance in a BigFix content repo on every commit |
 | [Python library](#python-library) | `import` it from PyPI into your own tool |
